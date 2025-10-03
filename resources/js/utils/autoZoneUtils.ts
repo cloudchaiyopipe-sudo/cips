@@ -1076,7 +1076,6 @@ export const createVoronoiZones = (
 
             // ตรวจสอบว่าโซนยังใช้ได้
             if (zoneCoordinates.length < 3) {
-
                 // Fallback: ใช้ convex hull ของ cluster
                 const plantPositions = cluster.map((plant) => plant.position);
                 const fallbackZone = convexHull(plantPositions);
@@ -1170,7 +1169,6 @@ export const createVoronoiZones = (
 
         // Validate that zone is valid
         if (zoneCoordinates.length < 3) {
-
             // Fallback to buffered plant positions
             const plantPositions = cluster.map((plant) => plant.position);
             const fallbackZone = createFallbackZone(plantPositions, mainArea, 10); // 10m buffer
@@ -1966,10 +1964,10 @@ export const createAutomaticZones = (
         }
 
         // Fix zone overlaps if detected
-        if (validation.errors.some(error => error.includes('พื้นที่ทับซ้อนกัน'))) {
+        if (validation.errors.some((error) => error.includes('พื้นที่ทับซ้อนกัน'))) {
             console.log('🔧 Fixing zone overlaps...');
             zones = fixZoneOverlaps(zones, mainArea);
-            
+
             // Re-validate after fixing
             const revalidation = validateZones(zones, mainArea);
             if (config.debugMode) {
@@ -2387,89 +2385,97 @@ const hasPolygonSelfIntersection = (polygon: Coordinate[]): boolean => {
 
 // Function to fix zone overlaps by adjusting zone boundaries
 const fixZoneOverlaps = (zones: IrrigationZone[], mainArea: Coordinate[]): IrrigationZone[] => {
-    const fixedZones = zones.map(zone => ({ ...zone }));
-    
+    const fixedZones = zones.map((zone) => ({ ...zone }));
+
     // For each pair of zones, check and fix overlaps
     for (let i = 0; i < fixedZones.length; i++) {
         for (let j = i + 1; j < fixedZones.length; j++) {
             const zone1 = fixedZones[i];
             const zone2 = fixedZones[j];
-            
+
             // Check if zones overlap
             if (checkPolygonIntersection(zone1.coordinates, zone2.coordinates)) {
                 console.log(`🔧 Fixing overlap between zone ${i + 1} and zone ${j + 1}`);
-                
+
                 // Create a buffer between zones by shrinking each zone slightly
                 const bufferDistance = 0.00001; // ~1 meter buffer
-                
+
                 // Shrink zone1
                 fixedZones[i].coordinates = shrinkPolygon(zone1.coordinates, bufferDistance);
-                
+
                 // Shrink zone2
                 fixedZones[j].coordinates = shrinkPolygon(zone2.coordinates, bufferDistance);
-                
+
                 // Ensure zones are still within main area
-                fixedZones[i].coordinates = clipPolygonToMainArea(fixedZones[i].coordinates, mainArea);
-                fixedZones[j].coordinates = clipPolygonToMainArea(fixedZones[j].coordinates, mainArea);
-                
+                fixedZones[i].coordinates = clipPolygonToMainArea(
+                    fixedZones[i].coordinates,
+                    mainArea
+                );
+                fixedZones[j].coordinates = clipPolygonToMainArea(
+                    fixedZones[j].coordinates,
+                    mainArea
+                );
+
                 // Reassign plants to the closest zone
                 const allPlants = [...zone1.plants, ...zone2.plants];
                 const zone1Center = getPolygonCenter(fixedZones[i].coordinates);
                 const zone2Center = getPolygonCenter(fixedZones[j].coordinates);
-                
+
                 fixedZones[i].plants = [];
                 fixedZones[j].plants = [];
-                
-                allPlants.forEach(plant => {
+
+                allPlants.forEach((plant) => {
                     const distToZone1 = calculateDistance(plant.position, zone1Center);
                     const distToZone2 = calculateDistance(plant.position, zone2Center);
-                    
+
                     if (distToZone1 < distToZone2) {
                         fixedZones[i].plants.push(plant);
                     } else {
                         fixedZones[j].plants.push(plant);
                     }
                 });
-                
+
                 // Recalculate water needs
                 fixedZones[i].totalWaterNeed = fixedZones[i].plants.reduce(
-                    (sum, plant) => sum + plant.plantData.waterNeed, 0
+                    (sum, plant) => sum + plant.plantData.waterNeed,
+                    0
                 );
                 fixedZones[j].totalWaterNeed = fixedZones[j].plants.reduce(
-                    (sum, plant) => sum + plant.plantData.waterNeed, 0
+                    (sum, plant) => sum + plant.plantData.waterNeed,
+                    0
                 );
             }
         }
     }
-    
+
     return fixedZones;
 };
 
 // Helper function to shrink a polygon by a given distance
 const shrinkPolygon = (polygon: Coordinate[], distance: number): Coordinate[] => {
     if (polygon.length < 3) return polygon;
-    
+
     // Calculate the centroid
     const centroid = getPolygonCenter(polygon);
-    
+
     // Shrink each vertex towards the centroid
-    return polygon.map(vertex => {
+    return polygon.map((vertex) => {
         const direction = {
             lat: vertex.lat - centroid.lat,
-            lng: vertex.lng - centroid.lng
+            lng: vertex.lng - centroid.lng,
         };
-        
+
         const length = Math.sqrt(direction.lat * direction.lat + direction.lng * direction.lng);
         if (length === 0) return vertex;
-        
+
         const normalized = {
             lat: direction.lat / length,
-            lng: direction.lng / length
+            lng: direction.lng / length,
         };
-        
+
         return {
             lat: vertex.lat - normalized.lat * distance,
-            lng: vertex.lng - normalized.lng * distance
+            lng: vertex.lng - normalized.lng * distance,
         };
     });
 };

@@ -121,11 +121,7 @@ const calculatePipeLength = (coordinates: { lat: number; lng: number }[]): numbe
     return totalLength;
 };
 
-import {
-    loadSprinklerConfig,
-    calculateTotalFlowRate,
-} from '../utils/sprinklerUtils';
-
+import { loadSprinklerConfig, calculateTotalFlowRate } from '../utils/sprinklerUtils';
 
 const createAreaTextOverlay = (
     map: google.maps.Map,
@@ -882,7 +878,9 @@ const GoogleMapsResultsOverlays: React.FC<{
 
 // ฟังก์ชันสร้าง emitterLines สำหรับ lateral pipes ที่มีอยู่แล้ว
 // 🔧 แก้ไขให้สร้างเฉพาะ placementMode: 'between_plants' เท่านั้น
-const generateEmitterLinesForExistingPipes = (lateralPipe: LocalLateralPipe): LocalEmitterLine[] => {
+const generateEmitterLinesForExistingPipes = (
+    lateralPipe: LocalLateralPipe
+): LocalEmitterLine[] => {
     // ⚠️ สร้างเฉพาะโหมด 'between_plants' เท่านั้น
     if (
         !lateralPipe.plants ||
@@ -1153,7 +1151,6 @@ function EnhancedHorticultureResultsPageContent() {
                     // Recalculate enhanced stats after loading sprinkler config
                     const updatedStats = getOverallStats();
                     setEnhancedStats(updatedStats);
-
                 } else {
                     // No enhanced stats available
                 }
@@ -1256,20 +1253,23 @@ function EnhancedHorticultureResultsPageContent() {
         router.visit('/horticulture/planner');
     };
 
-    const handleMapLoad = useCallback((map: google.maps.Map) => {
-        mapRef.current = map;
-        setMapLoaded(true);
-        
-        // ตั้งค่า map options ตาม isMapLocked state เริ่มต้น
-        if (isMapLocked) {
-            map.setOptions({
-                draggable: false,
-                zoomControl: false,
-                scrollwheel: false,
-                disableDoubleClickZoom: true,
-            });
-        }
-    }, [isMapLocked]);
+    const handleMapLoad = useCallback(
+        (map: google.maps.Map) => {
+            mapRef.current = map;
+            setMapLoaded(true);
+
+            // ตั้งค่า map options ตาม isMapLocked state เริ่มต้น
+            if (isMapLocked) {
+                map.setOptions({
+                    draggable: false,
+                    zoomControl: false,
+                    scrollwheel: false,
+                    disableDoubleClickZoom: true,
+                });
+            }
+        },
+        [isMapLocked]
+    );
 
     // Enhanced feature handlers
     // const handleHeadLossCalculation = (pipeInfo: {
@@ -1419,8 +1419,11 @@ function EnhancedHorticultureResultsPageContent() {
                 localStorage.setItem('projectType', 'horticulture');
 
                 // ส่งข้อมูลระบบหัวฉีดและโซนสำหรับ product page
-                localStorage.setItem('projectDataIrrigationZones', JSON.stringify(projectData?.irrigationZones));
-                
+                localStorage.setItem(
+                    'projectDataIrrigationZones',
+                    JSON.stringify(projectData?.irrigationZones)
+                );
+
                 console.log('Debug handleExportMapToProduct:', {
                     enhancedStats: enhancedStats,
                     sprinklerFlowRate: enhancedStats?.sprinklerFlowRate,
@@ -1581,7 +1584,8 @@ function EnhancedHorticultureResultsPageContent() {
                                           waterPerTree: 0,
                                           waterNeedPerMinute: calculateTotalFlowRate(
                                               projectData.plants ? projectData.plants.length : 0,
-                                              enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
+                                              enhancedStats?.sprinklerFlowRate?.flowRatePerPlant ||
+                                                  2.5
                                           ),
                                           area: projectData.totalArea || 0,
                                           color: '#22c55e',
@@ -2355,7 +2359,8 @@ function EnhancedHorticultureResultsPageContent() {
                                         <h4 className="mb-3 text-lg font-semibold text-cyan-300">
                                             🚿 {t('ข้อมูลระบบหัวฉีดของพื้นที่รวมทั้ังหมด')} (แรงดัน{' '}
                                             {enhancedStats?.sprinklerFlowRate.pressureBar} บาร์ /
-                                            รัศมี {enhancedStats?.sprinklerFlowRate.radiusMeters} ม.)
+                                            รัศมี {enhancedStats?.sprinklerFlowRate.radiusMeters}{' '}
+                                            ม.)
                                         </h4>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <div className="text-center">
@@ -2903,6 +2908,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                                           {formatDistance(
                                                                                                               bestMain.length
                                                                                                           )}
+
                                                                                                           ,
                                                                                                           เชื่อม{' '}
                                                                                                           {
@@ -2967,6 +2973,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                                           {formatDistance(
                                                                                                               bestSubMain.length
                                                                                                           )}
+
                                                                                                           ,
                                                                                                           เชื่อม{' '}
                                                                                                           {
@@ -3030,6 +3037,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                                           {formatDistance(
                                                                                                               bestBranch.length
                                                                                                           )}
+
                                                                                                           ,
                                                                                                           ให้น้ำ{' '}
                                                                                                           {
@@ -3200,7 +3208,10 @@ function EnhancedHorticultureResultsPageContent() {
                                                                               </span>
                                                                               <div className="font-bold text-cyan-400">
                                                                                   {zone.plantCount *
-                                                                                      (enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5)}{' '}
+                                                                                      (enhancedStats
+                                                                                          ?.sprinklerFlowRate
+                                                                                          ?.flowRatePerPlant ||
+                                                                                          2.5)}{' '}
                                                                                   ลิตร/นาที
                                                                               </div>
                                                                           </div>

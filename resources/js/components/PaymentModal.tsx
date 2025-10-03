@@ -23,7 +23,7 @@ export default function PaymentModal({
     months,
     amount,
     tokens,
-    onSubmit
+    onSubmit,
 }: PaymentModalProps) {
     const [paymentProof, setPaymentProof] = useState('');
     const [notes, setNotes] = useState('');
@@ -42,7 +42,7 @@ export default function PaymentModal({
                 plan_type: planType,
                 months: months,
                 payment_proof: paymentProof.trim(),
-                notes: notes.trim()
+                notes: notes.trim(),
             });
             onClose();
         } catch (error) {
@@ -66,7 +66,7 @@ export default function PaymentModal({
                 </div>
 
                 <div className="mb-6 rounded-lg bg-gray-700 p-4">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="mb-3 flex items-center gap-3">
                         <FaCreditCard className="h-6 w-6 text-blue-400" />
                         <div>
                             <h3 className="text-lg font-semibold text-white">
@@ -77,14 +77,18 @@ export default function PaymentModal({
                             </p>
                         </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
-                            <div className="text-2xl font-bold text-white">฿{amount.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-white">
+                                ฿{amount.toLocaleString()}
+                            </div>
                             <div className="text-sm text-gray-400">Total Amount</div>
                         </div>
                         <div>
-                            <div className="text-2xl font-bold text-blue-400">{tokens.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-blue-400">
+                                {tokens.toLocaleString()}
+                            </div>
                             <div className="text-sm text-gray-400">Tokens</div>
                         </div>
                     </div>
@@ -121,9 +125,9 @@ export default function PaymentModal({
                         />
                     </div>
 
-                    <div className="mb-4 rounded-lg bg-yellow-900/30 border border-yellow-600 p-3">
+                    <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
                         <div className="flex items-start gap-2">
-                            <FaCheck className="h-4 w-4 text-yellow-400 mt-0.5" />
+                            <FaCheck className="mt-0.5 h-4 w-4 text-yellow-400" />
                             <div className="text-sm text-yellow-200">
                                 <p className="font-medium">Payment Process:</p>
                                 <p>1. Make payment to our bank account</p>
@@ -145,7 +149,7 @@ export default function PaymentModal({
                         <button
                             type="submit"
                             disabled={!paymentProof.trim() || isSubmitting}
-                            className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                            className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                         >
                             {isSubmitting ? (
                                 <>

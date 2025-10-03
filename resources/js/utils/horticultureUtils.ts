@@ -551,7 +551,7 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
                 point.lat < ((xj - xi) * (point.lng - yi)) / (yj - yi) + xi;
             if (intersect) inside = !inside;
         }
-        
+
         return inside;
     } catch (error) {
         console.error('Error in isPointInPolygon:', error);

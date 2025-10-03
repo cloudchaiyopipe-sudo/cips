@@ -15,10 +15,10 @@ import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
-import { 
+import {
     FieldCropSystemData,
     getEnhancedFieldCropData,
-    calculateEnhancedFieldStats
+    calculateEnhancedFieldStats,
 } from '../../utils/fieldCropData';
 
 // Reduce verbose logs in production/dev by toggling these flags
@@ -156,7 +156,6 @@ interface GoogleMapsDisplayProps {
     irrigationPoints: IrrigationPoint[];
     irrigationLines: IrrigationLine[];
     onMapReady?: (map: google.maps.Map) => void;
-    showRadiusCircles?: boolean;
 }
 
 // Additional type definitions for pipe calculations
@@ -237,7 +236,6 @@ const GoogleMapsDisplay = ({
     irrigationPoints,
     irrigationLines,
     onMapReady,
-    showRadiusCircles = true,
 }: GoogleMapsDisplayProps) => {
     const { t } = useLanguage();
     const mapRef = useRef<HTMLDivElement>(null);
@@ -544,8 +542,8 @@ const GoogleMapsDisplay = ({
                         },
                     });
 
-                    // Draw coverage circles for sprinklers and pivots (if they have radius and showRadiusCircles is true)
-                    if (point.radius && normalizedType !== 'drip_tape' && showRadiusCircles) {
+                    // Draw coverage circles for sprinklers and pivots (if they have radius)
+                    if (point.radius && normalizedType !== 'drip_tape') {
                         let circleColor = color;
                         let strokeWeight = 1;
                         let strokeOpacity = 0.6;
@@ -611,7 +609,6 @@ const GoogleMapsDisplay = ({
         irrigationPoints,
         irrigationLines,
         onMapReady,
-        showRadiusCircles,
     ]);
 
     if (!isLoaded) {
@@ -1734,6 +1731,13 @@ const createSubmainToMainConnectionPoints = (
 
         const submainStart = submain.coordinates[0];
         const submainEnd = submain.coordinates[submain.coordinates.length - 1];
+        
+        // Debug: Log submain pipe info
+        console.log(`🔍 Processing submain ${submain.id}:`, {
+            start: submainStart,
+            end: submainEnd,
+            coordinates: submain.coordinates.length
+        });
 
         mainPipes.forEach((main) => {
             if (!main.coordinates || main.coordinates.length < 2) return;
@@ -1741,6 +1745,13 @@ const createSubmainToMainConnectionPoints = (
             const mainStart = main.coordinates[0];
             const mainEnd = main.coordinates[main.coordinates.length - 1];
             const threshold = 2; // 2 meters
+            
+            // Debug: Log main pipe info
+            console.log(`🔍 Processing main ${main.id}:`, {
+                start: mainStart,
+                end: mainEnd,
+                coordinates: main.coordinates.length
+            });
 
             // L-shape: submain end near main end
             const submainStartToMainStart = calculateDistanceBetweenPoints(submainStart, mainStart);
@@ -1808,7 +1819,7 @@ const createSubmainToMainConnectionPoints = (
                 }
             }
 
-            // T-shape: submain intersects main near main end (actual intersection)
+            // T-shape: submain intersects main (actual intersection)
             for (let i = 0; i < main.coordinates.length - 1; i++) {
                 const intersection = getLineIntersection(
                     submainStart,
@@ -1817,55 +1828,67 @@ const createSubmainToMainConnectionPoints = (
                     main.coordinates[i + 1]
                 );
                 if (intersection) {
+                    console.log(`✅ Found T-shape intersection between submain ${submain.id} and main ${main.id} segment ${i}:`, {
+                        intersection,
+                        submainStart,
+                        submainEnd,
+                        mainSegment: [main.coordinates[i], main.coordinates[i + 1]]
+                    });
+                    
                     const isAtMainStart =
                         calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
                     const isAtMainEnd =
                         calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
 
+                    // T-shape at main start
                     if (isAtMainStart) {
-                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
-                        const isLShape =
-                            submainStartToMainStart < threshold ||
-                            submainEndToMainStart < threshold;
-                        if (!isLShape) {
-                            const existingPoint = connectionPoints.find(
-                                (cp) => calculateDistanceBetweenPoints(cp.position, mainStart) < 1
-                            );
-                            if (!existingPoint) {
-                                connectionPoints.push({
-                                    id: `t-shape-start-${submain.id}-${Date.now()}`,
-                                    position: mainStart,
-                                    connectedLaterals: [String(submain.id)],
-                                    submainId: String(submain.id),
-                                    type: 't_shape',
-                                });
-                            }
+                        const existingPoint = connectionPoints.find(
+                            (cp) => calculateDistanceBetweenPoints(cp.position, mainStart) < 1
+                        );
+                        if (!existingPoint) {
+                            connectionPoints.push({
+                                id: `t-shape-start-${submain.id}-${Date.now()}`,
+                                position: mainStart,
+                                connectedLaterals: [String(submain.id)],
+                                submainId: String(submain.id),
+                                type: 't_shape',
+                            });
                         }
                     }
-
-                    if (isAtMainEnd) {
-                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
-                        const isLShape =
-                            submainStartToMainEnd < threshold || submainEndToMainEnd < threshold;
-                        if (!isLShape) {
-                            const existingPoint = connectionPoints.find(
-                                (cp) => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
-                            );
-                            if (!existingPoint) {
-                                connectionPoints.push({
-                                    id: `t-shape-end-${submain.id}-${Date.now()}`,
-                                    position: mainEnd,
-                                    connectedLaterals: [String(submain.id)],
-                                    submainId: String(submain.id),
-                                    type: 't_shape',
-                                });
-                            }
+                    // T-shape at main end
+                    else if (isAtMainEnd) {
+                        const existingPoint = connectionPoints.find(
+                            (cp) => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
+                        );
+                        if (!existingPoint) {
+                            connectionPoints.push({
+                                id: `t-shape-end-${submain.id}-${Date.now()}`,
+                                position: mainEnd,
+                                connectedLaterals: [String(submain.id)],
+                                submainId: String(submain.id),
+                                type: 't_shape',
+                            });
+                        }
+                    }
+                    // T-shape in the middle of main pipe
+                    else {
+                        const existingPoint = connectionPoints.find(
+                            (cp) => calculateDistanceBetweenPoints(cp.position, intersection) < 1
+                        );
+                        if (!existingPoint) {
+                            connectionPoints.push({
+                                id: `t-shape-middle-${submain.id}-${i}-${Date.now()}`,
+                                position: intersection,
+                                connectedLaterals: [String(submain.id)],
+                                submainId: String(submain.id),
+                                type: 't_shape',
+                            });
                         }
                     }
                 }
             }
 
-            // T-shape (Auto-snap): submain is very close to main near main end (no actual intersection)
+            // T-shape (Auto-snap): submain is very close to main (no actual intersection)
             for (let i = 0; i < main.coordinates.length - 1; i++) {
                 const { point: closestPointOnMain, distance: distanceToMain } =
                     getClosestPointOnSegment(
@@ -1888,95 +1911,54 @@ const createSubmainToMainConnectionPoints = (
                     const isNearMainEnd =
                         calculateDistanceBetweenPoints(closestPoint, mainEnd) < threshold;
 
+                    // Auto-snap T-shape at main start
                     if (isNearMainStart) {
-                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
-                        const isLShape =
-                            submainStartToMainStart < threshold ||
-                            submainEndToMainStart < threshold;
-                        if (!isLShape) {
-                            const existingPoint = connectionPoints.find(
-                                (cp) => calculateDistanceBetweenPoints(cp.position, mainStart) < 1
-                            );
-                            if (!existingPoint) {
-                                connectionPoints.push({
-                                    id: `t-shape-snap-start-${submain.id}-${Date.now()}`,
-                                    position: mainStart,
-                                    connectedLaterals: [String(submain.id)],
-                                    submainId: String(submain.id),
-                                    type: 't_shape',
-                                });
-                            }
-                        }
-                    }
-
-                    if (isNearMainEnd) {
-                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
-                        const isLShape =
-                            submainStartToMainEnd < threshold || submainEndToMainEnd < threshold;
-                        if (!isLShape) {
-                            const existingPoint = connectionPoints.find(
-                                (cp) => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
-                            );
-                            if (!existingPoint) {
-                                connectionPoints.push({
-                                    id: `t-shape-snap-end-${submain.id}-${Date.now()}`,
-                                    position: mainEnd,
-                                    connectedLaterals: [String(submain.id)],
-                                    submainId: String(submain.id),
-                                    type: 't_shape',
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-
-            // T-shape (Additional): submain passes through main but not at ends
-            for (let i = 0; i < main.coordinates.length - 1; i++) {
-                const intersection = getLineIntersection(
-                    submainStart,
-                    submainEnd,
-                    main.coordinates[i],
-                    main.coordinates[i + 1]
-                );
-                if (intersection) {
-                    const isAtMainStart =
-                        calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
-                    const isAtMainEnd =
-                        calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
-
-                    // ถ้าตัดกันแต่ไม่ใช่ที่ปลาย และไม่ใช่ + shape
-                    if (!isAtMainStart && !isAtMainEnd) {
-                        // ตรวจสอบว่า submain ผ่าน main ใกล้ปลาย main หรือไม่
-                        const distanceToStart = calculateDistanceBetweenPoints(
-                            intersection,
-                            mainStart
+                        const existingPoint = connectionPoints.find(
+                            (cp) => calculateDistanceBetweenPoints(cp.position, mainStart) < 1
                         );
-                        const distanceToEnd = calculateDistanceBetweenPoints(intersection, mainEnd);
-                        const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
-
-                        // ถ้าอยู่ใกล้ปลาย main (ภายใน 30% ของความยาว main)
-                        if (
-                            distanceToStart < mainLength * 0.3 ||
-                            distanceToEnd < mainLength * 0.3
-                        ) {
-                            const existingPoint = connectionPoints.find(
-                                (cp) =>
-                                    calculateDistanceBetweenPoints(cp.position, intersection) < 1
-                            );
-                            if (!existingPoint) {
-                                connectionPoints.push({
-                                    id: `t-shape-through-${submain.id}-${i}-${Date.now()}`,
-                                    position: intersection,
-                                    connectedLaterals: [String(submain.id)],
-                                    submainId: String(submain.id),
-                                    type: 't_shape',
-                                });
-                            }
+                        if (!existingPoint) {
+                            connectionPoints.push({
+                                id: `t-shape-snap-start-${submain.id}-${Date.now()}`,
+                                position: mainStart,
+                                connectedLaterals: [String(submain.id)],
+                                submainId: String(submain.id),
+                                type: 't_shape',
+                            });
+                        }
+                    }
+                    // Auto-snap T-shape at main end
+                    else if (isNearMainEnd) {
+                        const existingPoint = connectionPoints.find(
+                            (cp) => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
+                        );
+                        if (!existingPoint) {
+                            connectionPoints.push({
+                                id: `t-shape-snap-end-${submain.id}-${Date.now()}`,
+                                position: mainEnd,
+                                connectedLaterals: [String(submain.id)],
+                                submainId: String(submain.id),
+                                type: 't_shape',
+                            });
+                        }
+                    }
+                    // Auto-snap T-shape in the middle
+                    else {
+                        const existingPoint = connectionPoints.find(
+                            (cp) => calculateDistanceBetweenPoints(cp.position, closestPoint) < 1
+                        );
+                        if (!existingPoint) {
+                            connectionPoints.push({
+                                id: `t-shape-snap-middle-${submain.id}-${i}-${Date.now()}`,
+                                position: closestPoint,
+                                connectedLaterals: [String(submain.id)],
+                                submainId: String(submain.id),
+                                type: 't_shape',
+                            });
                         }
                     }
                 }
             }
+
 
             // + shape (actual intersection)
             for (let i = 0; i < main.coordinates.length - 1; i++) {
@@ -2001,10 +1983,11 @@ const createSubmainToMainConnectionPoints = (
                         const distanceToEnd = calculateDistanceBetweenPoints(intersection, mainEnd);
                         const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
 
-                        // ถ้าไม่ใกล้ปลาย main (เกิน 30% ของความยาว main) ให้เป็น + shape
+                        // ถ้าไม่ใกล้ปลาย main (เกิน 20% ของความยาว main) ให้เป็น + shape
+                        // ลดจาก 30% เป็น 20% เพื่อให้ T-shape ครอบคลุมมากขึ้น
                         if (
-                            distanceToStart >= mainLength * 0.3 &&
-                            distanceToEnd >= mainLength * 0.3
+                            distanceToStart >= mainLength * 0.2 &&
+                            distanceToEnd >= mainLength * 0.2
                         ) {
                             const existingPoint = connectionPoints.find(
                                 (cp) =>
@@ -2017,6 +2000,22 @@ const createSubmainToMainConnectionPoints = (
                                     connectedLaterals: [String(submain.id)],
                                     submainId: String(submain.id),
                                     type: 'cross_shape',
+                                });
+                            }
+                        }
+                        // ถ้าใกล้ปลาย main (ภายใน 20% ของความยาว main) ให้เป็น T-shape
+                        else {
+                            const existingPoint = connectionPoints.find(
+                                (cp) =>
+                                    calculateDistanceBetweenPoints(cp.position, intersection) < 1
+                            );
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `t-shape-near-end-${submain.id}-${i}-${Date.now()}`,
+                                    position: intersection,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 't_shape',
                                 });
                             }
                         }
@@ -2080,6 +2079,14 @@ const createSubmainToMainConnectionPoints = (
             }
         });
     });
+
+    // Debug: Log final connection points
+    console.log(`🎯 Final connection points for ${submainPipes.length} submain pipes:`, connectionPoints.map(cp => ({
+        id: cp.id,
+        type: cp.type,
+        position: cp.position,
+        submainId: cp.submainId
+    })));
 
     return connectionPoints;
 };
@@ -3217,12 +3224,12 @@ const buildZoneConnectivityLongestFlows = (
 
     // Flow from lateral sprinklers
     const perSprinkler = flowSettings?.sprinkler_system?.flow ?? 0;
-    
+
     // Debug logging for flow settings
     if (perSprinkler === 0) {
         // No flow settings available
     }
-    
+
     // ฟังก์ชันสำหรับหาสปริงเกลอร์ที่เชื่อมต่อกับท่อย่อยแบบโหมดระหว่างแถว
     const findNearbyConnectedSprinklersBetweenRows = (
         coordinates: Coordinate[],
@@ -3836,13 +3843,15 @@ export default function FieldCropSummary() {
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<
         Record<string, ZoneSummary>
     >({});
-    const [zoneIrrigationCounts, setZoneIrrigationCounts] = useState<Array<{
-        sprinkler: number;
-        dripTape: number;
-        pivot: number;
-        waterJetTape: number;
-        total: number;
-    }>>([]);
+    const [zoneIrrigationCounts, setZoneIrrigationCounts] = useState<
+        Array<{
+            sprinkler: number;
+            dripTape: number;
+            pivot: number;
+            waterJetTape: number;
+            total: number;
+        }>
+    >([]);
 
     // Enhanced state for Google Maps and image capture
     const [mapImageCaptured, setMapImageCaptured] = useState<boolean>(false);
@@ -3854,7 +3863,6 @@ export default function FieldCropSummary() {
     const [zoneLateralDetailsOpen, setZoneLateralDetailsOpen] = useState<Record<string, boolean>>(
         {}
     );
-    const [showRadiusCircles, setShowRadiusCircles] = useState<boolean>(true);
 
     useEffect(() => {
         // Prefer Inertia props first (normalize JSON strings if POSTed)
@@ -4238,7 +4246,13 @@ export default function FieldCropSummary() {
 
             return () => clearTimeout(timer);
         }
-    }, [summaryData, mapImageCaptured, isCapturingImage, handleCaptureMapImage, zoneIrrigationCounts]);
+    }, [
+        summaryData,
+        mapImageCaptured,
+        isCapturingImage,
+        handleCaptureMapImage,
+        zoneIrrigationCounts,
+    ]);
 
     // Enhanced manual capture function with user feedback
     const handleManualCapture = async () => {
@@ -4409,8 +4423,7 @@ export default function FieldCropSummary() {
     }, [summaryData]);
 
     // Debug logging for irrigation settings
-    useEffect(() => {
-    }, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
+    useEffect(() => {}, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
 
     // Build global pipe network connectivity & flow summary
     const pipeNetworkSummary = useMemo(() => {
@@ -4464,11 +4477,11 @@ export default function FieldCropSummary() {
                 waterJetTape: number;
                 total: number;
             }> = [];
-            
+
             // Load zoneAssignments and irrigationAssignments from localStorage if not in props
             let zAssign: Record<string, string> = {};
             let iAssign: Record<string, string> = {};
-            
+
             if (zoneAssignments && typeof zoneAssignments === 'object') {
                 zAssign = zoneAssignments as Record<string, string>;
             } else {
@@ -4484,7 +4497,7 @@ export default function FieldCropSummary() {
                 } catch (error) {
                     console.warn('Failed to load zoneAssignments from localStorage:', error);
                 }
-                
+
                 // If still empty, create from zones with cropType
                 if (Object.keys(zAssign).length === 0) {
                     zones.forEach((zone) => {
@@ -4494,7 +4507,7 @@ export default function FieldCropSummary() {
                     });
                 }
             }
-            
+
             if (irrigationAssignments && typeof irrigationAssignments === 'object') {
                 iAssign = irrigationAssignments as Record<string, string>;
             } else {
@@ -4510,7 +4523,7 @@ export default function FieldCropSummary() {
                 } catch (error) {
                     console.warn('Failed to load irrigationAssignments from localStorage:', error);
                 }
-                
+
                 // If still empty, create default irrigation assignments
                 if (Object.keys(iAssign).length === 0) {
                     zones.forEach((zone) => {
@@ -4549,12 +4562,15 @@ export default function FieldCropSummary() {
             console.log('🌾 [FIELD-CROP-SUMMARY] Zones Array:', zones);
             console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (from props):', zoneAssignments);
             console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (loaded):', zAssign);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (from props):', irrigationAssignments);
+            console.log(
+                '🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (from props):',
+                irrigationAssignments
+            );
             console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (loaded):', iAssign);
             console.log('🌾 [FIELD-CROP-SUMMARY] Pipes Data:', pipes);
             console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Points:', irrigationPoints);
             console.log('🌾 [FIELD-CROP-SUMMARY] Plant Points:', actualPlantPoints);
-            
+
             // Detailed zone information
             const allZonesData = zones.map((zone: Zone) => ({
                 id: zone.id,
@@ -4563,11 +4579,11 @@ export default function FieldCropSummary() {
                 coordinates: zone.coordinates,
                 cropType: zone.cropType,
                 assignedCrop: zAssign[zone.id.toString()],
-                irrigationType: iAssign[zone.id.toString()]
+                irrigationType: iAssign[zone.id.toString()],
             }));
             console.log('🌾 [FIELD-CROP-SUMMARY] All Zones Detailed Data:', allZonesData);
             console.log('🌾 [FIELD-CROP-SUMMARY] ===== END ZONE DATA =====');
-            
+
             zones.forEach((zone: Zone) => {
                 const zoneId = zone.id.toString();
                 let assignedCropValue = zone.cropType || zAssign[zoneId];
@@ -4597,12 +4613,15 @@ export default function FieldCropSummary() {
                         // Use plant count from zone object first (calculated in zone-obstacle.tsx)
                         let totalPlantingPoints = 0;
                         let actualPlantsInZone = 0;
-                        
+
                         // Check if zone has plantCount property (from zone-obstacle.tsx calculation)
                         if (typeof zone.plantCount === 'number' && zone.plantCount > 0) {
                             totalPlantingPoints = zone.plantCount;
                             actualPlantsInZone = zone.plantCount;
-                            console.log(`Using zone plantCount for zone ${zoneId}:`, totalPlantingPoints);
+                            console.log(
+                                `Using zone plantCount for zone ${zoneId}:`,
+                                totalPlantingPoints
+                            );
                         } else {
                             // Fallback to calculation methods
                             try {
@@ -4624,7 +4643,9 @@ export default function FieldCropSummary() {
                                     ]);
                                     actualPlantsInZone = actualPlantPoints.reduce((acc, pt) => {
                                         const p = turf.point([pt.lng, pt.lat]);
-                                        return acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0);
+                                        return (
+                                            acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0)
+                                        );
                                     }, 0);
                                 }
                             } catch {
@@ -4688,7 +4709,7 @@ export default function FieldCropSummary() {
                             zone,
                             actualIrrigationPoints
                         );
-                        
+
                         // เก็บ zoneIrrigationCounts ไว้ใน array
                         newZoneIrrigationCounts.push(zoneIrrigationCounts);
 
@@ -5001,6 +5022,41 @@ export default function FieldCropSummary() {
         if (!point || !point.id) return false;
         const firstIndex = array.findIndex((p) => p && p.id === point.id);
         return firstIndex === index;
+    }).map((point) => {
+        // Add radius information based on irrigation type and settings
+        const normalizedType = point.type?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+        let radius = 0;
+        
+        // Get radius from irrigation settings
+        if (irrigationSettingsData && irrigationSettingsData[normalizedType]) {
+            radius = irrigationSettingsData[normalizedType].coverageRadius || 0;
+        }
+        
+        // Fallback radius values based on type
+        if (radius === 0) {
+            switch (normalizedType) {
+                case 'sprinkler':
+                case 'sprinkler_system':
+                    radius = 8; // 8 meters default
+                    break;
+                case 'pivot':
+                    radius = 50; // 50 meters default
+                    break;
+                case 'water_jet_tape':
+                    radius = 3; // 3 meters default
+                    break;
+                case 'drip_tape':
+                    radius = 1; // 1 meter default
+                    break;
+                default:
+                    radius = 5; // 5 meters default
+            }
+        }
+        
+        return {
+            ...point,
+            radius: radius
+        };
     });
 
     // Debug: ตรวจสอบข้อมูลที่ได้รับ
@@ -5024,13 +5080,22 @@ export default function FieldCropSummary() {
         calculateZoneIrrigationCounts(zone, uniqueIrrigationPoints)
     );
 
-    const sprinklerPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + counts.sprinkler, 0);
-    const pivotPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + (counts.pivot || 0), 0);
+    const sprinklerPoints = calculatedZoneIrrigationCounts.reduce(
+        (sum, counts) => sum + counts.sprinkler,
+        0
+    );
+    const pivotPoints = calculatedZoneIrrigationCounts.reduce(
+        (sum, counts) => sum + (counts.pivot || 0),
+        0
+    );
     const waterJetPoints = calculatedZoneIrrigationCounts.reduce(
         (sum, counts) => sum + (counts.waterJetTape || 0),
         0
     );
-    const dripPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + counts.dripTape, 0);
+    const dripPoints = calculatedZoneIrrigationCounts.reduce(
+        (sum, counts) => sum + counts.dripTape,
+        0
+    );
 
     // Debug: ตรวจสอบการคำนวณจำนวน irrigation points รวม
     dbg('🔍 Total irrigation points calculation:', {
@@ -5068,6 +5133,9 @@ export default function FieldCropSummary() {
         )
         .filter((e) => e.type === 'pump' || e.type === 'water_pump');
     const pumpCount = uniqueEquipment.length;
+
+    console.log('[Summary] actualEquipmentIcons:', actualEquipmentIcons);
+    console.log('[Summary] uniqueEquipment (pumps only):', uniqueEquipment);
 
     // Persist merged equipment to localStorage so pump markers remain across navigation
     useEffect(() => {
@@ -5115,14 +5183,20 @@ export default function FieldCropSummary() {
                     name: e.name || 'Water Pump',
                 }));
 
+            console.log('[Summary] Pumps to persist:', pumpEquip);
+
             // If there's no valid pump to persist, don't touch existing data
-            if (pumpEquip.length === 0) return;
+            if (pumpEquip.length === 0) {
+                console.log('[Summary] No pumps to persist, skipping');
+                return;
+            }
 
             const nonPump = (e: Equipment) => e.type !== 'pump' && e.type !== 'water_pump';
             const mergedEquip: Equipment[] = [...existingEquip.filter(nonPump), ...pumpEquip];
             const mergedIcons: Equipment[] = [...existingIcons.filter(nonPump), ...pumpEquip];
 
             const next = { ...(parsed || {}), equipment: mergedEquip, equipmentIcons: mergedIcons };
+            console.log('[Summary] Persisting to localStorage:', { equipment: mergedEquip, equipmentIcons: mergedIcons });
             localStorage.setItem('fieldCropData', JSON.stringify(next));
         } catch {
             // ignore persistence errors
@@ -5156,7 +5230,7 @@ export default function FieldCropSummary() {
         try {
             // Capture map image first
             setCaptureStatus('กำลังบันทึกภาพแผนที่...');
-            
+
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
             const html2canvas = await import('html2canvas');
@@ -5254,8 +5328,11 @@ export default function FieldCropSummary() {
 
                 if (fieldData && zoneIrrigationCounts.length > 0) {
                     // คำนวณจำนวนสปริงเกลอร์รวมทั้งหมด
-                    const totalSprinklerCount = zoneIrrigationCounts.reduce((total, count) => total + count.sprinkler, 0);
-                    
+                    const totalSprinklerCount = zoneIrrigationCounts.reduce(
+                        (total, count) => total + count.sprinkler,
+                        0
+                    );
+
                     // ใช้ค่าอัตราการไหลจาก irrigationSettingsData
                     const sprinklerSettings = irrigationSettingsData?.sprinkler_system;
                     const flowRatePerSprinkler = sprinklerSettings?.flow || 2.5; // ลิตร/นาที ต่อหัวฉีด
@@ -5273,16 +5350,22 @@ export default function FieldCropSummary() {
                         connectionStats: [], // Can be enhanced later
                         zones: fieldData.zones.info.map((zone, index) => {
                             // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts state แทน totalPlantingPoints
-                            const zoneIrrigationCount = zoneIrrigationCounts[index] || { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
+                            const zoneIrrigationCount = zoneIrrigationCounts[index] || {
+                                sprinkler: 0,
+                                dripTape: 0,
+                                pivot: 0,
+                                waterJetTape: 0,
+                                total: 0,
+                            };
                             // ใช้แค่จำนวนสปริงเกลอร์ ไม่รวม drip tape, pivot, water jet tape
                             const actualSprinklerCount = zoneIrrigationCount.sprinkler;
-                            
+
                             // คำนวณน้ำต่อต้น (หัวฉีด) = อัตราการไหลต่อหัวฉีด
                             const waterPerTree = flowRatePerSprinkler; // ลิตร/นาที ต่อหัวฉีด
 
                             // คำนวณปริมาณน้ำต่อครั้ง (ลิตร/ครั้ง) จากข้อมูลที่คำนวณไว้แล้ว
                             const waterPerIrrigation = actualSprinklerCount * waterPerTree * 30; // ลิตร/ครั้ง
-                            
+
                             return {
                                 id: zone.id,
                                 name: zone.name,
@@ -5326,15 +5409,27 @@ export default function FieldCropSummary() {
                     };
 
                     // Save system data to localStorage (similar to horticulture and greenhouse)
-                    localStorage.setItem('fieldCropSystemData', JSON.stringify(fieldCropSystemData));
-                    
+                    localStorage.setItem(
+                        'fieldCropSystemData',
+                        JSON.stringify(fieldCropSystemData)
+                    );
+
                     // Debug: แสดงข้อมูลที่สร้าง fieldCropSystemData
-                    console.log('🌾 [FIELD-CROP-SUMMARY] Created fieldCropSystemData:', fieldCropSystemData);
-                    console.log('🌾 [FIELD-CROP-SUMMARY] Zone Irrigation Counts:', zoneIrrigationCounts);
-                    console.log('🌾 [FIELD-CROP-SUMMARY] Total Sprinkler Count:', totalSprinklerCount);
+                    console.log(
+                        '🌾 [FIELD-CROP-SUMMARY] Created fieldCropSystemData:',
+                        fieldCropSystemData
+                    );
+                    console.log(
+                        '🌾 [FIELD-CROP-SUMMARY] Zone Irrigation Counts:',
+                        zoneIrrigationCounts
+                    );
+                    console.log(
+                        '🌾 [FIELD-CROP-SUMMARY] Total Sprinkler Count:',
+                        totalSprinklerCount
+                    );
                     localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
                     localStorage.setItem('projectType', 'field-crop');
-                    
+
                     // Navigate to product page using router (similar to greenhouse)
                     router.visit('/product?mode=field-crop');
                 } else {
@@ -5427,45 +5522,6 @@ export default function FieldCropSummary() {
                             </div>
 
                             <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
-                                {/* Radius Toggle Button */}
-                                <button
-                                    onClick={() => setShowRadiusCircles(!showRadiusCircles)}
-                                    className={`inline-flex transform items-center rounded-lg px-4 py-2 font-medium text-white transition-all duration-200 hover:scale-105 hover:shadow-lg ${
-                                        showRadiusCircles
-                                            ? 'bg-green-600 hover:bg-green-700'
-                                            : 'bg-gray-600 hover:bg-gray-700'
-                                    }`}
-                                    title={
-                                        showRadiusCircles
-                                            ? t('Hide radius circles')
-                                            : t('Show radius circles')
-                                    }
-                                >
-                                    <svg
-                                        className="mr-2 h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                                        <circle
-                                            cx="12"
-                                            cy="12"
-                                            r="6"
-                                            strokeWidth="1"
-                                            opacity="0.5"
-                                        />
-                                        <circle
-                                            cx="12"
-                                            cy="12"
-                                            r="2"
-                                            strokeWidth="1"
-                                            opacity="0.3"
-                                        />
-                                    </svg>
-                                    {showRadiusCircles ? t('Hide Radius') : t('Show Radius')}
-                                </button>
-
                                 {/* Enhanced Map capture button */}
                                 <button
                                     onClick={handleManualCapture}
@@ -5580,7 +5636,7 @@ export default function FieldCropSummary() {
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </div>   
                 </div>
             </div>
 
@@ -5621,7 +5677,6 @@ export default function FieldCropSummary() {
                                                 center={optimalCenter as [number, number]}
                                                 zoom={optimalZoom}
                                                 mainField={mainField}
-                                                showRadiusCircles={showRadiusCircles}
                                                 zones={actualZones}
                                                 pipes={actualPipes}
                                                 obstacles={actualObstacles as unknown as Obstacle[]}
@@ -6689,16 +6744,6 @@ export default function FieldCropSummary() {
                                                                             {formatIrrigationType(
                                                                                 irrigationType
                                                                             )}
-                                                                            {zoneIrrigationCounts.sprinkler >
-                                                                                0 && (
-                                                                                <span className="text-xs text-green-300">
-                                                                                    🟢{' '}
-                                                                                    {
-                                                                                        zoneIrrigationCounts.sprinkler
-                                                                                    }{' '}
-                                                                                    {t('units')}
-                                                                                </span>
-                                                                            )}
                                                                         </div>
                                                                     </div>
 
@@ -6893,6 +6938,7 @@ export default function FieldCropSummary() {
                                                                                                             {t(
                                                                                                                 'longest'
                                                                                                             )}
+
                                                                                                             )
                                                                                                         </td>
                                                                                                         <td className="border border-cyan-700/50 px-2 py-1 font-bold print:border-cyan-300">
@@ -6922,6 +6968,7 @@ export default function FieldCropSummary() {
                                                                                                             {t(
                                                                                                                 'longest'
                                                                                                             )}
+
                                                                                                             )
                                                                                                         </td>
                                                                                                         <td className="border border-cyan-700/50 px-2 py-1 font-bold print:border-cyan-300">
@@ -6951,6 +6998,7 @@ export default function FieldCropSummary() {
                                                                                                             {t(
                                                                                                                 'longest'
                                                                                                             )}
+
                                                                                                             )
                                                                                                         </td>
                                                                                                         <td className="border border-cyan-700/50 px-2 py-1 font-bold print:border-cyan-300">
@@ -7158,6 +7206,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'Most outlets'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     <span className="font-bold">
                                                                                                         {(most.units <
@@ -7531,6 +7580,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'L-shape'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.red
@@ -7543,6 +7593,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'T-shape'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.blue
@@ -7555,6 +7606,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         '+ shape'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.purple
@@ -7567,6 +7619,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'Junction'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.yellow
@@ -7579,6 +7632,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'Crossing'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.green

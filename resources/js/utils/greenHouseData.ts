@@ -91,11 +91,11 @@ export interface GreenhouseSummaryData {
     // Flow rate settings from map
     sprinklerFlowRate?: number; // L/min per sprinkler
     dripEmitterFlowRate?: number; // L/min per drip emitter
-    
+
     // Pressure settings
     sprinklerPressure?: number; // Bar for sprinklers
     dripPressure?: number; // Bar for drip emitters
-    
+
     // Sprinkler settings
     sprinklerRadius?: number; // Radius in meters for sprinklers
 
@@ -733,7 +733,9 @@ export const convertSummaryDataToRawData = (summaryData: GreenhouseSummaryData):
 /**
  * Convert EnhancedGreenhousePlanningData to GreenhouseSummaryData format
  */
-export const convertEnhancedDataToSummaryData = (enhancedData: EnhancedGreenhousePlanningData): GreenhouseSummaryData => {
+export const convertEnhancedDataToSummaryData = (
+    enhancedData: EnhancedGreenhousePlanningData
+): GreenhouseSummaryData => {
     return {
         selectedCrops: enhancedData.rawData.selectedCrops || [],
         planningMethod: enhancedData.projectInfo.planningMethod,

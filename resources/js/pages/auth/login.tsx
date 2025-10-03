@@ -99,24 +99,25 @@ export default function Login({ status }: LoginProps) {
                                 {/* Chaiyo Logo */}
                                 <button
                                     onClick={() =>
-                                        (window.location.href = 'https://maps.app.goo.gl/HM6LtDJQEDRTRXV17')
+                                        (window.location.href =
+                                            'https://maps.app.goo.gl/HM6LtDJQEDRTRXV17')
                                     }
                                     className="cursor-pointer"
                                 >
                                     <div className="group relative">
-                                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-300 to-cyan-400 opacity-0 blur transition-opacity duration-300 group-hover:opacity-70"></div>
-                                    <img
-                                        src="/images/chaiyo-logo.png"
-                                        alt="ไชโย ไปป์แอนด์ฟิตติ้ง"
-                                        className="relative h-16 w-16 transform rounded-full border-2 border-white/50 object-cover shadow-lg transition-transform duration-300 group-hover:scale-105"
-                                    />
-                                    {/* Company name tooltip */}
-                                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 transform opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                                        <div className="whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white">
-                                            ไชโย ไปป์แอนด์ฟิตติ้ง
+                                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-300 to-cyan-400 opacity-0 blur transition-opacity duration-300 group-hover:opacity-70"></div>
+                                        <img
+                                            src="/images/chaiyo-logo.png"
+                                            alt="ไชโย ไปป์แอนด์ฟิตติ้ง"
+                                            className="relative h-16 w-16 transform rounded-full border-2 border-white/50 object-cover shadow-lg transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                        {/* Company name tooltip */}
+                                        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 transform opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                                            <div className="whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white">
+                                                ไชโย ไปป์แอนด์ฟิตติ้ง
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
                                 </button>
                             </div>
 

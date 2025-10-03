@@ -21,7 +21,7 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
     t,
 }) => {
     const [selectedZone, setSelectedZone] = useState<string>('all');
-    
+
     if (!isVisible) return null;
 
     return (
@@ -46,9 +46,21 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                 <div className="mb-6 rounded-lg bg-blue-900 p-4 text-blue-100">
                     <h4 className="mb-2 font-semibold">📋 {t('คำอธิบาย') || 'คำอธิบาย'}</h4>
                     <ul className="space-y-1 text-sm">
-                        <li>• {t('ระบบจะลากท่อย่อยตามแนวต้นไม้โดยอัตโนมัติ') || 'ระบบจะลากท่อย่อยตามแนวต้นไม้โดยอัตโนมัติ'}</li>
-                        <li>• {t('ลากได้เฉพาะในโซนตัวเองเท่านั้น') || 'ลากได้เฉพาะในโซนตัวเองเท่านั้น'}</li>
-                        <li>• {t('ใช้โหมด "ทับแนวต้นไม้" เท่านั้น') || 'ใช้โหมด "ทับแนวต้นไม้" เท่านั้น'}</li>
+                        <li>
+                            •{' '}
+                            {t('ระบบจะลากท่อย่อยตามแนวต้นไม้โดยอัตโนมัติ') ||
+                                'ระบบจะลากท่อย่อยตามแนวต้นไม้โดยอัตโนมัติ'}
+                        </li>
+                        <li>
+                            •{' '}
+                            {t('ลากได้เฉพาะในโซนตัวเองเท่านั้น') ||
+                                'ลากได้เฉพาะในโซนตัวเองเท่านั้น'}
+                        </li>
+                        <li>
+                            •{' '}
+                            {t('ใช้โหมด "ทับแนวต้นไม้" เท่านั้น') ||
+                                'ใช้โหมด "ทับแนวต้นไม้" เท่านั้น'}
+                        </li>
                     </ul>
                 </div>
 
@@ -73,14 +85,18 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     🌍 {t('ทุกโซน') || 'ทุกโซน'}
                                 </div>
                                 <div className="text-sm text-gray-400">
-                                    {t('สร้างท่อย่อยในทุกโซนพร้อมกัน') || 'สร้างท่อย่อยในทุกโซนพร้อมกัน'}
+                                    {t('สร้างท่อย่อยในทุกโซนพร้อมกัน') ||
+                                        'สร้างท่อย่อยในทุกโซนพร้อมกัน'}
                                 </div>
                             </div>
                         </label>
 
                         {/* Individual Zone Options */}
                         {zones.map((zone) => (
-                            <label key={zone.id} className="flex cursor-pointer items-center rounded-lg border border-gray-600 p-3 hover:bg-gray-700">
+                            <label
+                                key={zone.id}
+                                className="flex cursor-pointer items-center rounded-lg border border-gray-600 p-3 hover:bg-gray-700"
+                            >
                                 <input
                                     type="radio"
                                     name="zone"
@@ -90,9 +106,7 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     className="mr-3 h-4 w-4 text-blue-600"
                                 />
                                 <div>
-                                    <div className="font-medium text-white">
-                                        🏷️ {zone.name}
-                                    </div>
+                                    <div className="font-medium text-white">🏷️ {zone.name}</div>
                                     <div className="text-sm text-gray-400">
                                         {zone.plants.length} {t('ต้นไม้') || 'ต้นไม้'}
                                     </div>
@@ -106,7 +120,12 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                 <div className="mb-6 space-y-4">
                     {/* Mode 1: Through SubMain */}
                     <button
-                        onClick={() => onModeSelect('through_submain', selectedZone === 'all' ? undefined : selectedZone)}
+                        onClick={() =>
+                            onModeSelect(
+                                'through_submain',
+                                selectedZone === 'all' ? undefined : selectedZone
+                            )
+                        }
                         className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-blue-300 hover:bg-blue-600"
                     >
                         <div className="flex items-center gap-6">
@@ -118,8 +137,8 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     🔄 {t('ลากผ่านท่อ Sub Main') || 'ลากผ่านท่อ Sub Main'}
                                 </h4>
                                 <p className="text-sm text-gray-300">
-                                    {t('ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน') || 
-                                     'ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน'}
+                                    {t('ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน') ||
+                                        'ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน'}
                                 </p>
                                 <div className="mt-2 flex items-center gap-2 text-xs text-blue-300">
                                     <span>✅ เหมาะสำหรับแนวต้นไม้ที่ตั้งฉากกับท่อ Sub Main</span>
@@ -130,7 +149,12 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
 
                     {/* Mode 2: From SubMain */}
                     <button
-                        onClick={() => onModeSelect('from_submain', selectedZone === 'all' ? undefined : selectedZone)}
+                        onClick={() =>
+                            onModeSelect(
+                                'from_submain',
+                                selectedZone === 'all' ? undefined : selectedZone
+                            )
+                        }
                         className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-green-300 hover:bg-green-600"
                     >
                         <div className="flex items-center gap-6">
@@ -142,8 +166,9 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     🚀 {t('เริ่มจากท่อ Sub Main') || 'เริ่มจากท่อ Sub Main'}
                                 </h4>
                                 <p className="text-sm text-gray-300">
-                                    {t('ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้') || 
-                                     'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
+                                    {t(
+                                        'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'
+                                    ) || 'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
                                 </p>
                                 <div className="mt-2 flex items-center gap-2 text-xs text-green-300">
                                     <span>✅ เหมาะสำหรับแนวต้นไม้ที่ขนานกับท่อ Sub Main</span>

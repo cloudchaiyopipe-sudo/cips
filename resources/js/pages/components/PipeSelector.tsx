@@ -102,7 +102,11 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             const fcData = fieldCropData || getEnhancedFieldCropData();
             if (fcData) {
                 // สร้างข้อมูล pipe สำหรับ field-crop
-                const createFieldCropPipeInfo = (type: string, length: number, flowRate: number) => ({
+                const createFieldCropPipeInfo = (
+                    type: string,
+                    length: number,
+                    flowRate: number
+                ) => ({
                     id: `${type}-pipe-field-crop`,
                     length: length,
                     count: 1,
@@ -115,7 +119,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         return createFieldCropPipeInfo(
                             'branch',
                             fcData.pipes.stats.lateral.longest || 50,
-                            fcData.summary.totalWaterRequirementPerDay / Math.max(fcData.summary.totalPlantingPoints || 1, 1) / 60 // Convert to LPM
+                            fcData.summary.totalWaterRequirementPerDay /
+                                Math.max(fcData.summary.totalPlantingPoints || 1, 1) /
+                                60 // Convert to LPM
                         );
                     case 'secondary':
                         return createFieldCropPipeInfo(
@@ -159,11 +165,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             switch (pipeType) {
                 case 'branch': {
                     // ท่อย่อย - เชื่อมจากท่อเมนไปยังหัวฉีด
-                    const branchLength = currentPlot.pipeStats.sub.longest || currentPlot.pipeStats.drip.longest || 30;
-                    const branchFlowRate = currentPlot.production?.waterCalculation 
-                        ? (currentPlot.production.waterCalculation.dailyWaterNeed?.optimal || 0) / (2 * 30) // 2 ครั้งต่อวัน, 30 นาทีต่อครั้ง
+                    const branchLength =
+                        currentPlot.pipeStats.sub.longest ||
+                        currentPlot.pipeStats.drip.longest ||
+                        30;
+                    const branchFlowRate = currentPlot.production?.waterCalculation
+                        ? (currentPlot.production.waterCalculation.dailyWaterNeed?.optimal || 0) /
+                          (2 * 30) // 2 ครั้งต่อวัน, 30 นาทีต่อครั้ง
                         : currentPlot.production.waterRequirementPerIrrigation / 30; // fallback
-                    
+
                     return createGreenhousePipeInfo(
                         'branch',
                         branchLength,
@@ -177,10 +187,11 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 case 'main': {
                     // ท่อเมนหลัก - จากแหล่งน้ำไปยังโรงเรือน
                     const mainLength = currentPlot.pipeStats.main.longest || 100;
-                    const mainFlowRate = currentPlot.production?.waterCalculation 
-                        ? (currentPlot.production.waterCalculation.dailyWaterNeed?.optimal || 0) / (2 * 30)
+                    const mainFlowRate = currentPlot.production?.waterCalculation
+                        ? (currentPlot.production.waterCalculation.dailyWaterNeed?.optimal || 0) /
+                          (2 * 30)
                         : currentPlot.production.waterRequirementPerIrrigation / 30;
-                    
+
                     return createGreenhousePipeInfo(
                         'main',
                         mainLength,
@@ -256,7 +267,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             default:
                 return null;
         }
-    }, [projectMode, horticultureSystemData, gardenSystemData, greenhouseSystemData, fieldCropData, activeZoneId, pipeType]);
+    }, [
+        projectMode,
+        horticultureSystemData,
+        gardenSystemData,
+        greenhouseSystemData,
+        fieldCropData,
+        activeZoneId,
+        pipeType,
+    ]);
 
     // Calculate sprinkler pressure info
     useEffect(() => {
@@ -283,14 +302,17 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         // สำหรับ greenhouse mode ใช้ greenhouseSystemData
         else if (projectMode === 'greenhouse') {
             if (greenhouseSystemData && activeZoneId) {
-                const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
-                
+                const currentPlot = greenhouseSystemData.summary.plotStats.find(
+                    (p: any) => p.plotId === activeZoneId
+                );
+
                 // ใช้ pressure จาก irrigation elements หรือค่า default
                 let pressureBar = 2.0; // ค่า default สำหรับ greenhouse (ต่ำกว่าสวนบ้าน)
-                
+
                 // ตรวจสอบ irrigation method จาก greenhouse data
-                const irrigationMethod = greenhouseSystemData.projectInfo?.irrigationMethod || 'mini-sprinkler';
-                
+                const irrigationMethod =
+                    greenhouseSystemData.projectInfo?.irrigationMethod || 'mini-sprinkler';
+
                 if (irrigationMethod === 'drip') {
                     pressureBar = 1.5; // ความดันต่ำสำหรับระบบหยด
                 } else if (irrigationMethod === 'mini-sprinkler') {
@@ -298,17 +320,18 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 } else if (irrigationMethod === 'mixed') {
                     pressureBar = 2.2; // ความดันผสมสำหรับระบบผสม
                 }
-                
+
                 // ตรวจสอบจาก irrigation elements
                 if (greenhouseSystemData.rawData?.irrigationElements) {
-                    const sprinklerElements = greenhouseSystemData.rawData.irrigationElements.filter(
-                        (el: any) => el.type === 'sprinkler'
-                    );
+                    const sprinklerElements =
+                        greenhouseSystemData.rawData.irrigationElements.filter(
+                            (el: any) => el.type === 'sprinkler'
+                        );
                     if (sprinklerElements.length > 0 && sprinklerElements[0].pressureBar) {
                         pressureBar = sprinklerElements[0].pressureBar;
                     }
                 }
-                
+
                 const pressureInfo = {
                     pressureBar: pressureBar,
                     headM: pressureBar * 10, // แปลงจากบาร์เป็นเมตร
@@ -330,7 +353,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             if (fieldCropData) {
                 const irrigationByType = fieldCropData.irrigation?.byType || {};
                 let pressureBar = 2.5; // Default pressure for sprinklers
-                
+
                 if (irrigationByType.dripTape > 0) {
                     pressureBar = 1.0; // Lower pressure for drip tape
                 } else if (irrigationByType.pivot > 0) {
@@ -338,7 +361,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 } else if (irrigationByType.waterJetTape > 0) {
                     pressureBar = 1.5; // Medium pressure for water jet tape
                 }
-                
+
                 const pressureInfo = {
                     pressureBar: pressureBar,
                     headM: pressureBar * 10,
@@ -369,7 +392,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             const pressureInfo = calculateSprinklerPressure(selectedSprinkler);
             setSprinklerPressure(pressureInfo);
         }
-    }, [projectMode, horticultureSystemData, gardenSystemData, greenhouseSystemData, fieldCropData, activeZoneId, selectedSprinkler]);
+    }, [
+        projectMode,
+        horticultureSystemData,
+        gardenSystemData,
+        greenhouseSystemData,
+        fieldCropData,
+        activeZoneId,
+        selectedSprinkler,
+    ]);
 
     // Garden mode: ดึงข้อมูล zone statistics
     useEffect(() => {
@@ -444,7 +475,6 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
                     return pipeTypeMatch;
                 });
-                
 
                 // กรองตามขนาดท่อสำหรับแต่ละประเภท
                 if (pipeType === 'branch' || pipeType === 'emitter') {
@@ -453,7 +483,6 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         (pipe) =>
                             pipe.sizeMM <= 32 || (pipe.sizeInch && parseFloat(pipe.sizeInch) <= 1)
                     );
-                    
                 }
 
                 // กรองตามแรงดันหัวฉีด
@@ -461,10 +490,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     filteredPipes = filteredPipes.filter(
                         (pipe) => pipe.pn >= sprinklerPressure.pressureBar
                     );
-                    
                 }
 
-                
                 setAvailablePipes(filteredPipes);
                 // Reset manual selection when pipe type changes to allow auto-selection
                 setIsManuallySelected(false);
@@ -474,24 +501,121 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 if (projectMode === 'field-crop') {
                     const fallbackPipes = [
                         // PE pipes
-                        { id: 1, name: 'PE PN2.5 25mm', productCode: 'PE25', pipeType: 'PE', type: 'PE', sizeMM: 25, pn: 2.5, lengthM: 100, price: 1500, image: null, brand: 'Generic' },
-                        { id: 2, name: 'PE PN2.5 32mm', productCode: 'PE32', pipeType: 'PE', type: 'PE', sizeMM: 32, pn: 2.5, lengthM: 100, price: 2000, image: null, brand: 'Generic' },
-                        { id: 3, name: 'PE PN4 50mm', productCode: 'PE50', pipeType: 'PE', type: 'PE', sizeMM: 50, pn: 4, lengthM: 100, price: 3000, image: null, brand: 'Generic' },
-                        { id: 4, name: 'PE PN4 63mm', productCode: 'PE63', pipeType: 'PE', type: 'PE', sizeMM: 63, pn: 4, lengthM: 100, price: 4000, image: null, brand: 'Generic' },
+                        {
+                            id: 1,
+                            name: 'PE PN2.5 25mm',
+                            productCode: 'PE25',
+                            pipeType: 'PE',
+                            type: 'PE',
+                            sizeMM: 25,
+                            pn: 2.5,
+                            lengthM: 100,
+                            price: 1500,
+                            image: null,
+                            brand: 'Generic',
+                        },
+                        {
+                            id: 2,
+                            name: 'PE PN2.5 32mm',
+                            productCode: 'PE32',
+                            pipeType: 'PE',
+                            type: 'PE',
+                            sizeMM: 32,
+                            pn: 2.5,
+                            lengthM: 100,
+                            price: 2000,
+                            image: null,
+                            brand: 'Generic',
+                        },
+                        {
+                            id: 3,
+                            name: 'PE PN4 50mm',
+                            productCode: 'PE50',
+                            pipeType: 'PE',
+                            type: 'PE',
+                            sizeMM: 50,
+                            pn: 4,
+                            lengthM: 100,
+                            price: 3000,
+                            image: null,
+                            brand: 'Generic',
+                        },
+                        {
+                            id: 4,
+                            name: 'PE PN4 63mm',
+                            productCode: 'PE63',
+                            pipeType: 'PE',
+                            type: 'PE',
+                            sizeMM: 63,
+                            pn: 4,
+                            lengthM: 100,
+                            price: 4000,
+                            image: null,
+                            brand: 'Generic',
+                        },
                         // PVC pipes
-                        { id: 5, name: 'PVC Class5 25mm', productCode: 'PVC25', pipeType: 'PVC', type: 'PVC', sizeMM: 25, pn: 5, lengthM: 100, price: 1200, image: null, brand: 'Generic' },
-                        { id: 6, name: 'PVC Class5 32mm', productCode: 'PVC32', pipeType: 'PVC', type: 'PVC', sizeMM: 32, pn: 5, lengthM: 100, price: 1800, image: null, brand: 'Generic' },
-                        { id: 7, name: 'PVC Class5 50mm', productCode: 'PVC50', pipeType: 'PVC', type: 'PVC', sizeMM: 50, pn: 5, lengthM: 100, price: 2500, image: null, brand: 'Generic' },
-                        { id: 8, name: 'PVC Class5 63mm', productCode: 'PVC63', pipeType: 'PVC', type: 'PVC', sizeMM: 63, pn: 5, lengthM: 100, price: 3500, image: null, brand: 'Generic' },
+                        {
+                            id: 5,
+                            name: 'PVC Class5 25mm',
+                            productCode: 'PVC25',
+                            pipeType: 'PVC',
+                            type: 'PVC',
+                            sizeMM: 25,
+                            pn: 5,
+                            lengthM: 100,
+                            price: 1200,
+                            image: null,
+                            brand: 'Generic',
+                        },
+                        {
+                            id: 6,
+                            name: 'PVC Class5 32mm',
+                            productCode: 'PVC32',
+                            pipeType: 'PVC',
+                            type: 'PVC',
+                            sizeMM: 32,
+                            pn: 5,
+                            lengthM: 100,
+                            price: 1800,
+                            image: null,
+                            brand: 'Generic',
+                        },
+                        {
+                            id: 7,
+                            name: 'PVC Class5 50mm',
+                            productCode: 'PVC50',
+                            pipeType: 'PVC',
+                            type: 'PVC',
+                            sizeMM: 50,
+                            pn: 5,
+                            lengthM: 100,
+                            price: 2500,
+                            image: null,
+                            brand: 'Generic',
+                        },
+                        {
+                            id: 8,
+                            name: 'PVC Class5 63mm',
+                            productCode: 'PVC63',
+                            pipeType: 'PVC',
+                            type: 'PVC',
+                            sizeMM: 63,
+                            pn: 5,
+                            lengthM: 100,
+                            price: 3500,
+                            image: null,
+                            brand: 'Generic',
+                        },
                     ];
-                    
+
                     // Filter fallback pipes based on selected pipe type
                     const filteredFallbackPipes = fallbackPipes.filter((pipe) => {
-                        const pipeTypeMatch = pipe.pipeType?.toLowerCase() === selectedPipeType.toLowerCase() ||
-                                            pipe.type?.toLowerCase() === selectedPipeType.toLowerCase();
+                        const pipeTypeMatch =
+                            pipe.pipeType?.toLowerCase() === selectedPipeType.toLowerCase() ||
+                            pipe.type?.toLowerCase() === selectedPipeType.toLowerCase();
                         return pipeTypeMatch;
                     });
-                    
+
                     // Filter by size for branch/emitter
                     let sizeFilteredPipes = filteredFallbackPipes;
                     if (pipeType === 'branch' || pipeType === 'emitter') {
@@ -499,7 +623,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             (pipe) => pipe.sizeMM <= 32
                         );
                     }
-                    
+
                     // Filter by pressure
                     let pressureFilteredPipes = sizeFilteredPipes;
                     if (sprinklerPressure) {
@@ -507,7 +631,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             (pipe) => pipe.pn >= sprinklerPressure.pressureBar
                         );
                     }
-                    
+
                     setAvailablePipes(pressureFilteredPipes);
                 } else {
                     setAvailablePipes([]);
@@ -838,13 +962,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     }
 
                     localStorage.setItem(storageKey, JSON.stringify(existingCalc));
-                    
+
                     // สำหรับ greenhouse mode ให้บันทึกค่าสูงสุดของ Head Loss
                     if (projectMode === 'greenhouse') {
                         const branchHeadLoss = existingCalc.branch?.headLoss || 0;
                         const mainHeadLoss = existingCalc.main?.headLoss || 0;
                         const totalHeadLoss = branchHeadLoss + mainHeadLoss;
-                        
+
                         // ดึงค่าสูงสุดที่เก็บไว้
                         let maxHeadLoss = 0;
                         try {
@@ -856,15 +980,18 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         } catch (e) {
                             console.error('Error loading max head loss:', e);
                         }
-                        
+
                         // บันทึกค่าสูงสุด
                         if (totalHeadLoss > maxHeadLoss) {
-                            localStorage.setItem('greenhouse_max_head_loss', JSON.stringify({
-                                totalHeadLoss: totalHeadLoss,
-                                branchHeadLoss: branchHeadLoss,
-                                mainHeadLoss: mainHeadLoss,
-                                updatedAt: new Date().toISOString()
-                            }));
+                            localStorage.setItem(
+                                'greenhouse_max_head_loss',
+                                JSON.stringify({
+                                    totalHeadLoss: totalHeadLoss,
+                                    branchHeadLoss: branchHeadLoss,
+                                    mainHeadLoss: mainHeadLoss,
+                                    updatedAt: new Date().toISOString(),
+                                })
+                            );
                         }
                     }
                 } catch (error) {
@@ -1050,7 +1177,12 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         });
 
     // Only show for horticulture, garden, greenhouse and field-crop modes
-    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse' && projectMode !== 'field-crop') {
+    if (
+        projectMode !== 'horticulture' &&
+        projectMode !== 'garden' &&
+        projectMode !== 'greenhouse' &&
+        projectMode !== 'field-crop'
+    ) {
         return (
             <div className="flex items-center justify-center rounded-lg bg-gray-800 p-8">
                 <div className="text-center text-gray-500">
@@ -1105,9 +1237,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${gardenZoneStats.totalPipeLength.toFixed(1)} ม.`
-                                    : projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId
+                                    : projectMode === 'greenhouse' &&
+                                        greenhouseSystemData &&
+                                        activeZoneId
                                       ? (() => {
-                                            const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                                            const currentPlot =
+                                                greenhouseSystemData.summary.plotStats.find(
+                                                    (p: any) => p.plotId === activeZoneId
+                                                );
                                             if (currentPlot) {
                                                 switch (pipeType) {
                                                     case 'branch':
@@ -1130,19 +1267,30 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? gardenZoneStats.sprinklerCount
-                                    : projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId
+                                    : projectMode === 'greenhouse' &&
+                                        greenhouseSystemData &&
+                                        activeZoneId
                                       ? (() => {
-                                            const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                                            const currentPlot =
+                                                greenhouseSystemData.summary.plotStats.find(
+                                                    (p: any) => p.plotId === activeZoneId
+                                                );
                                             if (currentPlot) {
                                                 switch (pipeType) {
                                                     case 'branch':
-                                                        return currentPlot.equipmentCount.sprinklers || 1;
+                                                        return (
+                                                            currentPlot.equipmentCount.sprinklers ||
+                                                            1
+                                                        );
                                                     case 'secondary':
                                                         return 1;
                                                     case 'main':
                                                         return 0;
                                                     case 'emitter':
-                                                        return currentPlot.equipmentCount.sprinklers || 1;
+                                                        return (
+                                                            currentPlot.equipmentCount.sprinklers ||
+                                                            1
+                                                        );
                                                     default:
                                                         return currentZoneBestPipe.count;
                                                 }
@@ -1155,9 +1303,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${(gardenZoneStats.sprinklerFlowRate * gardenZoneStats.sprinklerCount).toFixed(1)} L/min`
-                                    : projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId
+                                    : projectMode === 'greenhouse' &&
+                                        greenhouseSystemData &&
+                                        activeZoneId
                                       ? (() => {
-                                            const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                                            const currentPlot =
+                                                greenhouseSystemData.summary.plotStats.find(
+                                                    (p: any) => p.plotId === activeZoneId
+                                                );
                                             if (currentPlot) {
                                                 switch (pipeType) {
                                                     case 'branch':
@@ -1167,8 +1320,12 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                     case 'main':
                                                         return '0.0 L/min';
                                                     case 'emitter': {
-                                                        const waterCalc = currentPlot.production?.waterCalculation;
-                                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute ?? 6.0;
+                                                        const waterCalc =
+                                                            currentPlot.production
+                                                                ?.waterCalculation;
+                                                        const flowRate =
+                                                            waterCalc?.waterPerPlant
+                                                                ?.litersPerMinute ?? 6.0;
                                                         return `${flowRate.toFixed(1)} L/min`;
                                                     }
                                                     default:

@@ -174,7 +174,7 @@ const createSimpleDragCurvePipe = (
                 lat: (anchorPoints[0].lat + anchorPoints[1].lat) / 2,
                 lng: (anchorPoints[0].lng + anchorPoints[1].lng) / 2,
             };
-            
+
             // Add slight curve by offsetting the midpoint
             const offset = customRadius * 0.1;
             const direction = {
@@ -185,16 +185,16 @@ const createSimpleDragCurvePipe = (
             if (length > 0) {
                 direction.lat /= length;
                 direction.lng /= length;
-                
+
                 const perpendicular = {
                     lat: -direction.lng,
                     lng: direction.lat,
                 };
-                
+
                 midPoint.lat += perpendicular.lat * offset;
                 midPoint.lng += perpendicular.lng * offset;
             }
-            
+
             path.push(anchorPoints[0], midPoint, anchorPoints[1]);
             return { path, guides: [] };
         }

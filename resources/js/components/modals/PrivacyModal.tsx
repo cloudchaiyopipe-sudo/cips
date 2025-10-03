@@ -18,7 +18,9 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                         <div className="rounded-full bg-green-100 p-2">
                             <Shield className="h-5 w-5 text-green-600" />
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900">นโยบายความเป็นส่วนตัว (PDPA)</h2>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            นโยบายความเป็นส่วนตัว (PDPA)
+                        </h2>
                     </div>
                     <Button
                         variant="ghost"
@@ -34,17 +36,21 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                 <div className="max-h-[calc(90vh-120px)] overflow-y-auto px-6 py-6">
                     <div className="prose prose-gray max-w-none">
                         <div className="mb-6 rounded-lg bg-green-50 p-4">
-                            <div className="flex items-center space-x-2 mb-2">
+                            <div className="mb-2 flex items-center space-x-2">
                                 <Lock className="h-4 w-4 text-green-600" />
-                                <span className="text-sm font-medium text-green-800">ความปลอดภัยของข้อมูลส่วนบุคคล</span>
+                                <span className="text-sm font-medium text-green-800">
+                                    ความปลอดภัยของข้อมูลส่วนบุคคล
+                                </span>
                             </div>
                             <p className="text-sm text-green-800">
-                                <strong>วันที่มีผลบังคับใช้:</strong> 1 มกราคม 2025<br />
-                                นโยบายนี้เป็นไปตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA)
+                                <strong>วันที่มีผลบังคับใช้:</strong> 1 มกราคม 2025
+                                <br />
+                                นโยบายนี้เป็นไปตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
+                                (PDPA)
                             </p>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                        <h3 className="mb-4 flex items-center space-x-2 text-lg font-semibold text-gray-900">
                             <Database className="h-5 w-5 text-blue-600" />
                             <span>1. ข้อมูลส่วนบุคคลที่เราเก็บรวบรวม</span>
                         </h3>
@@ -53,8 +59,8 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                         </p>
                         <div className="mb-6 grid gap-4 md:grid-cols-2">
                             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                <h4 className="font-semibold text-blue-900 mb-2">ข้อมูลพื้นฐาน</h4>
-                                <ul className="text-sm text-blue-800 space-y-1">
+                                <h4 className="mb-2 font-semibold text-blue-900">ข้อมูลพื้นฐาน</h4>
+                                <ul className="space-y-1 text-sm text-blue-800">
                                     <li>• ชื่อ-นามสกุล</li>
                                     <li>• อีเมล</li>
                                     <li>• รหัสผ่าน (เข้ารหัส)</li>
@@ -62,8 +68,10 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                                 </ul>
                             </div>
                             <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
-                                <h4 className="font-semibold text-purple-900 mb-2">ข้อมูลการใช้งาน</h4>
-                                <ul className="text-sm text-purple-800 space-y-1">
+                                <h4 className="mb-2 font-semibold text-purple-900">
+                                    ข้อมูลการใช้งาน
+                                </h4>
+                                <ul className="space-y-1 text-sm text-purple-800">
                                     <li>• ประวัติการเข้าสู่ระบบ</li>
                                     <li>• การคำนวณและโครงการ</li>
                                     <li>• IP Address</li>
@@ -72,14 +80,16 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                             </div>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                        <h3 className="mb-4 flex items-center space-x-2 text-lg font-semibold text-gray-900">
                             <Eye className="h-5 w-5 text-green-600" />
                             <span>2. วัตถุประสงค์ในการเก็บรวบรวมข้อมูล</span>
                         </h3>
                         <div className="mb-6 space-y-3">
                             <div className="rounded-lg border-l-4 border-green-500 bg-green-50 p-4">
-                                <h4 className="font-semibold text-green-900 mb-2">การให้บริการหลัก</h4>
-                                <ul className="text-sm text-green-800 space-y-1">
+                                <h4 className="mb-2 font-semibold text-green-900">
+                                    การให้บริการหลัก
+                                </h4>
+                                <ul className="space-y-1 text-sm text-green-800">
                                     <li>• สร้างและจัดการบัญชีผู้ใช้</li>
                                     <li>• ให้บริการระบบคำนวณอุปกรณ์ชลประทาน</li>
                                     <li>• บันทึกและจัดเก็บโครงการของท่าน</li>
@@ -87,8 +97,10 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                                 </ul>
                             </div>
                             <div className="rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
-                                <h4 className="font-semibold text-blue-900 mb-2">การปรับปรุงบริการ</h4>
-                                <ul className="text-sm text-blue-800 space-y-1">
+                                <h4 className="mb-2 font-semibold text-blue-900">
+                                    การปรับปรุงบริการ
+                                </h4>
+                                <ul className="space-y-1 text-sm text-blue-800">
                                     <li>• วิเคราะห์การใช้งานเพื่อพัฒนาระบบ</li>
                                     <li>• ป้องกันการใช้งานที่ผิดปกติ</li>
                                     <li>• รักษาความปลอดภัยของระบบ</li>
@@ -96,43 +108,57 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                             </div>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">3. การแชร์ข้อมูลกับบุคคลที่สาม</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            3. การแชร์ข้อมูลกับบุคคลที่สาม
+                        </h3>
                         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-                            <div className="flex items-center space-x-2 mb-2">
+                            <div className="mb-2 flex items-center space-x-2">
                                 <Shield className="h-4 w-4 text-red-600" />
-                                <span className="font-semibold text-red-900">นโยบายการไม่แชร์ข้อมูล</span>
+                                <span className="font-semibold text-red-900">
+                                    นโยบายการไม่แชร์ข้อมูล
+                                </span>
                             </div>
                             <p className="text-sm text-red-800">
-                                <strong>เราไม่ขาย แชร์ หรือให้เช่าข้อมูลส่วนบุคคลของท่านกับบุคคลที่สาม</strong> 
+                                <strong>
+                                    เราไม่ขาย แชร์ หรือให้เช่าข้อมูลส่วนบุคคลของท่านกับบุคคลที่สาม
+                                </strong>
                                 ยกเว้นในกรณีดังต่อไปนี้:
                             </p>
-                            <ul className="mt-2 text-sm text-red-800 space-y-1">
+                            <ul className="mt-2 space-y-1 text-sm text-red-800">
                                 <li>• เมื่อได้รับความยินยอมจากท่าน</li>
                                 <li>• เพื่อปฏิบัติตามกฎหมายหรือคำสั่งศาล</li>
                                 <li>• เพื่อป้องกันอันตรายต่อความปลอดภัย</li>
                             </ul>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">4. การรักษาความปลอดภัยข้อมูล</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            4. การรักษาความปลอดภัยข้อมูล
+                        </h3>
                         <div className="mb-6 grid gap-4 md:grid-cols-3">
                             <div className="rounded-lg bg-gray-50 p-4 text-center">
                                 <Lock className="mx-auto mb-2 h-8 w-8 text-gray-600" />
-                                <h4 className="font-semibold text-gray-900 mb-1">การเข้ารหัส</h4>
-                                <p className="text-xs text-gray-600">ข้อมูลถูกเข้ารหัสด้วย SSL/TLS</p>
+                                <h4 className="mb-1 font-semibold text-gray-900">การเข้ารหัส</h4>
+                                <p className="text-xs text-gray-600">
+                                    ข้อมูลถูกเข้ารหัสด้วย SSL/TLS
+                                </p>
                             </div>
                             <div className="rounded-lg bg-gray-50 p-4 text-center">
                                 <Shield className="mx-auto mb-2 h-8 w-8 text-gray-600" />
-                                <h4 className="font-semibold text-gray-900 mb-1">การควบคุมการเข้าถึง</h4>
+                                <h4 className="mb-1 font-semibold text-gray-900">
+                                    การควบคุมการเข้าถึง
+                                </h4>
                                 <p className="text-xs text-gray-600">เฉพาะบุคลากรที่ได้รับอนุญาต</p>
                             </div>
                             <div className="rounded-lg bg-gray-50 p-4 text-center">
                                 <Database className="mx-auto mb-2 h-8 w-8 text-gray-600" />
-                                <h4 className="font-semibold text-gray-900 mb-1">การสำรองข้อมูล</h4>
+                                <h4 className="mb-1 font-semibold text-gray-900">การสำรองข้อมูล</h4>
                                 <p className="text-xs text-gray-600">สำรองข้อมูลอย่างปลอดภัย</p>
                             </div>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">5. สิทธิของเจ้าของข้อมูลส่วนบุคคล</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            5. สิทธิของเจ้าของข้อมูลส่วนบุคคล
+                        </h3>
                         <p className="mb-4 text-gray-700">ตามกฎหมาย PDPA ท่านมีสิทธิดังต่อไปนี้:</p>
                         <div className="mb-6 grid gap-3 md:grid-cols-2">
                             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -141,7 +167,9 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                                 </div>
                                 <div>
                                     <h4 className="font-medium text-gray-900">สิทธิในการเข้าถึง</h4>
-                                    <p className="text-sm text-gray-600">ขอดูข้อมูลส่วนบุคคลที่เราเก็บไว้</p>
+                                    <p className="text-sm text-gray-600">
+                                        ขอดูข้อมูลส่วนบุคคลที่เราเก็บไว้
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -150,7 +178,9 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                                 </div>
                                 <div>
                                     <h4 className="font-medium text-gray-900">สิทธิในการแก้ไข</h4>
-                                    <p className="text-sm text-gray-600">ขอแก้ไขข้อมูลที่ไม่ถูกต้อง</p>
+                                    <p className="text-sm text-gray-600">
+                                        ขอแก้ไขข้อมูลที่ไม่ถูกต้อง
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-start space-x-3 rounded-lg border p-3">
@@ -168,14 +198,18 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                                 </div>
                                 <div>
                                     <h4 className="font-medium text-gray-900">สิทธิในการคัดค้าน</h4>
-                                    <p className="text-sm text-gray-600">คัดค้านการประมวลผลข้อมูล</p>
+                                    <p className="text-sm text-gray-600">
+                                        คัดค้านการประมวลผลข้อมูล
+                                    </p>
                                 </div>
                             </div>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">6. การเก็บรักษาข้อมูล</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            6. การเก็บรักษาข้อมูล
+                        </h3>
                         <p className="mb-4 text-gray-700">
-                            เราจะเก็บรักษาข้อมูลส่วนบุคคลของท่านตราบเท่าที่จำเป็นเพื่อวัตถุประสงค์ที่ระบุไว้ 
+                            เราจะเก็บรักษาข้อมูลส่วนบุคคลของท่านตราบเท่าที่จำเป็นเพื่อวัตถุประสงค์ที่ระบุไว้
                             หรือตามที่กฎหมายกำหนด โดยทั่วไป:
                         </p>
                         <ul className="mb-6 list-disc pl-6 text-gray-700">
@@ -184,7 +218,9 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                             <li>ข้อมูล Log: เก็บไว้ 1 ปี เพื่อความปลอดภัย</li>
                         </ul>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">7. การใช้ Cookies</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            7. การใช้ Cookies
+                        </h3>
                         <p className="mb-4 text-gray-700">
                             เราใช้ Cookies เพื่อปรับปรุงประสบการณ์การใช้งานของท่าน รวมถึง:
                         </p>
@@ -195,13 +231,18 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                         </ul>
 
                         <div className="mt-8 rounded-lg bg-gray-50 p-4">
-                            <h4 className="font-semibold text-gray-900 mb-2">การติดต่อเรื่องข้อมูลส่วนบุคคล</h4>
-                            <p className="text-sm text-gray-600 mb-2">
-                                หากท่านต้องการใช้สิทธิหรือมีข้อสงสัยเกี่ยวกับการคุ้มครองข้อมูลส่วนบุคคล กรุณาติดต่อ:
+                            <h4 className="mb-2 font-semibold text-gray-900">
+                                การติดต่อเรื่องข้อมูลส่วนบุคคล
+                            </h4>
+                            <p className="mb-2 text-sm text-gray-600">
+                                หากท่านต้องการใช้สิทธิหรือมีข้อสงสัยเกี่ยวกับการคุ้มครองข้อมูลส่วนบุคคล
+                                กรุณาติดต่อ:
                             </p>
                             <div className="text-sm text-gray-600">
-                                <strong>เจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO)</strong><br />
-                                บริษัท กนกส์โปรดักส์ จำกัด<br />
+                                <strong>เจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO)</strong>
+                                <br />
+                                บริษัท กนกส์โปรดักส์ จำกัด
+                                <br />
                                 โทรศัพท์: 02-451-1111 กด 2<br />
                                 <strong>เวลาทำการ:</strong> จันทร์-เสาร์ 8:00-17:00 น.
                             </div>

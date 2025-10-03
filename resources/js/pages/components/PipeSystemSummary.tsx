@@ -41,14 +41,22 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
     const { t } = useLanguage();
 
     // Only show for supported modes
-    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'field-crop' && projectMode !== 'greenhouse') {
+    if (
+        projectMode !== 'horticulture' &&
+        projectMode !== 'garden' &&
+        projectMode !== 'field-crop' &&
+        projectMode !== 'greenhouse'
+    ) {
         return null;
     }
 
     // Don't show if no data
-    const systemData = projectMode === 'garden' ? gardenSystemData : 
-                      projectMode === 'greenhouse' ? greenhouseData : 
-                      horticultureSystemData;
+    const systemData =
+        projectMode === 'garden'
+            ? gardenSystemData
+            : projectMode === 'greenhouse'
+              ? greenhouseData
+              : horticultureSystemData;
     if (!sprinklerPressure || !systemData || !activeZoneId) {
         return null;
     }
@@ -64,7 +72,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                       : projectMode === 'field-crop'
                         ? 'field_crop_pipe_calculations'
                         : 'horticulture_pipe_calculations';
-            
+
             const storedCalcStr = localStorage.getItem(storageKey);
             return storedCalcStr ? JSON.parse(storedCalcStr) : {};
         } catch (error) {
@@ -74,71 +82,87 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
     }, [projectMode]);
 
     const calculateData = useCallback(() => {
-
         const storedCalculations = getStoredCalculations();
-        
+
         // สำหรับ greenhouse mode ให้กรองเฉพาะท่อที่ใช้จริง (ท่อเมนหลักและท่อย่อย)
-        const filteredCalculations = projectMode === 'greenhouse' ? {
-            branch: storedCalculations.branch || {},
-            main: storedCalculations.main || {},
-            // greenhouse ไม่มีท่อเมนรองและท่อย่อยแยก
-            secondary: {},
-            emitter: {}
-        } : storedCalculations;
+        const filteredCalculations =
+            projectMode === 'greenhouse'
+                ? {
+                      branch: storedCalculations.branch || {},
+                      main: storedCalculations.main || {},
+                      // greenhouse ไม่มีท่อเมนรองและท่อย่อยแยก
+                      secondary: {},
+                      emitter: {},
+                  }
+                : storedCalculations;
 
         // ล้างข้อมูลเก่าใน localStorage สำหรับ greenhouse mode
-        if (projectMode === 'greenhouse' && (storedCalculations.secondary || storedCalculations.emitter)) {
+        if (
+            projectMode === 'greenhouse' &&
+            (storedCalculations.secondary || storedCalculations.emitter)
+        ) {
             const cleanedData = {
                 branch: storedCalculations.branch || {},
-                main: storedCalculations.main || {}
+                main: storedCalculations.main || {},
             };
             localStorage.setItem('greenhouse_pipe_calculations', JSON.stringify(cleanedData));
         }
-        
-        
+
         // ถ้าไม่มีข้อมูลการคำนวณ หรือไม่มี selectedPipes ให้ return null
         if (!selectedPipes || Object.keys(filteredCalculations).length === 0) {
             return null;
         }
 
         // สร้าง calculation results จากข้อมูลที่กรองแล้ว
-        const branchCalc = filteredCalculations.branch ? {
-            headLoss: filteredCalculations.branch.headLoss || 0,
-            pipeLength: filteredCalculations.branch.pipeLength || 0,
-            flowRate: filteredCalculations.branch.flowRate || 0,
-        } : null;
+        const branchCalc = filteredCalculations.branch
+            ? {
+                  headLoss: filteredCalculations.branch.headLoss || 0,
+                  pipeLength: filteredCalculations.branch.pipeLength || 0,
+                  flowRate: filteredCalculations.branch.flowRate || 0,
+              }
+            : null;
 
-        const subMainCalc = filteredCalculations.secondary ? {
-            headLoss: filteredCalculations.secondary.headLoss || 0,
-            pipeLength: filteredCalculations.secondary.pipeLength || 0,
-            flowRate: filteredCalculations.secondary.flowRate || 0,
-        } : null;
+        const subMainCalc = filteredCalculations.secondary
+            ? {
+                  headLoss: filteredCalculations.secondary.headLoss || 0,
+                  pipeLength: filteredCalculations.secondary.pipeLength || 0,
+                  flowRate: filteredCalculations.secondary.flowRate || 0,
+              }
+            : null;
 
-        const mainCalc = filteredCalculations.main ? {
-            headLoss: filteredCalculations.main.headLoss || 0,
-            pipeLength: filteredCalculations.main.pipeLength || 0,
-            flowRate: filteredCalculations.main.flowRate || 0,
-        } : null;
+        const mainCalc = filteredCalculations.main
+            ? {
+                  headLoss: filteredCalculations.main.headLoss || 0,
+                  pipeLength: filteredCalculations.main.pipeLength || 0,
+                  flowRate: filteredCalculations.main.flowRate || 0,
+              }
+            : null;
 
         // คำนวณ emitter pipe จากข้อมูลที่กรองแล้ว
-        const emitterCalc = filteredCalculations.emitter ? {
-            headLoss: filteredCalculations.emitter.headLoss || 0,
-            pipeLength: filteredCalculations.emitter.pipeLength || 0,
-            flowRate: filteredCalculations.emitter.flowRate || 0,
-        } : null;
+        const emitterCalc = filteredCalculations.emitter
+            ? {
+                  headLoss: filteredCalculations.emitter.headLoss || 0,
+                  pipeLength: filteredCalculations.emitter.pipeLength || 0,
+                  flowRate: filteredCalculations.emitter.flowRate || 0,
+              }
+            : null;
 
         // สำหรับ greenhouse mode คำนวณ total head loss = ท่อเมนหลัก + ท่อย่อย (ไม่มีท่อเมนรอง)
-        const branchSubMainCombined = projectMode === 'greenhouse' 
-            ? (branchCalc?.headLoss || 0)
-            : (branchCalc?.headLoss || 0) + (subMainCalc?.headLoss || 0);
-        
+        const branchSubMainCombined =
+            projectMode === 'greenhouse'
+                ? branchCalc?.headLoss || 0
+                : (branchCalc?.headLoss || 0) + (subMainCalc?.headLoss || 0);
+
         // สำหรับ greenhouse mode คำนวณ total head loss ทั้งระบบ
-        const totalHeadLoss = projectMode === 'greenhouse'
-            ? (mainCalc?.headLoss || 0) + (branchCalc?.headLoss || 0) // ท่อเมนหลัก + ท่อย่อย
-            : (mainCalc?.headLoss || 0) + (subMainCalc?.headLoss || 0) + (branchCalc?.headLoss || 0) + (emitterCalc?.headLoss || 0);
-        
+        const totalHeadLoss =
+            projectMode === 'greenhouse'
+                ? (mainCalc?.headLoss || 0) + (branchCalc?.headLoss || 0) // ท่อเมนหลัก + ท่อย่อย
+                : (mainCalc?.headLoss || 0) +
+                  (subMainCalc?.headLoss || 0) +
+                  (branchCalc?.headLoss || 0) +
+                  (emitterCalc?.headLoss || 0);
+
         const head20Percent = sprinklerPressure.head20PercentM;
-        
 
         return {
             branchCalc,
@@ -154,7 +178,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
     // ใช้ state แทน useMemo เพื่อให้สามารถอัปเดตได้
     const [calculationData, setCalculationData] = useState(() => calculateData());
     const calculationDataRef = useRef(calculationData);
-    
+
     // อัปเดต ref เมื่อ state เปลี่ยน
     useEffect(() => {
         calculationDataRef.current = calculationData;
@@ -175,7 +199,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             // เปรียบเทียบค่าเพื่อหลีกเลี่ยงการ re-render ที่ไม่จำเป็น
             const currentDataString = JSON.stringify(calculationDataRef.current);
             const newDataString = JSON.stringify(newData);
-            
+
             if (currentDataString !== newDataString) {
                 setCalculationData(newData);
             }
@@ -199,8 +223,15 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         return null;
     }
 
-    const { branchCalc, subMainCalc, mainCalc, emitterCalc, branchSubMainCombined, totalHeadLoss, head20Percent } =
-        calculationData;
+    const {
+        branchCalc,
+        subMainCalc,
+        mainCalc,
+        emitterCalc,
+        branchSubMainCombined,
+        totalHeadLoss,
+        head20Percent,
+    } = calculationData;
 
     return (
         <div className="mt-6 rounded bg-blue-900 p-4">
@@ -215,7 +246,9 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">แรงดัน</span>
                         <span className="text-lg font-bold text-white">
-                            {parseFloat((sprinklerPressure?.pressureBar || 0).toFixed(2)).toString()}
+                            {parseFloat(
+                                (sprinklerPressure?.pressureBar || 0).toFixed(2)
+                            ).toString()}
                         </span>
                         <span className="text-lg text-blue-300">บาร์</span>
                     </div>
@@ -297,52 +330,69 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                                 {(head20Percent || 0).toFixed(3)} ม.
                                             </span>
                                         </div>
-                                        
+
                                         {/* แสดง Total Head Loss สำหรับ greenhouse mode */}
                                         {projectMode === 'greenhouse' && (
                                             <div className="flex justify-between">
                                                 <span className="text-blue-300">
                                                     Head Loss รวมทั้งระบบ:
                                                 </span>
-                                                <span className={`font-bold ${totalHeadLoss > head20Percent ? 'text-red-400' : 'text-green-400'}`}>
+                                                <span
+                                                    className={`font-bold ${totalHeadLoss > head20Percent ? 'text-red-400' : 'text-green-400'}`}
+                                                >
                                                     {totalHeadLoss.toFixed(3)} ม.
                                                 </span>
                                             </div>
                                         )}
-                                        
+
                                         {/* Debug info สำหรับ greenhouse mode */}
                                         {projectMode === 'greenhouse' && (
-                                            <div className="text-xs text-gray-400 mt-2">
-                                                Debug: Branch={branchCalc?.headLoss?.toFixed(3) || '0'} + Main={mainCalc?.headLoss?.toFixed(3) || '0'} = {totalHeadLoss.toFixed(3)}
+                                            <div className="mt-2 text-xs text-gray-400">
+                                                Debug: Branch=
+                                                {branchCalc?.headLoss?.toFixed(3) || '0'} + Main=
+                                                {mainCalc?.headLoss?.toFixed(3) || '0'} ={' '}
+                                                {totalHeadLoss.toFixed(3)}
                                             </div>
                                         )}
 
                                         {/* Warning Messages สำหรับ greenhouse mode */}
-                                        {projectMode === 'greenhouse' && totalHeadLoss > head20Percent && (
-                                            <div className="rounded border border-red-700 bg-red-900 p-2">
-                                                <span className="text-xs text-red-300">
-                                                    ⚠️ <strong>คำเตือน:</strong> Head Loss รวมทั้งระบบ ({totalHeadLoss.toFixed(3)} ม.) เกินขีดจำกัด 20% Head หัวฉีด ({head20Percent.toFixed(3)} ม.) อยู่ {(totalHeadLoss - head20Percent).toFixed(3)} ม.
-                                                </span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Warning Messages สำหรับ mode อื่นๆ */}
-                                        {projectMode !== 'greenhouse' && mainCalc && mainCalc.headLoss > head20Percent && (
-                                            <div className="rounded border border-red-700 bg-red-900 p-2">
-                                                <span className="text-xs text-red-300">
-                                                    ⚠️ <strong>คำเตือน:</strong> ท่อเมนหลักมี Head
-                                                    Loss เกินขีดจำกัด{' '}
-                                                    {(mainCalc.headLoss - (head20Percent || 0)).toFixed(3)}{' '}
-                                                    ม.
-                                                </span>
-                                            </div>
-                                        )}
+                                        {projectMode === 'greenhouse' &&
+                                            totalHeadLoss > head20Percent && (
+                                                <div className="rounded border border-red-700 bg-red-900 p-2">
+                                                    <span className="text-xs text-red-300">
+                                                        ⚠️ <strong>คำเตือน:</strong> Head Loss
+                                                        รวมทั้งระบบ ({totalHeadLoss.toFixed(3)} ม.)
+                                                        เกินขีดจำกัด 20% Head หัวฉีด (
+                                                        {head20Percent.toFixed(3)} ม.) อยู่{' '}
+                                                        {(totalHeadLoss - head20Percent).toFixed(3)}{' '}
+                                                        ม.
+                                                    </span>
+                                                </div>
+                                            )}
 
-                                        {projectMode !== 'greenhouse' && branchCalc &&
+                                        {/* Warning Messages สำหรับ mode อื่นๆ */}
+                                        {projectMode !== 'greenhouse' &&
+                                            mainCalc &&
+                                            mainCalc.headLoss > head20Percent && (
+                                                <div className="rounded border border-red-700 bg-red-900 p-2">
+                                                    <span className="text-xs text-red-300">
+                                                        ⚠️ <strong>คำเตือน:</strong> ท่อเมนหลักมี
+                                                        Head Loss เกินขีดจำกัด{' '}
+                                                        {(
+                                                            mainCalc.headLoss - (head20Percent || 0)
+                                                        ).toFixed(3)}{' '}
+                                                        ม.
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                        {projectMode !== 'greenhouse' &&
+                                            branchCalc &&
                                             branchSubMainCombined > head20Percent && (
                                                 <div className="rounded border border-red-700 bg-red-900 p-2">
                                                     <span className="text-xs text-red-300">
-                                                        ⚠️ <strong>คำเตือน:</strong> ท่อย่อย + ท่อเมนรอง มี Head Loss เกินขีดจำกัด{' '}
+                                                        ⚠️ <strong>คำเตือน:</strong> ท่อย่อย +
+                                                        ท่อเมนรอง มี Head Loss เกินขีดจำกัด{' '}
                                                         {(
                                                             branchSubMainCombined - head20Percent
                                                         ).toFixed(3)}{' '}
@@ -352,16 +402,21 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                             )}
 
                                         {/* Success Message */}
-                                        {projectMode === 'greenhouse' && totalHeadLoss <= head20Percent && (
-                                            <div className="rounded border border-green-700 bg-green-900 p-2">
-                                                <span className="text-xs text-green-300">
-                                                    ✅ <strong>ปกติ:</strong> Head Loss รวมทั้งระบบ ({totalHeadLoss.toFixed(3)} ม.) อยู่ในขีดจำกัดที่ยอมรับได้
-                                                </span>
-                                            </div>
-                                        )}
-                                        
-                                        {projectMode !== 'greenhouse' && (!mainCalc || mainCalc.headLoss <= head20Percent) &&
-                                            (!branchCalc || branchSubMainCombined <= head20Percent) && (
+                                        {projectMode === 'greenhouse' &&
+                                            totalHeadLoss <= head20Percent && (
+                                                <div className="rounded border border-green-700 bg-green-900 p-2">
+                                                    <span className="text-xs text-green-300">
+                                                        ✅ <strong>ปกติ:</strong> Head Loss
+                                                        รวมทั้งระบบ ({totalHeadLoss.toFixed(3)} ม.)
+                                                        อยู่ในขีดจำกัดที่ยอมรับได้
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                        {projectMode !== 'greenhouse' &&
+                                            (!mainCalc || mainCalc.headLoss <= head20Percent) &&
+                                            (!branchCalc ||
+                                                branchSubMainCombined <= head20Percent) && (
                                                 <div className="rounded border border-green-700 bg-green-900 p-2">
                                                     <span className="text-xs text-green-300">
                                                         ✅ <strong>ปกติ:</strong> ค่า Head Loss

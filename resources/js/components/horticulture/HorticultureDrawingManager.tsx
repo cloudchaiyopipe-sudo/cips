@@ -273,17 +273,23 @@ const advancedSnapToMainArea = (
     ).length;
 
     if (snappedCount > 0) {
-        if (typeof window !== 'undefined' && (window as unknown as { showSnapNotification?: (message: string) => void }).showSnapNotification) {
-            (window as unknown as { showSnapNotification: (message: string) => void }).showSnapNotification(
-                `${snappedCount} points snapped to main area boundary`
-            );
+        if (
+            typeof window !== 'undefined' &&
+            (window as unknown as { showSnapNotification?: (message: string) => void })
+                .showSnapNotification
+        ) {
+            (
+                window as unknown as { showSnapNotification: (message: string) => void }
+            ).showSnapNotification(`${snappedCount} points snapped to main area boundary`);
         }
     }
 
     return snappedCoordinates;
 };
 
-const extractCoordinatesFromShape = (shape: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | google.maps.Polyline): Coordinate[] => {
+const extractCoordinatesFromShape = (
+    shape: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | google.maps.Polyline
+): Coordinate[] => {
     try {
         let coordinates: Coordinate[] = [];
 
@@ -1001,7 +1007,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             setIsCurvedDrawingActive(false);
         }
     }, [enableCurvedDrawing, editMode]);
-
 
     useEffect(() => {
         return () => {

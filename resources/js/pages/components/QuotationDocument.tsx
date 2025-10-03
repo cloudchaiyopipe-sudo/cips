@@ -368,9 +368,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
         const isMultiZone =
             projectData?.useZones && projectData.zones && projectData.zones.length > 1;
-        
+
         const isGreenhouseMode = projectMode === 'greenhouse' && greenhouseData;
-        const isGreenhouseMultiPlot = isGreenhouseMode && greenhouseData.summary?.plotStats?.length > 1;
+        const isGreenhouseMultiPlot =
+            isGreenhouseMode && greenhouseData.summary?.plotStats?.length > 1;
 
         if (isGreenhouseMultiPlot) {
             // Handle greenhouse multi-plot mode
@@ -391,7 +392,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     if (sprinklerQuantity === 0) {
                         const totalPlants = plot.production?.totalPlants || 0;
                         const effectiveArea = plot.effectivePlantingArea || plot.area || 0;
-                        
+
                         if (totalPlants > 0) {
                             sprinklerQuantity = Math.ceil(totalPlants / 15);
                         } else if (effectiveArea > 0) {
@@ -427,8 +428,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
                 if (branchPipe) {
                     const pipeKey = `branch_${branchPipe.id}`;
-                    const plotRatio = (plot.production?.totalPlants || 0) / Math.max(totalPlantsInAllPlots, 1);
-                    const rolls = Math.max(1, Math.ceil((results.branchPipeRolls || 1) * plotRatio));
+                    const plotRatio =
+                        (plot.production?.totalPlants || 0) / Math.max(totalPlantsInAllPlots, 1);
+                    const rolls = Math.max(
+                        1,
+                        Math.ceil((results.branchPipeRolls || 1) * plotRatio)
+                    );
 
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);

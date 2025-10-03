@@ -2246,19 +2246,19 @@ export default function GreenhouseMap() {
                             for (let i = 0; i < elementToDelete.points.length; i++) {
                                 const pipePoint = elementToDelete.points[i];
                                 const dripPoint = dripLine.points[i];
-                                
+
                                 // ตรวจสอบระยะห่างระหว่างจุด (ถ้าใกล้กันมากกว่า 10 pixels ถือว่าเกี่ยวข้อง)
                                 const distance = Math.sqrt(
                                     Math.pow(pipePoint.x - dripPoint.x, 2) +
-                                    Math.pow(pipePoint.y - dripPoint.y, 2)
+                                        Math.pow(pipePoint.y - dripPoint.y, 2)
                                 );
-                                
+
                                 if (distance > 10) {
                                     isRelated = false;
                                     break;
                                 }
                             }
-                            
+
                             if (isRelated) {
                                 relatedDripLines.push(dripLine.id);
                             }
@@ -2267,9 +2267,10 @@ export default function GreenhouseMap() {
 
                 // ลบท่อย่อย สปริงเกลอร์ และสายน้ำหยดที่เกี่ยวข้องเรียบร้อยแล้ว
                 newIrrigationElements = irrigationElements.filter(
-                    (el) => el.id !== selectedElement && 
-                           !relatedSprinklers.includes(el.id) && 
-                           !relatedDripLines.includes(el.id)
+                    (el) =>
+                        el.id !== selectedElement &&
+                        !relatedSprinklers.includes(el.id) &&
+                        !relatedDripLines.includes(el.id)
                 );
 
                 // แสดงข้อความแจ้งเตือน
@@ -2277,13 +2278,19 @@ export default function GreenhouseMap() {
                 if (totalRelated > 0) {
                     let message = t('ลบท่อย่อยและ');
                     if (relatedSprinklers.length > 0) {
-                        message += t('สปริงเกลอร์ {count} ตัว').replace('{count}', relatedSprinklers.length.toString());
+                        message += t('สปริงเกลอร์ {count} ตัว').replace(
+                            '{count}',
+                            relatedSprinklers.length.toString()
+                        );
                     }
                     if (relatedSprinklers.length > 0 && relatedDripLines.length > 0) {
                         message += t(' และ');
                     }
                     if (relatedDripLines.length > 0) {
-                        message += t('สายน้ำหยด {count} เส้น').replace('{count}', relatedDripLines.length.toString());
+                        message += t('สายน้ำหยด {count} เส้น').replace(
+                            '{count}',
+                            relatedDripLines.length.toString()
+                        );
                     }
                     message += t('ที่เกี่ยวข้องเรียบร้อยแล้ว');
                     alert(message);

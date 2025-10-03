@@ -72,7 +72,6 @@ export const consumeTokens = async (tokens: number, operation: string): Promise<
     }
 };
 
-
 /**
  * Get current token status
  */

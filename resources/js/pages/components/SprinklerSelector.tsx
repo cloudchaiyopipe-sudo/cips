@@ -75,14 +75,15 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             const totalWaterRequirement = fcData.summary?.totalWaterRequirementPerDay || 0;
             const totalPlantingPoints = fcData.summary?.totalPlantingPoints || 1;
             const irrigationTimeMinutes = 30; // Default irrigation time
-            
+
             // Calculate flow per sprinkler (LPM)
-            const targetFlowPerSprinkler = totalWaterRequirement / totalPlantingPoints / irrigationTimeMinutes;
-            
+            const targetFlowPerSprinkler =
+                totalWaterRequirement / totalPlantingPoints / irrigationTimeMinutes;
+
             // Calculate target pressure based on irrigation type
             const irrigationByType = fcData.irrigation?.byType || {};
             let targetPressure = 2.5; // Default pressure for sprinklers
-            
+
             if (irrigationByType.dripTape > 0) {
                 targetPressure = 1.0; // Lower pressure for drip tape
             } else if (irrigationByType.pivot > 0) {
@@ -90,7 +91,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             } else if (irrigationByType.waterJetTape > 0) {
                 targetPressure = 1.5; // Medium pressure for water jet tape
             }
-            
+
             return {
                 targetFlowPerSprinkler,
                 targetPressure,
@@ -99,7 +100,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 irrigationTypes: irrigationByType,
             };
         }
-        
+
         return null;
     }, [fieldCropData]);
 
@@ -111,23 +112,23 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 // Find the best matching sprinkler based on field-crop requirements
                 const targetFlow = fieldCropRequirements.targetFlowPerSprinkler;
                 const targetPressure = fieldCropRequirements.targetPressure;
-                
+
                 // Sort sprinklers by how well they match the requirements
                 const sortedSprinklers = analyzedSprinklers
-                    .map(sprinkler => {
+                    .map((sprinkler) => {
                         const sprinklerFlow = sprinkler.waterVolumeLitersPerMinute || 0;
                         const sprinklerPressure = getAverageValue(sprinkler.pressureBar);
-                        
+
                         // Calculate match score (lower is better)
                         const flowDiff = Math.abs(sprinklerFlow - targetFlow);
                         const pressureDiff = Math.abs(sprinklerPressure - targetPressure);
-                        const matchScore = flowDiff + (pressureDiff * 2); // Weight pressure more
-                        
+                        const matchScore = flowDiff + pressureDiff * 2; // Weight pressure more
+
                         return {
                             ...sprinkler,
                             matchScore,
                             flowDiff,
-                            pressureDiff
+                            pressureDiff,
                         };
                     })
                     .sort((a, b) => {
@@ -138,14 +139,20 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         // Then by price
                         return a.price - b.price;
                     });
-                
+
                 // Select the best matching sprinkler
                 if (sortedSprinklers.length > 0) {
                     onSprinklerChange(sortedSprinklers[0]);
                 }
             }
         }
-    }, [projectMode, selectedSprinkler, analyzedSprinklers, getFieldCropSprinklerRequirements, onSprinklerChange]);
+    }, [
+        projectMode,
+        selectedSprinkler,
+        analyzedSprinklers,
+        getFieldCropSprinklerRequirements,
+        onSprinklerChange,
+    ]);
 
     // Helper function to get average value from range or single value
     const getAverageValue = (value: any): number => {
@@ -181,7 +188,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
     // Auto-select sprinkler for horticulture, garden, and greenhouse modes based on system requirements
     useEffect(() => {
-        if ((projectMode === 'horticulture' || projectMode === 'garden' || projectMode === 'greenhouse') && analyzedSprinklers.length > 0) {
+        if (
+            (projectMode === 'horticulture' ||
+                projectMode === 'garden' ||
+                projectMode === 'greenhouse') &&
+            analyzedSprinklers.length > 0
+        ) {
             let sprinklerConfig: any = null;
 
             if (projectMode === 'horticulture') {
@@ -221,23 +233,23 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     const storedData = localStorage.getItem('greenhousePlanningData');
                     if (storedData) {
                         const summaryData = JSON.parse(storedData);
-                        
+
                         // ดึงข้อมูลจาก Equipment Settings ใน green-house-summary.tsx
                         const flowRate = summaryData?.sprinklerFlowRate || 10.0; // L/min per sprinkler
                         const pressureBar = summaryData?.sprinklerPressure || 2.0; // Bar for sprinklers
                         const radiusMeters = summaryData?.sprinklerRadius || 1.5; // Radius in meters
-                        
+
                         sprinklerConfig = {
                             flowRatePerMinute: flowRate,
                             pressureBar: pressureBar,
                             radiusMeters: radiusMeters,
                         };
-                        
+
                         console.log(`🚿 Greenhouse sprinkler config from summary:`, {
                             flowRate,
                             pressureBar,
                             radiusMeters,
-                            irrigationMethod: summaryData?.irrigationMethod
+                            irrigationMethod: summaryData?.irrigationMethod,
                         });
                     } else {
                         // fallback ค่า default สำหรับ greenhouse
@@ -329,7 +341,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
     // กรองสปริงเกอร์สำหรับ horticulture, garden, greenhouse และ field-crop modes
     const getFilteredSprinklers = () => {
-        if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse' && projectMode !== 'field-crop') {
+        if (
+            projectMode !== 'horticulture' &&
+            projectMode !== 'garden' &&
+            projectMode !== 'greenhouse' &&
+            projectMode !== 'field-crop'
+        ) {
             return analyzedSprinklers.sort((a, b) => a.price - b.price);
         }
 
@@ -387,23 +404,23 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 const storedData = localStorage.getItem('greenhousePlanningData');
                 if (storedData) {
                     const summaryData = JSON.parse(storedData);
-                    
+
                     // ดึงข้อมูลจาก Equipment Settings ใน green-house-summary.tsx
                     const flowRate = summaryData?.sprinklerFlowRate || 10.0; // L/min per sprinkler
                     const pressureBar = summaryData?.sprinklerPressure || 2.0; // Bar for sprinklers
                     const radiusMeters = summaryData?.sprinklerRadius || 1.5; // Radius in meters
-                    
+
                     sprinklerConfig = {
                         flowRatePerMinute: flowRate,
                         pressureBar: pressureBar,
                         radiusMeters: radiusMeters,
                     };
-                    
+
                     console.log(`🚿 Greenhouse sprinkler filter config:`, {
                         flowRate,
                         pressureBar,
                         radiusMeters,
-                        irrigationMethod: summaryData?.irrigationMethod
+                        irrigationMethod: summaryData?.irrigationMethod,
                     });
                 } else {
                     // fallback ค่า default สำหรับ greenhouse
@@ -512,7 +529,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             </h3>
 
             {/* แสดงข้อมูลระบบหัวฉีดสำหรับ Horticulture, Garden, Greenhouse และ Field-crop Mode */}
-            {(projectMode === 'horticulture' || projectMode === 'garden' || projectMode === 'greenhouse' || projectMode === 'field-crop') &&
+            {(projectMode === 'horticulture' ||
+                projectMode === 'garden' ||
+                projectMode === 'greenhouse' ||
+                projectMode === 'field-crop') &&
                 (() => {
                     let sprinklerConfig: any = null;
 
@@ -552,23 +572,23 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             const storedData = localStorage.getItem('greenhousePlanningData');
                             if (storedData) {
                                 const summaryData = JSON.parse(storedData);
-                                
+
                                 // ดึงข้อมูลจาก Equipment Settings ใน green-house-summary.tsx
                                 const flowRate = summaryData?.sprinklerFlowRate || 10.0; // L/min per sprinkler
                                 const pressureBar = summaryData?.sprinklerPressure || 2.0; // Bar for sprinklers
                                 const radiusMeters = summaryData?.sprinklerRadius || 1.5; // Radius in meters
-                                
+
                                 sprinklerConfig = {
                                     flowRatePerMinute: flowRate,
                                     pressureBar: pressureBar,
                                     radiusMeters: radiusMeters,
                                 };
-                                
+
                                 console.log(`🚿 Greenhouse sprinkler display config:`, {
                                     flowRate,
                                     pressureBar,
                                     radiusMeters,
-                                    irrigationMethod: summaryData?.irrigationMethod
+                                    irrigationMethod: summaryData?.irrigationMethod,
                                 });
                             } else {
                                 // fallback ค่า default สำหรับ greenhouse
@@ -579,7 +599,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                 };
                             }
                         } catch (error) {
-                            console.log('Could not load greenhouse sprinkler display config:', error);
+                            console.log(
+                                'Could not load greenhouse sprinkler display config:',
+                                error
+                            );
                             // fallback ค่า default สำหรับ greenhouse
                             sprinklerConfig = {
                                 flowRatePerMinute: 10.0,
@@ -590,12 +613,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     } else if (projectMode === 'field-crop') {
                         // ใช้ข้อมูลจาก field-crop data
                         const fieldCropRequirements = getFieldCropSprinklerRequirements();
-            if (fieldCropRequirements) {
-                sprinklerConfig = {
-                    flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
-                    pressureBar: fieldCropRequirements.targetPressure,
-                    radiusMeters: fieldCropRequirements.targetRadius || 8.0,
-                };
+                        if (fieldCropRequirements) {
+                            sprinklerConfig = {
+                                flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
+                                pressureBar: fieldCropRequirements.targetPressure,
+                                radiusMeters: fieldCropRequirements.targetRadius || 8.0,
+                            };
                         } else {
                             // fallback ค่า default สำหรับ field-crop
                             sprinklerConfig = {
@@ -663,7 +686,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     );
 
                     // อัปเดต global default sprinkler เมื่อมีการเลือกด้วยตนเอง
-                    if (selected && (projectMode === 'horticulture' || projectMode === 'garden' || projectMode === 'greenhouse')) {
+                    if (
+                        selected &&
+                        (projectMode === 'horticulture' ||
+                            projectMode === 'garden' ||
+                            projectMode === 'greenhouse')
+                    ) {
                         localStorage.setItem(
                             `${projectMode}_defaultSprinkler`,
                             JSON.stringify(selected)
