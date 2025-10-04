@@ -332,8 +332,8 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                     const data = JSON.parse(str) as FieldData;
                     localStorage.setItem('fieldCropData', JSON.stringify(data));
                 }
-            } catch (error) {
-                console.warn('Failed to sanitize fieldCropData on reload:', error);
+            } catch {
+                // Failed to sanitize fieldCropData on reload
             }
             // no-op: keep existing state
         }
@@ -376,12 +376,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             const pivotsInZone = fieldData.irrigationPositions.pivots.filter((pivot) =>
                 isPointInOrOnPolygon(pivot, coordinates)
             );
-            const dripTapesInZone = fieldData.irrigationPositions.dripTapes.filter((dripTape) =>
-                isPointInOrOnPolygon(dripTape, coordinates)
-            );
-            const waterJetsInZone = fieldData.irrigationPositions.waterJets.filter((waterJet) =>
-                isPointInOrOnPolygon(waterJet, coordinates)
-            );
 
             const flowPerSprinkler =
                 (fieldData.irrigationSettings?.sprinkler_system?.flow as number) ||
@@ -389,30 +383,19 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             const flowPerPivot =
                 (fieldData.irrigationSettings?.pivot?.flow as number) ||
                 ALGORITHM_CONFIG.DEFAULT_FLOW_RATES.pivot;
-            const flowPerDripTape = 0.24; // Fixed flow for drip tape
-            const flowPerWaterJet =
-                (fieldData.irrigationSettings?.water_jet_tape?.flow as number) || 1.5;
 
             const totalFlow =
                 sprinklersInZone.length * flowPerSprinkler +
-                pivotsInZone.length * flowPerPivot +
-                dripTapesInZone.length * flowPerDripTape +
-                waterJetsInZone.length * flowPerWaterJet;
+                pivotsInZone.length * flowPerPivot;
 
             return {
                 sprinklerCount: sprinklersInZone.length,
                 pivotCount: pivotsInZone.length,
-                dripTapeCount: dripTapesInZone.length,
-                waterJetCount: waterJetsInZone.length,
                 totalEquipmentCount:
                     sprinklersInZone.length +
-                    pivotsInZone.length +
-                    dripTapesInZone.length +
-                    waterJetsInZone.length,
+                    pivotsInZone.length,
                 flowPerSprinkler,
                 flowPerPivot,
-                flowPerDripTape,
-                flowPerWaterJet,
                 totalFlow,
             };
         },
@@ -477,16 +460,11 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         const flowPerPivot =
             (fieldData.irrigationSettings?.pivot?.flow as number) ||
             ALGORITHM_CONFIG.DEFAULT_FLOW_RATES.pivot;
-        const flowPerDripTape = 0.24; // Fixed flow for drip tape
-        const flowPerWaterJet =
-            (fieldData.irrigationSettings?.water_jet_tape?.flow as number) || 1.5;
 
         // Calculate total irrigation flow for scaling
         const totalIrrigationFlow =
             fieldData.irrigationPositions.sprinklers.length * flowPerSprinkler +
-            fieldData.irrigationPositions.pivots.length * flowPerPivot +
-            fieldData.irrigationPositions.dripTapes.length * flowPerDripTape +
-            fieldData.irrigationPositions.waterJets.length * flowPerWaterJet;
+            fieldData.irrigationPositions.pivots.length * flowPerPivot;
 
         // Use normalized weights based on flow rates
         const baseWeight = totalIrrigationFlow > 0 ? 1.0 : 1.0;
@@ -495,8 +473,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         const IRRIGATION_WEIGHTS = {
             sprinkler: baseWeight * (flowPerSprinkler / 10), // Normalize to base weight
             pivot: baseWeight * (flowPerPivot / 50), // Normalize to base weight
-            dripTape: baseWeight * (flowPerDripTape / 0.24), // Normalize to base weight
-            waterJet: baseWeight * (flowPerWaterJet / 1.5), // Normalize to base weight
         };
 
         // Add sprinklers
@@ -518,28 +494,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 lng: pivot.lng,
                 type: 'sprinkler', // Use same type for zone generation
                 weight: IRRIGATION_WEIGHTS.pivot,
-            });
-        });
-
-        // Add drip tapes
-        fieldData.irrigationPositions.dripTapes.forEach((dripTape, index) => {
-            combinedPoints.push({
-                id: `dripTape-${index}`,
-                lat: dripTape.lat,
-                lng: dripTape.lng,
-                type: 'sprinkler', // Use same type for zone generation
-                weight: IRRIGATION_WEIGHTS.dripTape,
-            });
-        });
-
-        // Add water jets
-        fieldData.irrigationPositions.waterJets.forEach((waterJet, index) => {
-            combinedPoints.push({
-                id: `waterJet-${index}`,
-                lat: waterJet.lat,
-                lng: waterJet.lng,
-                type: 'sprinkler', // Use same type for zone generation
-                weight: IRRIGATION_WEIGHTS.waterJet,
             });
         });
 
@@ -565,8 +519,8 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                 const intersection = turf.intersect(polygon1, polygon2);
                 return intersection !== null;
-            } catch (error) {
-                console.warn('Error checking polygon overlap:', error);
+            } catch {
+                // Error checking polygon overlap
                 return false;
             }
         },
@@ -629,8 +583,8 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                     largestArea = area;
                                                     largestPolygon = polyCoords[0];
                                                 }
-                                            } catch (e) {
-                                                console.warn('Error calculating polygon area:', e);
+                                            } catch {
+                                                // Error calculating polygon area
                                             }
                                         });
                                         newCoordinates = largestPolygon
@@ -647,7 +601,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                         return {
                                             ...zone,
                                             coordinates: simplifiedCoords,
-                                            name: `${zone.name.split('(')[0].trim()} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
+                                            name: `${zone.name.split('(')[0].trim()} (${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')})`,
                                             ...waterInfo,
                                         };
                                     } else {
@@ -656,23 +610,20 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                 } else {
                                     return null;
                                 }
-                            } catch (error) {
-                                console.warn(
-                                    `Error processing overlap for zone ${zone.id}:`,
-                                    error
-                                );
+                            } catch {
+                                // Error processing overlap for zone
                                 return zone;
                             }
                         }
                         return zone;
                     })
                     .filter((zone): zone is Zone => zone !== null);
-            } catch (error) {
-                console.error('Error in cutOverlapFromZones:', error);
+            } catch {
+                // Error in cutOverlapFromZones
                 return allZones;
             }
         },
-        [checkPolygonOverlap, calculateZoneWaterInfo]
+        [checkPolygonOverlap, calculateZoneWaterInfo, t]
     );
 
     // ==================== ZONE GENERATION ALGORITHMS ====================
@@ -754,11 +705,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                         // Different multipliers for different irrigation types to balance zone generation
                         let weightMultiplier = 1.0;
-                        if (point.id.includes('dripTape')) {
-                            weightMultiplier = 2.0; // Higher multiplier for drip tapes
-                        } else if (point.id.includes('waterJet')) {
-                            weightMultiplier = 1.8; // Higher multiplier for water jets
-                        } else if (point.id.includes('pivot')) {
+                        if (point.id.includes('pivot')) {
                             weightMultiplier = 1.2; // Moderate multiplier for pivots
                         } else if (point.id.includes('sprinkler')) {
                             weightMultiplier = 1.0; // Standard multiplier for sprinklers
@@ -841,7 +788,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                 return {
                     id: `convex-zone-${Date.now()}-${index}`,
-                    name: `Zone ${index + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
+                    name: `${t('Zone')} ${index + 1} (${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')})`,
                     coordinates: hull,
                     color: ZONE_COLORS[index % ZONE_COLORS.length],
                     cropType: fieldData.selectedCrops[0],
@@ -849,7 +796,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 };
             });
         },
-        [fieldData.selectedCrops, calculateZoneWaterInfo]
+        [fieldData.selectedCrops, calculateZoneWaterInfo, t]
     );
 
     const createVoronoiZones = useCallback(
@@ -894,7 +841,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                 return {
                     id: `voronoi-zone-${Date.now()}-${index}`,
-                    name: `Zone ${index + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
+                    name: `${t('Zone')} ${index + 1} (${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')})`,
                     coordinates: zone.coordinates,
                     color: zone.color,
                     cropType: fieldData.selectedCrops[0],
@@ -902,7 +849,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 };
             });
         },
-        [fieldData.selectedCrops, fieldData.mainArea, calculateZoneWaterInfo]
+        [fieldData.selectedCrops, fieldData.mainArea, calculateZoneWaterInfo, t]
     );
 
     const calculateZoneStats = useCallback(
@@ -937,13 +884,13 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 balanceScore = ((targetWaterPerZone - averageDeviation) / targetWaterPerZone) * 100;
 
                 if (balanceScore >= 80) {
-                    balanceStatus = 'Excellent';
+                    balanceStatus = t('Excellent');
                 } else if (balanceScore >= 60) {
-                    balanceStatus = 'Good';
+                    balanceStatus = t('Good');
                 } else if (balanceScore >= 40) {
-                    balanceStatus = 'Fair';
+                    balanceStatus = t('Fair');
                 } else {
-                    balanceStatus = 'Poor';
+                    balanceStatus = t('Poor');
                 }
             }
 
@@ -951,14 +898,14 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 totalZones: zones.length,
                 averageWater,
                 waterDeviation,
-                mostUnevenZone: maxWaterZone.name || 'Unknown',
-                mostEvenZone: minWaterZone.name || 'Unknown',
+                mostUnevenZone: maxWaterZone.name || t('Unknown'),
+                mostEvenZone: minWaterZone.name || t('Unknown'),
                 targetWaterPerZone,
                 balanceScore,
                 balanceStatus,
             };
         },
-        []
+        [t]
     );
 
     // Memoize expensive calculations
@@ -1007,7 +954,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                     : createConvexHullZones(clusters);
 
             if (!newZones || newZones.length === 0) {
-                throw new Error('No zones were generated successfully');
+                throw new Error(t('No zones were generated successfully'));
             }
 
             updateFieldData({ zones: newZones });
@@ -1015,28 +962,11 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             const stats = calculateZoneStats(newZones, targetWaterPerZone);
             setZoneStats(stats);
 
-            // Console log zone information
-            console.log('=== ZONE GENERATION COMPLETED ===');
-            console.log(`Generated ${newZones.length} zones using ${zoneGenerationMethod} method`);
-            console.log('Zone Details:');
-            newZones.forEach((zone, index) => {
-                console.log(`Zone ${index + 1} (${zone.name}):`, {
-                    id: zone.id,
-                    color: zone.color,
-                    coordinates: zone.coordinates.length + ' points',
-                    cropType: zone.cropType,
-                    plantCount: zone.plantCount || 0,
-                    waterRequirement: (zone.waterRequirement || 0).toFixed(2) + ' ลิตร/ครั้ง',
-                    waterStatus: zone.waterStatus,
-                    waterMessage: zone.waterMessage,
-                });
-            });
-            console.log('Zone Statistics:', stats);
-            console.log('=================================');
+            // Zone generation completed
 
             // Note: saveState is no longer needed as updateFieldData automatically saves to localStorage
-        } catch (error) {
-            console.error('Error generating smart zones:', error);
+        } catch {
+            // Error generating smart zones
             alert(t('Error generating zones. Please try again.'));
         } finally {
             setIsGeneratingZones(false);
@@ -1113,24 +1043,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         const stats = calculateZoneStats(autoZones, targetWaterPerZone);
         setZoneStats(stats);
 
-        // Console log auto zone information
-        console.log('=== AUTO ZONE GENERATION COMPLETED ===');
-        console.log(`Generated ${autoZones.length} auto zones (4 quadrants)`);
-        console.log('Auto Zone Details:');
-        autoZones.forEach((zone, index) => {
-            console.log(`Auto Zone ${index + 1} (${zone.name}):`, {
-                id: zone.id,
-                color: zone.color,
-                coordinates: zone.coordinates.length + ' points',
-                cropType: zone.cropType,
-                plantCount: zone.plantCount || 0,
-                waterRequirement: (zone.waterRequirement || 0).toFixed(2) + ' ลิตร/ครั้ง',
-                waterStatus: zone.waterStatus,
-                waterMessage: zone.waterMessage,
-            });
-        });
-        console.log('Auto Zone Statistics:', stats);
-        console.log('=======================================');
+        // Auto zone generation completed
 
         // Note: saveState is no longer needed as updateFieldData automatically saves to localStorage
     }, [
@@ -1165,9 +1078,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         (map: google.maps.Map) => {
             const totalIrrigationCount =
                 fieldData.irrigationPositions.sprinklers.length +
-                fieldData.irrigationPositions.pivots.length +
-                fieldData.irrigationPositions.dripTapes.length +
-                fieldData.irrigationPositions.waterJets.length;
+                fieldData.irrigationPositions.pivots.length;
 
             if (irrigationMarkersRef.current.length !== totalIrrigationCount) {
                 irrigationMarkersRef.current.forEach((marker) => marker.setMap(null));
@@ -1256,43 +1167,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                         irrigationCirclesRef.current.push(circle);
                     }
                 });
-
-                // Create drip tape and water jet markers
-                [
-                    {
-                        points: fieldData.irrigationPositions.dripTapes,
-                        name: 'Drip Tape',
-                        color: '#3b82f6',
-                    },
-                    {
-                        points: fieldData.irrigationPositions.waterJets,
-                        name: 'Water Jet',
-                        color: '#f97316',
-                    },
-                ].forEach(({ points, name, color }) => {
-                    points.forEach((pos, index) => {
-                        const marker = new google.maps.Marker({
-                            position: pos,
-                            map: map,
-                            icon: {
-                                url:
-                                    'data:image/svg+xml;charset=UTF-8,' +
-                                    encodeURIComponent(`
-								<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-									<circle cx="4" cy="4" r="3" fill="${color}" stroke="${color}" stroke-width="1"/>
-								</svg>
-							`),
-                                scaledSize: new google.maps.Size(8, 8),
-                                anchor: new google.maps.Point(4, 4),
-                            },
-                            title: `${name} ${index + 1}`,
-                            optimized: true,
-                            clickable: false,
-                            zIndex: 1700, // Above zones (1500) and obstacles (1600)
-                        });
-                        irrigationMarkersRef.current.push(marker);
-                    });
-                });
             }
         },
         [fieldData.irrigationPositions, fieldData.irrigationSettings]
@@ -1341,7 +1215,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                     return {
                         ...zone,
                         coordinates: newCoordinates,
-                        name: `Zone ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
+                        name: `${t('Zone')} ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')})`,
                         ...waterInfo,
                     };
                 }
@@ -1384,8 +1258,8 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                         }
                     }
                 });
-            } catch (error) {
-                console.warn('Failed to update zone polygon visuals:', error);
+            } catch {
+                // Failed to update zone polygon visuals
             }
 
             const stats = calculateZoneStats(finalZones, defaultWaterPerZone);
@@ -1401,6 +1275,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             cutOverlapFromZones,
             zoneEditingState.currentEdit,
             updateFieldData,
+            t,
         ]
     ); // Keep all dependencies as they are needed for zone updates
 
@@ -1679,7 +1554,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                     const newZone: Zone = {
                         id: `manual-zone-${Date.now()}`,
-                        name: `Zone ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
+                        name: `${t('Zone')} ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')})`,
                         coordinates,
                         color: previewColor,
                         cropType: fieldData.selectedCrops[0],
@@ -1703,9 +1578,9 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                     const equipmentMessage =
                         irrigationInfo.totalEquipmentCount > 0
-                            ? `\n🚿 Sprinklers: ${irrigationInfo.sprinklerCount} units\n🔄 Pivots: ${irrigationInfo.pivotCount} units\n💧 Drip Tapes: ${irrigationInfo.dripTapeCount} units\n🌊 Water Jets: ${irrigationInfo.waterJetCount} units\n💦 Total Flow: ${irrigationInfo.totalFlow} L/min`
+                            ? `\n🚿 Sprinklers: ${irrigationInfo.sprinklerCount} units\n🔄 Pivots: ${irrigationInfo.pivotCount} units\n💦 Total Flow: ${irrigationInfo.totalFlow} L/min`
                             : '\n💿 No irrigation equipment in this zone';
-                    const message = `Zone created successfully! Water requirement: ${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง${equipmentMessage}`;
+                    const message = `Zone created successfully! Water requirement: ${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')}${equipmentMessage}`;
                     alert(message);
                 } else {
                     polygon.setMap(null);
@@ -1946,6 +1821,38 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         },
     ];
 
+    // Helper function to check if current step is completed
+    const isCurrentStepCompleted = () => {
+        switch (currentStep) {
+            case 1: // Initial Area
+                return fieldData.mainArea.length >= 3;
+            case 2: // Irrigation Generate
+                return fieldData.irrigationPositions.sprinklers.length > 0 || fieldData.irrigationPositions.pivots.length > 0;
+            case 3: // Zone Obstacle
+                return fieldData.zones.some(
+                    (zone) =>
+                        zone.coordinates.length >= 3 &&
+                        zone.coordinates.every((coord) =>
+                            isPointInOrOnPolygon(coord, fieldData.mainArea)
+                        )
+                );
+            case 4: // Pipe Generate
+                return fieldData.pipes.length > 0;
+            default:
+                return false;
+        }
+    };
+
+    // Helper function to update completed steps
+    const updateCompletedSteps = () => {
+        const existing = parseCompletedSteps(completedSteps);
+        let result = existing;
+        if (isCurrentStepCompleted()) {
+            result = Array.from(new Set([...existing, currentStep]));
+        }
+        return toCompletedStepsCsv(result);
+    };
+
     const handleStepClick = (step: StepData) => {
         // Note: saveState is no longer needed as updateFieldData automatically saves to localStorage
 
@@ -1998,10 +1905,13 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             router.get(step.route, params);
             return;
         }
+        // Update completed steps before navigating
+        const updatedCompletedSteps = updateCompletedSteps();
+        
         const params = {
             crops: fieldData.selectedCrops.join(','),
             currentStep: step.id,
-            completedSteps: toCompletedStepsCsv(parseCompletedSteps(completedSteps)),
+            completedSteps: updatedCompletedSteps,
             mapCenter: JSON.stringify(fieldData.mapCenter),
             mapZoom: fieldData.mapZoom.toString(),
         };
@@ -2182,7 +2092,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                         )
                                                     }
                                                     className="w-full rounded border border-gray-500 bg-gray-700 px-2 py-1 text-xs text-white"
-                                                    placeholder="Enter number of zones"
+                                                    placeholder={t('Enter number of zones')}
                                                 />
                                             </div>
 
@@ -2190,10 +2100,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                 (fieldData.irrigationPositions.sprinklers.length >
                                                     0 ||
                                                     fieldData.irrigationPositions.pivots.length >
-                                                        0 ||
-                                                    fieldData.irrigationPositions.dripTapes.length >
-                                                        0 ||
-                                                    fieldData.irrigationPositions.waterJets.length >
                                                         0) && (
                                                     <div className="rounded bg-gray-700 p-2 text-xs">
                                                         <div className="mb-1 text-gray-300">
@@ -2205,7 +2111,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                 fieldData.totalWaterRequirement /
                                                                 desiredZoneCount
                                                             ).toFixed(1)}{' '}
-                                                            ลิตร/ครั้ง
+                                                            {t('liters per irrigation')}
                                                         </div>
                                                         <div className="text-green-300">
                                                             {t('Plants per zone')}: ~
@@ -2240,38 +2146,13 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                 {t('units')}
                                                             </div>
                                                         )}
-                                                        {fieldData.irrigationPositions.dripTapes
-                                                            .length > 0 && (
-                                                            <div className="text-orange-300">
-                                                                {t('Drip Tapes per zone')}: ~
-                                                                {Math.ceil(
-                                                                    fieldData.irrigationPositions
-                                                                        .dripTapes.length /
-                                                                        desiredZoneCount
-                                                                )}{' '}
-                                                                {t('units')}
-                                                            </div>
-                                                        )}
-                                                        {fieldData.irrigationPositions.waterJets
-                                                            .length > 0 && (
-                                                            <div className="text-orange-300">
-                                                                {t('Water Jets per zone')}: ~
-                                                                {Math.ceil(
-                                                                    fieldData.irrigationPositions
-                                                                        .waterJets.length /
-                                                                        desiredZoneCount
-                                                                )}{' '}
-                                                                {t('units')}
-                                                            </div>
-                                                        )}
                                                         <div className="mt-2 border-t border-gray-600 pt-2">
                                                             <div className="text-xs text-yellow-300">
                                                                 💡 {t('Zone Generation Based On')}:
                                                             </div>
                                                             <div className="mt-1 text-xs text-gray-400">
                                                                 🚿 {t('Sprinklers')} | 🔄{' '}
-                                                                {t('Pivots')} | 💧 {t('Drip Tapes')}{' '}
-                                                                | 🌊 {t('Water Jets')}
+                                                                {t('Pivots')}
                                                             </div>
                                                             <div className="mt-1 text-xs text-blue-300">
                                                                 {t(
@@ -2289,10 +2170,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                     (fieldData.irrigationPositions.sprinklers
                                                         .length === 0 &&
                                                         fieldData.irrigationPositions.pivots
-                                                            .length === 0 &&
-                                                        fieldData.irrigationPositions.dripTapes
-                                                            .length === 0 &&
-                                                        fieldData.irrigationPositions.waterJets
                                                             .length === 0)
                                                 }
                                                 className="w-full rounded border border-white bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -2354,14 +2231,14 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                     <span>{t('Average Water')}:</span>
                                                     <span className="text-blue-400">
                                                         {zoneStats.averageWater.toFixed(1)}{' '}
-                                                        ลิตร/ครั้ง
+                                                        {t('liters per irrigation')}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>{t('Water Deviation')}:</span>
                                                     <span className="text-yellow-400">
                                                         {zoneStats.waterDeviation.toFixed(1)}{' '}
-                                                        ลิตร/ครั้ง
+                                                        {t('liters per irrigation')}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
@@ -2412,7 +2289,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                 {actualTotalWaterFromZones.toFixed(
                                                                     1
                                                                 )}{' '}
-                                                                ลิตร/ครั้ง
+                                                                {t('liters per irrigation')}
                                                             </div>
                                                             <div className="text-gray-300">
                                                                 {t('Total Equipment')}:{' '}
@@ -2445,7 +2322,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                     },
                                                                     0
                                                                 )}{' '}
-                                                                L/min
+                                                                {t('L/min')}
                                                             </div>
                                                         </div>
                                                         {recalculatedTotalWater > 0 && (
@@ -2455,7 +2332,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                     {recalculatedTotalWater.toFixed(
                                                                         1
                                                                     )}{' '}
-                                                                    ลิตร/ครั้ง
+                                                                    {t('liters per irrigation')}
                                                                 </div>
                                                                 {Math.abs(
                                                                     actualTotalWaterFromZones -
@@ -2495,7 +2372,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                     ></div>
                                                                     <div className="flex flex-col">
                                                                         <span className="text-xs font-semibold text-white">
-                                                                            Zone {index + 1}
+                                                                            {t('Zone')} {index + 1}
                                                                         </span>
                                                                         <span className="text-xs text-gray-300">
                                                                             {(() => {
@@ -2531,8 +2408,8 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                         title={
                                                                             zoneEditingState.currentEdit ===
                                                                             zone.id
-                                                                                ? 'Stop editing'
-                                                                                : 'Edit zone shape on map'
+                                                                                ? t('Stop editing')
+                                                                                : t('Edit zone shape on map')
                                                                         }
                                                                     >
                                                                         {zoneEditingState.currentEdit ===
@@ -2635,7 +2512,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                             zone.waterRequirement ||
                                                                             0
                                                                         ).toFixed(1)}{' '}
-                                                                        ลิตร/ครั้ง
+                                                                        {t('liters per irrigation')}
                                                                     </span>
                                                                 </div>
 
@@ -2682,42 +2559,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                                     </span>
                                                                                 </div>
                                                                             )}
-                                                                            {irrigationInfo.dripTapeCount >
-                                                                                0 && (
-                                                                                <div className="flex items-center justify-between">
-                                                                                    <span className="text-gray-300">
-                                                                                        💧{' '}
-                                                                                        {t(
-                                                                                            'Drip Tapes'
-                                                                                        )}
-                                                                                        :
-                                                                                    </span>
-                                                                                    <span className="font-semibold text-blue-400">
-                                                                                        {
-                                                                                            irrigationInfo.dripTapeCount
-                                                                                        }{' '}
-                                                                                        {t('units')}
-                                                                                    </span>
-                                                                                </div>
-                                                                            )}
-                                                                            {irrigationInfo.waterJetCount >
-                                                                                0 && (
-                                                                                <div className="flex items-center justify-between">
-                                                                                    <span className="text-gray-300">
-                                                                                        🌊{' '}
-                                                                                        {t(
-                                                                                            'Water Jets'
-                                                                                        )}
-                                                                                        :
-                                                                                    </span>
-                                                                                    <span className="font-semibold text-orange-400">
-                                                                                        {
-                                                                                            irrigationInfo.waterJetCount
-                                                                                        }{' '}
-                                                                                        {t('units')}
-                                                                                    </span>
-                                                                                </div>
-                                                                            )}
                                                                             {irrigationInfo.totalEquipmentCount >
                                                                                 0 && (
                                                                                 <>
@@ -2733,7 +2574,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                                             {
                                                                                                 irrigationInfo.totalFlow
                                                                                             }{' '}
-                                                                                            L/min
+                                                                                            {t('L/min')}
                                                                                         </span>
                                                                                     </div>
                                                                                 </>
@@ -2753,7 +2594,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                                 0) -
                                                                             defaultWaterPerZone
                                                                         ).toFixed(1)}{' '}
-                                                                        ลิตร/ครั้ง
+                                                                        {t('liters per irrigation')}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -2799,7 +2640,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                         }}
                                                     ></div>
                                                     <span className="text-xs text-purple-100">
-                                                        Next zone color
+                                                        {t('Next zone color')}
                                                     </span>
                                                 </div>
                                             </div>

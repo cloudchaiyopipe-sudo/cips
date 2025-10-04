@@ -555,30 +555,30 @@ export default function Product() {
         const totalMainLength = zonePipeStats.main.totalLength || 0;
 
         return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
-            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
-            numberOfZones: totalZones,
+            farmSizeRai: formatNumber(areaInRai || 0, 3),
+            totalTrees: totalSprinklers || 0, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
+            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM || 2.5, 3),
+            numberOfZones: totalZones || 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
             staticHeadM: 0,
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(longestBranch, 3),
-            totalBranchPipeM: formatNumber(totalBranchLength, 3),
-            longestSecondaryPipeM: formatNumber(longestSubmain, 3),
-            totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
-            longestMainPipeM: formatNumber(longestMain, 3),
-            totalMainPipeM: formatNumber(totalMainLength, 3),
+            longestBranchPipeM: formatNumber(longestBranch || 30, 3),
+            totalBranchPipeM: formatNumber(totalBranchLength || 100, 3),
+            longestSecondaryPipeM: formatNumber(longestSubmain || 0, 3),
+            totalSecondaryPipeM: formatNumber(totalSubmainLength || 0, 3),
+            longestMainPipeM: formatNumber(longestMain || 0, 3),
+            totalMainPipeM: formatNumber(totalMainLength || 0, 3),
         };
     };
 
@@ -587,25 +587,26 @@ export default function Product() {
         totalZones: number
     ): IrrigationInput => {
         const areaInRai = zone.area / 1600;
-        const totalSprinklers = zone.plantCount || 0;
+        // ใช้ sprinklerCount ก่อน หากไม่มีให้ใช้ plantCount
+        const totalSprinklers = zone.sprinklerCount || zone.plantCount || 0;
         const waterPerSprinklerLPM = zone.waterPerTree || 2.0;
 
         return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
-            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
-            numberOfZones: totalZones,
+            farmSizeRai: formatNumber(areaInRai || 0, 3),
+            totalTrees: totalSprinklers || 0, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
+            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM || 2.0, 3),
+            numberOfZones: totalZones || 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
             staticHeadM: 0,
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
@@ -631,9 +632,9 @@ export default function Product() {
         const waterPerSprinklerLPM = 2.5; // ลิตร/นาที ต่อหัวฉีด (ค่าเริ่มต้น)
 
         return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
-            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
+            farmSizeRai: formatNumber(areaInRai || 0, 3),
+            totalTrees: totalSprinklers || 0, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
+            waterPerTreeLiters: formatNumber(waterPerSprinklerLPM || 2.5, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
@@ -641,23 +642,23 @@ export default function Product() {
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longestLength || 30, 3),
-            totalBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.totalLength || 100, 3),
+            longestBranchPipeM: formatNumber(fieldData.pipes?.stats?.lateral?.longestLength || 30, 3),
+            totalBranchPipeM: formatNumber(fieldData.pipes?.stats?.lateral?.totalLength || 100, 3),
             longestSecondaryPipeM: formatNumber(
-                fieldData.pipes.stats.submain.longestLength || 0,
+                fieldData.pipes?.stats?.submain?.longestLength || 0,
                 3
             ),
-            totalSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.totalLength || 0, 3),
-            longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longestLength || 0, 3),
-            totalMainPipeM: formatNumber(fieldData.pipes.stats.main.totalLength || 0, 3),
+            totalSecondaryPipeM: formatNumber(fieldData.pipes?.stats?.submain?.totalLength || 0, 3),
+            longestMainPipeM: formatNumber(fieldData.pipes?.stats?.main?.longestLength || 0, 3),
+            totalMainPipeM: formatNumber(fieldData.pipes?.stats?.main?.totalLength || 0, 3),
         };
     };
 
@@ -734,26 +735,26 @@ export default function Product() {
                 : zoneStats.sprinklerFlowRate;
 
         return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: sprinklerCount,
-            waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
-            numberOfZones: totalZones,
+            farmSizeRai: formatNumber(areaInRai || 0, 3),
+            totalTrees: sprinklerCount || 0,
+            waterPerTreeLiters: formatNumber(waterPerSprinkler || 2.5, 3),
+            numberOfZones: totalZones || 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
             staticHeadM: 0,
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(sprinklerCount / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil((sprinklerCount || 0) / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(sprinklerCount / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil((sprinklerCount || 0) / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(zoneStats.longestPipeFromSource || 20, 3),
-            totalBranchPipeM: formatNumber(zoneStats.totalPipeLength || 100, 3),
+            longestBranchPipeM: formatNumber(zoneStats?.longestPipeFromSource || 20, 3),
+            totalBranchPipeM: formatNumber(zoneStats?.totalPipeLength || 100, 3),
             longestSecondaryPipeM: 0,
             totalSecondaryPipeM: 0,
             longestMainPipeM: 0,
@@ -773,8 +774,8 @@ export default function Product() {
                 : Math.max(5, Math.ceil(areaInRai * 12)); // 12 sprinklers per rai as default
 
         return {
-            farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers,
+            farmSizeRai: formatNumber(areaInRai || 0, 3),
+            totalTrees: totalSprinklers || 0,
             waterPerTreeLiters: formatNumber(50, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
@@ -783,16 +784,16 @@ export default function Product() {
             pressureHeadM: 20,
             pipeAgeYears: 0,
 
-            sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerSecondary: 1,
             simultaneousZones: 1,
 
-            sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
+            sprinklersPerLongestBranch: Math.max(1, Math.ceil((totalSprinklers || 0) / 5)),
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(summary.longestPipeFromSource || 20, 3),
-            totalBranchPipeM: formatNumber(summary.totalPipeLength || 100, 3),
+            longestBranchPipeM: formatNumber(summary?.longestPipeFromSource || 20, 3),
+            totalBranchPipeM: formatNumber(summary?.totalPipeLength || 100, 3),
             longestSecondaryPipeM: 0,
             totalSecondaryPipeM: 0,
             longestMainPipeM: 0,
@@ -1382,19 +1383,19 @@ export default function Product() {
 
                     horticultureSystemData.zones.forEach((zone: any) => {
                         initialZoneInputs[zone.id] = {
-                            farmSizeRai: formatNumber(zone.area / 1600, 3),
-                            totalTrees: zone.plantCount,
+                            farmSizeRai: formatNumber((zone.area || 0) / 1600, 3),
+                            totalTrees: zone.plantCount || 0,
                             waterPerTreeLiters: formatNumber(zone.waterNeedPerMinute || 50, 3), // ใช้ waterNeedPerMinute (ลิตร/นาที)
-                            numberOfZones: horticultureSystemData.zones.length,
+                            numberOfZones: horticultureSystemData.zones.length || 1,
                             sprinklersPerTree: 1,
                             irrigationTimeMinutes: 20,
                             staticHeadM: 0,
                             pressureHeadM: 20,
                             pipeAgeYears: 0,
-                            sprinklersPerBranch: Math.max(1, Math.ceil(zone.plantCount / 5)),
+                            sprinklersPerBranch: Math.max(1, Math.ceil((zone.plantCount || 0) / 5)),
                             branchesPerSecondary: 1,
                             simultaneousZones: 1,
-                            sprinklersPerLongestBranch: Math.max(1, Math.ceil(zone.plantCount / 5)),
+                            sprinklersPerLongestBranch: Math.max(1, Math.ceil((zone.plantCount || 0) / 5)),
                             branchesPerLongestSecondary: 1,
                             secondariesPerLongestMain: 1,
                             // ใช้ข้อมูลท่อจริงจาก Zone Details
@@ -1434,19 +1435,19 @@ export default function Product() {
 
                     data.zones.forEach((zone) => {
                         initialZoneInputs[zone.id] = {
-                            farmSizeRai: formatNumber(zone.area / 1600, 3),
+                            farmSizeRai: formatNumber((zone.area || 0) / 1600, 3),
                             totalTrees: zone.plantCount || 100,
                             waterPerTreeLiters: formatNumber(50, 3), // default water per tree
-                            numberOfZones: data.zones.length,
+                            numberOfZones: data.zones.length || 1,
                             sprinklersPerTree: 1,
                             irrigationTimeMinutes: 20,
                             staticHeadM: 0,
                             pressureHeadM: 20,
                             pipeAgeYears: 0,
-                            sprinklersPerBranch: Math.max(1, Math.ceil(zone.plantCount / 5)),
+                            sprinklersPerBranch: Math.max(1, Math.ceil((zone.plantCount || 0) / 5)),
                             branchesPerSecondary: 1,
                             simultaneousZones: 1,
-                            sprinklersPerLongestBranch: Math.max(1, Math.ceil(zone.plantCount / 5)),
+                            sprinklersPerLongestBranch: Math.max(1, Math.ceil((zone.plantCount || 0) / 5)),
                             branchesPerLongestSecondary: 1,
                             secondariesPerLongestMain: 1,
                             longestBranchPipeM: 30,
@@ -1476,9 +1477,7 @@ export default function Product() {
                     // Single zone
                     const singleInput: IrrigationInput = {
                         farmSizeRai: formatNumber(
-                            horticultureSystemData?.zones?.[0]?.area / 1600 ||
-                                data?.totalArea / 1600 ||
-                                1,
+                            (horticultureSystemData?.zones?.[0]?.area || data?.totalArea || 1600) / 1600,
                             3
                         ),
                         totalTrees:

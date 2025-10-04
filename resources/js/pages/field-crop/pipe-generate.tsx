@@ -198,6 +198,28 @@ interface DrawingState {
 
 // ===== UTILITY FUNCTIONS =====
 // ... (ส่วนนี้เหมือนเดิมทั้งหมด) ...
+
+// Helper function to check if a point is inside or on a polygon
+const isPointInOrOnPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
+    if (polygon.length < 3) return false;
+    
+    let inside = false;
+    const { lat, lng } = point;
+    
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lng;
+        const yi = polygon[i].lat;
+        const xj = polygon[j].lng;
+        const yj = polygon[j].lat;
+        
+        if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+    }
+    
+    return inside;
+};
+
 const calculateDistance = (coordinates: Coordinate[]): number => {
     if (coordinates.length < 2) return 0;
 
@@ -208,9 +230,7 @@ const calculateDistance = (coordinates: Coordinate[]): number => {
         !google.maps.geometry ||
         !google.maps.geometry.spherical
     ) {
-        console.warn(
-            'Google Maps geometry library not loaded, using fallback distance calculation'
-        );
+        // Google Maps geometry library not loaded, using fallback distance calculation
         // Fallback to simple distance calculation using Haversine formula
         let totalDistance = 0;
         for (let i = 1; i < coordinates.length; i++) {
@@ -411,9 +431,7 @@ const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coordinate):
         !google.maps.geometry ||
         !google.maps.geometry.spherical
     ) {
-        console.warn(
-            'Google Maps geometry library not loaded, using fallback distance calculation'
-        );
+        // Google Maps geometry library not loaded, using fallback distance calculation
         // Fallback to simple distance calculation using Haversine formula
         const lat1 = (point1.lat * Math.PI) / 180;
         const lat2 = (point2.lat * Math.PI) / 180;
@@ -508,7 +526,7 @@ const usePipeManager = () => {
     const recordHistory = useCallback(
         (nextPipes: Pipe[], resetHistory?: boolean) => {
             if (isApplyingHistoryRef.current) {
-                console.log('⏭️ Skipping history record (applying history)');
+                // Skipping history record (applying history)
                 return;
             }
             const snapshot = deepCopyPipes(nextPipes);
@@ -519,26 +537,14 @@ const usePipeManager = () => {
             if (resetHistory) {
                 setPipeHistory([snapshot]);
                 setPipeHistoryIndex(0);
-                console.log('🔄 History reset with', nextPipes.length, 'pipes');
                 return;
             }
             
             setPipeHistoryIndex((prevIndex) => {
-                console.log('📝 Recording pipe history:', {
-                    resetHistory,
-                    pipesCount: nextPipes.length,
-                    currentIndex: prevIndex,
-                    pipeTypes: nextPipes.map(p => p.type)
-                });
                 
                 setPipeHistory((prev) => {
                     const upto = prev.slice(0, prevIndex + 1);
                     const newHistory = [...upto, snapshot];
-                    console.log('📚 History updated:', {
-                        previousLength: prev.length,
-                        newLength: newHistory.length,
-                        newIndex: prevIndex + 1
-                    });
                     return newHistory;
                 });
                 
@@ -754,7 +760,7 @@ const usePipeManager = () => {
             options?: { lateralMode?: LateralMode; betweenRowsHalfWidth?: number }
         ) => {
             if (coordinates.length < 2)
-                return { sprinklers: [], dripTapes: [], waterJets: [], pivots: [] };
+                return { sprinklers: [], pivots: [] };
 
             const mode: LateralMode | undefined = options?.lateralMode;
             const halfWidth = options?.betweenRowsHalfWidth ?? 1.5;
@@ -765,16 +771,6 @@ const usePipeManager = () => {
                     irrigationPositions.sprinklers,
                     halfWidth
                 );
-                const connectedDripTapes = findNearbyConnectedSprinklersBetweenRows(
-                    coordinates,
-                    irrigationPositions.dripTapes,
-                    halfWidth
-                );
-                const connectedWaterJets = findNearbyConnectedSprinklersBetweenRows(
-                    coordinates,
-                    irrigationPositions.waterJets,
-                    halfWidth
-                );
                 const connectedPivots = findNearbyConnectedSprinklersBetweenRows(
                     coordinates,
                     irrigationPositions.pivots,
@@ -782,8 +778,6 @@ const usePipeManager = () => {
                 );
                 return {
                     sprinklers: connectedSprinklers,
-                    dripTapes: connectedDripTapes,
-                    waterJets: connectedWaterJets,
                     pivots: connectedPivots,
                 };
             }
@@ -793,16 +787,6 @@ const usePipeManager = () => {
                 irrigationPositions.sprinklers,
                 snapRadius
             );
-            const connectedDripTapes = findNearbyConnectedSprinklers(
-                coordinates,
-                irrigationPositions.dripTapes,
-                snapRadius
-            );
-            const connectedWaterJets = findNearbyConnectedSprinklers(
-                coordinates,
-                irrigationPositions.waterJets,
-                snapRadius
-            );
             const connectedPivots = findNearbyConnectedSprinklers(
                 coordinates,
                 irrigationPositions.pivots,
@@ -810,8 +794,6 @@ const usePipeManager = () => {
             );
             return {
                 sprinklers: connectedSprinklers,
-                dripTapes: connectedDripTapes,
-                waterJets: connectedWaterJets,
                 pivots: connectedPivots,
             };
         },
@@ -823,8 +805,6 @@ const usePipeManager = () => {
         (
             connectedPoints: {
                 sprinklers: Coordinate[];
-                dripTapes: Coordinate[];
-                waterJets: Coordinate[];
                 pivots: Coordinate[];
             },
             irrigationSettings: IrrigationSettings
@@ -835,13 +815,6 @@ const usePipeManager = () => {
             const sprinklerFlow = Number(irrigationSettings.sprinkler_system?.flow) || 10;
             totalFlow += connectedPoints.sprinklers.length * sprinklerFlow;
 
-            // เทปน้ำหยด (0.24 L/min per emitter)
-            const dripFlow = 0.24;
-            totalFlow += connectedPoints.dripTapes.length * dripFlow;
-
-            // เทปน้ำพุ่ง
-            const waterJetFlow = Number(irrigationSettings.water_jet_tape?.flow) || 1.5;
-            totalFlow += connectedPoints.waterJets.length * waterJetFlow;
 
             // Pivot
             const pivotFlow = Number(irrigationSettings.pivot?.flow) || 50;
@@ -939,35 +912,23 @@ const usePipeManager = () => {
         undo: () => {
             if (pipeHistoryIndex > 0) {
                 const newIndex = pipeHistoryIndex - 1;
-                console.log('🔙 PipeManager undo:', {
-                    currentIndex: pipeHistoryIndex,
-                    newIndex,
-                    historyLength: pipeHistory.length,
-                    pipesCount: pipeHistory[newIndex]?.length || 0
-                });
                 isApplyingHistoryRef.current = true;
                 setPipes(deepCopyPipes(pipeHistory[newIndex]));
                 setPipeHistoryIndex(newIndex);
                 isApplyingHistoryRef.current = false;
             } else {
-                console.log('❌ Cannot undo: already at beginning of history');
+                // Cannot undo: already at beginning of history
             }
         },
         redo: () => {
             if (pipeHistoryIndex < pipeHistory.length - 1) {
                 const newIndex = pipeHistoryIndex + 1;
-                console.log('🔜 PipeManager redo:', {
-                    currentIndex: pipeHistoryIndex,
-                    newIndex,
-                    historyLength: pipeHistory.length,
-                    pipesCount: pipeHistory[newIndex]?.length || 0
-                });
                 isApplyingHistoryRef.current = true;
                 setPipes(deepCopyPipes(pipeHistory[newIndex]));
                 setPipeHistoryIndex(newIndex);
                 isApplyingHistoryRef.current = false;
             } else {
-                console.log('❌ Cannot redo: already at end of history');
+                // Cannot redo: already at end of history
             }
         },
         pipeHistoryIndex,
@@ -1061,8 +1022,6 @@ const useSnapSystem = () => {
                 pipeType === 'lateral' && !isBetweenRows
                     ? [
                           ...irrigationPositions.sprinklers,
-                          ...irrigationPositions.dripTapes,
-                          ...irrigationPositions.waterJets,
                           ...irrigationPositions.pivots,
                       ]
                     : [];
@@ -1718,9 +1677,7 @@ const useMapManager = () => {
         (map: google.maps.Map, positions: IrrigationPositions, settings: IrrigationSettings) => {
             const totalIrrigationCount =
                 positions.sprinklers.length +
-                positions.pivots.length +
-                positions.dripTapes.length +
-                positions.waterJets.length;
+                positions.pivots.length;
 
             if (overlaysRef.current.irrigation.size !== totalIrrigationCount) {
                 overlaysRef.current.irrigation.forEach((marker) => marker.setMap(null));
@@ -1812,35 +1769,6 @@ const useMapManager = () => {
                     }
                 });
 
-                // Create drip tape and water jet markers
-                [
-                    { points: positions.dripTapes, name: 'Drip Tape', color: '#3b82f6' },
-                    { points: positions.waterJets, name: 'Water Jet', color: '#f97316' },
-                ].forEach(({ points, name, color }) => {
-                    points.forEach((pos, index) => {
-                        const id = `${name.toLowerCase().replace(' ', '')}-${index}`;
-                        const marker = new google.maps.Marker({
-                            position: pos,
-                            map: map,
-                            icon: {
-                                url:
-                                    'data:image/svg+xml;charset=UTF-8,' +
-                                    encodeURIComponent(`
-                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="4" cy="4" r="3" fill="${color}" stroke="${color}" stroke-width="1"/>
-                </svg>
-              `),
-                                scaledSize: new google.maps.Size(8, 8),
-                                anchor: new google.maps.Point(4, 4),
-                            },
-                            title: `${name} ${index + 1}`,
-                            optimized: true,
-                            clickable: false, // จะถูกปรับใน addIrrigationClickListeners
-                            zIndex: 1700, // Above zones (1500) and obstacles (1600)
-                        });
-                        overlaysRef.current.irrigation.set(id, marker);
-                    });
-                });
             }
             
             // เพิ่ม click listeners ให้กับ irrigation markers
@@ -2053,12 +1981,11 @@ const useMapManager = () => {
                 type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
             }>
         ) => {
-            console.log(`[PipeGenerate] drawConnectionPoints called with ${connectionPoints.length} points`);
             
             // ตรวจสอบ map reference ก่อนทำอะไร
             const currentMap = mapRef.current;
             if (!currentMap) {
-                console.log('[PipeGenerate] No map reference in drawConnectionPoints, skipping');
+                // No map reference in drawConnectionPoints, skipping
                 return;
             }
 
@@ -2076,11 +2003,8 @@ const useMapManager = () => {
 
             // ถ้าไม่มีจุดเชื่อมต่อ ให้หยุดทำงาน
             if (!connectionPoints || connectionPoints.length === 0) {
-                console.log('[PipeGenerate] No connection points to draw');
                 return;
             }
-
-            console.log(`[PipeGenerate] Drawing ${connectionPoints.length} connection points on map`);
 
             // สร้าง markers ใหม่แบบ batch เพื่อลดการกระพริบ
             const newMarkers: google.maps.Marker[] = [];
@@ -2102,19 +2026,19 @@ const useMapManager = () => {
                     } else if (connectionPoint.type === 'l_shape') {
                         color = '#F44336'; // สีแดง
                         size = 8;
-                        title = 'จุดเชื่อมต่อรูปตัว L (ปลายท่อเมน)';
+                        title = 'L-shaped junction (main pipe end)';
                     } else if (connectionPoint.type === 't_shape') {
                         color = '#2196F3'; // สีน้ำเงิน
                         size = 8;
-                        title = 'จุดเชื่อมต่อรูปตัว T (ผ่านปลายท่อเมน)';
+                        title = 'T-shaped junction (through main pipe end)';
                     } else if (connectionPoint.type === 'cross_shape') {
                         color = '#9C27B0'; // สีม่วง
                         size = 8;
-                        title = 'จุดเชื่อมต่อรูป + (ผ่านเส้นท่อเมน)';
+                        title = 'Cross-shaped junction (through main pipe)';
                     } else {
                         color = '#FFD700'; // สีเหลือง
                         size = 6;
-                        title = 'จุดเชื่อมต่อท่อย่อย';
+                        title = 'Lateral pipe junction';
                     }
 
                     // สร้าง SVG icon แบบเสถียร
@@ -2145,8 +2069,8 @@ const useMapManager = () => {
 
                     newMarkers.push(marker);
                     
-                } catch (error) {
-                    console.error(`[PipeGenerate] Error creating marker for connection point ${connectionPoint.id}:`, error);
+                } catch {
+                    // Error creating marker for connection point
                 }
             });
 
@@ -2158,26 +2082,7 @@ const useMapManager = () => {
                 }
             });
 
-            console.log(`[PipeGenerate] Successfully created and displayed ${newMarkers.length} connection point markers`);
             
-            // ตรวจสอบว่าจุดเชื่อมต่อแสดงผลจริงหรือไม่
-            setTimeout(() => {
-                const overlays = overlaysRef.current;
-                const actualCount = overlays.connectionPoints ? overlays.connectionPoints.size : 0;
-                if (actualCount === 0 && connectionPoints.length > 0) {
-                    console.log('[PipeGenerate] Connection points not visible after creation, retrying...');
-                    // ลองสร้างใหม่
-                    setTimeout(() => {
-                        if (mapRef.current) {
-                            newMarkers.forEach((marker) => {
-                                if (marker && marker.setMap) {
-                                    marker.setMap(mapRef.current);
-                                }
-                            });
-                        }
-                    }, 100);
-                }
-            }, 100);
         },
         [mapRef, overlaysRef]
     );
@@ -2195,7 +2100,6 @@ const useMapManager = () => {
                 startPoint: position,
                 startMarkerId: markerId,
             });
-            console.log(`[PipeGenerate] Started lateral connection from ${markerId} at`, position);
         } else {
             // สร้างท่อย่อยเชื่อมระหว่างจุดเริ่มต้นและจุดปลาย
             if (lateralConnectionMode.startMarkerId !== markerId) {
@@ -2213,7 +2117,6 @@ const useMapManager = () => {
                 // เพิ่มท่อย่อยใหม่
                 pipeManager.addPipe(newLateralPipe);
                 
-                console.log(`[PipeGenerate] Created lateral pipe connecting ${lateralConnectionMode.startMarkerId} to ${markerId}, length: ${length.toFixed(2)}m`);
 
                 // รีเซ็ตโหมดการเชื่อม
                 setLateralConnectionMode({
@@ -2228,7 +2131,6 @@ const useMapManager = () => {
                     startPoint: null,
                     startMarkerId: null,
                 });
-                console.log('[PipeGenerate] Cancelled lateral connection');
             }
         }
     }, []);
@@ -2274,8 +2176,6 @@ const useMapManager = () => {
                 options: { lateralMode: LateralMode; betweenRowsHalfWidth: number }
             ) => {
                 sprinklers: Coordinate[];
-                dripTapes: Coordinate[];
-                waterJets: Coordinate[];
                 pivots: Coordinate[];
             }
         ) => {
@@ -2311,8 +2211,6 @@ const useMapManager = () => {
                 // รวมจุดให้น้ำทั้งหมด
                 const allConnectedPoints = [
                     ...connectedPoints.sprinklers,
-                    ...connectedPoints.dripTapes,
-                    ...connectedPoints.waterJets,
                     ...connectedPoints.pivots,
                 ];
 
@@ -2926,8 +2824,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         try {
             const data = localStorage.getItem('fieldCropData');
             return data ? JSON.parse(data) : null;
-        } catch (error) {
-            console.error('Error loading from localStorage:', error);
+        } catch {
+            // Error loading from localStorage
             return null;
         }
     }, []);
@@ -2938,8 +2836,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         if (!hasUrlParams) {
             try {
                 resetPipesOnly();
-            } catch (e) {
-                console.error('Error clearing pipes on fresh reload:', e);
+            } catch {
+                // Error clearing pipes on fresh reload
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2991,13 +2889,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     
     // Update fieldData when standardizedFieldData changes
     useEffect(() => {
-        console.log('PipeGenerate - Updating fieldData from standardizedFieldData:', {
-            mainArea: standardizedFieldData.mainArea?.length || 0,
-            obstacles: standardizedFieldData.obstacles?.length || 0,
-            plantPoints: standardizedFieldData.plantPoints?.length || 0,
-            zones: standardizedFieldData.zones?.length || 0,
-            pipes: standardizedFieldData.pipes?.length || 0
-        });
         setFieldData(standardizedFieldData);
     }, [standardizedFieldData]);
 
@@ -3014,11 +2905,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         });
     }, [fieldData.mapCenter, fieldData.mapZoom]);
 
-    const [lateralReference, setLateralReference] = useState<{
-        pipeId: string;
-        length: number;
-        flowLpm: number;
-    } | null>(null);
 
     // Notification modal state
     const [notificationModal, setNotificationModal] = useState({
@@ -3035,37 +2921,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     // ===== Sprinkler-based recommended pipe length warnings (submain & lateral only) =====
     // Deprecated legacy maps for prior logic removed
 
-    const pipeOverLengthWarnings = useMemo(() => {
-        // ตรรกะใหม่: ใช้ท่อย่อยเส้นอ้างอิง (เส้นแรกที่วาดหรือที่ผู้ใช้ยอมรับแทน) เป็นเกณฑ์เดียว
-        type Warning = {
-            pipeId: string;
-            type: PipeType;
-            actualLength: number;
-            recommendedLength: number;
-        };
-        const warnings: Warning[] = [];
-
-        if (!lateralReference) return warnings;
-        const threshold = lateralReference.length;
-
-        const lateralPipes = pipeManager.pipes.filter(
-            (p) => p.type === 'lateral' && p.coordinates && p.coordinates.length >= 2
-        );
-        for (const pipe of lateralPipes) {
-            if (pipe.id === lateralReference.pipeId) continue; // ข้ามท่ออ้างอิงเอง
-            const actualLength = pipe.length ?? calculateDistance(pipe.coordinates!);
-            if (actualLength > threshold) {
-                warnings.push({
-                    pipeId: pipe.id,
-                    type: pipe.type,
-                    actualLength,
-                    recommendedLength: threshold,
-                });
-            }
-        }
-
-        return warnings;
-    }, [pipeManager.pipes, lateralReference]);
 
     const [pumps, setPumps] = useState<Pump[]>([]);
     // History stacks for undo/redo of pump operations
@@ -3098,8 +2953,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             plantPointsLength: data.plantPoints.length,
             irrigationSprinklersLength: data.irrigationPositions?.sprinklers?.length || 0,
             irrigationPivotsLength: data.irrigationPositions?.pivots?.length || 0,
-            irrigationDripTapesLength: data.irrigationPositions?.dripTapes?.length || 0,
-            irrigationWaterJetsLength: data.irrigationPositions?.waterJets?.length || 0,
             selectedCropsLength: data.selectedCrops.length,
             areaRai: data.areaRai,
             perimeterMeters: data.perimeterMeters,
@@ -3117,12 +2970,10 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         // Only handle pipes and pumps restoration from localStorage
         const loadPipesAndPumps = () => {
             const storageData = loadFromStorage();
-            console.log('[PipeGenerate] Loading pipes and pumps from storage:', storageData);
             
             if (storageData) {
                 // Restore pipes
                 if (storageData.pipes && Array.isArray(storageData.pipes)) {
-                    console.log('[PipeGenerate] Restoring pipes:', storageData.pipes.length);
                     setPipes(storageData.pipes, { resetHistory: true });
                 }
                 
@@ -3153,15 +3004,14 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         name: e.name ?? `Water Pump ${idx + 1}`,
                                     }) as Pump
                             );
-                        console.log('[PipeGenerate] Restored pumps:', restored.length);
                         if (restored.length > 0) {
                             setPumps(restored);
                             setPumpHistory([[], restored.map((pump) => ({ ...pump }))]);
                             setPumpHistoryIndex(1);
                         }
                     }
-                } catch (e) {
-                    console.error('[PipeGenerate] Error restoring pumps:', e);
+                } catch {
+                    // Error restoring pumps
                 }
             }
         };
@@ -3636,12 +3486,12 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     const startDrawing = useCallback(
         (type: PipeType, curveType: CurveType = 'straight') => {
             if (typeof google === 'undefined' || !google.maps) {
-                console.error('Google Maps not available');
+                // Google Maps not available
                 alert(t('Map library not loaded. Please refresh the page.'));
                 return;
             }
             if (!mapManager.mapRef.current) {
-                console.error('Map not available');
+                // Map not available
                 alert(t('Map not loaded. Please wait for the map to load.'));
                 return;
             }
@@ -3985,18 +3835,12 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                         // สร้างข้อความแสดงจำนวนจุดเชื่อมแต่ละประเภท
                         const totalPoints =
                             connectedPoints.sprinklers.length +
-                            connectedPoints.dripTapes.length +
-                            connectedPoints.waterJets.length +
                             connectedPoints.pivots.length;
                         let labelText = `💧 ${Math.round(totalFlow)} L/min`;
                         if (totalPoints > 0) {
                             const parts: string[] = [];
                             if (connectedPoints.sprinklers.length > 0)
                                 parts.push(`🚿${connectedPoints.sprinklers.length}`);
-                            if (connectedPoints.dripTapes.length > 0)
-                                parts.push(`💧${connectedPoints.dripTapes.length}`);
-                            if (connectedPoints.waterJets.length > 0)
-                                parts.push(`🌊${connectedPoints.waterJets.length}`);
                             if (connectedPoints.pivots.length > 0)
                                 parts.push(`🔄${connectedPoints.pivots.length}`);
                             labelText = `${parts.join(' ')} • ${labelText}`;
@@ -4028,14 +3872,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                             pipeManager.findNearbyConnectedIrrigationPoints
                         );
 
-                        // ตั้งท่อเส้นแรกเป็นอ้างอิง หากยังไม่มีการตั้งค่า
-                        if (!lateralReference) {
-                            setLateralReference({
-                                pipeId: newPipe.id,
-                                length: newPipe.length || calculateDistance(outputCoordinates),
-                                flowLpm: totalFlow,
-                            });
-                        }
 
                         // สร้างท่อด้านตรงข้ามโดยอัตโนมัติ (เฉพาะโหมดระหว่างแถวและเริ่มจากท่อเมนย่อย)
                         if (
@@ -4178,23 +4014,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         const existOpp = mapLabels.get(oppositePipe.id) || [];
                                         mapLabels.set(oppositePipe.id, [...existOpp, oppLabel]);
 
-                                        // ปรับปรุงความยาวอ้างอิงให้พิจารณาทั้งเส้นแรกและเส้นฝั่งตรงข้าม
-                                        const firstLen =
-                                            newPipe.length || calculateDistance(outputCoordinates);
-                                        const mirrorLen =
-                                            oppositePipe.length || calculateDistance(mirrorCoords);
-                                        const refLen = Math.min(firstLen, mirrorLen);
-                                        const refFlow = Math.min(totalFlow, oppFlow);
-                                        if (
-                                            !lateralReference ||
-                                            lateralReference.pipeId === newPipe.id
-                                        ) {
-                                            setLateralReference({
-                                                pipeId: newPipe.id,
-                                                length: refLen,
-                                                flowLpm: refFlow,
-                                            });
-                                        }
 
                                         // วาดเส้นเชื่อมต่อสำหรับท่อย่อยที่สร้างอัตโนมัติ
                                         const updatedLateralPipes = pipeManager.pipes.filter(
@@ -4208,18 +4027,18 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         );
                                     }
                                 }
-                            } catch (err) {
-                                console.warn('Auto-create opposite lateral failed:', err);
+                            } catch {
+                                // Auto-create opposite lateral failed
                             }
                         }
 
                         // Show notification modal instead of confirm dialog
                         setNotificationModal({
                             isOpen: true,
-                            title: t('การสร้างท่อย่อยอัตโนมัติ'),
-                            message: t('เลือกรูปแบบการสร้างท่อย่อย:'),
+                            title: t('Automatic lateral pipe generation'),
+                            message: t('Select lateral pipe generation method:'),
                             warningMessage: t(
-                                'การวาดท่ออัตโนมัติ กรุณาวาดให้เป็นเส้นตรง ไม่งั้นการสร้างท่ออาจจะผิดปกติ'
+                                'Automatic pipe drawing. Please draw straight lines, otherwise pipe generation may be abnormal'
                             ),
                             type: 'warning',
                             showColorOptions: true,
@@ -4253,8 +4072,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     // Explicitly end drawing after successful finalize
                     hasFinalized = true;
                     stopDrawing();
-                } catch (error) {
-                    console.error('finalizeDrawing error', error);
+                } catch {
+                    // finalizeDrawing error
                     // Ensure cleanup on error as well
                     hasFinalized = true;
                     stopDrawing();
@@ -4506,7 +4325,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             fieldData,
             getNearestPointOnPipes,
             pumps,
-            lateralReference,
         ]
     );
 
@@ -4635,7 +4453,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     // สร้างจุดเชื่อมต่อของท่อย่อยที่ต่อกับท่อเมนย่อย
     const createLateralConnectionPoints = useCallback(
         (lateralPipes: Pipe[]) => {
-            console.log('[PipeGenerate] createLateralConnectionPoints called with:', lateralPipes.length, 'lateral pipes');
             const connectionPoints: Array<{
                 id: string;
                 position: Coordinate;
@@ -4646,7 +4463,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
             // หาท่อเมนย่อยทั้งหมด
             const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
-            console.log('[PipeGenerate] Found', submainPipes.length, 'submain pipes');
 
             lateralPipes.forEach((lateral) => {
                 if (!lateral.coordinates || lateral.coordinates.length < 2) return;
@@ -4749,7 +4565,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 }
             });
 
-            console.log('[PipeGenerate] createLateralConnectionPoints returning:', connectionPoints.length, 'connection points');
             return connectionPoints;
         },
         [pipeManager.pipes, checkLateralCrossingSubmain]
@@ -4757,7 +4572,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
     const createSubmainToMainConnectionPoints = useCallback(() => {
-        console.log('[PipeGenerate] createSubmainToMainConnectionPoints called');
         const connectionPoints: Array<{
             id: string;
             position: Coordinate;
@@ -4770,10 +4584,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         const mainPipes = pipeManager.pipes.filter((p) => p.type === 'main');
         const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
 
-        console.log('[PipeGenerate] Found', mainPipes.length, 'main pipes and', submainPipes.length, 'submain pipes');
 
         if (mainPipes.length === 0 || submainPipes.length === 0) {
-            console.log('[PipeGenerate] No main or submain pipes, returning empty connection points');
+            // No main or submain pipes, returning empty connection points
             return connectionPoints;
         }
 
@@ -5197,15 +5010,18 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             });
         });
 
-        console.log('[PipeGenerate] createSubmainToMainConnectionPoints returning:', connectionPoints.length, 'connection points');
         return connectionPoints;
     }, [pipeManager.pipes, getLineIntersection]);
 
-    // วิธีใหม่: สร้างจุดเชื่อมต่อแบบเสถียร - ใช้ useMemo และ useEffect แยกกัน
+    // สร้างจุดเชื่อมต่อแบบเสถียร - ใช้ useMemo และ useEffect แยกกัน
     const connectionPointsData = useMemo(() => {
-        console.log('[PipeGenerate] Computing connection points data...');
-        
         const lateralPipes = pipeManager.pipes.filter((p) => p.type === 'lateral');
+        const mainPipes = pipeManager.pipes.filter((p) => p.type === 'main');
+        const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
+        
+        // ตรวจสอบว่ามีท่อครบถ้วนหรือไม่
+        const hasCompletePipeSystem = mainPipes.length > 0 && submainPipes.length > 0;
+        
         const allConnectionPoints: Array<{
             id: string;
             position: Coordinate;
@@ -5214,25 +5030,23 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
         }> = [];
 
-        // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย
-        if (lateralPipes.length > 0) {
-            console.log('[PipeGenerate] Creating lateral connection points...');
+        // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย (เฉพาะเมื่อมีท่อเมนย่อย)
+        if (lateralPipes.length > 0 && submainPipes.length > 0) {
             const lateralConnectionPoints = createLateralConnectionPoints(lateralPipes);
-            console.log('[PipeGenerate] Got', lateralConnectionPoints.length, 'lateral connection points');
             allConnectionPoints.push(...lateralConnectionPoints);
         }
 
-        // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
-        console.log('[PipeGenerate] Creating submain to main connection points...');
-        const submainToMainConnectionPoints = createSubmainToMainConnectionPoints();
-        console.log('[PipeGenerate] Got', submainToMainConnectionPoints.length, 'submain to main connection points');
-        allConnectionPoints.push(...submainToMainConnectionPoints);
+        // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน (เฉพาะเมื่อมีท่อครบถ้วน)
+        if (hasCompletePipeSystem) {
+            const submainToMainConnectionPoints = createSubmainToMainConnectionPoints();
+            allConnectionPoints.push(...submainToMainConnectionPoints);
+        }
 
-        console.log(`[PipeGenerate] Total connection points computed: ${allConnectionPoints.length}`);
         return {
             connectionPoints: allConnectionPoints,
             lateralPipes: lateralPipes,
-            hasData: allConnectionPoints.length > 0
+            hasData: allConnectionPoints.length > 0,
+            hasCompleteSystem: hasCompletePipeSystem
         };
     }, [
         pipeManager.pipes,
@@ -5242,11 +5056,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // ฟังก์ชันสำหรับการวาดจุดเชื่อมต่อ
     const renderConnectionPoints = useCallback(() => {
-        console.log('[PipeGenerate] renderConnectionPoints called');
-        
         // ตรวจสอบว่าแผนที่พร้อมใช้งาน
         if (!mapManager.mapRef.current) {
-            console.log('[PipeGenerate] Map not ready, skipping connection points drawing');
             return false;
         }
 
@@ -5261,9 +5072,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             overlays.connectionLines.clear();
         }
 
-        // วาดจุดเชื่อมต่อใหม่
-        if (connectionPointsData.hasData) {
-            console.log(`[PipeGenerate] Drawing ${connectionPointsData.connectionPoints.length} connection points`);
+        // วาดจุดเชื่อมต่อใหม่ (เฉพาะเมื่อมีระบบท่อครบถ้วน)
+        if (connectionPointsData.hasData && connectionPointsData.hasCompleteSystem) {
             mapManager.drawConnectionPoints(connectionPointsData.connectionPoints);
             
             // วาดเส้นเชื่อมต่อระหว่างท่อย่อยกับสปริงเกลอร์
@@ -5275,12 +5085,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     pipeManager.findNearbyConnectedIrrigationPoints
                 );
             }
-            console.log('[PipeGenerate] Connection points drawn successfully');
             return true;
-        } else {
-            console.log('[PipeGenerate] No connection points to draw');
-            return false;
         }
+        return false;
     }, [
         connectionPointsData,
         mapManager,
@@ -5289,78 +5096,10 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         pipeManager.findNearbyConnectedIrrigationPoints,
     ]);
 
-    // useEffect สำหรับการวาดจุดเชื่อมต่อ
+    // useEffect สำหรับการวาดจุดเชื่อมต่อ (เฉพาะเมื่อมีระบบท่อครบถ้วน)
     useEffect(() => {
-        console.log('[PipeGenerate] Connection points useEffect triggered');
         renderConnectionPoints();
     }, [renderConnectionPoints]);
-
-    // ระบบตรวจสอบและ render อัตโนมัติ
-    useEffect(() => {
-        console.log('[PipeGenerate] Setting up auto-render system');
-        
-        // ตรวจสอบจุดเชื่อมต่อทุก 2 วินาที
-        const checkInterval = setInterval(() => {
-            if (!mapManager.mapRef.current) {
-                console.log('[PipeGenerate] Map not available for auto-check');
-                return;
-            }
-
-            const overlays = mapManager.overlaysRef.current;
-            const expectedCount = connectionPointsData.connectionPoints.length;
-            const actualCount = overlays.connectionPoints ? overlays.connectionPoints.size : 0;
-            
-            console.log(`[PipeGenerate] Auto-check: expected ${expectedCount}, actual ${actualCount} connection points`);
-            
-            // ถ้าจำนวนจุดเชื่อมต่อไม่ตรงกัน ให้ render ใหม่
-            if (expectedCount > 0 && actualCount !== expectedCount) {
-                console.log('[PipeGenerate] Connection points count mismatch, re-rendering...');
-                renderConnectionPoints();
-            }
-        }, 2000); // ตรวจสอบทุก 2 วินาที
-
-        // ตรวจสอบเมื่อ map zoom หรือ pan
-        const map = mapManager.mapRef.current;
-        if (map) {
-            const zoomListener = map.addListener('zoom_changed', () => {
-                console.log('[PipeGenerate] Map zoom changed, checking connection points...');
-                setTimeout(() => {
-                    if (connectionPointsData.hasData) {
-                        const overlays = mapManager.overlaysRef.current;
-                        const actualCount = overlays.connectionPoints ? overlays.connectionPoints.size : 0;
-                        if (actualCount === 0) {
-                            console.log('[PipeGenerate] Connection points missing after zoom, re-rendering...');
-                            renderConnectionPoints();
-                        }
-                    }
-                }, 500); // รอ 500ms หลัง zoom
-            });
-
-            const idleListener = map.addListener('idle', () => {
-                console.log('[PipeGenerate] Map idle, checking connection points...');
-                setTimeout(() => {
-                    if (connectionPointsData.hasData) {
-                        const overlays = mapManager.overlaysRef.current;
-                        const actualCount = overlays.connectionPoints ? overlays.connectionPoints.size : 0;
-                        if (actualCount === 0) {
-                            console.log('[PipeGenerate] Connection points missing after map idle, re-rendering...');
-                            renderConnectionPoints();
-                        }
-                    }
-                }, 300); // รอ 300ms หลัง map idle
-            });
-
-            return () => {
-                clearInterval(checkInterval);
-                google.maps.event.removeListener(zoomListener);
-                google.maps.event.removeListener(idleListener);
-            };
-        }
-
-        return () => {
-            clearInterval(checkInterval);
-        };
-    }, [connectionPointsData, mapManager, renderConnectionPoints]);
 
     // วิเคราะห์รูปแบบของท่อต้นแบบ: "ลากผ่าน" หรือ "ออกจากด้านใดด้านหนึ่ง"
     const analyzeTemplatePattern = useCallback(
@@ -5473,8 +5212,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             // ดึงจุดให้น้ำทั้งหมดในโซนนั้น
             const allIrrigationPoints = [
                 ...fieldData.irrigationPositions.sprinklers,
-                ...fieldData.irrigationPositions.dripTapes,
-                ...fieldData.irrigationPositions.waterJets,
                 ...fieldData.irrigationPositions.pivots,
             ].filter((point) => isPointInPolygonEnhanced([point.lat, point.lng], zone.coordinates));
 
@@ -6291,7 +6028,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             }
             // ไม่ต้องเรียก mapManager.clearPipeOverlays โดยตรง เพราะ useEffect จะจัดการเอง
             if (!type || type === 'lateral') {
-                setLateralReference(null);
                 // ลบจุดเชื่อมต่อเมื่อลบท่อย่อยจะถูกจัดการใน useEffect
             }
             if (mapManager.drawingManagerRef.current) {
@@ -6303,53 +6039,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         [pipeManager, mapManager]
     );
 
-    // Extracted from inline JSX to avoid complex nested braces causing TSX parsing issues
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleAcceptAsReference = useCallback(
-        (pipeId: string) => {
-            const p = pipeManager.pipes.find((pp) => pp.id === pipeId);
-            if (!p || !p.coordinates) return;
-            const connectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(
-                p.coordinates,
-                fieldData.irrigationPositions
-            );
-            const totalFlow = pipeManager.calculateTotalFlowRate(
-                connectedPoints,
-                fieldData.irrigationSettings
-            );
-            const newThreshold = p.length || calculateDistance(p.coordinates);
-            if (confirm(t('Use this lateral as new reference?'))) {
-                setLateralReference({ pipeId, length: newThreshold, flowLpm: totalFlow });
-            }
-        },
-        [fieldData.irrigationSettings, fieldData.irrigationPositions, pipeManager, t]
-    );
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const handleSelectWarningPipe = useCallback(
-        (pipeId: string, e?: React.MouseEvent) => {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            const p = pipeManager.pipes.find((pp) => pp.id === pipeId);
-            if (!p || !p.coordinates || p.coordinates.length < 2) return;
-            // retrigger highlight if same pipe clicked consecutively
-            if (pipeManager.editingPipeId === pipeId) {
-                pipeManager.setEditingPipeId(null);
-                setTimeout(() => pipeManager.setEditingPipeId(pipeId), 0);
-            } else {
-                pipeManager.setEditingPipeId(pipeId);
-            }
-            try {
-                mapManager.fitBounds(p.coordinates);
-            } catch (err) {
-                console.warn('fitBounds failed for pipe', pipeId, err);
-            }
-            // Do not change reference lateral automatically on selection
-        },
-        [pipeManager, mapManager]
-    );
 
     // Helper function to deep copy pumps
     const deepCopyPumps = useCallback((pumps: Pump[]): Pump[] => {
@@ -6778,6 +6468,38 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         }
     }, [pumps]);
 
+    // Helper function to check if current step is completed
+    const isCurrentStepCompleted = useCallback(() => {
+        switch (props.currentStep) {
+            case 1: // Initial Area
+                return fieldData.mainArea.length >= 3;
+            case 2: // Irrigation Generate
+                return fieldData.irrigationPositions.sprinklers.length > 0 || fieldData.irrigationPositions.pivots.length > 0;
+            case 3: // Zone Obstacle
+                return fieldData.zones.some(
+                    (zone) =>
+                        zone.coordinates.length >= 3 &&
+                        zone.coordinates.every((coord) =>
+                            isPointInOrOnPolygon(coord, fieldData.mainArea)
+                        )
+                );
+            case 4: // Pipe Generate
+                return fieldData.pipes.length > 0;
+            default:
+                return false;
+        }
+    }, [fieldData, props.currentStep]);
+
+    // Helper function to update completed steps
+    const updateCompletedSteps = useCallback(() => {
+        const existing = parseCompletedSteps(props.completedSteps);
+        let result = existing;
+        if (isCurrentStepCompleted() && props.currentStep) {
+            result = Array.from(new Set([...existing, props.currentStep]));
+        }
+        return toCompletedStepsCsv(result);
+    }, [props.completedSteps, isCurrentStepCompleted, props.currentStep]);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const handleStepClick = useCallback(
         (step: (typeof steps)[0]) => {
@@ -6802,14 +6524,17 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             }
 
             // Original logic for incomplete steps
+            // Update completed steps before navigating
+            const updatedCompletedSteps = updateCompletedSteps();
+            
             const params = {
                 crops: fieldData.selectedCrops.join(','),
                 currentStep: step.id,
-                completedSteps: toCompletedStepsCsv(parseCompletedSteps(props.completedSteps)),
+                completedSteps: updatedCompletedSteps,
             };
             router.get(step.route, params);
         },
-        [fieldData.selectedCrops, props.completedSteps]
+        [fieldData.selectedCrops, props.completedSteps, updateCompletedSteps]
     );
 
     return (
@@ -7062,32 +6787,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                                                 </span>
                                                             </div>
                                                         </>
-                                                    )}
-                                                    {fieldData.irrigationPositions.dripTapes
-                                                        .length > 0 && (
-                                                        <div className="flex justify-between text-gray-400">
-                                                            <span>💧 {t('Drip Tapes')}:</span>
-                                                            <span className="text-blue-400">
-                                                                {
-                                                                    fieldData.irrigationPositions
-                                                                        .dripTapes.length
-                                                                }{' '}
-                                                                {t('units')}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {fieldData.irrigationPositions.waterJets
-                                                        .length > 0 && (
-                                                        <div className="flex justify-between text-gray-400">
-                                                            <span>🌊 {t('Water Jets')}:</span>
-                                                            <span className="text-orange-400">
-                                                                {
-                                                                    fieldData.irrigationPositions
-                                                                        .waterJets.length
-                                                                }{' '}
-                                                                {t('units')}
-                                                            </span>
-                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -7358,7 +7057,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                                             : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
                                                     }`}
                                                 >
-                                                    {t('ภายในแถว')}
+                                                    {t('Within rows')}
                                                 </button>
                                                 <button
                                                     onClick={() =>
@@ -7370,7 +7069,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                                             : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
                                                     }`}
                                                 >
-                                                    {t('ระหว่างแถว')}
+                                                    {t('Between rows')}
                                                 </button>
                                             </div>
 
@@ -7700,23 +7399,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         {t('Back')}
                                     </button>
 
-                                    <button
-                                        onClick={() => {
-                                            if (
-                                                confirm(
-                                                    t(
-                                                        '⚠️ Reset all pipes? All drawn pipes will be lost.'
-                                                    )
-                                                )
-                                            ) {
-                                                pipeManager.setPipes([], { resetHistory: true });
-                                                resetPipesOnly();
-                                            }
-                                        }}
-                                        className="flex-1 rounded border border-white bg-orange-600 px-4 py-2 text-sm text-white transition-colors hover:bg-orange-500"
-                                    >
-                                        {t('Reset')}
-                                    </button>
 
                                     <button
                                         onClick={handleContinue}
@@ -7768,17 +7450,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         >
                                             ⟳
                                         </button>
-                                        {/* Sprinkler-based warnings indicator */}
-                                        {pipeOverLengthWarnings.length > 0 && (
-                                            <div
-                                                className="ml-1 rounded border border-white bg-yellow-600 px-2 py-1 text-xs text-white"
-                                                title={t(
-                                                    'Some pipes may be too long based on sprinkler rows'
-                                                )}
-                                            >
-                                                ⚠️ {t('Pipe length warning')}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
 
@@ -7845,69 +7516,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                     </div>
                                 )}
 
-                                {/* Detailed warning panel & reference lateral controls */}
-                                {(pipeOverLengthWarnings.length > 0 || lateralReference) && (
-                                    <div className="absolute left-1 top-36 z-10 max-w-sm rounded-lg border border-yellow-400 bg-yellow-700 bg-opacity-90 p-2 text-xs">
-                                        <div className="mb-1 font-bold text-white">
-                                            ⚠️ {t('Pipe Length Advisory')}
-                                        </div>
-                                        {lateralReference && (
-                                            <div className="mb-2 rounded bg-yellow-800/60 p-1 text-yellow-100">
-                                                <div>
-                                                    {t('Reference Lateral')}: #
-                                                    {lateralReference.pipeId.split('-').pop()}
-                                                </div>
-                                                <div>
-                                                    📏 {t('Length')}:{' '}
-                                                    {Math.round(lateralReference.length)} m
-                                                </div>
-                                                <div>
-                                                    💧 {t('Flow Rate')}:{' '}
-                                                    {Math.round(lateralReference.flowLpm)} L/min
-                                                </div>
-                                            </div>
-                                        )}
-                                        {pipeOverLengthWarnings.length > 0 && (
-                                            <div className="max-h-56 space-y-1 overflow-y-auto pr-1 text-yellow-100">
-                                                {pipeOverLengthWarnings.map((w) => (
-                                                    <div
-                                                        key={w.pipeId}
-                                                        className="flex items-center justify-between"
-                                                    >
-                                                        <button
-                                                            className="text-yellow-200 underline hover:text-white"
-                                                            onClick={(e) =>
-                                                                handleSelectWarningPipe(w.pipeId, e)
-                                                            }
-                                                            title={t('Select and focus this pipe')}
-                                                        >
-                                                            {w.type === 'submain'
-                                                                ? t('Submain')
-                                                                : t('Lateral')}{' '}
-                                                            #{w.pipeId.split('-').pop()}
-                                                        </button>
-                                                        <span className="ml-1">
-                                                            {Math.round(w.actualLength)}m →{' '}
-                                                            {Math.round(w.recommendedLength)}m
-                                                        </span>
-                                                        <div className="ml-2 flex space-x-1">
-                                                            <button
-                                                                className="rounded border border-yellow-300 bg-yellow-500 px-1.5 py-0.5 text-[10px] text-black hover:bg-yellow-400"
-                                                                onClick={() =>
-                                                                    handleAcceptAsReference(
-                                                                        w.pipeId
-                                                                    )
-                                                                }
-                                                            >
-                                                                {t('Accept as reference')}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
 
                                 {/* Floating Distance Meter */}
                                 {pipeManager.isDrawing &&
@@ -8021,7 +7629,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 warningMessage={notificationModal.warningMessage}
                 type={notificationModal.type}
                 showConfirmButton={!!notificationModal.onConfirm}
-                confirmText={t('ยืนยัน')}
+                confirmText={t('Confirm')}
                 cancelText={t('ยกเลิก')}
                 showColorOptions={notificationModal.showColorOptions}
             />

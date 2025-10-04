@@ -39,9 +39,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
         const dataSizeKB = new Blob([dataString]).size / 1024;
 
         if (dataSizeKB > maxSizeKB) {
-            console.warn(
-                `Data size (${dataSizeKB.toFixed(2)}KB) exceeds limit (${maxSizeKB}KB), optimizing...`
-            );
+            // Data size exceeds limit, optimizing...
 
             // Optimize by reducing precision
             const dataObj = data as Record<string, unknown>;
@@ -110,24 +108,6 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
                                   };
                               })
                             : [],
-                        dripTapes: Array.isArray(irrigationPos?.dripTapes)
-                            ? irrigationPos.dripTapes.map((pos: unknown) => {
-                                  const p = pos as { lat: number; lng: number };
-                                  return {
-                                      lat: Math.round(p.lat * 1000000) / 1000000,
-                                      lng: Math.round(p.lng * 1000000) / 1000000,
-                                  };
-                              })
-                            : [],
-                        waterJets: Array.isArray(irrigationPos?.waterJets)
-                            ? irrigationPos.waterJets.map((pos: unknown) => {
-                                  const p = pos as { lat: number; lng: number };
-                                  return {
-                                      lat: Math.round(p.lat * 1000000) / 1000000,
-                                      lng: Math.round(p.lng * 1000000) / 1000000,
-                                  };
-                              })
-                            : [],
                     };
                 })(),
             };
@@ -136,9 +116,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
 
             if (optimizedSizeKB > maxSizeKB) {
-                console.warn(
-                    'Data still too large after optimization, further reducing plant points...'
-                );
+                // Data still too large after optimization, further reducing plant points...
                 // Further reduce plant points precision
                 const dataObj = optimizedData as Record<string, unknown>;
                 const furtherOptimizedData = {
@@ -165,7 +143,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
                 const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
 
                 if (furtherOptimizedSizeKB > maxSizeKB) {
-                    console.warn('Data still too large, sampling plant points...');
+                    // Data still too large, sampling plant points...
                     // Sample plant points (keep every 2nd point)
                     const sampledPlantPoints = Array.isArray(furtherOptimizedData.plantPoints)
                         ? furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0)
@@ -185,8 +163,8 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             localStorage.setItem(key, dataString);
         }
         return true;
-    } catch (error) {
-        console.error('Error saving to localStorage:', error);
+    } catch {
+        // Error saving to localStorage
         return false;
     }
 };
@@ -296,10 +274,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         typeof fieldData.realPlantCount === 'number' &&
                         fieldData.realPlantCount > 0
                     ) {
-                        console.log(
-                            'Fresh load - Loading realPlantCount from localStorage:',
-                            fieldData.realPlantCount
-                        );
                         setRealPlantCount(fieldData.realPlantCount);
                     } else if (fieldData.plantPoints) {
                         // Fallback to plantPoints.__realCount
@@ -309,7 +283,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                             };
                         const realCount =
                             plantPointsWithRealCount.__realCount || fieldData.plantPoints.length;
-                        console.log('Fresh load - Using fallback realPlantCount:', realCount);
                         setRealPlantCount(realCount);
                     }
 
@@ -363,8 +336,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         irrigationCounts: {
                             sprinkler_system: 0,
                             pivot: 0,
-                            drip_tape: 0,
-                            water_jet_tape: 0,
                         },
                         irrigationSettings: {
                             sprinkler_system: {
@@ -374,32 +345,16 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                 pressure: 2.5,
                             },
                             pivot: { coverageRadius: 165, overlap: 0, flow: 50, pressure: 3.0 },
-                            drip_tape: {
-                                emitterSpacing: 20,
-                                placement: 'along_rows',
-                                side: 'left',
-                                flow: 0.24,
-                                pressure: 1.0,
-                            },
-                            water_jet_tape: {
-                                emitterSpacing: 20,
-                                placement: 'along_rows',
-                                side: 'left',
-                                flow: 1.5,
-                                pressure: 1.5,
-                            },
                         },
                         irrigationPositions: {
                             sprinklers: [],
                             pivots: [],
-                            dripTapes: [],
-                            waterJets: [],
                         },
                     };
                     safeSetItem('fieldCropData', sanitized);
                 }
-            } catch (e) {
-                console.error('Error sanitizing irrigation data on fresh load:', e);
+            } catch {
+                // Error sanitizing irrigation data on fresh load
             }
             // Clear irrigation overlays if map is loaded
             if (mapRef.current) {
@@ -454,10 +409,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         typeof fieldData.realPlantCount === 'number' &&
                         fieldData.realPlantCount > 0
                     ) {
-                        console.log(
-                            'Irrigation - Loading realPlantCount from separate property:',
-                            fieldData.realPlantCount
-                        );
                         setRealPlantCount(fieldData.realPlantCount);
                     } else if (fieldData.plantPoints) {
                         // Extract real count if available (from initial-area.tsx with real count)
@@ -467,11 +418,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                             };
                         const realCount =
                             plantPointsWithRealCount.__realCount || fieldData.plantPoints.length;
-                        console.log('Irrigation - Loading plant points:', {
-                            plantPointsLength: fieldData.plantPoints.length,
-                            realCount: realCount,
-                            hasRealCount: !!plantPointsWithRealCount.__realCount,
-                        });
                         setRealPlantCount(realCount);
                         dbg('Real plant count:', realCount);
                     }
@@ -540,8 +486,8 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 } else {
                     dbg('No field data found in localStorage');
                 }
-            } catch (e) {
-                console.error('Error loading field data from localStorage:', e);
+            } catch {
+                // Error loading field data from localStorage
             }
         }
     }, [
@@ -617,11 +563,10 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [selectedIrrigationType, setSelectedIrrigationType] = useState<string>('');
     const [isGeneratingIrrigation, setIsGeneratingIrrigation] = useState(false);
+    const [isAngleRegenerating, setIsAngleRegenerating] = useState(false);
     const [irrigationCounts, setIrrigationCounts] = useState({
         sprinkler_system: 0,
         pivot: 0,
-        drip_tape: 0,
-        water_jet_tape: 0,
     });
 
     // เพิ่ม state สำหรับเก็บตำแหน่งอุปกรณ์ irrigation
@@ -634,16 +579,12 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     // Require at least one generated irrigation type before proceeding
     const hasGeneratedIrrigation =
         irrigationPositions.sprinklers.length > 0 ||
-        irrigationPositions.pivots.length > 0 ||
-        irrigationPositions.dripTapes.length > 0 ||
-        irrigationPositions.waterJets.length > 0;
+        irrigationPositions.pivots.length > 0;
 
     // Irrigation settings for different types
     const defaultSettings: IrrigationSettings = {
         sprinkler_system: { coverageRadius: 8, overlap: 0, flow: 10, pressure: 2.5 },
         pivot: { coverageRadius: 165, overlap: 0, flow: 50, pressure: 3.0 },
-        drip_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 0.24, pressure: 1.0 },
-        water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 1.5, pressure: 1.5 }
     };
 
     const [irrigationSettings, setIrrigationSettings] = useState<IrrigationSettings>({
@@ -654,8 +595,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     // Type guard functions for irrigation settings
     const getSprinklerSettings = useCallback(() => irrigationSettings.sprinkler_system || defaultSettings.sprinkler_system!, [irrigationSettings.sprinkler_system, defaultSettings.sprinkler_system]);
     const getPivotSettings = useCallback(() => irrigationSettings.pivot || defaultSettings.pivot!, [irrigationSettings.pivot, defaultSettings.pivot]);
-    const getDripTapeSettings = useCallback(() => irrigationSettings.drip_tape || defaultSettings.drip_tape!, [irrigationSettings.drip_tape, defaultSettings.drip_tape]);
-    const getWaterJetTapeSettings = useCallback(() => irrigationSettings.water_jet_tape || defaultSettings.water_jet_tape!, [irrigationSettings.water_jet_tape, defaultSettings.water_jet_tape]);
 
     // Calculate total water requirement
     const totalWaterRequirement = useMemo(() => {
@@ -817,8 +756,8 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             case 1: // Initial Area
                 return finalMainArea.length >= 3;
             case 2: // Irrigation Generate
-                // Do not auto-complete on data presence; only mark as completed on Next
-                return false;
+                // Mark as completed if irrigation has been generated
+                return hasGeneratedIrrigation;
             case 3: // Zone Obstacle
                 // This will be handled in the zone-obstacle page
                 return false;
@@ -868,8 +807,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                       irrigationCounts: {
                           sprinkler_system: 0,
                           pivot: 0,
-                          drip_tape: 0,
-                          water_jet_tape: 0,
                       },
                       totalWaterRequirement: 0,
                       irrigationSettings,
@@ -901,8 +838,8 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             };
 
             safeSetItem('fieldCropData', fieldData);
-        } catch (error) {
-            console.error('Error saving irrigation data to localStorage:', error);
+        } catch {
+            // Error saving irrigation data to localStorage
         }
 
         // Update completed steps automatically
@@ -934,7 +871,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
 
     // ฟังก์ชันอัปเดตขนาดของ markers แทนการสร้างใหม่ (เหมือนหน้าอื่นๆ)
     const updateMarkerSizes = useCallback((zoom: number) => {
-        if (!mapRef.current) return;
+        if (!mapRef.current || irrigationMarkersRef.current.length === 0) return;
         
         // คำนวณขนาดใหม่ตาม zoom level
         let newSize = 12; // ขนาดเริ่มต้น
@@ -943,7 +880,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         else if (zoom < 20) newSize = 12; // ขนาดปกติ
         else newSize = 14;                // ซูมเข้าใกล้
         
-        // อัปเดตขนาดของ sprinkler markers
+        // อัปเดตขนาดของ sprinkler markers โดยไม่สร้างใหม่
         irrigationMarkersRef.current.forEach((marker) => {
             if (marker.getTitle()?.includes('Sprinkler')) {
                 const newIcon = {
@@ -1001,14 +938,25 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         
         // ใช้ debounce timer แทน requestAnimationFrame เพื่อลดการ regenerate บ่อยเกินไป
         const debounceTimer = setTimeout(() => {
+            setIsAngleRegenerating(true);
+            
             // Only regenerate the currently selected type, if any data exists
-            if (irrigationPositions.sprinklers.length > 0) {
+            const hasSprinklers = irrigationPositions.sprinklers.length > 0;
+            const hasPivots = irrigationPositions.pivots.length > 0;
+            
+            if (hasSprinklers && hasPivots) {
+                // If both exist, regenerate both but with a small delay between them
                 generateSprinklerSystem();
-            }
-            if (irrigationPositions.pivots.length > 0) {
+                setTimeout(() => generatePivotSystem(), 50);
+            } else if (hasSprinklers) {
+                generateSprinklerSystem();
+            } else if (hasPivots) {
                 generatePivotSystem();
             }
-        }, 300); // รอ 300ms หลังจากหยุดปรับองศาค่อย regenerate
+            
+            // Reset flag after a short delay to allow state updates to complete
+            setTimeout(() => setIsAngleRegenerating(false), 150);
+        }, 500); // เพิ่ม debounce time เป็น 500ms เพื่อลดการ regenerate บ่อยเกินไป
         
         return () => {
             clearTimeout(debounceTimer);
@@ -1038,16 +986,12 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         setIrrigationCounts({
             sprinkler_system: 0,
             pivot: 0,
-            drip_tape: 0,
-            water_jet_tape: 0,
         });
 
         // Clear irrigation positions when switching types
         setIrrigationPositions({
             sprinklers: [],
             pivots: [],
-            dripTapes: [],
-            waterJets: [],
         });
 
         setSelectedIrrigationType(type);
@@ -1074,7 +1018,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             sprinklers: [...prev.sprinklers, newSprinkler],
         }));
         setIrrigationCounts((prev) => ({ ...prev, sprinkler_system: prev.sprinkler_system + 1 }));
-        console.log('Added sprinkler:', newSprinkler);
     }, []);
 
     // Update sprinkler position
@@ -1086,7 +1029,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     i === index ? { lat: newPosition.lat, lng: newPosition.lng } : sprinkler
                 ),
             }));
-            console.log('Updated sprinkler position:', index, newPosition);
         },
         []
     );
@@ -1101,7 +1043,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             ...prev,
             sprinkler_system: Math.max(0, prev.sprinkler_system - 1),
         }));
-        console.log('Deleted sprinkler:', index);
     }, []);
 
     // Handle sprinkler mode change
@@ -1160,7 +1101,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             }
         }
 
-        console.log('Sprinkler mode changed to:', mode);
     }, []);
 
     // Handle map click for sprinkler operations
@@ -1195,7 +1135,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 // ถ้าพบสปริงเกลอร์ในระยะที่เหมาะสม ให้ลบ
                 if (closestIndex !== -1 && closestDistance < 0.001) { // ~100m tolerance
                     deleteSprinkler(closestIndex);
-                    console.log('Deleted sprinkler:', closestIndex);
                 }
             } else if (sprinklerMode === 'move') {
                 // หาสปริงเกลอร์ที่ใกล้ที่สุดและเลือกเพื่อขยับ
@@ -1216,7 +1155,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 // ถ้าพบสปริงเกลอร์ในระยะที่เหมาะสม ให้เลือก
                 if (closestIndex !== -1 && closestDistance < 0.001) { // ~100m tolerance
                     setSelectedSprinklers([closestIndex]);
-                    console.log('Selected sprinkler for move:', closestIndex);
                 } else {
                     setSelectedSprinklers([]);
                 }
@@ -1239,7 +1177,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     updateSprinklerPosition(index, newPosition);
                 });
                 
-                console.log('Moved sprinklers to:', newPosition);
                 setSelectedSprinklers([]); // Clear selection after move
             }
         },
@@ -1267,43 +1204,10 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             }));
 
             setSelectedSprinklers([]);
-            console.log('Deleted selected sprinklers:', selectedSprinklers);
         }
     }, [selectedSprinklers]);
 
-    // Helper function to check if point is inside polygon
-    const isPointInPolygon = useCallback(
-        (point: { lat: number; lng: number }, polygon: { lat: number; lng: number }[]): boolean => {
-            let inside = false;
-            const x = point.lat;
-            const y = point.lng;
 
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                const xi = polygon[i].lat;
-                const yi = polygon[i].lng;
-                const xj = polygon[j].lat;
-                const yj = polygon[j].lng;
-
-                if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-                    inside = !inside;
-                }
-            }
-
-            return inside;
-        },
-        []
-    );
-
-    // Helper function to check if point is inside any obstacle
-    const isPointInObstacle = useCallback(
-        (point: { lat: number; lng: number }): boolean => {
-            return finalObstacles.some((obstacle) => {
-                if (obstacle.coordinates.length < 3) return false;
-                return isPointInPolygon(point, obstacle.coordinates);
-            });
-        },
-        [finalObstacles, isPointInPolygon]
-    );
 
     // Optimized generateSprinklerSystem function with better performance and resource management
     const generateSprinklerSystem = useCallback(async () => {
@@ -1339,7 +1243,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             const radius = sprinklerSettings.coverageRadius || 8;
             const overlap = (sprinklerSettings.overlap || 0) / 100;
             const effectiveSpacing = radius * 2 * (1 - overlap);
-            const rotationAngleRad = (finalRotationAngle * Math.PI) / 180;
+            const rotationAngleRad = (parsedRotationAngle * Math.PI) / 180;
             const bufferDistance = effectiveSpacing * 0.3;
 
             // Pre-calculate trigonometric values for better performance
@@ -1511,65 +1415,56 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             setIrrigationCounts((prev) => ({ ...prev, sprinkler_system: sprinklers.length }));
             setIrrigationPositions((prev) => ({ ...prev, sprinklers }));
 
-            // Create markers and circles in batches for better performance
-            const markerBatchSize = 50;
-            for (let i = 0; i < sprinklers.length; i += markerBatchSize) {
-                await new Promise((resolve) => requestAnimationFrame(resolve));
-
-                const batch = sprinklers.slice(i, i + markerBatchSize);
-
-                batch.forEach((pos, batchIndex) => {
-                    const index = i + batchIndex;
-
-                    // Create marker with optimized icon
-                    const marker = new google.maps.Marker({
-                        position: pos,
-                        map: mapRef.current,
-                        icon: {
-                            url:
-                                'data:image/svg+xml;charset=UTF-8,' +
-                                encodeURIComponent(`
+            // Create all markers and circles at once for full area generation
+            sprinklers.forEach((pos, index) => {
+                // Create marker with optimized icon
+                const marker = new google.maps.Marker({
+                    position: pos,
+                    map: mapRef.current,
+                    icon: {
+                        url:
+                            'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent(`
 								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
 									<circle cx="6" cy="6" r="5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
 									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
 								</svg>
 							`),
-                            scaledSize: new google.maps.Size(12, 12),
-                            anchor: new google.maps.Point(6, 6),
-                        },
-                        title: `Sprinkler ${index + 1}`,
-                        optimized: true,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationMarkersRef.current.push(marker);
-
-                    // Create coverage circle
-                    const circle = new google.maps.Circle({
-                        center: pos,
-                        radius: radius,
-                        fillColor: '#3b82f6',
-                        fillOpacity: 0.2,
-                        strokeColor: '#1d4ed8',
-                        strokeOpacity: 0.6,
-                        strokeWeight: 1,
-                        map: mapRef.current,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationCirclesRef.current.push(circle);
+                        scaledSize: new google.maps.Size(12, 12),
+                        anchor: new google.maps.Point(6, 6),
+                    },
+                    title: `Sprinkler ${index + 1}`,
+                    optimized: true,
+                    clickable: false,
+                    zIndex: 2000,
                 });
-            }
-        } catch (error) {
-            console.error('Error generating sprinkler system:', error);
+                irrigationMarkersRef.current.push(marker);
+
+                // Create coverage circle
+                const circle = new google.maps.Circle({
+                    center: pos,
+                    radius: radius,
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.2,
+                    strokeColor: '#1d4ed8',
+                    strokeOpacity: 0.6,
+                    strokeWeight: 1,
+                    map: mapRef.current,
+                    clickable: false,
+                    zIndex: 2000,
+                });
+                irrigationCirclesRef.current.push(circle);
+            });
+        } catch {
+            // Error generating sprinkler system
         } finally {
             setIsGeneratingIrrigation(false);
         }
     }, [
         finalMainArea,
         finalObstacles,
-        finalRotationAngle,
         getSprinklerSettings,
+        parsedRotationAngle,
     ]);
 
     // Updated generatePivotSystem function to use center-first row placement like plant points
@@ -1606,7 +1501,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             const radius = pivotSettings.coverageRadius || 165;
             const overlap = (pivotSettings.overlap || 0) / 100;
             const effectiveSpacing = radius * 2 * (1 - overlap); // Distance between pivot centers
-            const rotationAngleRad = (finalRotationAngle * Math.PI) / 180;
+            const rotationAngleRad = (parsedRotationAngle * Math.PI) / 180;
             const bufferDistance = effectiveSpacing * 0.3; // Buffer from edges like plant points
 
             // Geometry helper functions (same as plant point generation)
@@ -1836,356 +1731,59 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             // Save pivot positions
             setIrrigationPositions((prev) => ({ ...prev, pivots }));
 
-            // Create markers and circles in batches for better performance
-            const markerBatchSize = 50;
-            for (let i = 0; i < pivots.length; i += markerBatchSize) {
-                await new Promise((resolve) => requestAnimationFrame(resolve));
-
-                const batch = pivots.slice(i, i + markerBatchSize);
-
-                batch.forEach((pos, batchIndex) => {
-                    const index = i + batchIndex;
-
-                    // Create marker
-                    const marker = new google.maps.Marker({
-                        position: pos,
-                        map: mapRef.current,
-                        icon: {
-                            url:
-                                'data:image/svg+xml;charset=UTF-8,' +
-                                encodeURIComponent(`
+            // Create all markers and circles at once for full area generation
+            pivots.forEach((pos, index) => {
+                // Create marker
+                const marker = new google.maps.Marker({
+                    position: pos,
+                    map: mapRef.current,
+                    icon: {
+                        url:
+                            'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent(`
 								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
 									<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
 									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
 								</svg>
 							`),
-                            scaledSize: new google.maps.Size(12, 12),
-                            anchor: new google.maps.Point(6, 6),
-                        },
-                        title: `Pivot ${index + 1}`,
-                        optimized: true,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationMarkersRef.current.push(marker);
-
-                    // Create coverage circle
-                    const circle = new google.maps.Circle({
-                        center: pos,
-                        radius: radius,
-                        fillColor: '#f97316',
-                        fillOpacity: 0.2,
-                        strokeColor: '#ea580c',
-                        strokeOpacity: 1.0,
-                        strokeWeight: 1,
-                        map: mapRef.current,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationCirclesRef.current.push(circle);
+                        scaledSize: new google.maps.Size(12, 12),
+                        anchor: new google.maps.Point(6, 6),
+                    },
+                    title: `Pivot ${index + 1}`,
+                    optimized: true,
+                    clickable: false,
+                    zIndex: 2000,
                 });
-            }
-        } catch (error) {
-            console.error('Error generating pivot system:', error);
+                irrigationMarkersRef.current.push(marker);
+
+                // Create coverage circle
+                const circle = new google.maps.Circle({
+                    center: pos,
+                    radius: radius,
+                    fillColor: '#f97316',
+                    fillOpacity: 0.2,
+                    strokeColor: '#ea580c',
+                    strokeOpacity: 1.0,
+                    strokeWeight: 1,
+                    map: mapRef.current,
+                    clickable: false,
+                    zIndex: 2000,
+                });
+                irrigationCirclesRef.current.push(circle);
+            });
+        } catch {
+            // Error generating pivot system
         } finally {
             setIsGeneratingIrrigation(false);
         }
     }, [
         finalMainArea,
         finalObstacles,
-        finalRotationAngle,
         getPivotSettings,
+        parsedRotationAngle,
     ]);
 
-    // Updated generateDripTape function to use center-first row placement like plant points
-    const generateDripTape = useCallback(async () => {
-        if (!mapRef.current || finalPlantPoints.length === 0) return;
 
-        setIsGeneratingIrrigation(true);
-
-        try {
-            // Clear existing irrigation overlays
-            irrigationMarkersRef.current.forEach((marker) => marker.setMap(null));
-            irrigationMarkersRef.current = [];
-
-            const dripTapeSettings = getDripTapeSettings();
-            const spacing = (dripTapeSettings.emitterSpacing || 20) / 100; // Convert cm to meters
-            const side = dripTapeSettings.side || 'left';
-
-            // Group plant points by rows (approximate)
-            const rows: { lat: number; lng: number }[][] = [];
-            const tolerance = spacing * 2; // Group plants within 2x spacing
-
-            finalPlantPoints.forEach((point) => {
-                let addedToRow = false;
-                for (const row of rows) {
-                    if (row.length > 0) {
-                        const firstPlant = row[0];
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            new google.maps.LatLng(firstPlant.lat, firstPlant.lng),
-                            new google.maps.LatLng(point.lat, point.lng)
-                        );
-                        if (distance < tolerance) {
-                            row.push({ lat: point.lat, lng: point.lng });
-                            addedToRow = true;
-                            break;
-                        }
-                    }
-                }
-                if (!addedToRow) {
-                    rows.push([{ lat: point.lat, lng: point.lng }]);
-                }
-            });
-
-            // Sort rows by latitude to find center row
-            rows.sort((a, b) => {
-                const avgLatA = a.reduce((sum, p) => sum + p.lat, 0) / a.length;
-                const avgLatB = b.reduce((sum, p) => sum + p.lat, 0) / b.length;
-                return avgLatA - avgLatB;
-            });
-
-            // Reorder rows to start from center
-            const centerIndex = Math.floor(rows.length / 2);
-            const reorderedRows: { lat: number; lng: number }[][] = [];
-
-            // Add center row first
-            if (rows.length > 0) {
-                reorderedRows.push(rows[centerIndex]);
-            }
-
-            // Add rows above center (going up)
-            for (let i = centerIndex + 1; i < rows.length; i++) {
-                reorderedRows.push(rows[i]);
-            }
-
-            // Add rows below center (going down)
-            for (let i = centerIndex - 1; i >= 0; i--) {
-                reorderedRows.push(rows[i]);
-            }
-
-            // Generate drip tape positions
-            const dripPositions: { lat: number; lng: number }[] = [];
-
-            reorderedRows.forEach((row) => {
-                // Sort plants in row by longitude
-                row.sort((a, b) => a.lng - b.lng);
-
-                // Calculate offset based on side
-                const offset = side === 'left' ? -spacing : spacing;
-
-                // Generate drip positions along the row
-                for (let i = 0; i < row.length; i++) {
-                    const plant = row[i];
-
-                    // Calculate perpendicular offset
-                    const angle =
-                        Math.atan2(
-                            row[Math.min(i + 1, row.length - 1)].lng - row[Math.max(i - 1, 0)].lng,
-                            row[Math.min(i + 1, row.length - 1)].lat - row[Math.max(i - 1, 0)].lat
-                        ) +
-                        Math.PI / 2;
-
-                    const dripLat = plant.lat + (offset / 111000) * Math.cos(angle);
-                    const dripLng =
-                        plant.lng +
-                        (offset / (111000 * Math.cos((plant.lat * Math.PI) / 180))) *
-                            Math.sin(angle);
-
-                    // Check if position is inside main area and not in any obstacle
-                    if (
-                        isPointInPolygon({ lat: dripLat, lng: dripLng }, finalMainArea) &&
-                        !isPointInObstacle({ lat: dripLat, lng: dripLng })
-                    ) {
-                        dripPositions.push({ lat: dripLat, lng: dripLng });
-                    }
-                }
-            });
-
-            // Update irrigation count
-            setIrrigationCounts((prev) => ({ ...prev, drip_tape: dripPositions.length }));
-
-            // บันทึกตำแหน่ง drip tapes
-            setIrrigationPositions((prev) => ({ ...prev, dripTapes: dripPositions }));
-
-            // Create markers
-            dripPositions.forEach((pos, index) => {
-                const marker = new google.maps.Marker({
-                    position: pos,
-                    map: mapRef.current,
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-							<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="4" cy="4" r="3" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
-							</svg>
-						`),
-                        scaledSize: new google.maps.Size(8, 8),
-                        anchor: new google.maps.Point(4, 4),
-                    },
-                    title: `Drip ${index + 1}`,
-                    optimized: true,
-                    clickable: false,
-                });
-                irrigationMarkersRef.current.push(marker);
-            });
-        } catch (error) {
-            console.error('Error generating drip tape:', error);
-        } finally {
-            setIsGeneratingIrrigation(false);
-        }
-    }, [
-        finalPlantPoints,
-        finalMainArea,
-        getDripTapeSettings,
-        isPointInObstacle,
-        isPointInPolygon,
-    ]);
-
-    // Updated generateWaterJetTape function to use center-first row placement like plant points
-    const generateWaterJetTape = useCallback(async () => {
-        if (!mapRef.current || finalPlantPoints.length === 0) return;
-
-        setIsGeneratingIrrigation(true);
-
-        try {
-            // Clear existing irrigation overlays
-            irrigationMarkersRef.current.forEach((marker) => marker.setMap(null));
-            irrigationMarkersRef.current = [];
-
-            const waterJetTapeSettings = getWaterJetTapeSettings();
-            const spacing = (waterJetTapeSettings.emitterSpacing || 20) / 100; // Convert cm to meters
-            const side = waterJetTapeSettings.side || 'left';
-
-            // Group plant points by rows (approximate)
-            const rows: { lat: number; lng: number }[][] = [];
-            const tolerance = spacing * 2;
-
-            finalPlantPoints.forEach((point) => {
-                let addedToRow = false;
-                for (const row of rows) {
-                    if (row.length > 0) {
-                        const firstPlant = row[0];
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            new google.maps.LatLng(firstPlant.lat, firstPlant.lng),
-                            new google.maps.LatLng(point.lat, point.lng)
-                        );
-                        if (distance < tolerance) {
-                            row.push({ lat: point.lat, lng: point.lng });
-                            addedToRow = true;
-                            break;
-                        }
-                    }
-                }
-                if (!addedToRow) {
-                    rows.push([{ lat: point.lat, lng: point.lng }]);
-                }
-            });
-
-            // Sort rows by latitude to find center row
-            rows.sort((a, b) => {
-                const avgLatA = a.reduce((sum, p) => sum + p.lat, 0) / a.length;
-                const avgLatB = b.reduce((sum, p) => sum + p.lat, 0) / b.length;
-                return avgLatA - avgLatB;
-            });
-
-            // Reorder rows to start from center
-            const centerIndex = Math.floor(rows.length / 2);
-            const reorderedRows: { lat: number; lng: number }[][] = [];
-
-            // Add center row first
-            if (rows.length > 0) {
-                reorderedRows.push(rows[centerIndex]);
-            }
-
-            // Add rows above center (going up)
-            for (let i = centerIndex + 1; i < rows.length; i++) {
-                reorderedRows.push(rows[i]);
-            }
-
-            // Add rows below center (going down)
-            for (let i = centerIndex - 1; i >= 0; i--) {
-                reorderedRows.push(rows[i]);
-            }
-
-            // Generate water jet positions
-            const jetPositions: { lat: number; lng: number }[] = [];
-
-            reorderedRows.forEach((row) => {
-                // Sort plants in row by longitude
-                row.sort((a, b) => a.lng - b.lng);
-
-                // Calculate offset based on side
-                const offset = side === 'left' ? -spacing : spacing;
-
-                // Generate jet positions along the row
-                for (let i = 0; i < row.length; i++) {
-                    const plant = row[i];
-
-                    // Calculate perpendicular offset
-                    const angle =
-                        Math.atan2(
-                            row[Math.min(i + 1, row.length - 1)].lng - row[Math.max(i - 1, 0)].lng,
-                            row[Math.min(i + 1, row.length - 1)].lat - row[Math.max(i - 1, 0)].lat
-                        ) +
-                        Math.PI / 2;
-
-                    const jetLat = plant.lat + (offset / 111000) * Math.cos(angle);
-                    const jetLng =
-                        plant.lng +
-                        (offset / (111000 * Math.cos((plant.lat * Math.PI) / 180))) *
-                            Math.sin(angle);
-
-                    // Check if position is inside main area and not in any obstacle
-                    if (
-                        isPointInPolygon({ lat: jetLat, lng: jetLng }, finalMainArea) &&
-                        !isPointInObstacle({ lat: jetLat, lng: jetLng })
-                    ) {
-                        jetPositions.push({ lat: jetLat, lng: jetLng });
-                    }
-                }
-            });
-
-            // Update irrigation count
-            setIrrigationCounts((prev) => ({ ...prev, water_jet_tape: jetPositions.length }));
-
-            // บันทึกตำแหน่ง water jets
-            setIrrigationPositions((prev) => ({ ...prev, waterJets: jetPositions }));
-
-            // Create markers
-            jetPositions.forEach((pos, index) => {
-                const marker = new google.maps.Marker({
-                    position: pos,
-                    map: mapRef.current,
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-							<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="4" cy="4" r="3" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-							</svg>
-						`),
-                        scaledSize: new google.maps.Size(8, 8),
-                        anchor: new google.maps.Point(4, 4),
-                    },
-                    title: `Water Jet ${index + 1}`,
-                    optimized: true,
-                    clickable: false,
-                });
-                irrigationMarkersRef.current.push(marker);
-            });
-        } catch (error) {
-            console.error('Error generating water jet tape:', error);
-        } finally {
-            setIsGeneratingIrrigation(false);
-        }
-    }, [
-        finalPlantPoints,
-        finalMainArea,
-        getWaterJetTapeSettings,
-        isPointInObstacle,
-        isPointInPolygon,
-    ]);
 
     // Function to render irrigation settings based on selected type
     const renderIrrigationSettings = () => {
@@ -2222,7 +1820,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                     }
                                     className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
                                     style={{
-                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((getSprinklerSettings()?.coverageRadius || 8 - 1) / 14) * 100}%, #6b7280 ${((getSprinklerSettings()?.coverageRadius || 8 - 1) / 14) * 100}%, #6b7280 100%)`,
+                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(((getSprinklerSettings()?.coverageRadius || 8) - 1) / 14) * 100}%, #6b7280 ${(((getSprinklerSettings()?.coverageRadius || 8) - 1) / 14) * 100}%, #6b7280 100%)`,
                                     }}
                                 />
                                 <div className="mt-1 flex justify-between text-xs text-gray-400">
@@ -2250,7 +1848,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                     }
                                     className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
                                     style={{
-                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((getSprinklerSettings()?.overlap || 0) / 50) * 100}%, #6b7280 ${((getSprinklerSettings()?.overlap || 0) / 50) * 100}%, #6b7280 100%)`,
+                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(((getSprinklerSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 ${(((getSprinklerSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 100%)`,
                                     }}
                                 />
                                 <div className="mt-1 flex justify-between text-xs text-gray-400">
@@ -2394,7 +1992,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                     }
                                     className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
                                     style={{
-                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${((getPivotSettings()?.coverageRadius || 165 - 80) / 170) * 100}%, #6b7280 ${((getPivotSettings()?.coverageRadius || 165 - 80) / 170) * 100}%, #6b7280 100%)`,
+                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${(((getPivotSettings()?.coverageRadius || 165) - 80) / 170) * 100}%, #6b7280 ${(((getPivotSettings()?.coverageRadius || 165) - 80) / 170) * 100}%, #6b7280 100%)`,
                                     }}
                                 />
                                 <div className="mt-1 flex justify-between text-xs text-gray-400">
@@ -2422,7 +2020,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                     }
                                     className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
                                     style={{
-                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${((getPivotSettings()?.overlap || 0) / 50) * 100}%, #6b7280 ${((getPivotSettings()?.overlap || 0) / 50) * 100}%, #6b7280 100%)`,
+                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${(((getPivotSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 ${(((getPivotSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 100%)`,
                                     }}
                                 />
                                 <div className="mt-1 flex justify-between text-xs text-gray-400">
@@ -2521,354 +2119,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     </div>
                 );
 
-            case 'drip_tape': {
-                const dripOptions = [10, 15, 20, 30];
-                return (
-                    <div
-                        className="rounded border border-white p-3"
-                        style={{ backgroundColor: '#000005' }}
-                    >
-                        <h4 className="mb-3 text-sm font-medium text-white">
-                            {t('Drip Tape Settings')}
-                        </h4>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Emitter Spacing')}:{' '}
-                                    {getDripTapeSettings().emitterSpacing}cm
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {dripOptions.map((option) => (
-                                        <button
-                                            key={option}
-                                            onClick={() =>
-                                                handleSettingsChange(
-                                                    'drip_tape',
-                                                    'emitterSpacing',
-                                                    option
-                                                )
-                                            }
-                                            className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                                getDripTapeSettings().emitterSpacing ===
-                                                option
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                        >
-                                            {option}cm
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
 
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Placement')}
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange(
-                                                'drip_tape',
-                                                'placement',
-                                                'along_rows'
-                                            )
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getDripTapeSettings().placement === 'along_rows'
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Along Rows')}
-                                    </button>
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange(
-                                                'drip_tape',
-                                                'placement',
-                                                'staggered'
-                                            )
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getDripTapeSettings().placement === 'staggered'
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Staggered')}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Side')}
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange('drip_tape', 'side', 'left')
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getDripTapeSettings().side === 'left'
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Left')}
-                                    </button>
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange('drip_tape', 'side', 'right')
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getDripTapeSettings().side === 'right'
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Right')}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
-                                        {t('Flow')} (L/min)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={0.24}
-                                        max={0.24}
-                                        step={0.01}
-                                        value={0.24}
-                                        readOnly
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
-                                        {t('Pressure')} (bar)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={0.5}
-                                        max={2.0}
-                                        step={0.1}
-                                        value={getDripTapeSettings().pressure}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'drip_tape',
-                                                'pressure',
-                                                parseFloat(e.target.value) || 1.0
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-                                        placeholder="1.0"
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => generateDripTape()}
-                                disabled={isGeneratingIrrigation}
-                                className="w-full rounded bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-500"
-                            >
-                                {isGeneratingIrrigation
-                                    ? t('Generating...')
-                                    : t('Generate Drip Tape')}
-                            </button>
-                            {irrigationCounts.drip_tape > 0 && (
-                                <div className="mt-2 text-center text-xs text-blue-400">
-                                    {t('Generated')}: {irrigationCounts.drip_tape}{' '}
-                                    {t('drip points')}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            }
-
-            case 'water_jet_tape': {
-                const jetOptions = [10, 20, 30];
-                return (
-                    <div
-                        className="rounded border border-white p-3"
-                        style={{ backgroundColor: '#000005' }}
-                    >
-                        <h4 className="mb-3 text-sm font-medium text-white">
-                            {t('Water Jet Tape Settings')}
-                        </h4>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Jet Spacing')}:{' '}
-                                    {getWaterJetTapeSettings().emitterSpacing}cm
-                                </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {jetOptions.map((option) => (
-                                        <button
-                                            key={option}
-                                            onClick={() =>
-                                                handleSettingsChange(
-                                                    'water_jet_tape',
-                                                    'emitterSpacing',
-                                                    option
-                                                )
-                                            }
-                                            className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                                getWaterJetTapeSettings().emitterSpacing ===
-                                                option
-                                                    ? 'bg-orange-600 text-white'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                        >
-                                            {option}cm
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Placement')}
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange(
-                                                'water_jet_tape',
-                                                'placement',
-                                                'along_rows'
-                                            )
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getWaterJetTapeSettings().placement ===
-                                            'along_rows'
-                                                ? 'bg-orange-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Along Rows')}
-                                    </button>
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange(
-                                                'water_jet_tape',
-                                                'placement',
-                                                'staggered'
-                                            )
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getWaterJetTapeSettings().placement ===
-                                            'staggered'
-                                                ? 'bg-orange-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Staggered')}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Side')}
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange('water_jet_tape', 'side', 'left')
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getWaterJetTapeSettings().side === 'left'
-                                                ? 'bg-orange-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Left')}
-                                    </button>
-                                    <button
-                                        onClick={() =>
-                                            handleSettingsChange('water_jet_tape', 'side', 'right')
-                                        }
-                                        className={`rounded border border-white px-3 py-2 text-xs font-medium transition-colors ${
-                                            getWaterJetTapeSettings().side === 'right'
-                                                ? 'bg-orange-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
-                                        {t('Right')}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
-                                        {t('Flow')} (L/min)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={0.5}
-                                        max={10}
-                                        step={0.1}
-                                        value={getWaterJetTapeSettings().flow}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'water_jet_tape',
-                                                'flow',
-                                                parseFloat(e.target.value) || 1.5
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none"
-                                        placeholder="1.5"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
-                                        {t('Pressure')} (bar)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={0.5}
-                                        max={3.0}
-                                        step={0.1}
-                                        value={getWaterJetTapeSettings().pressure}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'water_jet_tape',
-                                                'pressure',
-                                                parseFloat(e.target.value) || 1.5
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none"
-                                        placeholder="1.5"
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => generateWaterJetTape()}
-                                disabled={isGeneratingIrrigation}
-                                className="w-full rounded bg-orange-600 px-3 py-2 text-xs text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-gray-500"
-                            >
-                                {isGeneratingIrrigation
-                                    ? t('Generating...')
-                                    : t('Generate Water Jet Tape')}
-                            </button>
-                            {irrigationCounts.water_jet_tape > 0 && (
-                                <div className="mt-2 text-center text-xs text-orange-400">
-                                    {t('Generated')}: {irrigationCounts.water_jet_tape}{' '}
-                                    {t('water jets')}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            }
 
             default:
                 return null;
@@ -2959,10 +2210,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
 
                 // Validate obstacle has valid coordinates
                 if (!obstacle.coordinates || obstacle.coordinates.length < 3) {
-                    console.warn(
-                        `Skipping obstacle ${index + 1} - insufficient coordinates:`,
-                        obstacle.coordinates?.length || 0
-                    );
+                    // Skipping obstacle - insufficient coordinates
                     return;
                 }
 
@@ -2980,10 +2228,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 );
 
                 if (validCoordinates.length < 3) {
-                    console.warn(
-                        `Skipping obstacle ${index + 1} - invalid coordinates:`,
-                        obstacle.coordinates
-                    );
+                    // Skipping obstacle - invalid coordinates
                     return;
                 }
 
@@ -3012,16 +2257,12 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         dbg('Creating distance overlays for water source:', obstacle.id);
                         try {
                             createSimpleDistanceOverlays(obstacle);
-                        } catch (error) {
-                            console.error(
-                                'Error creating distance overlays for obstacle:',
-                                obstacle.id,
-                                error
-                            );
+                        } catch {
+                            // Error creating distance overlays for obstacle
                         }
                     }
-                } catch (error) {
-                    console.error(`Error creating polygon for obstacle ${index + 1}:`, error);
+                } catch {
+                    // Error creating polygon for obstacle
                 }
             });
 
@@ -3094,204 +2335,135 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         irrigationCirclesRef.current.forEach((circle) => circle.setMap(null));
         irrigationCirclesRef.current = [];
 
-        // Recreate sprinkler overlays with batch processing
+        // Recreate sprinkler overlays at once
         if (irrigationPositions.sprinklers.length > 0) {
             const radius = getSprinklerSettings().coverageRadius;
-            const markerBatchSize = 50;
 
-            for (let i = 0; i < irrigationPositions.sprinklers.length; i += markerBatchSize) {
-                await new Promise((resolve) => requestAnimationFrame(resolve));
+            irrigationPositions.sprinklers.forEach((pos, index) => {
+                // Check if this sprinkler is selected
+                const isSelected = selectedSprinklers.includes(index);
+                const fillColor = isSelected ? '#f59e0b' : '#3b82f6';
+                const strokeColor = isSelected ? '#d97706' : '#1d4ed8';
 
-                const batch = irrigationPositions.sprinklers.slice(i, i + markerBatchSize);
-
-                batch.forEach((pos, batchIndex) => {
-                    const index = i + batchIndex;
-
-                    // Check if this sprinkler is selected
-                    const isSelected = selectedSprinklers.includes(index);
-                    const fillColor = isSelected ? '#f59e0b' : '#3b82f6';
-                    const strokeColor = isSelected ? '#d97706' : '#1d4ed8';
-
-                    // Create marker
-                    const marker = new google.maps.Marker({
-                        position: pos,
-                        map: mapRef.current,
-                        icon: {
-                            url:
-                                'data:image/svg+xml;charset=UTF-8,' +
-                                encodeURIComponent(`
+                // Create marker
+                const marker = new google.maps.Marker({
+                    position: pos,
+                    map: mapRef.current,
+                    icon: {
+                        url:
+                            'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent(`
 								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
 									<circle cx="6" cy="6" r="5" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${isSelected ? '2' : '1'}"/>
 									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
 								</svg>
 							`),
-                            scaledSize: new google.maps.Size(12, 12),
-                            anchor: new google.maps.Point(6, 6),
-                        },
-                        title: `Sprinkler ${index + 1}${isSelected ? ' (Selected)' : ''}`,
-                        optimized: true,
-                        clickable: sprinklerMode === 'delete',
-                        draggable: sprinklerMode === 'move',
-                        zIndex: isSelected ? 2100 : 2000,
-                    });
-
-                    // Add click listener for deletion
-                    if (sprinklerMode === 'delete') {
-                        marker.addListener('click', (e: google.maps.MapMouseEvent) => {
-                            e.stop(); // Prevent map click
-                            deleteSprinkler(index);
-                        });
-                    }
-
-                    // Add drag listener for moving
-                    if (sprinklerMode === 'move') {
-                        marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
-                            if (event.latLng) {
-                                updateSprinklerPosition(index, {
-                                    lat: event.latLng.lat(),
-                                    lng: event.latLng.lng(),
-                                });
-                            }
-                        });
-                    }
-
-                    // Prevent marker clicks from interfering with rectangle delete selection
-                    if (sprinklerMode === 'delete') {
-                        marker.addListener('mousedown', (e: google.maps.MapMouseEvent) => {
-                            e.stop();
-                        });
-                    }
-                    irrigationMarkersRef.current.push(marker);
-
-                    // Create coverage circle
-                    const circle = new google.maps.Circle({
-                        center: pos,
-                        radius: radius,
-                        fillColor: '#3b82f6',
-                        fillOpacity: 0.2,
-                        strokeColor: '#1d4ed8',
-                        strokeOpacity: 0.6,
-                        strokeWeight: 1,
-                        map: mapRef.current,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationCirclesRef.current.push(circle);
+                        scaledSize: new google.maps.Size(12, 12),
+                        anchor: new google.maps.Point(6, 6),
+                    },
+                    title: `Sprinkler ${index + 1}${isSelected ? ' (Selected)' : ''}`,
+                    optimized: true,
+                    clickable: sprinklerMode === 'delete',
+                    draggable: sprinklerMode === 'move',
+                    zIndex: isSelected ? 2100 : 2000,
                 });
-            }
+
+                // Add click listener for deletion
+                if (sprinklerMode === 'delete') {
+                    marker.addListener('click', (e: google.maps.MapMouseEvent) => {
+                        e.stop(); // Prevent map click
+                        deleteSprinkler(index);
+                    });
+                }
+
+                // Add drag listener for moving
+                if (sprinklerMode === 'move') {
+                    marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+                        if (event.latLng) {
+                            updateSprinklerPosition(index, {
+                                lat: event.latLng.lat(),
+                                lng: event.latLng.lng(),
+                            });
+                        }
+                    });
+                }
+
+                // Prevent marker clicks from interfering with rectangle delete selection
+                if (sprinklerMode === 'delete') {
+                    marker.addListener('mousedown', (e: google.maps.MapMouseEvent) => {
+                        e.stop();
+                    });
+                }
+                irrigationMarkersRef.current.push(marker);
+
+                // Create coverage circle
+                const circle = new google.maps.Circle({
+                    center: pos,
+                    radius: radius,
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.2,
+                    strokeColor: '#1d4ed8',
+                    strokeOpacity: 0.6,
+                    strokeWeight: 1,
+                    map: mapRef.current,
+                    clickable: false,
+                    zIndex: 2000,
+                });
+                irrigationCirclesRef.current.push(circle);
+            });
         }
 
-        // Recreate pivot overlays with batch processing
+        // Recreate pivot overlays at once
         if (irrigationPositions.pivots.length > 0) {
             const radius = getPivotSettings().coverageRadius;
-            const markerBatchSize = 50;
 
-            for (let i = 0; i < irrigationPositions.pivots.length; i += markerBatchSize) {
-                await new Promise((resolve) => requestAnimationFrame(resolve));
-
-                const batch = irrigationPositions.pivots.slice(i, i + markerBatchSize);
-
-                batch.forEach((pos, batchIndex) => {
-                    const index = i + batchIndex;
-
-                    // Create marker
-                    const marker = new google.maps.Marker({
-                        position: pos,
-                        map: mapRef.current,
-                        icon: {
-                            url:
-                                'data:image/svg+xml;charset=UTF-8,' +
-                                encodeURIComponent(`
+            irrigationPositions.pivots.forEach((pos, index) => {
+                // Create marker
+                const marker = new google.maps.Marker({
+                    position: pos,
+                    map: mapRef.current,
+                    icon: {
+                        url:
+                            'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent(`
 								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
 									<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
 									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
 								</svg>
 							`),
-                            scaledSize: new google.maps.Size(12, 12),
-                            anchor: new google.maps.Point(6, 6),
-                        },
-                        title: `Pivot ${index + 1}`,
-                        optimized: true,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationMarkersRef.current.push(marker);
-
-                    // Create coverage circle
-                    const circle = new google.maps.Circle({
-                        center: pos,
-                        radius: radius,
-                        fillColor: '#f97316',
-                        fillOpacity: 0.2,
-                        strokeColor: '#ea580c',
-                        strokeOpacity: 0.6,
-                        strokeWeight: 1,
-                        map: mapRef.current,
-                        clickable: false,
-                        zIndex: 2000,
-                    });
-                    irrigationCirclesRef.current.push(circle);
-                });
-            }
-        }
-
-        // Recreate drip tape overlays
-        if (irrigationPositions.dripTapes.length > 0) {
-            irrigationPositions.dripTapes.forEach((pos, index) => {
-                const marker = new google.maps.Marker({
-                    position: pos,
-                    map: mapRef.current,
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-							<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="4" cy="4" r="3" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
-							</svg>
-						`),
-                        scaledSize: new google.maps.Size(8, 8),
-                        anchor: new google.maps.Point(4, 4),
+                        scaledSize: new google.maps.Size(12, 12),
+                        anchor: new google.maps.Point(6, 6),
                     },
-                    title: `Drip ${index + 1}`,
+                    title: `Pivot ${index + 1}`,
                     optimized: true,
                     clickable: false,
+                    zIndex: 2000,
                 });
                 irrigationMarkersRef.current.push(marker);
+
+                // Create coverage circle
+                const circle = new google.maps.Circle({
+                    center: pos,
+                    radius: radius,
+                    fillColor: '#f97316',
+                    fillOpacity: 0.2,
+                    strokeColor: '#ea580c',
+                    strokeOpacity: 0.6,
+                    strokeWeight: 1,
+                    map: mapRef.current,
+                    clickable: false,
+                    zIndex: 2000,
+                });
+                irrigationCirclesRef.current.push(circle);
             });
         }
 
-        // Recreate water jet overlays
-        if (irrigationPositions.waterJets.length > 0) {
-            irrigationPositions.waterJets.forEach((pos, index) => {
-                const marker = new google.maps.Marker({
-                    position: pos,
-                    map: mapRef.current,
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-							<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="4" cy="4" r="3" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-							</svg>
-						`),
-                        scaledSize: new google.maps.Size(8, 8),
-                        anchor: new google.maps.Point(4, 4),
-                    },
-                    title: `Water Jet ${index + 1}`,
-                    optimized: true,
-                    clickable: false,
-                });
-                irrigationMarkersRef.current.push(marker);
-            });
-        }
     }, [
         isMapLoaded,
         getSprinklerSettings,
         getPivotSettings,
-        irrigationPositions.dripTapes,
         irrigationPositions.pivots,
         irrigationPositions.sprinklers,
-        irrigationPositions.waterJets,
         sprinklerMode,
         deleteSprinkler,
         updateSprinklerPosition,
@@ -3300,13 +2472,11 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
 
     // Additional effect to ensure irrigation overlays are recreated when data is loaded from localStorage
     useEffect(() => {
-        if (isMapLoaded && mapRef.current) {
+        if (isMapLoaded && mapRef.current && !isAngleRegenerating) {
             // Check if we have irrigation data that should be displayed
             const hasIrrigationData =
                 irrigationPositions.sprinklers.length > 0 ||
-                irrigationPositions.pivots.length > 0 ||
-                irrigationPositions.dripTapes.length > 0 ||
-                irrigationPositions.waterJets.length > 0;
+                irrigationPositions.pivots.length > 0;
 
             if (hasIrrigationData) {
                 renderIrrigationOverlays();
@@ -3314,13 +2484,10 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         }
     }, [
         isMapLoaded,
-        getSprinklerSettings,
-        getPivotSettings,
-        irrigationPositions.dripTapes,
-        irrigationPositions.pivots,
-        irrigationPositions.sprinklers,
-        irrigationPositions.waterJets,
+        irrigationPositions.pivots.length,
+        irrigationPositions.sprinklers.length,
         renderIrrigationOverlays,
+        isAngleRegenerating,
     ]);
 
     // Map event listeners for sprinkler management
@@ -3421,9 +2588,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                 case 2: // Irrigation Generate
                                                     return (
                                                         irrigationPositions.sprinklers.length > 0 ||
-                                                        irrigationPositions.pivots.length > 0 ||
-                                                        irrigationPositions.dripTapes.length > 0 ||
-                                                        irrigationPositions.waterJets.length > 0
+                                                        irrigationPositions.pivots.length > 0
                                                     );
                                                 default:
                                                     return false;
@@ -3535,22 +2700,16 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
-                                                    <span>ปริมาณน้ำที่ต้องใช้ทั้งหมด:</span>
+                                                    <span>{t('Total water requirement')}:</span>
                                                     <span className="text-green-400">
                                                         {totalWaterRequirement.toFixed(1)}{' '}
-                                                        ลิตร/ครั้ง
+                                                        {t('liters per irrigation')}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>{t('Obstacles')}:</span>
                                                     <span className="text-green-400">
                                                         {finalObstacles.length} {t('items')}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between text-gray-400">
-                                                    <span>{t('Rotation Angle')}:</span>
-                                                    <span className="text-green-400">
-                                                        {finalRotationAngle.toFixed(0)}°
                                                     </span>
                                                 </div>
 
@@ -3654,37 +2813,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                 )}
                                             </div>
 
-                                            <div
-                                                className="cursor-not-allowed rounded border border-gray-600 p-2 text-center opacity-50 transition-colors"
-                                                style={{ backgroundColor: '#000005' }}
-                                            >
-                                                <div className="mb-1 text-lg">🌊</div>
-                                                <h4 className="text-xs font-medium text-gray-500">
-                                                    {t('Water Jet Tape')}
-                                                </h4>
-                                                <p className="text-xs text-gray-600">
-                                                    {t('Precise water jets')}
-                                                </p>
-                                                <div className="mt-1 text-xs text-gray-600">
-                                                    {t('Disabled')}
-                                                </div>
-                                            </div>
-
-                                            <div
-                                                className="cursor-not-allowed rounded border border-gray-600 p-2 text-center opacity-50 transition-colors"
-                                                style={{ backgroundColor: '#000005' }}
-                                            >
-                                                <div className="mb-1 text-lg">💧</div>
-                                                <h4 className="text-xs font-medium text-gray-500">
-                                                    {t('Drip Tape')}
-                                                </h4>
-                                                <p className="text-xs text-gray-600">
-                                                    {t('Water efficient dripping')}
-                                                </p>
-                                                <div className="mt-1 text-xs text-gray-600">
-                                                    {t('Disabled')}
-                                                </div>
-                                            </div>
                                         </div>
                                     </div>
 
@@ -3730,36 +2858,18 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                     flow: 50,
                                                     pressure: 3.0,
                                                 },
-                                                drip_tape: {
-                                                    emitterSpacing: 20,
-                                                    placement: 'along_rows',
-                                                    side: 'left',
-                                                    flow: 0.24,
-                                                    pressure: 1.0,
-                                                },
-                                                water_jet_tape: {
-                                                    emitterSpacing: 20,
-                                                    placement: 'along_rows',
-                                                    side: 'left',
-                                                    flow: 1.5,
-                                                    pressure: 1.5,
-                                                },
                                             });
 
                                             // Clear irrigation counts
                                             setIrrigationCounts({
                                                 sprinkler_system: 0,
                                                 pivot: 0,
-                                                drip_tape: 0,
-                                                water_jet_tape: 0,
                                             });
 
                                             // Clear irrigation positions
                                             setIrrigationPositions({
                                                 sprinklers: [],
                                                 pivots: [],
-                                                dripTapes: [],
-                                                waterJets: [],
                                             });
 
                                             // Clear irrigation overlays

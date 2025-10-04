@@ -31,8 +31,6 @@ export interface Zone {
 export interface IrrigationPositions {
     sprinklers: Coordinate[];
     pivots: Coordinate[];
-    dripTapes: Coordinate[];
-    waterJets: Coordinate[];
 }
 
 export interface IrrigationSettings {
@@ -46,22 +44,6 @@ export interface IrrigationSettings {
     pivot?: { 
         coverageRadius?: number; 
         overlap?: number;
-        flow?: number;
-        pressure?: number;
-        [key: string]: unknown 
-    };
-    drip_tape?: { 
-        emitterSpacing?: number;
-        placement?: string;
-        side?: string;
-        flow?: number;
-        pressure?: number;
-        [key: string]: unknown 
-    };
-    water_jet_tape?: { 
-        emitterSpacing?: number;
-        placement?: string;
-        side?: string;
         flow?: number;
         pressure?: number;
         [key: string]: unknown 
@@ -170,8 +152,6 @@ export const FIELD_STYLING = {
     IRRIGATION: {
         sprinklers: { fill: '#EF4444', stroke: '#DC2626' },
         pivots: { fill: '#F59E0B', stroke: '#D97706' },
-        dripTapes: { fill: '#10B981', stroke: '#059669' },
-        waterJets: { fill: '#8B5CF6', stroke: '#7C3AED' },
         fillOpacity: 0.8,
         strokeWeight: 2,
         strokeOpacity: 1,
@@ -182,16 +162,12 @@ export const FIELD_STYLING = {
 // Default values
 export const DEFAULT_IRRIGATION_COUNTS = {
     sprinkler_system: 0,
-    pivot: 0,
-    drip_tape: 0,
-    water_jet_tape: 0
+    pivot: 0
 };
 
 export const DEFAULT_IRRIGATION_POSITIONS: IrrigationPositions = {
     sprinklers: [],
-    pivots: [],
-    dripTapes: [],
-    waterJets: []
+    pivots: []
 };
 
 export const MAP_CONFIG = {

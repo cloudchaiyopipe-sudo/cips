@@ -143,9 +143,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
         return t('ไร่');
     };
 
-    const formatArea = (area: number) => {
+    const formatArea = (area: number | undefined | null) => {
         // Fix: Since farmSizeRai is now consistently in rai for all modes
-        return `${area.toFixed(1)} ไร่`;
+        const safeArea = area || 0;
+        return `${safeArea.toFixed(1)} ไร่`;
     };
 
     const getProjectIcon = () => {
@@ -1462,7 +1463,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                         <p className="text-xs text-green-300">
                                             {Number(
                                                 (
-                                                    Number(item.totalCost) / Number(item.quantity)
+                                                    (Number(item.totalCost) || 0) / (Number(item.quantity) || 1)
                                                 ).toFixed(2)
                                             ).toLocaleString('th-TH')}{' '}
                                             {t('บาท')}/{t('หัว')}
@@ -1537,7 +1538,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 <span className="text-yellow-300">
                                                                     {' '}
                                                                     (+ {t('Riser')}{' '}
-                                                                    {item.extraLength.toFixed(1)}{' '}
+                                                                    {(item.extraLength || 0).toFixed(1)}{' '}
                                                                     ม.)
                                                                 </span>
                                                             )}{' '}
@@ -1612,7 +1613,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                     <span className="text-yellow-300">
                                                                         {' '}
                                                                         (+ {t('Riser')}{' '}
-                                                                        {item.extraLength.toFixed(
+                                                                        {(item.extraLength || 0).toFixed(
                                                                             1
                                                                         )}{' '}
                                                                         ม.)
@@ -1681,7 +1682,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 <span className="text-yellow-300">
                                                                     {' '}
                                                                     (+ {t('Riser')}{' '}
-                                                                    {item.extraLength.toFixed(1)}{' '}
+                                                                    {(item.extraLength || 0).toFixed(1)}{' '}
                                                                     ม.)
                                                                 </span>
                                                             )}{' '}
@@ -1747,7 +1748,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 <span className="text-yellow-300">
                                                                     {' '}
                                                                     (+ {t('Riser')}{' '}
-                                                                    {item.extraLength.toFixed(1)}{' '}
+                                                                    {(item.extraLength || 0).toFixed(1)}{' '}
                                                                     ม.)
                                                                 </span>
                                                             )}{' '}

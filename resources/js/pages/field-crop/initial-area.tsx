@@ -27,9 +27,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
         const dataSizeKB = new Blob([dataString]).size / 1024;
 
         if (dataSizeKB > maxSizeKB) {
-            console.warn(
-                `Data size (${dataSizeKB.toFixed(2)}KB) exceeds limit (${maxSizeKB}KB), optimizing...`
-            );
+            // Data size exceeds limit, optimizing...
 
             // Optimize by reducing precision
             const dataObj = data as Record<string, unknown>;
@@ -83,9 +81,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
 
             if (optimizedSizeKB > maxSizeKB) {
-                console.warn(
-                    'Data still too large after optimization, further reducing plant points...'
-                );
+                // Data still too large after optimization, further reducing plant points...
                 // Further reduce plant points precision
                 const dataObj = optimizedData as Record<string, unknown>;
                 const furtherOptimizedData = {
@@ -112,7 +108,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
                 const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
 
                 if (furtherOptimizedSizeKB > maxSizeKB) {
-                    console.warn('Data still too large, sampling plant points...');
+                    // Data still too large, sampling plant points...
                     // Sample plant points (keep every 2nd point)
                     const sampledPlantPoints = Array.isArray(furtherOptimizedData.plantPoints)
                         ? furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0)
@@ -132,8 +128,8 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             localStorage.setItem(key, dataString);
         }
         return true;
-    } catch (error) {
-        console.error('Error saving to localStorage:', error);
+    } catch {
+        // Error saving to localStorage
         return false;
     }
 };
@@ -937,15 +933,7 @@ export default function InitialArea(props: FieldCropPageProps) {
     // Calculate plant count and row/column info without creating actual points
     const calculatePlantCountOnly = useCallback(
         async (generationId: number): Promise<{ count: number; rows: number; columns: number }> => {
-            console.log('Initial Area - calculatePlantCountOnly called:', {
-                generationId: generationId,
-                mainAreaLength: mainArea.length,
-                selectedCrops: selectedCrops,
-                timestamp: new Date().toISOString(),
-            });
-
             if (mainArea.length < 3 || selectedCrops.length === 0) {
-                console.log('Initial Area - calculatePlantCountOnly: Invalid input, returning 0');
                 return { count: 0, rows: 0, columns: 0 };
             }
 
@@ -955,12 +943,6 @@ export default function InitialArea(props: FieldCropPageProps) {
             const plantSpacingM = cropInfo.plantSpacing / 100;
             const bufferDistance = plantSpacingM * 0.3;
 
-            console.log('Initial Area - calculatePlantCountOnly: Crop info:', {
-                primaryCrop: primaryCrop,
-                rowSpacingM: rowSpacingM,
-                plantSpacingM: plantSpacingM,
-                bufferDistance: bufferDistance,
-            });
 
             const origin = computeCentroid(mainArea);
 
@@ -1056,13 +1038,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                 }
             }
 
-            console.log('Initial Area - calculatePlantCountOnly: Final result:', {
-                plantCount: plantCount,
-                actualRows: actualRows,
-                maxColumnsInAnyRow: maxColumnsInAnyRow,
-                generationId: generationId,
-                timestamp: new Date().toISOString(),
-            });
 
             return { count: plantCount, rows: actualRows, columns: maxColumnsInAnyRow };
         },
@@ -1129,18 +1104,11 @@ export default function InitialArea(props: FieldCropPageProps) {
                     mapZoom: mapZoom,
                 };
 
-                console.log('Initial Area - Saving field data to localStorage:', {
-                    realPlantCount: plantCount,
-                    calculatedRows: rows,
-                    calculatedColumns: columns,
-                    fieldData: fieldDataToSave,
-                    timestamp: new Date().toISOString(),
-                });
 
                 // Use standardized storage approach
                 updateFieldData(fieldDataToSave);
-            } catch (error) {
-                console.error('Initial Area - Error saving field data to localStorage:', error);
+            } catch {
+                // Error saving field data to localStorage
             }
         },
         [
@@ -1172,7 +1140,7 @@ export default function InitialArea(props: FieldCropPageProps) {
             const result = await Promise.race([
                 calculatePlantCountOnly(generationId),
                 new Promise<{ count: number; rows: number; columns: number }>((_, reject) =>
-                    setTimeout(() => reject(new Error('Plant count calculation timeout')), 10000)
+                    setTimeout(() => reject(new Error(t('Plant count calculation timeout'))), 10000)
                 ),
             ]);
 
@@ -1198,18 +1166,11 @@ export default function InitialArea(props: FieldCropPageProps) {
             setRealPlantPoints([]); // No actual points stored
             setPlantPoints([]); // No display points
 
-            console.log('Initial Area - Plant count calculated:', {
-                plantCount: result.count,
-                rows: result.rows,
-                columns: result.columns,
-                generationId: generationId,
-                timestamp: new Date().toISOString(),
-            });
 
             // Save to localStorage immediately after calculation
             saveFieldDataToLocalStorage(result.count, result.rows, result.columns);
         } catch (error) {
-            if (error instanceof Error && error.message === 'Plant count calculation timeout') {
+            if (error instanceof Error && error.message === t('Plant count calculation timeout')) {
                 alert(
                     t(
                         'Plant count calculation took too long. Please try with a smaller area or different spacing.'
@@ -1233,11 +1194,6 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Handle plant point generation
     const handleGeneratePlantPoints = useCallback(async () => {
-        console.log('Initial Area - handleGeneratePlantPoints called:', {
-            isMainAreaSet: isMainAreaSet,
-            selectedCrops: selectedCrops,
-            timestamp: new Date().toISOString(),
-        });
 
         if (!isMainAreaSet || selectedCrops.length === 0) {
             alert(t('Please set main area and select crops first'));
@@ -1518,28 +1474,54 @@ export default function InitialArea(props: FieldCropPageProps) {
             perimeterMetersData ||
             rowSpacingData ||
             plantSpacingData ||
-            currentStepParamPresent;
+            currentStepParamPresent ||
+            // Check if we have data in localStorage (indicating we're navigating back from a completed flow)
+            (() => {
+                try {
+                    const stored = localStorage.getItem('fieldCropData');
+                    return stored && JSON.parse(stored);
+                } catch {
+                    return false;
+                }
+            })();
 
         if (!hasUrlParams) {
-            // Only clear storage if not navigating within flow
-            if (!currentStepParamPresent) {
+            // Only clear storage if not navigating within flow and not a completed project
+            const hasCompletedProject = (() => {
+                try {
+                    const stored = localStorage.getItem('fieldCropData');
+                    if (!stored) return false;
+                    const data = JSON.parse(stored);
+                    // Check if we have completed project data (zones, pipes, irrigation)
+                    return data.zones?.length > 0 || data.pipes?.length > 0 || 
+                           data.irrigationPositions?.sprinklers?.length > 0 || 
+                           data.irrigationPositions?.pivots?.length > 0;
+                } catch {
+                    return false;
+                }
+            })();
+            
+            if (!currentStepParamPresent && !hasCompletedProject) {
                 localStorage.removeItem('fieldCropData');
             }
-            // Reset all state to initial values
-            setMainArea([]);
-            setAreaRai(null);
-            setPerimeterMeters(null);
-            setIsMainAreaSet(false);
-            setPlantPoints([]);
-            setRealPlantPoints([]);
-            setRealPlantCount(0);
-            setCalculatedRows(0);
-            setCalculatedColumns(0);
-            setObstacles([]);
-            setRowSpacing({});
-            setPlantSpacing({});
-            setMapCenter([13.7563, 100.5018]);
-            setMapZoom(16);
+            
+            // Only reset state if we don't have a completed project
+            if (!hasCompletedProject) {
+                setMainArea([]);
+                setAreaRai(null);
+                setPerimeterMeters(null);
+                setIsMainAreaSet(false);
+                setPlantPoints([]);
+                setRealPlantPoints([]);
+                setRealPlantCount(0);
+                setCalculatedRows(0);
+                setCalculatedColumns(0);
+                setObstacles([]);
+                setRowSpacing({});
+                setPlantSpacing({});
+                setMapCenter([13.7563, 100.5018]);
+                setMapZoom(16);
+            }
 
             if (map) {
                 if (drawnPolygonRef.current) {
@@ -1962,7 +1944,7 @@ export default function InitialArea(props: FieldCropPageProps) {
         );
 
         if (!window.google?.maps?.drawing) {
-            alert('Drawing tools could not be loaded. Please refresh the page.');
+            alert(t('Drawing tools could not be loaded. Please refresh the page.'));
             return;
         }
 
@@ -2487,11 +2469,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                     // Preserve real count and real points in the plant points data
                     (minimalPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
                     (minimalPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
-                    console.log('Initial Area - Saving plant points with real count:', {
-                        realPlantCount: realPlantCount,
-                        minimalPointsLength: minimalPoints.length,
-                        hasRealCount: !!(minimalPoints as PlantPointArrayWithRealCount).__realCount,
-                    });
                     return minimalPoints;
                 })(),
                 // Add realPlantCount as a separate property to ensure it's saved
@@ -3597,7 +3574,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                                                 <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
                                                     💧 {t('Total Water Requirement')}:{' '}
                                                     {waterRequirementInfo.total?.toFixed(2)}{' '}
-                                                    {t('ลิตร/ครั้ง')}
+                                                    {t('liters per irrigation')}
                                                 </div>
                                             )}
                                             {realPlantCount === 0 && (
@@ -3691,7 +3668,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                                 >
                                     <EnhancedHorticultureSearchControl
                                         onPlaceSelect={handleSearch}
-                                        placeholder="🔍 ค้นหาสถานที่..."
+                                        placeholder={`🔍 ${t('Search places...')}`}
                                     />
                                     <HorticultureDrawingManager
                                         editMode={null}
