@@ -527,20 +527,11 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
         const normalizedType = normalizeIrrigationTypeEnhanced(point.type);
         if (normalizedType === 'sprinkler') {
             irrigationByType.sprinkler++;
-        } else if (normalizedType === 'drip_tape') {
-            irrigationByType.dripTape++;
         } else if (normalizedType === 'pivot') {
             irrigationByType.pivot++;
-        } else if (normalizedType === 'water_jet_tape') {
-            irrigationByType.waterJetTape++;
         }
     });
 
-    irrigationLines.forEach((line: any) => {
-        const normalizedType = normalizeIrrigationTypeEnhanced(line.type);
-        if (normalizedType === 'drip_tape') irrigationByType.dripTape++;
-        else if (normalizedType === 'water_jet_tape') irrigationByType.waterJetTape++;
-    });
 
     const totalPlantingPoints = enhancedZones.reduce(
         (sum, zone) => sum + zone.totalPlantingPoints,
@@ -690,14 +681,8 @@ export const normalizeIrrigationTypeEnhanced = (type: string): string => {
         micro_spray: 'sprinkler',
         microspray: 'sprinkler',
         micro: 'sprinkler',
-        drip: 'drip_tape',
-        'drip-tape': 'drip_tape',
-        drip_tape: 'drip_tape',
-        'drip-irrigation': 'drip_tape',
         pivot: 'pivot',
         center_pivot: 'pivot',
-        water_jet_tape: 'water_jet_tape',
-        'water-jet-tape': 'water_jet_tape',
     };
 
     return typeMapping[normalizedType] || normalizedType;

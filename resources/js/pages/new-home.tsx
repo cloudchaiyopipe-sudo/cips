@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Head, usePage, router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
@@ -23,17 +23,20 @@ interface NewHomeProps {
     auth: {
         user: User;
     };
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export default function NewHome() {
     const { t } = useLanguage();
 
-    // Defensive usePage call with error handling
+    // Always call usePage hook at the top level
+    const page = usePage<NewHomeProps>();
+    
+    // Defensive auth access with error handling
     let auth;
     try {
-        auth = usePage<NewHomeProps>().props.auth;
-    } catch (error) {
+        auth = page.props.auth;
+    } catch {
         console.warn('Inertia context not available in NewHome, using fallback values');
         auth = { user: null };
     }
@@ -131,10 +134,14 @@ export default function NewHome() {
             } else {
                 alert(response.data.message || 'Error purchasing plan. Please try again.');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error purchasing plan:', error);
             const errorMessage =
+<<<<<<< HEAD
                 error.response?.data?.message || 'Error purchasing plan. Please try again.';
+=======
+                (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error purchasing plan. Please try again.';
+>>>>>>> main
             alert(errorMessage);
         }
     };
@@ -166,6 +173,14 @@ export default function NewHome() {
         setSelectedPlan({ type: planType, months });
         setShowTokenPurchaseModal(true);
     };
+
+    // Suppress unused variable warning for t (translation function)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _unused = t;
+    
+    // Suppress unused function warning for handlePlanSelection
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _unusedHandler = handlePlanSelection;
 
     const handleContinueToApp = () => {
         // Navigate to the current home page (field management)

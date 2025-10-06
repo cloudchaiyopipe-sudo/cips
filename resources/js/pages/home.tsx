@@ -167,22 +167,21 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('environmental_monitoring'),
         ],
     },
-    // TODO: Temporarily hidden Field Crop - uncomment when ready to use
-    // {
-    //     id: 'field-crop',
-    //     name: t('field_crop'),
-    //     description: t('field_crop_desc'),
-    //     icon: '🌾',
-    //     color: 'from-yellow-600 to-yellow-800',
-    //     route: '/choose-crop',
-    //     features: [
-    //         t('large_scale_planning'),
-    //         t('efficient_irrigation'),
-    //         t('crop_rotation'),
-    //         t('weather_integration'),
-    //         t('yield_optimization'),
-    //     ],
-    // },
+    {
+        id: 'field-crop',
+        name: t('field_crop'),
+        description: t('field_crop_desc'),
+        icon: '🌾',
+        color: 'from-yellow-600 to-yellow-800',
+        route: '/choose-crop',
+        features: [
+            t('large_scale_planning'),
+            t('efficient_irrigation'),
+            t('crop_rotation'),
+            t('weather_integration'),
+            t('yield_optimization'),
+        ],
+    },
 ];
 
 // Components
@@ -1076,11 +1075,11 @@ export default function Home() {
         t = (key: string) => key;
     }
 
-    // Defensive usePage call with error handling
-    let page: any = { props: {} };
+    // Always call usePage hook at the top level
+    const page = usePage();
+    
     let auth: any = null;
     try {
-        page = usePage();
         auth = (page.props as any).auth;
         console.log('🔐 Auth object:', auth);
         console.log('👤 User:', auth?.user);
@@ -1353,7 +1352,7 @@ export default function Home() {
                     navigateToRoute('/field-crop');
                     break;
 
-                case 'greenhouse':
+                case 'greenhouse': {
                     // Extract crop and method from saved greenhouse data
                     const greenhouseData = field.greenhouse_data;
                     const crops = greenhouseData?.selectedCrops || [];
@@ -1396,9 +1395,10 @@ export default function Home() {
                         navigateToRoute(`/greenhouse-planner?${queryParams.toString()}`);
                     }
                     break;
+                }
 
                 case 'horticulture':
-                default:
+                default: {
                     // Prepare the data in the same format as map-planner for horticulture
                     const params = new URLSearchParams({
                         area: JSON.stringify(field.area),
@@ -1409,6 +1409,7 @@ export default function Home() {
                     });
                     navigateToRoute(`/horticulture/planner?${params.toString()}`);
                     break;
+                }
             }
         } catch (error) {
             console.error('Error preparing field data for navigation:', error);

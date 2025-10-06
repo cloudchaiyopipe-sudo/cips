@@ -8,6 +8,17 @@ import EnhancedHorticultureSearchControl from '../../components/horticulture/Hor
 import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMeasurementOverlay';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
+<<<<<<< HEAD
+=======
+import { 
+    FieldCropPageProps, 
+    Coordinate, 
+    PlantPoint, 
+    Obstacle, 
+    FIELD_STYLING 
+} from '../../types/fieldCropTypes';
+import { useFieldData } from '../../hooks/useFieldData';
+>>>>>>> main
 
 // Yield back to the browser between heavy batches without blocking UI
 const yieldToFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -19,9 +30,13 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
         const dataSizeKB = new Blob([dataString]).size / 1024;
 
         if (dataSizeKB > maxSizeKB) {
+<<<<<<< HEAD
             console.warn(
                 `Data size (${dataSizeKB.toFixed(2)}KB) exceeds limit (${maxSizeKB}KB), optimizing...`
             );
+=======
+            // Data size exceeds limit, optimizing...
+>>>>>>> main
 
             // Optimize by reducing precision
             const dataObj = data as Record<string, unknown>;
@@ -75,9 +90,13 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
 
             if (optimizedSizeKB > maxSizeKB) {
+<<<<<<< HEAD
                 console.warn(
                     'Data still too large after optimization, further reducing plant points...'
                 );
+=======
+                // Data still too large after optimization, further reducing plant points...
+>>>>>>> main
                 // Further reduce plant points precision
                 const dataObj = optimizedData as Record<string, unknown>;
                 const furtherOptimizedData = {
@@ -104,7 +123,11 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
                 const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
 
                 if (furtherOptimizedSizeKB > maxSizeKB) {
+<<<<<<< HEAD
                     console.warn('Data still too large, sampling plant points...');
+=======
+                    // Data still too large, sampling plant points...
+>>>>>>> main
                     // Sample plant points (keep every 2nd point)
                     const sampledPlantPoints = Array.isArray(furtherOptimizedData.plantPoints)
                         ? furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0)
@@ -124,8 +147,13 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             localStorage.setItem(key, dataString);
         }
         return true;
+<<<<<<< HEAD
     } catch (error) {
         console.error('Error saving to localStorage:', error);
+=======
+    } catch {
+        // Error saving to localStorage
+>>>>>>> main
         return false;
     }
 };
@@ -138,21 +166,7 @@ const detachOverlay = (overlay: unknown) => {
     if (hasSetMap(overlay)) overlay.setMap(null);
 };
 
-// Types and Interfaces
-type Coordinate = { lat: number; lng: number };
-
-interface InitialAreaProps {
-    crops?: string;
-    currentStep?: number;
-    completedSteps?: string;
-    mainArea?: string;
-    obstacles?: string;
-    plantPoints?: string;
-    areaRai?: string;
-    perimeterMeters?: string;
-    rowSpacing?: string;
-    plantSpacing?: string;
-}
+// Using standardized types from fieldCropTypes.ts
 
 interface StepData {
     id: number;
@@ -160,14 +174,6 @@ interface StepData {
     title: string;
     description: string;
     route: string;
-}
-
-interface PlantPoint {
-    id: string;
-    lat: number;
-    lng: number;
-    cropType: string;
-    isValid: boolean;
 }
 
 // Type for plant point arrays that can carry real count and real points information
@@ -188,6 +194,7 @@ const extractRealPoints = (plantPoints: PlantPoint[]): PlantPoint[] => {
     return pointsWithRealCount.__realPoints || plantPoints;
 };
 
+<<<<<<< HEAD
 interface Obstacle {
     id: string;
     type: 'water_source' | 'other';
@@ -209,17 +216,40 @@ export default function InitialArea({
 }: InitialAreaProps) {
     const { t, language } = useLanguage();
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
+=======
+// Using standardized Obstacle interface from fieldCropTypes.ts
+
+export default function InitialArea(props: FieldCropPageProps) {
+    const {
+        crops,
+        currentStep = 1,
+        completedSteps = '',
+        mainArea: mainAreaData,
+        obstacles: obstaclesData,
+        plantPoints: plantPointsData,
+        areaRai: areaRaiData,
+        perimeterMeters: perimeterMetersData,
+        rowSpacing: rowSpacingData,
+        plantSpacing: plantSpacingData,
+    } = props;
+    const { t, language } = useLanguage();
+    
+    // Use standardized field data management
+    const { fieldData, updateFieldData } = useFieldData(props);
+    
+    const [selectedCrops, setSelectedCrops] = useState<string[]>(fieldData.selectedCrops);
+>>>>>>> main
     const [completed, setCompleted] = useState<number[]>([]);
     const activeStep = currentStep;
 
     // Map and Area States
     const [map, setMap] = useState<google.maps.Map | null>(null);
-    const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]);
-    const [mapZoom, setMapZoom] = useState<number>(16);
-    const [mainArea, setMainArea] = useState<Coordinate[]>([]);
-    const [areaRai, setAreaRai] = useState<number | null>(null);
-    const [perimeterMeters, setPerimeterMeters] = useState<number | null>(null);
-    const [isMainAreaSet, setIsMainAreaSet] = useState<boolean>(false);
+    const [mapCenter, setMapCenter] = useState<[number, number]>([fieldData.mapCenter.lat, fieldData.mapCenter.lng]);
+    const [mapZoom, setMapZoom] = useState<number>(fieldData.mapZoom);
+    const [mainArea, setMainArea] = useState<Coordinate[]>(fieldData.mainArea);
+    const [areaRai, setAreaRai] = useState<number | null>(fieldData.areaRai);
+    const [perimeterMeters, setPerimeterMeters] = useState<number | null>(fieldData.perimeterMeters);
+    const [isMainAreaSet, setIsMainAreaSet] = useState<boolean>(fieldData.mainArea.length >= 3);
     const [isEditingMainArea, setIsEditingMainArea] = useState<boolean>(false);
 
     // Drawing States
@@ -230,13 +260,17 @@ export default function InitialArea({
     const [drawnPolygon, setDrawnPolygon] = useState<google.maps.Polygon | null>(null);
 
     // Plant and Obstacle States
-    const [plantPoints, setPlantPoints] = useState<PlantPoint[]>([]); // Display points (limited to 500)
-    const [realPlantPoints, setRealPlantPoints] = useState<PlantPoint[]>([]); // All real plant points
-    const [realPlantCount, setRealPlantCount] = useState<number>(0); // Track real point count for calculations
+    const [plantPoints, setPlantPoints] = useState<PlantPoint[]>(fieldData.plantPoints); // Display points (limited to 500)
+    const [realPlantPoints, setRealPlantPoints] = useState<PlantPoint[]>(fieldData.plantPoints); // All real plant points
+    const [realPlantCount, setRealPlantCount] = useState<number>(fieldData.realPlantCount || 0); // Track real point count for calculations
     const [isGeneratingPlants, setIsGeneratingPlants] = useState<boolean>(false);
-    const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+    const [obstacles, setObstacles] = useState<Obstacle[]>(fieldData.obstacles);
     const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
+<<<<<<< HEAD
     const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'other'>(
+=======
+    const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'building' | 'rock' | 'other'>(
+>>>>>>> main
         'water_source'
     );
     const [selectedObstacleShape, setSelectedObstacleShape] = useState<string>('polygon');
@@ -250,8 +284,8 @@ export default function InitialArea({
     const [calculatedColumns, setCalculatedColumns] = useState<number>(0);
 
     // Spacing States
-    const [rowSpacing, setRowSpacing] = useState<Record<string, number>>({});
-    const [plantSpacing, setPlantSpacing] = useState<Record<string, number>>({});
+    const [rowSpacing, setRowSpacing] = useState<Record<string, number>>(fieldData.rowSpacing);
+    const [plantSpacing, setPlantSpacing] = useState<Record<string, number>>(fieldData.plantSpacing);
     const [tempRowSpacing, setTempRowSpacing] = useState<Record<string, string>>({});
     const [tempPlantSpacing, setTempPlantSpacing] = useState<Record<string, string>>({});
     const [editingRowSpacingForCrop, setEditingRowSpacingForCrop] = useState<string | null>(null);
@@ -265,7 +299,7 @@ export default function InitialArea({
     const mainAreaRef = useRef<Coordinate[]>(mainArea);
     const obstaclesRef = useRef<Obstacle[]>(obstacles);
     const drawnPolygonRef = useRef<google.maps.Polygon | null>(drawnPolygon);
-    const selectedObstacleTypeRef = useRef<'water_source' | 'other'>(selectedObstacleType);
+    const selectedObstacleTypeRef = useRef<'water_source' | 'building' | 'rock' | 'other'>(selectedObstacleType);
     const isDrawingObstacleRef = useRef<boolean>(false);
     const obstacleOverlaysRef = useRef<google.maps.Polygon[]>([]);
     const distanceOverlaysByObstacleRef = useRef<
@@ -567,6 +601,7 @@ export default function InitialArea({
         }
     }, []);
 
+<<<<<<< HEAD
     // Helper function to filter points based on zoom level and total point count
     const filterPointsByZoom = useCallback(
         (points: PlantPoint[], zoom: number, totalPointCount: number): PlantPoint[] => {
@@ -617,6 +652,8 @@ export default function InitialArea({
         },
         []
     );
+=======
+>>>>>>> main
 
     // Enhanced function to clear all existing plant markers immediately
     const clearAllPlantMarkers = useCallback(() => {
@@ -849,15 +886,15 @@ export default function InitialArea({
         const createEditablePolygon = (coordinates: Coordinate[], holes: Coordinate[][] = []) => {
             const styledPolygon = new google.maps.Polygon({
                 paths: [coordinates, ...holes],
-                fillColor: '#86EFAC',
-                fillOpacity: 0.3,
-                strokeColor: '#22C55E',
-                strokeWeight: 2,
-                strokeOpacity: 1,
+                fillColor: FIELD_STYLING.MAIN_AREA.fillColor,
+                fillOpacity: FIELD_STYLING.MAIN_AREA.fillOpacity,
+                strokeColor: FIELD_STYLING.MAIN_AREA.strokeColor,
+                strokeWeight: FIELD_STYLING.MAIN_AREA.strokeWeight,
+                strokeOpacity: FIELD_STYLING.MAIN_AREA.strokeOpacity,
                 editable: false,
                 draggable: false,
                 clickable: true,
-                zIndex: 1000,
+                zIndex: FIELD_STYLING.MAIN_AREA.zIndex,
             });
 
             styledPolygon.setMap(map);
@@ -912,23 +949,31 @@ export default function InitialArea({
 
         const newObstacleOverlays: google.maps.Polygon[] = [];
         obstacles.forEach((obstacle) => {
+<<<<<<< HEAD
             const obstacleColors =
                 obstacle.type === 'water_source'
                     ? { fill: '#3b82f6', stroke: '#1d4ed8' }
                     : { fill: '#6b7280', stroke: '#374151' };
+=======
+            const obstacleColors = FIELD_STYLING.OBSTACLES[obstacle.type] || FIELD_STYLING.OBSTACLES.default;
+>>>>>>> main
 
             const polygon = new google.maps.Polygon({
                 paths: [obstacle.coordinates],
                 fillColor: obstacleColors.fill,
                 strokeColor: obstacleColors.stroke,
-                fillOpacity: 0.4,
-                strokeWeight: 2,
-                strokeOpacity: 1,
+                fillOpacity: FIELD_STYLING.OBSTACLES.fillOpacity,
+                strokeWeight: FIELD_STYLING.OBSTACLES.strokeWeight,
+                strokeOpacity: FIELD_STYLING.OBSTACLES.strokeOpacity,
                 editable: false,
                 draggable: false,
                 clickable: true,
                 map: map,
+<<<<<<< HEAD
                 zIndex: 1600,
+=======
+                zIndex: FIELD_STYLING.OBSTACLES.zIndex,
+>>>>>>> main
             });
 
             newObstacleOverlays.push(polygon);
@@ -953,8 +998,8 @@ export default function InitialArea({
         // Increment generation ID for this recreation
         const generationId = ++currentGenerationIdRef.current;
 
-        // Filter points based on zoom level and total point count
-        const filteredPoints = filterPointsByZoom(plantPoints, mapZoom, plantPoints.length);
+        // Use all plant points directly
+        const filteredPoints = plantPoints;
 
         // Calculate dynamic point size based on total point count (not filtered count)
         const pointSize = calculatePointSize(plantPoints.length);
@@ -999,11 +1044,16 @@ export default function InitialArea({
             // Clean up if generation was cancelled
             newMarkers.forEach((m) => m.setMap(null));
         }
+<<<<<<< HEAD
     }, [map, plantPoints, clearAllPlantMarkers, calculatePointSize, filterPointsByZoom, mapZoom]);
+=======
+    }, [map, plantPoints, clearAllPlantMarkers, calculatePointSize, mapZoom]);
+>>>>>>> main
 
     // Calculate plant count and row/column info without creating actual points
     const calculatePlantCountOnly = useCallback(
         async (generationId: number): Promise<{ count: number; rows: number; columns: number }> => {
+<<<<<<< HEAD
             console.log('Initial Area - calculatePlantCountOnly called:', {
                 generationId: generationId,
                 mainAreaLength: mainArea.length,
@@ -1013,6 +1063,9 @@ export default function InitialArea({
 
             if (mainArea.length < 3 || selectedCrops.length === 0) {
                 console.log('Initial Area - calculatePlantCountOnly: Invalid input, returning 0');
+=======
+            if (mainArea.length < 3 || selectedCrops.length === 0) {
+>>>>>>> main
                 return { count: 0, rows: 0, columns: 0 };
             }
 
@@ -1022,12 +1075,15 @@ export default function InitialArea({
             const plantSpacingM = cropInfo.plantSpacing / 100;
             const bufferDistance = plantSpacingM * 0.3;
 
+<<<<<<< HEAD
             console.log('Initial Area - calculatePlantCountOnly: Crop info:', {
                 primaryCrop: primaryCrop,
                 rowSpacingM: rowSpacingM,
                 plantSpacingM: plantSpacingM,
                 bufferDistance: bufferDistance,
             });
+=======
+>>>>>>> main
 
             const origin = computeCentroid(mainArea);
 
@@ -1123,6 +1179,7 @@ export default function InitialArea({
                 }
             }
 
+<<<<<<< HEAD
             console.log('Initial Area - calculatePlantCountOnly: Final result:', {
                 plantCount: plantCount,
                 actualRows: actualRows,
@@ -1130,6 +1187,8 @@ export default function InitialArea({
                 generationId: generationId,
                 timestamp: new Date().toISOString(),
             });
+=======
+>>>>>>> main
 
             return { count: plantCount, rows: actualRows, columns: maxColumnsInAnyRow };
         },
@@ -1149,7 +1208,11 @@ export default function InitialArea({
     const saveFieldDataToLocalStorage = useCallback(
         (plantCount: number, rows: number, columns: number) => {
             try {
+<<<<<<< HEAD
                 const fieldData = {
+=======
+                const fieldDataToSave = {
+>>>>>>> main
                     mainArea: mainArea.length >= 3 ? mainArea : [],
                     obstacles: obstacles.filter((obs) => obs.coordinates.length >= 3),
                     plantPoints: (() => {
@@ -1192,6 +1255,7 @@ export default function InitialArea({
                         )
                     ),
                     selectedCrops: selectedCrops,
+<<<<<<< HEAD
                     mapCenter: mapCenter,
                     mapZoom: mapZoom,
                 };
@@ -1207,6 +1271,17 @@ export default function InitialArea({
                 localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
             } catch (error) {
                 console.error('Initial Area - Error saving field data to localStorage:', error);
+=======
+                    mapCenter: { lat: mapCenter[0], lng: mapCenter[1] },
+                    mapZoom: mapZoom,
+                };
+
+
+                // Use standardized storage approach
+                updateFieldData(fieldDataToSave);
+            } catch {
+                // Error saving field data to localStorage
+>>>>>>> main
             }
         },
         [
@@ -1219,6 +1294,10 @@ export default function InitialArea({
             plantSpacing,
             mapCenter,
             mapZoom,
+<<<<<<< HEAD
+=======
+            updateFieldData,
+>>>>>>> main
         ]
     );
 
@@ -1237,7 +1316,11 @@ export default function InitialArea({
             const result = await Promise.race([
                 calculatePlantCountOnly(generationId),
                 new Promise<{ count: number; rows: number; columns: number }>((_, reject) =>
+<<<<<<< HEAD
                     setTimeout(() => reject(new Error('Plant count calculation timeout')), 10000)
+=======
+                    setTimeout(() => reject(new Error(t('Plant count calculation timeout'))), 10000)
+>>>>>>> main
                 ),
             ]);
 
@@ -1263,6 +1346,7 @@ export default function InitialArea({
             setRealPlantPoints([]); // No actual points stored
             setPlantPoints([]); // No display points
 
+<<<<<<< HEAD
             console.log('Initial Area - Plant count calculated:', {
                 plantCount: result.count,
                 rows: result.rows,
@@ -1270,11 +1354,17 @@ export default function InitialArea({
                 generationId: generationId,
                 timestamp: new Date().toISOString(),
             });
+=======
+>>>>>>> main
 
             // Save to localStorage immediately after calculation
             saveFieldDataToLocalStorage(result.count, result.rows, result.columns);
         } catch (error) {
+<<<<<<< HEAD
             if (error instanceof Error && error.message === 'Plant count calculation timeout') {
+=======
+            if (error instanceof Error && error.message === t('Plant count calculation timeout')) {
+>>>>>>> main
                 alert(
                     t(
                         'Plant count calculation took too long. Please try with a smaller area or different spacing.'
@@ -1298,11 +1388,14 @@ export default function InitialArea({
 
     // Handle plant point generation
     const handleGeneratePlantPoints = useCallback(async () => {
+<<<<<<< HEAD
         console.log('Initial Area - handleGeneratePlantPoints called:', {
             isMainAreaSet: isMainAreaSet,
             selectedCrops: selectedCrops,
             timestamp: new Date().toISOString(),
         });
+=======
+>>>>>>> main
 
         if (!isMainAreaSet || selectedCrops.length === 0) {
             alert(t('Please set main area and select crops first'));
@@ -1583,6 +1676,7 @@ export default function InitialArea({
             perimeterMetersData ||
             rowSpacingData ||
             plantSpacingData ||
+<<<<<<< HEAD
             currentStepParamPresent;
 
         if (!hasUrlParams) {
@@ -1605,6 +1699,56 @@ export default function InitialArea({
             setPlantSpacing({});
             setMapCenter([13.7563, 100.5018]);
             setMapZoom(16);
+=======
+            currentStepParamPresent ||
+            // Check if we have data in localStorage (indicating we're navigating back from a completed flow)
+            (() => {
+                try {
+                    const stored = localStorage.getItem('fieldCropData');
+                    return stored && JSON.parse(stored);
+                } catch {
+                    return false;
+                }
+            })();
+
+        if (!hasUrlParams) {
+            // Only clear storage if not navigating within flow and not a completed project
+            const hasCompletedProject = (() => {
+                try {
+                    const stored = localStorage.getItem('fieldCropData');
+                    if (!stored) return false;
+                    const data = JSON.parse(stored);
+                    // Check if we have completed project data (zones, pipes, irrigation)
+                    return data.zones?.length > 0 || data.pipes?.length > 0 || 
+                           data.irrigationPositions?.sprinklers?.length > 0 || 
+                           data.irrigationPositions?.pivots?.length > 0;
+                } catch {
+                    return false;
+                }
+            })();
+            
+            if (!currentStepParamPresent && !hasCompletedProject) {
+                localStorage.removeItem('fieldCropData');
+            }
+            
+            // Only reset state if we don't have a completed project
+            if (!hasCompletedProject) {
+                setMainArea([]);
+                setAreaRai(null);
+                setPerimeterMeters(null);
+                setIsMainAreaSet(false);
+                setPlantPoints([]);
+                setRealPlantPoints([]);
+                setRealPlantCount(0);
+                setCalculatedRows(0);
+                setCalculatedColumns(0);
+                setObstacles([]);
+                setRowSpacing({});
+                setPlantSpacing({});
+                setMapCenter([13.7563, 100.5018]);
+                setMapZoom(16);
+            }
+>>>>>>> main
 
             if (map) {
                 if (drawnPolygonRef.current) {
@@ -2027,7 +2171,11 @@ export default function InitialArea({
         );
 
         if (!window.google?.maps?.drawing) {
+<<<<<<< HEAD
             alert('Drawing tools could not be loaded. Please refresh the page.');
+=======
+            alert(t('Drawing tools could not be loaded. Please refresh the page.'));
+>>>>>>> main
             return;
         }
 
@@ -2552,11 +2700,14 @@ export default function InitialArea({
                     // Preserve real count and real points in the plant points data
                     (minimalPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
                     (minimalPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+<<<<<<< HEAD
                     console.log('Initial Area - Saving plant points with real count:', {
                         realPlantCount: realPlantCount,
                         minimalPointsLength: minimalPoints.length,
                         hasRealCount: !!(minimalPoints as PlantPointArrayWithRealCount).__realCount,
                     });
+=======
+>>>>>>> main
                     return minimalPoints;
                 })(),
                 // Add realPlantCount as a separate property to ensure it's saved
@@ -3662,7 +3813,11 @@ export default function InitialArea({
                                                 <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
                                                     💧 {t('Total Water Requirement')}:{' '}
                                                     {waterRequirementInfo.total?.toFixed(2)}{' '}
+<<<<<<< HEAD
                                                     {t('ลิตร/ครั้ง')}
+=======
+                                                    {t('liters per irrigation')}
+>>>>>>> main
                                                 </div>
                                             )}
                                             {realPlantCount === 0 && (
@@ -3756,7 +3911,11 @@ export default function InitialArea({
                                 >
                                     <EnhancedHorticultureSearchControl
                                         onPlaceSelect={handleSearch}
+<<<<<<< HEAD
                                         placeholder="🔍 ค้นหาสถานที่..."
+=======
+                                        placeholder={`🔍 ${t('Search places...')}`}
+>>>>>>> main
                                     />
                                     <HorticultureDrawingManager
                                         editMode={null}
@@ -3898,6 +4057,7 @@ export default function InitialArea({
                                     </div>
                                 </div>
 
+<<<<<<< HEAD
                                 <div className="pointer-events-none absolute bottom-4 right-20 z-10">
                                     <div className="mb-1 rounded border border-white bg-black bg-opacity-70 px-2 py-1 text-xs text-white">
                                         {t('Zoom Level')}: {mapZoom}
@@ -3960,6 +4120,8 @@ export default function InitialArea({
                                         </div>
                                     )}
                                 </div>
+=======
+>>>>>>> main
                                 {isDrawingObstacle && (
                                     <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-lg border border-purple-500 bg-purple-900 bg-opacity-90 p-3 shadow-lg">
                                         <div className="text-center text-sm text-white">
