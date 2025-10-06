@@ -650,17 +650,6 @@ export default function Product() {
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-<<<<<<< HEAD
-            longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longestLength || 30, 3),
-            totalBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.totalLength || 100, 3),
-            longestSecondaryPipeM: formatNumber(
-                fieldData.pipes.stats.submain.longestLength || 0,
-                3
-            ),
-            totalSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.totalLength || 0, 3),
-            longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longestLength || 0, 3),
-            totalMainPipeM: formatNumber(fieldData.pipes.stats.main.totalLength || 0, 3),
-=======
             longestBranchPipeM: formatNumber(fieldData.pipes?.stats?.lateral?.longestLength || 30, 3),
             totalBranchPipeM: formatNumber(fieldData.pipes?.stats?.lateral?.totalLength || 100, 3),
             longestSecondaryPipeM: formatNumber(
@@ -670,7 +659,6 @@ export default function Product() {
             totalSecondaryPipeM: formatNumber(fieldData.pipes?.stats?.submain?.totalLength || 0, 3),
             longestMainPipeM: formatNumber(fieldData.pipes?.stats?.main?.longestLength || 0, 3),
             totalMainPipeM: formatNumber(fieldData.pipes?.stats?.main?.totalLength || 0, 3),
->>>>>>> main
         };
     };
 

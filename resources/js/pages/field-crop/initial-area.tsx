@@ -8,8 +8,6 @@ import EnhancedHorticultureSearchControl from '../../components/horticulture/Hor
 import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMeasurementOverlay';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
-<<<<<<< HEAD
-=======
 import { 
     FieldCropPageProps, 
     Coordinate, 
@@ -18,7 +16,6 @@ import {
     FIELD_STYLING 
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
->>>>>>> main
 
 // Yield back to the browser between heavy batches without blocking UI
 const yieldToFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -30,13 +27,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
         const dataSizeKB = new Blob([dataString]).size / 1024;
 
         if (dataSizeKB > maxSizeKB) {
-<<<<<<< HEAD
-            console.warn(
-                `Data size (${dataSizeKB.toFixed(2)}KB) exceeds limit (${maxSizeKB}KB), optimizing...`
-            );
-=======
             // Data size exceeds limit, optimizing...
->>>>>>> main
 
             // Optimize by reducing precision
             const dataObj = data as Record<string, unknown>;
@@ -90,13 +81,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
 
             if (optimizedSizeKB > maxSizeKB) {
-<<<<<<< HEAD
-                console.warn(
-                    'Data still too large after optimization, further reducing plant points...'
-                );
-=======
                 // Data still too large after optimization, further reducing plant points...
->>>>>>> main
                 // Further reduce plant points precision
                 const dataObj = optimizedData as Record<string, unknown>;
                 const furtherOptimizedData = {
@@ -123,11 +108,7 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
                 const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
 
                 if (furtherOptimizedSizeKB > maxSizeKB) {
-<<<<<<< HEAD
-                    console.warn('Data still too large, sampling plant points...');
-=======
                     // Data still too large, sampling plant points...
->>>>>>> main
                     // Sample plant points (keep every 2nd point)
                     const sampledPlantPoints = Array.isArray(furtherOptimizedData.plantPoints)
                         ? furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0)
@@ -147,13 +128,8 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
             localStorage.setItem(key, dataString);
         }
         return true;
-<<<<<<< HEAD
-    } catch (error) {
-        console.error('Error saving to localStorage:', error);
-=======
     } catch {
         // Error saving to localStorage
->>>>>>> main
         return false;
     }
 };
@@ -194,29 +170,6 @@ const extractRealPoints = (plantPoints: PlantPoint[]): PlantPoint[] => {
     return pointsWithRealCount.__realPoints || plantPoints;
 };
 
-<<<<<<< HEAD
-interface Obstacle {
-    id: string;
-    type: 'water_source' | 'other';
-    coordinates: Coordinate[];
-    name?: string;
-}
-
-export default function InitialArea({
-    crops,
-    currentStep = 1,
-    completedSteps = '',
-    mainArea: mainAreaData,
-    obstacles: obstaclesData,
-    plantPoints: plantPointsData,
-    areaRai: areaRaiData,
-    perimeterMeters: perimeterMetersData,
-    rowSpacing: rowSpacingData,
-    plantSpacing: plantSpacingData,
-}: InitialAreaProps) {
-    const { t, language } = useLanguage();
-    const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
-=======
 // Using standardized Obstacle interface from fieldCropTypes.ts
 
 export default function InitialArea(props: FieldCropPageProps) {
@@ -238,7 +191,6 @@ export default function InitialArea(props: FieldCropPageProps) {
     const { fieldData, updateFieldData } = useFieldData(props);
     
     const [selectedCrops, setSelectedCrops] = useState<string[]>(fieldData.selectedCrops);
->>>>>>> main
     const [completed, setCompleted] = useState<number[]>([]);
     const activeStep = currentStep;
 
@@ -266,11 +218,7 @@ export default function InitialArea(props: FieldCropPageProps) {
     const [isGeneratingPlants, setIsGeneratingPlants] = useState<boolean>(false);
     const [obstacles, setObstacles] = useState<Obstacle[]>(fieldData.obstacles);
     const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
-<<<<<<< HEAD
-    const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'other'>(
-=======
     const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'building' | 'rock' | 'other'>(
->>>>>>> main
         'water_source'
     );
     const [selectedObstacleShape, setSelectedObstacleShape] = useState<string>('polygon');
@@ -601,59 +549,6 @@ export default function InitialArea(props: FieldCropPageProps) {
         }
     }, []);
 
-<<<<<<< HEAD
-    // Helper function to filter points based on zoom level and total point count
-    const filterPointsByZoom = useCallback(
-        (points: PlantPoint[], zoom: number, totalPointCount: number): PlantPoint[] => {
-            // If we have fewer than 800 points, show all points regardless of zoom
-            if (totalPointCount < 800) {
-                return points;
-            }
-
-            // Calculate maximum reduction factor based on total point count
-            let maxReductionFactor = 1; // No reduction by default
-
-            if (totalPointCount >= 5000) {
-                maxReductionFactor = 4; // Up to 4x reduction (show 1/4 of points)
-            } else if (totalPointCount >= 2000) {
-                maxReductionFactor = 3; // Up to 3x reduction (show 1/3 of points)
-            } else if (totalPointCount >= 800) {
-                maxReductionFactor = 2; // Up to 2x reduction (show 1/2 of points)
-            }
-
-            // Calculate zoom-based reduction (5 levels: zoom 20, 19, 18, 17, 16)
-            let reductionFactor = 1;
-
-            if (zoom >= 20) {
-                // Zoom 20+: show all points
-                reductionFactor = 1;
-            } else if (zoom >= 19) {
-                // Zoom 19: 25% of max reduction
-                reductionFactor = 1 + (maxReductionFactor - 1) * 0.25;
-            } else if (zoom >= 18) {
-                // Zoom 18: 50% of max reduction
-                reductionFactor = 1 + (maxReductionFactor - 1) * 0.5;
-            } else if (zoom >= 17) {
-                // Zoom 17: 75% of max reduction
-                reductionFactor = 1 + (maxReductionFactor - 1) * 0.75;
-            } else {
-                // Zoom < 17: maximum reduction
-                reductionFactor = maxReductionFactor;
-            }
-
-            // If no reduction needed, return all points
-            if (reductionFactor <= 1) {
-                return points;
-            }
-
-            // Sample points based on reduction factor
-            const step = Math.ceil(reductionFactor);
-            return points.filter((_, index) => index % step === 0);
-        },
-        []
-    );
-=======
->>>>>>> main
 
     // Enhanced function to clear all existing plant markers immediately
     const clearAllPlantMarkers = useCallback(() => {
@@ -949,14 +844,7 @@ export default function InitialArea(props: FieldCropPageProps) {
 
         const newObstacleOverlays: google.maps.Polygon[] = [];
         obstacles.forEach((obstacle) => {
-<<<<<<< HEAD
-            const obstacleColors =
-                obstacle.type === 'water_source'
-                    ? { fill: '#3b82f6', stroke: '#1d4ed8' }
-                    : { fill: '#6b7280', stroke: '#374151' };
-=======
             const obstacleColors = FIELD_STYLING.OBSTACLES[obstacle.type] || FIELD_STYLING.OBSTACLES.default;
->>>>>>> main
 
             const polygon = new google.maps.Polygon({
                 paths: [obstacle.coordinates],
@@ -969,11 +857,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                 draggable: false,
                 clickable: true,
                 map: map,
-<<<<<<< HEAD
-                zIndex: 1600,
-=======
                 zIndex: FIELD_STYLING.OBSTACLES.zIndex,
->>>>>>> main
             });
 
             newObstacleOverlays.push(polygon);
@@ -1044,28 +928,12 @@ export default function InitialArea(props: FieldCropPageProps) {
             // Clean up if generation was cancelled
             newMarkers.forEach((m) => m.setMap(null));
         }
-<<<<<<< HEAD
-    }, [map, plantPoints, clearAllPlantMarkers, calculatePointSize, filterPointsByZoom, mapZoom]);
-=======
     }, [map, plantPoints, clearAllPlantMarkers, calculatePointSize, mapZoom]);
->>>>>>> main
 
     // Calculate plant count and row/column info without creating actual points
     const calculatePlantCountOnly = useCallback(
         async (generationId: number): Promise<{ count: number; rows: number; columns: number }> => {
-<<<<<<< HEAD
-            console.log('Initial Area - calculatePlantCountOnly called:', {
-                generationId: generationId,
-                mainAreaLength: mainArea.length,
-                selectedCrops: selectedCrops,
-                timestamp: new Date().toISOString(),
-            });
-
             if (mainArea.length < 3 || selectedCrops.length === 0) {
-                console.log('Initial Area - calculatePlantCountOnly: Invalid input, returning 0');
-=======
-            if (mainArea.length < 3 || selectedCrops.length === 0) {
->>>>>>> main
                 return { count: 0, rows: 0, columns: 0 };
             }
 
@@ -1075,15 +943,6 @@ export default function InitialArea(props: FieldCropPageProps) {
             const plantSpacingM = cropInfo.plantSpacing / 100;
             const bufferDistance = plantSpacingM * 0.3;
 
-<<<<<<< HEAD
-            console.log('Initial Area - calculatePlantCountOnly: Crop info:', {
-                primaryCrop: primaryCrop,
-                rowSpacingM: rowSpacingM,
-                plantSpacingM: plantSpacingM,
-                bufferDistance: bufferDistance,
-            });
-=======
->>>>>>> main
 
             const origin = computeCentroid(mainArea);
 
@@ -1179,16 +1038,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                 }
             }
 
-<<<<<<< HEAD
-            console.log('Initial Area - calculatePlantCountOnly: Final result:', {
-                plantCount: plantCount,
-                actualRows: actualRows,
-                maxColumnsInAnyRow: maxColumnsInAnyRow,
-                generationId: generationId,
-                timestamp: new Date().toISOString(),
-            });
-=======
->>>>>>> main
 
             return { count: plantCount, rows: actualRows, columns: maxColumnsInAnyRow };
         },
@@ -1208,11 +1057,7 @@ export default function InitialArea(props: FieldCropPageProps) {
     const saveFieldDataToLocalStorage = useCallback(
         (plantCount: number, rows: number, columns: number) => {
             try {
-<<<<<<< HEAD
-                const fieldData = {
-=======
                 const fieldDataToSave = {
->>>>>>> main
                     mainArea: mainArea.length >= 3 ? mainArea : [],
                     obstacles: obstacles.filter((obs) => obs.coordinates.length >= 3),
                     plantPoints: (() => {
@@ -1255,23 +1100,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                         )
                     ),
                     selectedCrops: selectedCrops,
-<<<<<<< HEAD
-                    mapCenter: mapCenter,
-                    mapZoom: mapZoom,
-                };
-
-                console.log('Initial Area - Saving field data to localStorage:', {
-                    realPlantCount: plantCount,
-                    calculatedRows: rows,
-                    calculatedColumns: columns,
-                    fieldData: fieldData,
-                    timestamp: new Date().toISOString(),
-                });
-
-                localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
-            } catch (error) {
-                console.error('Initial Area - Error saving field data to localStorage:', error);
-=======
                     mapCenter: { lat: mapCenter[0], lng: mapCenter[1] },
                     mapZoom: mapZoom,
                 };
@@ -1281,7 +1109,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                 updateFieldData(fieldDataToSave);
             } catch {
                 // Error saving field data to localStorage
->>>>>>> main
             }
         },
         [
@@ -1294,10 +1121,7 @@ export default function InitialArea(props: FieldCropPageProps) {
             plantSpacing,
             mapCenter,
             mapZoom,
-<<<<<<< HEAD
-=======
             updateFieldData,
->>>>>>> main
         ]
     );
 
@@ -1316,11 +1140,7 @@ export default function InitialArea(props: FieldCropPageProps) {
             const result = await Promise.race([
                 calculatePlantCountOnly(generationId),
                 new Promise<{ count: number; rows: number; columns: number }>((_, reject) =>
-<<<<<<< HEAD
-                    setTimeout(() => reject(new Error('Plant count calculation timeout')), 10000)
-=======
                     setTimeout(() => reject(new Error(t('Plant count calculation timeout'))), 10000)
->>>>>>> main
                 ),
             ]);
 
@@ -1346,25 +1166,11 @@ export default function InitialArea(props: FieldCropPageProps) {
             setRealPlantPoints([]); // No actual points stored
             setPlantPoints([]); // No display points
 
-<<<<<<< HEAD
-            console.log('Initial Area - Plant count calculated:', {
-                plantCount: result.count,
-                rows: result.rows,
-                columns: result.columns,
-                generationId: generationId,
-                timestamp: new Date().toISOString(),
-            });
-=======
->>>>>>> main
 
             // Save to localStorage immediately after calculation
             saveFieldDataToLocalStorage(result.count, result.rows, result.columns);
         } catch (error) {
-<<<<<<< HEAD
-            if (error instanceof Error && error.message === 'Plant count calculation timeout') {
-=======
             if (error instanceof Error && error.message === t('Plant count calculation timeout')) {
->>>>>>> main
                 alert(
                     t(
                         'Plant count calculation took too long. Please try with a smaller area or different spacing.'
@@ -1388,14 +1194,6 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Handle plant point generation
     const handleGeneratePlantPoints = useCallback(async () => {
-<<<<<<< HEAD
-        console.log('Initial Area - handleGeneratePlantPoints called:', {
-            isMainAreaSet: isMainAreaSet,
-            selectedCrops: selectedCrops,
-            timestamp: new Date().toISOString(),
-        });
-=======
->>>>>>> main
 
         if (!isMainAreaSet || selectedCrops.length === 0) {
             alert(t('Please set main area and select crops first'));
@@ -1676,30 +1474,6 @@ export default function InitialArea(props: FieldCropPageProps) {
             perimeterMetersData ||
             rowSpacingData ||
             plantSpacingData ||
-<<<<<<< HEAD
-            currentStepParamPresent;
-
-        if (!hasUrlParams) {
-            // Only clear storage if not navigating within flow
-            if (!currentStepParamPresent) {
-                localStorage.removeItem('fieldCropData');
-            }
-            // Reset all state to initial values
-            setMainArea([]);
-            setAreaRai(null);
-            setPerimeterMeters(null);
-            setIsMainAreaSet(false);
-            setPlantPoints([]);
-            setRealPlantPoints([]);
-            setRealPlantCount(0);
-            setCalculatedRows(0);
-            setCalculatedColumns(0);
-            setObstacles([]);
-            setRowSpacing({});
-            setPlantSpacing({});
-            setMapCenter([13.7563, 100.5018]);
-            setMapZoom(16);
-=======
             currentStepParamPresent ||
             // Check if we have data in localStorage (indicating we're navigating back from a completed flow)
             (() => {
@@ -1748,7 +1522,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                 setMapCenter([13.7563, 100.5018]);
                 setMapZoom(16);
             }
->>>>>>> main
 
             if (map) {
                 if (drawnPolygonRef.current) {
@@ -2171,11 +1944,7 @@ export default function InitialArea(props: FieldCropPageProps) {
         );
 
         if (!window.google?.maps?.drawing) {
-<<<<<<< HEAD
-            alert('Drawing tools could not be loaded. Please refresh the page.');
-=======
             alert(t('Drawing tools could not be loaded. Please refresh the page.'));
->>>>>>> main
             return;
         }
 
@@ -2700,14 +2469,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                     // Preserve real count and real points in the plant points data
                     (minimalPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
                     (minimalPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
-<<<<<<< HEAD
-                    console.log('Initial Area - Saving plant points with real count:', {
-                        realPlantCount: realPlantCount,
-                        minimalPointsLength: minimalPoints.length,
-                        hasRealCount: !!(minimalPoints as PlantPointArrayWithRealCount).__realCount,
-                    });
-=======
->>>>>>> main
                     return minimalPoints;
                 })(),
                 // Add realPlantCount as a separate property to ensure it's saved
@@ -3813,11 +3574,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                                                 <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
                                                     💧 {t('Total Water Requirement')}:{' '}
                                                     {waterRequirementInfo.total?.toFixed(2)}{' '}
-<<<<<<< HEAD
-                                                    {t('ลิตร/ครั้ง')}
-=======
                                                     {t('liters per irrigation')}
->>>>>>> main
                                                 </div>
                                             )}
                                             {realPlantCount === 0 && (
@@ -3911,11 +3668,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                                 >
                                     <EnhancedHorticultureSearchControl
                                         onPlaceSelect={handleSearch}
-<<<<<<< HEAD
-                                        placeholder="🔍 ค้นหาสถานที่..."
-=======
                                         placeholder={`🔍 ${t('Search places...')}`}
->>>>>>> main
                                     />
                                     <HorticultureDrawingManager
                                         editMode={null}
@@ -4057,71 +3810,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                                     </div>
                                 </div>
 
-<<<<<<< HEAD
-                                <div className="pointer-events-none absolute bottom-4 right-20 z-10">
-                                    <div className="mb-1 rounded border border-white bg-black bg-opacity-70 px-2 py-1 text-xs text-white">
-                                        {t('Zoom Level')}: {mapZoom}
-                                    </div>
-                                    {plantPoints.length > 0 && (
-                                        <div className="mb-1 rounded border border-white bg-black bg-opacity-70 px-2 py-1 text-xs text-white">
-                                            {t('Points')}: {plantPoints.length.toLocaleString()} /{' '}
-                                            {realPlantCount.toLocaleString()}
-                                            {realPlantCount > plantPoints.length && (
-                                                <span className="ml-1 text-yellow-300">
-                                                    (
-                                                    {Math.round(
-                                                        (1 - plantPoints.length / realPlantCount) *
-                                                            100
-                                                    )}
-                                                    % {t('reduced')})
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {plantPoints.length > 0 && realPlantCount >= 800 && (
-                                        <div className="mb-1 rounded border border-blue-500 bg-blue-900 bg-opacity-70 px-2 py-1 text-xs text-white">
-                                            {mapZoom >= 20 && (
-                                                <span className="text-green-300">
-                                                    {t('All points visible')}
-                                                </span>
-                                            )}
-                                            {mapZoom >= 19 && mapZoom < 20 && (
-                                                <span className="text-yellow-300">
-                                                    {t('25% reduction')}
-                                                </span>
-                                            )}
-                                            {mapZoom >= 18 && mapZoom < 19 && (
-                                                <span className="text-orange-300">
-                                                    {t('50% reduction')}
-                                                </span>
-                                            )}
-                                            {mapZoom >= 17 && mapZoom < 18 && (
-                                                <span className="text-red-300">
-                                                    {t('75% reduction')}
-                                                </span>
-                                            )}
-                                            {mapZoom < 17 && (
-                                                <span className="text-red-500">
-                                                    {t('Maximum reduction')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {plantPoints.length > 0 && (
-                                        <div className="rounded border border-green-500 bg-green-900 bg-opacity-70 px-2 py-1 text-xs text-white">
-                                            <div>
-                                                {plantPoints.length} {t('points')} {t('visible')}
-                                            </div>
-                                            {realPlantCount > plantPoints.length && (
-                                                <div className="text-xs text-yellow-200">
-                                                    {t('Performance optimized')}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-=======
->>>>>>> main
                                 {isDrawingObstacle && (
                                     <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-lg border border-purple-500 bg-purple-900 bg-opacity-90 p-3 shadow-lg">
                                         <div className="text-center text-sm text-white">

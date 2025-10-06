@@ -137,11 +137,7 @@ export default function NewHome() {
         } catch (error: unknown) {
             console.error('Error purchasing plan:', error);
             const errorMessage =
-<<<<<<< HEAD
-                error.response?.data?.message || 'Error purchasing plan. Please try again.';
-=======
                 (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error purchasing plan. Please try again.';
->>>>>>> main
             alert(errorMessage);
         }
     };

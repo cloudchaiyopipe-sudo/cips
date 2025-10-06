@@ -16,10 +16,6 @@ import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
 import {
-<<<<<<< HEAD
-    FieldCropSystemData,
-=======
->>>>>>> main
     getEnhancedFieldCropData,
     calculateEnhancedFieldStats,
 } from '../../utils/fieldCropData';
@@ -3807,13 +3803,7 @@ export default function FieldCropSummary() {
     const [zoneIrrigationCounts, setZoneIrrigationCounts] = useState<
         Array<{
             sprinkler: number;
-<<<<<<< HEAD
-            dripTape: number;
             pivot: number;
-            waterJetTape: number;
-=======
-            pivot: number;
->>>>>>> main
             total: number;
         }>
     >([]);
@@ -4455,37 +4445,7 @@ export default function FieldCropSummary() {
                 // ignore
             }
 
-<<<<<<< HEAD
-            // Consolidated console.log for all zone data
-            console.log('🌾 [FIELD-CROP-SUMMARY] ===== ALL ZONE DATA =====');
-            console.log('🌾 [FIELD-CROP-SUMMARY] Summary Data:', summaryData);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Zones Array:', zones);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (from props):', zoneAssignments);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (loaded):', zAssign);
-            console.log(
-                '🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (from props):',
-                irrigationAssignments
-            );
-            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (loaded):', iAssign);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Pipes Data:', pipes);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Points:', irrigationPoints);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Plant Points:', actualPlantPoints);
-
-            // Detailed zone information
-            const allZonesData = zones.map((zone: Zone) => ({
-                id: zone.id,
-                name: zone.name,
-                color: zone.color,
-                coordinates: zone.coordinates,
-                cropType: zone.cropType,
-                assignedCrop: zAssign[zone.id.toString()],
-                irrigationType: iAssign[zone.id.toString()],
-            }));
-            console.log('🌾 [FIELD-CROP-SUMMARY] All Zones Detailed Data:', allZonesData);
-            console.log('🌾 [FIELD-CROP-SUMMARY] ===== END ZONE DATA =====');
-=======
             // Zone data processing completed
->>>>>>> main
 
             zones.forEach((zone: Zone) => {
                 const zoneId = zone.id.toString();
@@ -4521,14 +4481,7 @@ export default function FieldCropSummary() {
                         if (typeof zone.plantCount === 'number' && zone.plantCount > 0) {
                             totalPlantingPoints = zone.plantCount;
                             actualPlantsInZone = zone.plantCount;
-<<<<<<< HEAD
-                            console.log(
-                                `Using zone plantCount for zone ${zoneId}:`,
-                                totalPlantingPoints
-                            );
-=======
                             // Using zone plantCount for zone
->>>>>>> main
                         } else {
                             // Fallback to calculation methods
                             try {
@@ -4978,21 +4931,8 @@ export default function FieldCropSummary() {
     );
     const pivotPoints = calculatedZoneIrrigationCounts.reduce(
         (sum, counts) => sum + (counts.pivot || 0),
-<<<<<<< HEAD
         0
     );
-    const waterJetPoints = calculatedZoneIrrigationCounts.reduce(
-        (sum, counts) => sum + (counts.waterJetTape || 0),
-        0
-    );
-    const dripPoints = calculatedZoneIrrigationCounts.reduce(
-        (sum, counts) => sum + counts.dripTape,
-        0
-    );
-=======
-        0
-    );
->>>>>>> main
 
     // Debug: ตรวจสอบการคำนวณจำนวน irrigation points รวม
     dbg('🔍 Total irrigation points calculation:', {
@@ -5117,11 +5057,7 @@ export default function FieldCropSummary() {
         setIsCapturingImage(true);
         try {
             // Capture map image first
-<<<<<<< HEAD
-            setCaptureStatus('กำลังบันทึกภาพแผนที่...');
-=======
             setCaptureStatus(t('Map image capture in progress...'));
->>>>>>> main
 
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -5233,89 +5169,6 @@ export default function FieldCropSummary() {
                             size: fieldData.area.size,
                             rai: fieldData.area.sizeInRai,
                         },
-<<<<<<< HEAD
-                        connectionStats: [], // Can be enhanced later
-                        zones: fieldData.zones.info.map((zone, index) => {
-                            // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts state แทน totalPlantingPoints
-                            const zoneIrrigationCount = zoneIrrigationCounts[index] || {
-                                sprinkler: 0,
-                                dripTape: 0,
-                                pivot: 0,
-                                waterJetTape: 0,
-                                total: 0,
-                            };
-                            // ใช้แค่จำนวนสปริงเกลอร์ ไม่รวม drip tape, pivot, water jet tape
-                            const actualSprinklerCount = zoneIrrigationCount.sprinkler;
-
-                            // คำนวณน้ำต่อต้น (หัวฉีด) = อัตราการไหลต่อหัวฉีด
-                            const waterPerTree = flowRatePerSprinkler; // ลิตร/นาที ต่อหัวฉีด
-
-                            // คำนวณปริมาณน้ำต่อครั้ง (ลิตร/ครั้ง) จากข้อมูลที่คำนวณไว้แล้ว
-                            const waterPerIrrigation = actualSprinklerCount * waterPerTree * 30; // ลิตร/ครั้ง
-
-                            return {
-                                id: zone.id,
-                                name: zone.name,
-                                plantCount: actualSprinklerCount, // ใช้จำนวนสปริงเกลอร์จริง
-                                totalWaterNeed: waterPerIrrigation, // ปริมาณน้ำต่อครั้ง (ลิตร/ครั้ง)
-                                waterPerTree: waterPerTree, // ลิตร/นาที ต่อหัวฉีด
-                                waterNeedPerMinute: actualSprinklerCount * waterPerTree, // ลิตร/นาที รวมทั้งโซน
-                                area: zone.area,
-                                color: '#22C55E', // Default green color
-                                pipes: {
-                                    mainPipes: {
-                                        count: zone.pipeStats?.main?.count || 0,
-                                        totalLength: zone.pipeStats?.main?.totalLength || 0,
-                                        longest: zone.pipeStats?.main?.longestLength || 0,
-                                    },
-                                    subMainPipes: {
-                                        count: zone.pipeStats?.submain?.count || 0,
-                                        totalLength: zone.pipeStats?.submain?.totalLength || 0,
-                                        longest: zone.pipeStats?.submain?.longestLength || 0,
-                                    },
-                                    branchPipes: {
-                                        count: zone.pipeStats?.lateral?.count || 0,
-                                        totalLength: zone.pipeStats?.lateral?.totalLength || 0,
-                                        longest: zone.pipeStats?.lateral?.longestLength || 0,
-                                    },
-                                    emitterPipes: {
-                                        count: 0,
-                                        totalLength: 0,
-                                        longest: 0,
-                                    },
-                                },
-                                bestPipes: {
-                                    main: null,
-                                    subMain: null,
-                                    branch: null,
-                                },
-                            };
-                        }),
-                        totalPlants: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
-                        isMultipleZones: fieldData.zones.info.length > 1,
-                    };
-
-                    // Save system data to localStorage (similar to horticulture and greenhouse)
-                    localStorage.setItem(
-                        'fieldCropSystemData',
-                        JSON.stringify(fieldCropSystemData)
-                    );
-
-                    // Debug: แสดงข้อมูลที่สร้าง fieldCropSystemData
-                    console.log(
-                        '🌾 [FIELD-CROP-SUMMARY] Created fieldCropSystemData:',
-                        fieldCropSystemData
-                    );
-                    console.log(
-                        '🌾 [FIELD-CROP-SUMMARY] Zone Irrigation Counts:',
-                        zoneIrrigationCounts
-                    );
-                    console.log(
-                        '🌾 [FIELD-CROP-SUMMARY] Total Sprinkler Count:',
-                        totalSprinklerCount
-                    );
-                    localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
-=======
                         crops: {
                             selected: fieldData.crops.selectedCrops,
                             zoneAssignments: fieldData.crops.zoneAssignments,
@@ -5368,7 +5221,6 @@ export default function FieldCropSummary() {
                     );
 
                     // Created fieldCropData successfully
->>>>>>> main
                     localStorage.setItem('projectType', 'field-crop');
 
                     // Navigate to product page using router (similar to greenhouse)
