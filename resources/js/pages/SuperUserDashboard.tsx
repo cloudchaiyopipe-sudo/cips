@@ -27,6 +27,8 @@ type User = {
     id: number;
     name: string;
     email: string;
+    phone: string;
+    additional_details: string;
     is_super_user: boolean;
     created_at: string;
     fields_count?: number;
@@ -94,7 +96,9 @@ export default function SuperUserDashboard() {
     const [activeTab, setActiveTab] = useState<'users' | 'fields' | 'folders' | 'payments'>(
         'payments'
     );
-    const [activePaymentTab, setActivePaymentTab] = useState<'management' | 'history'>('management');
+    const [activePaymentTab, setActivePaymentTab] = useState<'management' | 'history'>(
+        'management'
+    );
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
     const [showEditUserModal, setShowEditUserModal] = useState(false);
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
@@ -109,14 +113,19 @@ export default function SuperUserDashboard() {
 
     const loadDashboardData = async () => {
         try {
-            const [statsResponse, usersResponse, fieldsResponse, foldersResponse, paymentsResponse] =
-                await Promise.all([
-                    axios.get('/super/dashboard'),
-                    axios.get('/super/users'),
-                    axios.get('/super/fields'),
-                    axios.get('/super/folders'),
-                    axios.get('/api/admin/payments/all'),
-                ]);
+            const [
+                statsResponse,
+                usersResponse,
+                fieldsResponse,
+                foldersResponse,
+                paymentsResponse,
+            ] = await Promise.all([
+                axios.get('/super/dashboard'),
+                axios.get('/super/users'),
+                axios.get('/super/fields'),
+                axios.get('/super/folders'),
+                axios.get('/api/admin/payments/all'),
+            ]);
 
             if (statsResponse.data.success) {
                 setStats(statsResponse.data.stats);
@@ -141,7 +150,7 @@ export default function SuperUserDashboard() {
     };
 
     const handleCreateUser = async (
-        userData: Omit<User, 'id' | 'created_at'> & { password: string }
+        userData: Omit<User, 'id' | 'created_at' | 'phone' | 'additional_details'> & { password: string }
     ) => {
         try {
             const response = await axios.post('/super/users', userData);
@@ -243,13 +252,15 @@ export default function SuperUserDashboard() {
     const handleApprovePayment = async (paymentId: number, adminNotes?: string) => {
         try {
             const response = await axios.post(`/api/admin/payments/${paymentId}/approve`, {
-                admin_notes: adminNotes
+                admin_notes: adminNotes,
             });
             if (response.data.success) {
                 // Reload payments
                 const paymentsResponse = await axios.get('/api/admin/payments/all');
                 if (paymentsResponse.data.success) {
-                    setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+                    setPayments(
+                        paymentsResponse.data.payments.data || paymentsResponse.data.payments
+                    );
                 }
                 setShowPaymentModal(false);
                 setSelectedPayment(null);
@@ -264,18 +275,20 @@ export default function SuperUserDashboard() {
     const handleRejectPayment = async (paymentId: number, adminNotes: string) => {
         try {
             console.log('Rejecting payment:', { paymentId, adminNotes });
-            
+
             const response = await axios.post(`/api/admin/payments/${paymentId}/reject`, {
-                admin_notes: adminNotes
+                admin_notes: adminNotes,
             });
-            
+
             console.log('Reject payment response:', response.data);
-            
+
             if (response.data.success) {
                 // Reload payments
                 const paymentsResponse = await axios.get('/api/admin/payments/all');
                 if (paymentsResponse.data.success) {
-                    setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+                    setPayments(
+                        paymentsResponse.data.payments.data || paymentsResponse.data.payments
+                    );
                 }
                 setShowPaymentModal(false);
                 setSelectedPayment(null);
@@ -287,29 +300,35 @@ export default function SuperUserDashboard() {
             console.error('Error rejecting payment:', error);
             console.error('Error response:', error.response?.data);
             console.error('Error status:', error.response?.status);
-            
-            const errorMessage = error.response?.data?.message || 'Error rejecting payment. Please try again.';
+
+            const errorMessage =
+                error.response?.data?.message || 'Error rejecting payment. Please try again.';
             alert(errorMessage);
         }
     };
 
-    const handleUpdatePayment = async (paymentId: number, updateData: {
-        status: string;
-        admin_notes?: string;
-        force_remove_tokens?: boolean;
-    }) => {
+    const handleUpdatePayment = async (
+        paymentId: number,
+        updateData: {
+            status: string;
+            admin_notes?: string;
+            force_remove_tokens?: boolean;
+        }
+    ) => {
         try {
             console.log('Updating payment:', { paymentId, updateData });
-            
+
             const response = await axios.put(`/api/admin/payments/${paymentId}`, updateData);
-            
+
             console.log('Update payment response:', response.data);
-            
+
             if (response.data.success) {
                 // Reload payments
                 const paymentsResponse = await axios.get('/api/admin/payments/all');
                 if (paymentsResponse.data.success) {
-                    setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+                    setPayments(
+                        paymentsResponse.data.payments.data || paymentsResponse.data.payments
+                    );
                 }
                 setShowPaymentEditModal(false);
                 setSelectedPayment(null);
@@ -321,8 +340,9 @@ export default function SuperUserDashboard() {
             console.error('Error updating payment:', error);
             console.error('Error response:', error.response?.data);
             console.error('Error status:', error.response?.status);
-            
-            const errorMessage = error.response?.data?.message || 'Error updating payment. Please try again.';
+
+            const errorMessage =
+                error.response?.data?.message || 'Error updating payment. Please try again.';
             alert(errorMessage);
         }
     };
@@ -389,9 +409,15 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaCreditCard className="h-6 w-6" />
                                             <div className="ml-3">
-                                                <p className="text-sm opacity-90">Pending Payments</p>
+                                                <p className="text-sm opacity-90">
+                                                    Pending Payments
+                                                </p>
                                                 <p className="text-xl font-bold">
-                                                    {payments.filter(p => p.status === 'pending').length}
+                                                    {
+                                                        payments.filter(
+                                                            (p) => p.status === 'pending'
+                                                        ).length
+                                                    }
                                                 </p>
                                             </div>
                                         </div>
@@ -402,7 +428,11 @@ export default function SuperUserDashboard() {
                                             <div className="ml-3">
                                                 <p className="text-sm opacity-90">Approved</p>
                                                 <p className="text-xl font-bold">
-                                                    {payments.filter(p => p.status === 'approved').length}
+                                                    {
+                                                        payments.filter(
+                                                            (p) => p.status === 'approved'
+                                                        ).length
+                                                    }
                                                 </p>
                                             </div>
                                         </div>
@@ -413,7 +443,11 @@ export default function SuperUserDashboard() {
                                             <div className="ml-3">
                                                 <p className="text-sm opacity-90">Rejected</p>
                                                 <p className="text-xl font-bold">
-                                                    {payments.filter(p => p.status === 'rejected').length}
+                                                    {
+                                                        payments.filter(
+                                                            (p) => p.status === 'rejected'
+                                                        ).length
+                                                    }
                                                 </p>
                                             </div>
                                         </div>
@@ -424,7 +458,11 @@ export default function SuperUserDashboard() {
                                             <div className="ml-3">
                                                 <p className="text-sm opacity-90">Total Revenue</p>
                                                 <p className="text-xl font-bold">
-                                                    ฿{payments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
+                                                    ฿
+                                                    {payments
+                                                        .filter((p) => p.status === 'approved')
+                                                        .reduce((sum, p) => sum + p.amount, 0)
+                                                        .toLocaleString()}
                                                 </p>
                                             </div>
                                         </div>
@@ -435,12 +473,24 @@ export default function SuperUserDashboard() {
                                 <div className="mb-6">
                                     <nav className="flex space-x-8">
                                         {[
-                                            { id: 'management', label: 'Payment Management', icon: FaCreditCard },
-                                            { id: 'history', label: 'Payment History', icon: FaChartBar },
+                                            {
+                                                id: 'management',
+                                                label: 'Payment Management',
+                                                icon: FaCreditCard,
+                                            },
+                                            {
+                                                id: 'history',
+                                                label: 'Payment History',
+                                                icon: FaChartBar,
+                                            },
                                         ].map((tab) => (
                                             <button
                                                 key={tab.id}
-                                                onClick={() => setActivePaymentTab(tab.id as 'management' | 'history')}
+                                                onClick={() =>
+                                                    setActivePaymentTab(
+                                                        tab.id as 'management' | 'history'
+                                                    )
+                                                }
                                                 className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
                                                     activePaymentTab === tab.id
                                                         ? 'bg-blue-600 text-white'
@@ -460,121 +510,172 @@ export default function SuperUserDashboard() {
                                         <div className="mb-4">
                                             <h3 className="text-lg font-semibold text-white">
                                                 Pending Payments - Awaiting Review
-                                        </h3>
+                                            </h3>
                                             <p className="text-sm text-gray-400">
-                                                Review and approve or reject pending payment requests
+                                                Review and approve or reject pending payment
+                                                requests
                                             </p>
                                         </div>
 
                                         <div className="space-y-4">
-                                            {payments.filter(p => p.status === 'pending').map((payment) => (
-                                                <div
-                                                    key={payment.id}
-                                                    className="rounded-lg border border-yellow-500 bg-gray-800 p-6"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-4">
-                                                    <div>
-                                                                    <h3 className="text-lg font-semibold text-white">
-                                                                        {payment.user.name}
-                                                                    </h3>
-                                                        <p className="text-sm text-gray-400">
-                                                                        {payment.user.email}
-                                                        </p>
-                                                    </div>
-                                                                <div className="text-center">
-                                                                    <div className="text-2xl font-bold text-white">
-                                                                        ฿{payment.amount.toLocaleString()}
-                                                </div>
-                                                                    <div className="text-sm text-gray-400">
-                                                                        {payment.plan_type === 'token_purchase' 
-                                                                            ? 'TOKEN PURCHASE' 
-                                                                            : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`
-                                                                        }
+                                            {payments
+                                                .filter((p) => p.status === 'pending')
+                                                .map((payment) => (
+                                                    <div
+                                                        key={payment.id}
+                                                        className="rounded-lg border border-yellow-500 bg-gray-800 p-6"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div>
+                                                                        <h3 className="text-lg font-semibold text-white">
+                                                                            {payment.user.name}
+                                                                        </h3>
+                                                                        <p className="text-sm text-gray-400">
+                                                                            {payment.user.email}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="text-2xl font-bold text-white">
+                                                                            ฿
+                                                                            {payment.amount.toLocaleString()}
+                                                                        </div>
+                                                                        <div className="text-sm text-gray-400">
+                                                                            {payment.plan_type ===
+                                                                            'token_purchase'
+                                                                                ? 'TOKEN PURCHASE'
+                                                                                : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="text-lg font-semibold text-blue-400">
+                                                                            {payment.tokens_purchased.toLocaleString()}{' '}
+                                                                            tokens
+                                                                        </div>
+                                                                        <div className="text-sm text-gray-400">
+                                                                            {new Date(
+                                                                                payment.created_at
+                                                                            ).toLocaleDateString()}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-blue-400">
-                                                                        {payment.tokens_purchased.toLocaleString()} tokens
-                                                                    </div>
-                                                                    <div className="text-sm text-gray-400">
-                                                                        {new Date(payment.created_at).toLocaleDateString()}
-                                                                    </div>
-                                        </div>
-                                    </div>
 
-                                                            {payment.notes && (
-                                                                <div className="mt-3">
-                                                                    <p className="text-sm text-gray-300">
-                                                                        <strong>User Notes:</strong> {payment.notes}
-                                                        </p>
-                                                    </div>
-                                                            )}
-                                                            
-                                                            {payment.payment_proof && (
-                                                                <div className="mt-3">
-                                                                    <p className="text-sm text-gray-300 mb-2">
-                                                                        <strong>Payment Proof:</strong>
-                                                                    </p>
-                                                                    {payment.payment_proof.startsWith('payment_proofs/') ? (
-                                                                        <div className="relative inline-block">
-                                                                            <img 
-                                                                                src={`/storage/${payment.payment_proof}`}
-                                                                                alt="Payment proof"
-                                                                                className="max-w-xs max-h-48 rounded-lg border border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                                                                                onClick={() => window.open(`/storage/${payment.payment_proof}`, '_blank')}
-                                                                                onError={(e) => {
-                                                                                    const target = e.target as HTMLImageElement;
-                                                                                    target.style.display = 'none';
-                                                                                    const fallback = target.nextElementSibling as HTMLElement;
-                                                                                    if (fallback) fallback.style.display = 'block';
-                                                                                }}
-                                                                            />
-                                                                            <div className="max-w-xs max-h-48 bg-gray-700 border border-gray-600 rounded-lg flex items-center justify-center text-gray-400 text-sm" style={{ display: 'none' }}>
-                                                                                <div className="text-center">
-                                                                                    <div className="text-2xl mb-2">📷</div>
-                                                                                    <div>Image not found</div>
-                                                                                    <div className="text-xs">{payment.payment_proof}</div>
+                                                                {payment.notes && (
+                                                                    <div className="mt-3">
+                                                                        <p className="text-sm text-gray-300">
+                                                                            <strong>
+                                                                                User Notes:
+                                                                            </strong>{' '}
+                                                                            {payment.notes}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+
+                                                                {payment.payment_proof && (
+                                                                    <div className="mt-3">
+                                                                        <p className="mb-2 text-sm text-gray-300">
+                                                                            <strong>
+                                                                                Payment Proof:
+                                                                            </strong>
+                                                                        </p>
+                                                                        {payment.payment_proof.startsWith(
+                                                                            'payment_proofs/'
+                                                                        ) ? (
+                                                                            <div className="relative inline-block">
+                                                                                <img
+                                                                                    src={`/storage/${payment.payment_proof}`}
+                                                                                    alt="Payment proof"
+                                                                                    className="max-h-48 max-w-xs cursor-pointer rounded-lg border border-gray-600 transition-opacity hover:opacity-80"
+                                                                                    onClick={() =>
+                                                                                        window.open(
+                                                                                            `/storage/${payment.payment_proof}`,
+                                                                                            '_blank'
+                                                                                        )
+                                                                                    }
+                                                                                    onError={(
+                                                                                        e
+                                                                                    ) => {
+                                                                                        const target =
+                                                                                            e.target as HTMLImageElement;
+                                                                                        target.style.display =
+                                                                                            'none';
+                                                                                        const fallback =
+                                                                                            target.nextElementSibling as HTMLElement;
+                                                                                        if (
+                                                                                            fallback
+                                                                                        )
+                                                                                            fallback.style.display =
+                                                                                                'block';
+                                                                                    }}
+                                                                                />
+                                                                                <div
+                                                                                    className="flex max-h-48 max-w-xs items-center justify-center rounded-lg border border-gray-600 bg-gray-700 text-sm text-gray-400"
+                                                                                    style={{
+                                                                                        display:
+                                                                                            'none',
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="text-center">
+                                                                                        <div className="mb-2 text-2xl">
+                                                                                            📷
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            Image
+                                                                                            not
+                                                                                            found
+                                                                                        </div>
+                                                                                        <div className="text-xs">
+                                                                                            {
+                                                                                                payment.payment_proof
+                                                                                            }
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <p className="text-sm text-gray-300">
-                                                                            {payment.payment_proof}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        <div className="ml-6 flex flex-col items-end gap-2">
-                                                            <span className="rounded-full bg-yellow-600 px-3 py-1 text-xs font-medium text-white">
-                                                                PENDING
-                                                    </span>
-                                                            
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedPayment(payment);
-                                                                    setShowPaymentModal(true);
-                                                                }}
-                                                                className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
-                                                            >
-                                                                Review
-                                                            </button>
+                                                                        ) : (
+                                                                            <p className="text-sm text-gray-300">
+                                                                                {
+                                                                                    payment.payment_proof
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="ml-6 flex flex-col items-end gap-2">
+                                                                <span className="rounded-full bg-yellow-600 px-3 py-1 text-xs font-medium text-white">
+                                                                    PENDING
+                                                                </span>
+
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedPayment(payment);
+                                                                        setShowPaymentModal(true);
+                                                                    }}
+                                                                    className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
+                                                                >
+                                                                    Review
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                            
-                                            {payments.filter(p => p.status === 'pending').length === 0 && (
-                                                <div className="text-center py-8">
+                                                ))}
+
+                                            {payments.filter((p) => p.status === 'pending')
+                                                .length === 0 && (
+                                                <div className="py-8 text-center">
                                                     <FaCreditCard className="mx-auto h-12 w-12 text-gray-400" />
-                                                    <p className="mt-2 text-gray-400">No pending payments</p>
-                                                    <p className="text-sm text-gray-500">All payments have been processed</p>
-                                        </div>
+                                                    <p className="mt-2 text-gray-400">
+                                                        No pending payments
+                                                    </p>
+                                                    <p className="text-sm text-gray-500">
+                                                        All payments have been processed
+                                                    </p>
+                                                </div>
                                             )}
-                                    </div>
+                                        </div>
                                     </div>
                                 )}
 
@@ -584,115 +685,151 @@ export default function SuperUserDashboard() {
                                         <div className="mb-4">
                                             <h3 className="text-lg font-semibold text-white">
                                                 Payment History - All Processed Payments
-                                        </h3>
+                                            </h3>
                                             <p className="text-sm text-gray-400">
                                                 Complete history of approved and rejected payments
                                             </p>
                                         </div>
 
                                         <div className="space-y-4">
-                                            {payments.filter(p => p.status !== 'pending').map((payment) => (
-                                                <div
-                                                    key={payment.id}
-                                                    className={`rounded-lg border bg-gray-800 p-6 ${
-                                                        payment.status === 'approved' ? 'border-green-500' : 'border-red-500'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-4">
-                                                    <div>
-                                                                    <h3 className="text-lg font-semibold text-white">
-                                                                        {payment.user.name}
-                                                                    </h3>
-                                                        <p className="text-sm text-gray-400">
-                                                                        {payment.user.email}
-                                                        </p>
-                                                    </div>
-                                                                <div className="text-center">
-                                                                    <div className="text-2xl font-bold text-white">
-                                                                        ฿{payment.amount.toLocaleString()}
+                                            {payments
+                                                .filter((p) => p.status !== 'pending')
+                                                .map((payment) => (
+                                                    <div
+                                                        key={payment.id}
+                                                        className={`rounded-lg border bg-gray-800 p-6 ${
+                                                            payment.status === 'approved'
+                                                                ? 'border-green-500'
+                                                                : 'border-red-500'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div>
+                                                                        <h3 className="text-lg font-semibold text-white">
+                                                                            {payment.user.name}
+                                                                        </h3>
+                                                                        <p className="text-sm text-gray-400">
+                                                                            {payment.user.email}
+                                                                        </p>
                                                                     </div>
-                                                                    <div className="text-sm text-gray-400">
-                                                                        {payment.plan_type === 'token_purchase' 
-                                                                            ? 'TOKEN PURCHASE' 
-                                                                            : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`
-                                                                        }
+                                                                    <div className="text-center">
+                                                                        <div className="text-2xl font-bold text-white">
+                                                                            ฿
+                                                                            {payment.amount.toLocaleString()}
+                                                                        </div>
+                                                                        <div className="text-sm text-gray-400">
+                                                                            {payment.plan_type ===
+                                                                            'token_purchase'
+                                                                                ? 'TOKEN PURCHASE'
+                                                                                : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="text-lg font-semibold text-blue-400">
+                                                                            {payment.tokens_purchased.toLocaleString()}{' '}
+                                                                            tokens
+                                                                        </div>
+                                                                        <div className="text-sm text-gray-400">
+                                                                            {new Date(
+                                                                                payment.created_at
+                                                                            ).toLocaleDateString()}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="text-center">
-                                                                    <div className="text-lg font-semibold text-blue-400">
-                                                                        {payment.tokens_purchased.toLocaleString()} tokens
+
+                                                                {payment.notes && (
+                                                                    <div className="mt-3">
+                                                                        <p className="text-sm text-gray-300">
+                                                                            <strong>
+                                                                                User Notes:
+                                                                            </strong>{' '}
+                                                                            {payment.notes}
+                                                                        </p>
                                                                     </div>
-                                                                    <div className="text-sm text-gray-400">
-                                                                        {new Date(payment.created_at).toLocaleDateString()}
+                                                                )}
+
+                                                                {payment.payment_proof && (
+                                                                    <div className="mt-3">
+                                                                        <p className="text-sm text-gray-300">
+                                                                            <strong>
+                                                                                Payment Proof:
+                                                                            </strong>{' '}
+                                                                            {payment.payment_proof}
+                                                                        </p>
                                                                     </div>
-                                                                </div>
+                                                                )}
+
+                                                                {payment.admin_notes && (
+                                                                    <div className="mt-3">
+                                                                        <p className="text-sm text-gray-300">
+                                                                            <strong>
+                                                                                Admin Notes:
+                                                                            </strong>{' '}
+                                                                            {payment.admin_notes}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                            
-                                                            {payment.notes && (
-                                                                <div className="mt-3">
-                                                                    <p className="text-sm text-gray-300">
-                                                                        <strong>User Notes:</strong> {payment.notes}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {payment.payment_proof && (
-                                                                <div className="mt-3">
-                                                                    <p className="text-sm text-gray-300">
-                                                                        <strong>Payment Proof:</strong> {payment.payment_proof}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {payment.admin_notes && (
-                                                                <div className="mt-3">
-                                                                    <p className="text-sm text-gray-300">
-                                                                        <strong>Admin Notes:</strong> {payment.admin_notes}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        <div className="ml-6 flex flex-col items-end gap-2">
-                                                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                                                payment.status === 'approved' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                                                            }`}>
-                                                                {payment.status.toUpperCase()}
-                                                    </span>
-                                                            
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedPayment(payment);
-                                                                    setShowPaymentEditModal(true);
-                                                                }}
-                                                                className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            
-                                                            {payment.approver && (
-                                                                <div className="text-xs text-gray-400">
-                                                                    {payment.status === 'approved' ? 'Approved' : 'Rejected'} by {payment.approver.name}
-                                                                    <br />
-                                                                    {payment.approved_at && new Date(payment.approved_at).toLocaleDateString()}
-                                                                </div>
-                                                            )}
+
+                                                            <div className="ml-6 flex flex-col items-end gap-2">
+                                                                <span
+                                                                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                                                        payment.status ===
+                                                                        'approved'
+                                                                            ? 'bg-green-600 text-white'
+                                                                            : 'bg-red-600 text-white'
+                                                                    }`}
+                                                                >
+                                                                    {payment.status.toUpperCase()}
+                                                                </span>
+
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedPayment(payment);
+                                                                        setShowPaymentEditModal(
+                                                                            true
+                                                                        );
+                                                                    }}
+                                                                    className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
+                                                                >
+                                                                    Edit
+                                                                </button>
+
+                                                                {payment.approver && (
+                                                                    <div className="text-xs text-gray-400">
+                                                                        {payment.status ===
+                                                                        'approved'
+                                                                            ? 'Approved'
+                                                                            : 'Rejected'}{' '}
+                                                                        by {payment.approver.name}
+                                                                        <br />
+                                                                        {payment.approved_at &&
+                                                                            new Date(
+                                                                                payment.approved_at
+                                                                            ).toLocaleDateString()}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                            
-                                            {payments.filter(p => p.status !== 'pending').length === 0 && (
-                                                <div className="text-center py-8">
+                                                ))}
+
+                                            {payments.filter((p) => p.status !== 'pending')
+                                                .length === 0 && (
+                                                <div className="py-8 text-center">
                                                     <FaChartBar className="mx-auto h-12 w-12 text-gray-400" />
-                                                    <p className="mt-2 text-gray-400">No payment history</p>
-                                                    <p className="text-sm text-gray-500">No payments have been processed yet</p>
-                                        </div>
+                                                    <p className="mt-2 text-gray-400">
+                                                        No payment history
+                                                    </p>
+                                                    <p className="text-sm text-gray-500">
+                                                        No payments have been processed yet
+                                                    </p>
+                                                </div>
                                             )}
+                                        </div>
                                     </div>
-                                </div>
                                 )}
                             </div>
                         )}
@@ -711,43 +848,97 @@ export default function SuperUserDashboard() {
                                         {t('create_user')}
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                                     {users.map((user) => (
                                         <div
                                             key={user.id}
-                                            className="rounded-lg border border-gray-700 bg-gray-800 p-6"
+                                            className={`relative flex flex-col overflow-hidden rounded-3xl border border-blue-700 bg-gradient-to-br from-blue-900 via-gray-900 to-blue-800 shadow-2xl transition-transform hover:-translate-y-2 hover:scale-105 hover:shadow-blue-500/30 duration-300 min-h-[420px] ${user.is_super_user ? 'border-yellow-700 bg-gradient-to-br from-yellow-900 via-gray-900 to-yellow-800' : ''}`}
                                         >
-                                            <div className="mb-4 flex items-center justify-between">
-                                                <div>
-                                                    <h3 className="font-semibold text-white">
-                                                        {user.name}
-                                                    </h3>
-                                                    <p className="text-sm text-gray-400">
-                                                        {user.email}
-                                                    </p>
+                                            {/* User Banner */}
+                                            <div className={`h-24 w-full ${user.is_super_user ? 'bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-400' : 'bg-gradient-to-r from-blue-800 via-blue-600 to-blue-400'}`}></div>
+                                            {/* Avatar */}
+                                            <div className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
+                                                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-blue-700 via-blue-500 to-blue-400 shadow-lg ring-4 ring-blue-300/30">
+                                                    <FaUsers className="h-12 w-12 text-white drop-shadow" />
                                                 </div>
-                                                {user.is_super_user && (
-                                                    <span className="rounded bg-yellow-600 px-2 py-1 text-xs text-white">
+                                                {/* {user.is_super_user && (
+                                                    <span className="mt-2 rounded-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 px-4 py-1 text-xs font-bold text-white shadow-lg border border-yellow-300">
                                                         {t('super_user')}
                                                     </span>
-                                                )}
+                                                )} */}
                                             </div>
-                                            <div className="flex gap-2">
+                                            {/* User Info */}
+                                            <div className="flex-1 flex flex-col items-center pt-20 pb-4 px-8">
+                                                <h3 className="mb-1 text-xl font-extrabold text-white text-center tracking-wide drop-shadow">
+                                                    {user.name}
+                                                </h3>
+                                                <p className="mb-1 text-sm text-blue-200 text-center break-all font-mono">
+                                                    {user.email}
+                                                </p>
+                                                <div className="flex flex-col items-center gap-1 w-full">
+                                                    <span className="text-xs text-gray-300 flex items-center gap-1">
+                                                        <span className="inline-block rounded bg-blue-900 px-2 py-0.5 text-xs text-blue-200 font-semibold shadow">
+                                                            <span className="font-bold text-blue-400">Tel:</span> {user.is_super_user ? user.phone : '-'}
+                                                        </span>
+                                                    </span>
+                                                    {user.additional_details && (
+                                                        <div className="w-full mt-2">
+                                                            <div className="relative group">
+                                                                <div className="max-h-12 overflow-hidden text-xs text-gray-300 bg-blue-950 rounded-lg px-3 py-2 transition-all duration-200 group-hover:max-h-40 group-hover:overflow-y-auto shadow-inner border border-blue-800">
+                                                                    {user.additional_details}
+                                                                </div>
+                                                                {user.additional_details.length > 60 && (
+                                                                    <div className="absolute bottom-1 right-2 text-[10px] text-blue-300 opacity-70 group-hover:hidden">
+                                                                        ...
+                                                                    </div>
+                                                                )}
+                                                                {user.additional_details.length > 60 && (
+                                                                    <div className="hidden group-hover:block absolute top-full left-0 w-full z-20">
+                                                                        {/* Optionally, you can add a tooltip or modal for full text */}
+                                                                    </div>
+                                                                )}
+                                                                {user.additional_details.length > 60 && (
+                                                                    <div className="mt-1 text-[10px] text-blue-400 text-right group-hover:hidden">
+                                                                        {t('hover_to_expand') || 'Hover to expand'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {/* User Stats */}
+                                            <div className="flex justify-around border-t border-blue-800 bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 py-4 text-xs text-blue-200">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="font-bold text-white text-lg drop-shadow">{user.fields_count ?? '-'}</span>
+                                                    <span className="tracking-wide">{t('fields')}</span>
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                    <span className="font-bold text-white text-lg drop-shadow">{user.folders_count ?? '-'}</span>
+                                                    <span className="tracking-wide">{t('folders')}</span>
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                    <span className="font-bold text-white text-lg drop-shadow">{new Date(user.created_at).toLocaleDateString()}</span>
+                                                    <span className="tracking-wide">{t('joined')}</span>
+                                                </div>
+                                            </div>
+                                            {/* Action Buttons - stick to bottom */}
+                                            <div className="flex w-full gap-2 px-6 pb-6 pt-3 mt-auto">
                                                 <button
                                                     onClick={() => {
                                                         setSelectedUser(user);
                                                         setShowEditUserModal(true);
                                                     }}
-                                                    className="flex-1 rounded bg-blue-600 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-700"
+                                                    className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-md transition-all hover:from-blue-700 hover:to-blue-600 flex items-center justify-center gap-1 ring-1 ring-blue-400/30"
                                                 >
-                                                    <FaEdit className="mr-1 h-3 w-3" />
+                                                    <FaEdit className="h-4 w-4" />
                                                     {t('edit')}
                                                 </button>
                                                 <button
                                                     onClick={() => handleDeleteUser(user.id)}
-                                                    className="flex-1 rounded bg-red-600 px-3 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                                                    className="flex-1 rounded-lg bg-gradient-to-r from-red-600 to-red-500 px-3 py-2 text-sm font-semibold text-white shadow-md transition-all hover:from-red-700 hover:to-red-600 flex items-center justify-center gap-1 ring-1 ring-red-400/30"
                                                 >
-                                                    <FaTrash className="mr-1 h-3 w-3" />
+                                                    <FaTrash className="h-4 w-4" />
                                                     {t('delete')}
                                                 </button>
                                             </div>
@@ -1014,7 +1205,6 @@ export default function SuperUserDashboard() {
                                 })()}
                             </div>
                         )}
-
                     </div>
                 </div>
             </div>
@@ -1259,7 +1449,6 @@ const CreateFolderModal = ({
     );
 };
 
-
 // Create User Modal Component
 const CreateUserModal = ({
     isOpen,
@@ -1286,6 +1475,8 @@ const CreateUserModal = ({
             email: userEmail.trim(),
             password: userPassword,
             is_super_user: isSuperUser,
+            phone: '',
+            additional_details: ''
         });
 
         setUserName('');
@@ -1392,7 +1583,6 @@ const CreateUserModal = ({
         </div>
     );
 };
-
 
 // Edit User Modal Component
 const EditUserModal = ({
@@ -1530,5 +1720,3 @@ const EditUserModal = ({
         </div>
     );
 };
-
-

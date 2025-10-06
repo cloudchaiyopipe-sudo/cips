@@ -50,13 +50,13 @@ export default function PaymentReviewModal({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validate admin notes for rejection
         if (action === 'reject' && !adminNotes.trim()) {
             alert('Please provide admin notes when rejecting a payment.');
             return;
         }
-        
+
         if (action === 'approve') {
             onApprove(payment.id, adminNotes);
         } else if (action === 'reject') {
@@ -99,10 +99,9 @@ export default function PaymentReviewModal({
                             <h3 className="text-lg font-semibold text-white">Payment Details</h3>
                             <p className="text-gray-300">฿{payment.amount.toLocaleString()}</p>
                             <p className="text-sm text-gray-400">
-                                {payment.plan_type === 'token_purchase' 
-                                    ? 'TOKEN PURCHASE' 
-                                    : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`
-                                }
+                                {payment.plan_type === 'token_purchase'
+                                    ? 'TOKEN PURCHASE'
+                                    : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`}
                             </p>
                             <p className="text-sm text-blue-400">
                                 {payment.tokens_purchased.toLocaleString()} tokens
@@ -126,14 +125,20 @@ export default function PaymentReviewModal({
 
                     <div>
                         <h3 className="text-lg font-semibold text-white">Admin Notes</h3>
-                        <p className="text-sm text-gray-400 mb-2">
-                            {action === 'reject' ? 'Required when rejecting a payment' : 'Optional when approving a payment'}
+                        <p className="mb-2 text-sm text-gray-400">
+                            {action === 'reject'
+                                ? 'Required when rejecting a payment'
+                                : 'Optional when approving a payment'}
                         </p>
                         <textarea
                             value={adminNotes}
                             onChange={(e) => setAdminNotes(e.target.value)}
                             className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
-                            placeholder={action === 'reject' ? 'Please explain why this payment is being rejected...' : 'Add notes about this payment review...'}
+                            placeholder={
+                                action === 'reject'
+                                    ? 'Please explain why this payment is being rejected...'
+                                    : 'Add notes about this payment review...'
+                            }
                             rows={3}
                             required={action === 'reject'}
                         />
@@ -181,8 +186,8 @@ export default function PaymentReviewModal({
                                 <button
                                     type="submit"
                                     className={`rounded px-3 py-1 text-white transition-colors ${
-                                        action === 'approve' 
-                                            ? 'bg-green-600 hover:bg-green-700' 
+                                        action === 'approve'
+                                            ? 'bg-green-600 hover:bg-green-700'
                                             : 'bg-red-600 hover:bg-red-700'
                                     }`}
                                 >

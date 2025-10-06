@@ -30,11 +30,14 @@ interface PaymentEditModalProps {
     isOpen: boolean;
     onClose: () => void;
     payment: Payment;
-    onUpdate: (paymentId: number, updateData: {
-        status: string;
-        admin_notes?: string;
-        force_remove_tokens?: boolean;
-    }) => void;
+    onUpdate: (
+        paymentId: number,
+        updateData: {
+            status: string;
+            admin_notes?: string;
+            force_remove_tokens?: boolean;
+        }
+    ) => void;
     t: (key: string) => string;
 }
 
@@ -52,19 +55,19 @@ export default function PaymentEditModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validate admin notes for rejection
         if (status === 'rejected' && !adminNotes.trim()) {
             alert('Please provide admin notes when rejecting a payment.');
             return;
         }
-        
+
         setLoading(true);
         try {
             await onUpdate(payment.id, {
                 status,
                 admin_notes: adminNotes.trim() || undefined,
-                force_remove_tokens: forceRemoveTokens
+                force_remove_tokens: forceRemoveTokens,
             });
         } finally {
             setLoading(false);
@@ -113,10 +116,9 @@ export default function PaymentEditModal({
                             <h3 className="text-lg font-semibold text-white">Payment Details</h3>
                             <p className="text-gray-300">฿{payment.amount.toLocaleString()}</p>
                             <p className="text-sm text-gray-400">
-                                {payment.plan_type === 'token_purchase' 
-                                    ? 'TOKEN PURCHASE' 
-                                    : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`
-                                }
+                                {payment.plan_type === 'token_purchase'
+                                    ? 'TOKEN PURCHASE'
+                                    : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`}
                             </p>
                         </div>
                     </div>
@@ -139,7 +141,9 @@ export default function PaymentEditModal({
                         <h3 className="text-lg font-semibold text-white">Payment Status</h3>
                         <select
                             value={status}
-                            onChange={(e) => setStatus(e.target.value as 'pending' | 'approved' | 'rejected')}
+                            onChange={(e) =>
+                                setStatus(e.target.value as 'pending' | 'approved' | 'rejected')
+                            }
                             className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
                         >
                             <option value="pending">Pending</option>
@@ -150,14 +154,20 @@ export default function PaymentEditModal({
 
                     <div>
                         <h3 className="text-lg font-semibold text-white">Admin Notes</h3>
-                        <p className="text-sm text-gray-400 mb-2">
-                            {status === 'rejected' ? 'Required when rejecting a payment' : 'Optional notes about this payment'}
+                        <p className="mb-2 text-sm text-gray-400">
+                            {status === 'rejected'
+                                ? 'Required when rejecting a payment'
+                                : 'Optional notes about this payment'}
                         </p>
                         <textarea
                             value={adminNotes}
                             onChange={(e) => setAdminNotes(e.target.value)}
                             className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
-                            placeholder={status === 'rejected' ? 'Please explain why this payment is being rejected...' : 'Add notes about this payment...'}
+                            placeholder={
+                                status === 'rejected'
+                                    ? 'Please explain why this payment is being rejected...'
+                                    : 'Add notes about this payment...'
+                            }
                             rows={3}
                             required={status === 'rejected'}
                         />
@@ -166,10 +176,13 @@ export default function PaymentEditModal({
                     {/* Force Remove Tokens Option - Only show when changing from approved to non-approved */}
                     {payment.status === 'approved' && status !== 'approved' && (
                         <div className="rounded-lg border border-yellow-500 bg-yellow-900/20 p-4">
-                            <h3 className="text-lg font-semibold text-yellow-400 mb-2">⚠️ Token Removal Warning</h3>
-                            <p className="text-sm text-yellow-200 mb-3">
-                                This user received {payment.tokens_purchased} tokens from this payment. 
-                                If they have already spent some tokens, removing them may result in a negative balance.
+                            <h3 className="mb-2 text-lg font-semibold text-yellow-400">
+                                ⚠️ Token Removal Warning
+                            </h3>
+                            <p className="mb-3 text-sm text-yellow-200">
+                                This user received {payment.tokens_purchased} tokens from this
+                                payment. If they have already spent some tokens, removing them may
+                                result in a negative balance.
                             </p>
                             <label className="flex items-center">
                                 <input
@@ -179,7 +192,8 @@ export default function PaymentEditModal({
                                     className="mr-2 rounded border-gray-600 bg-gray-700 text-red-600 focus:ring-red-500"
                                 />
                                 <span className="text-sm text-yellow-200">
-                                    Force remove tokens even if user has insufficient balance (can result in negative balance)
+                                    Force remove tokens even if user has insufficient balance (can
+                                    result in negative balance)
                                 </span>
                             </label>
                         </div>

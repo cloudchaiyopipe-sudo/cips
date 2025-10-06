@@ -628,9 +628,13 @@ export default function HomeGardenPlanner() {
 
     // ฟังก์ชันตรวจสอบว่าโซนเป็นวงกลมหรือไม่
     const isCircleShape = useCallback(
-        (coordinates: Coordinate[] | CanvasCoordinate[], isCanvas: boolean, scale: number): boolean => {
+        (
+            coordinates: Coordinate[] | CanvasCoordinate[],
+            isCanvas: boolean,
+            scale: number
+        ): boolean => {
             if (coordinates.length < 8) return false; // วงกลมต้องมีจุดอย่างน้อย 8 จุด
-            
+
             // คำนวณจุดศูนย์กลาง
             let centerX: number, centerY: number;
             if (isCanvas) {
@@ -654,22 +658,20 @@ export default function HomeGardenPlanner() {
                     );
                 } else {
                     const gpsCoord = coord as Coordinate;
-                    distance = calculateDistance(
-                        { lat: centerY, lng: centerX },
-                        gpsCoord,
-                        scale
-                    );
+                    distance = calculateDistance({ lat: centerY, lng: centerX }, gpsCoord, scale);
                 }
                 distances.push(distance);
             });
 
             // คำนวณรัศมีเฉลี่ย
             const avgRadius = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-            
+
             // ตรวจสอบว่าทุกจุดมีระยะทางใกล้เคียงกับรัศมีเฉลี่ยหรือไม่ (ความผิดพลาดไม่เกิน 10%)
             const tolerance = avgRadius * 0.1;
-            const isCircular = distances.every(distance => Math.abs(distance - avgRadius) <= tolerance);
-            
+            const isCircular = distances.every(
+                (distance) => Math.abs(distance - avgRadius) <= tolerance
+            );
+
             return isCircular;
         },
         []
@@ -716,7 +718,7 @@ export default function HomeGardenPlanner() {
 
             // ถ้าเป็นวงกลม ให้วางสปริงเกอร์แค่ตรงกลาง
             if (isCircleZone) {
-                const centerPoint = isCanvas 
+                const centerPoint = isCanvas
                     ? { x: centerX, y: centerY }
                     : { lat: centerY, lng: centerX };
 
@@ -728,21 +730,21 @@ export default function HomeGardenPlanner() {
                         (forbiddenZone) =>
                             forbiddenZone.type === 'forbidden' &&
                             !forbiddenZone.parentZoneId &&
-                            (forbiddenZone.canvasCoordinates 
+                            (forbiddenZone.canvasCoordinates
                                 ? isPointInPolygon(centerPoint, forbiddenZone.canvasCoordinates)
                                 : isPointInPolygon(centerPoint, forbiddenZone.coordinates))
                     );
                 }
 
                 if (!shouldAvoid) {
-                    const gpsPos = isCanvas 
+                    const gpsPos = isCanvas
                         ? canvasToGPS(centerPoint as CanvasCoordinate, canvasData)
-                        : centerPoint as Coordinate;
-                    
+                        : (centerPoint as Coordinate);
+
                     newSprinklers.push({
                         id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
                         position: gpsPos,
-                        canvasPosition: isCanvas ? centerPoint as CanvasCoordinate : undefined,
+                        canvasPosition: isCanvas ? (centerPoint as CanvasCoordinate) : undefined,
                         type: sprinklerType,
                         zoneId: zone.id,
                         orientation: 0,
@@ -758,134 +760,138 @@ export default function HomeGardenPlanner() {
                 sprinklerCounter += cornerSprinklers.length;
 
                 if (isCanvas) {
-                const spacingPixels = spacing * scale;
-                const cos = Math.cos(radians);
-                const sin = Math.sin(radians);
+                    const spacingPixels = spacing * scale;
+                    const cos = Math.cos(radians);
+                    const sin = Math.sin(radians);
 
-                const canvasCoords = coordinates as CanvasCoordinate[];
-                const rotatedPoints = canvasCoords.map((coord) => {
-                    const relX = coord.x - centerX;
-                    const relY = coord.y - centerY;
-                    return { u: relX * cos - relY * sin, v: relX * sin + relY * cos };
-                });
+                    const canvasCoords = coordinates as CanvasCoordinate[];
+                    const rotatedPoints = canvasCoords.map((coord) => {
+                        const relX = coord.x - centerX;
+                        const relY = coord.y - centerY;
+                        return { u: relX * cos - relY * sin, v: relX * sin + relY * cos };
+                    });
 
-                const minU = Math.min(...rotatedPoints.map((p) => p.u));
-                const maxU = Math.max(...rotatedPoints.map((p) => p.u));
-                const minV = Math.min(...rotatedPoints.map((p) => p.v));
-                const maxV = Math.max(...rotatedPoints.map((p) => p.v));
+                    const minU = Math.min(...rotatedPoints.map((p) => p.u));
+                    const maxU = Math.max(...rotatedPoints.map((p) => p.u));
+                    const minV = Math.min(...rotatedPoints.map((p) => p.v));
+                    const maxV = Math.max(...rotatedPoints.map((p) => p.v));
 
-                for (let v = minV + spacingPixels / 2; v <= maxV; v += spacingPixels) {
-                    for (let u = minU + spacingPixels / 2; u <= maxU; u += spacingPixels) {
-                        const x = centerX + (u * cos + v * sin);
-                        const y = centerY + (u * -sin + v * cos);
-                        const point = { x, y };
+                    for (let v = minV + spacingPixels / 2; v <= maxV; v += spacingPixels) {
+                        for (let u = minU + spacingPixels / 2; u <= maxU; u += spacingPixels) {
+                            const x = centerX + (u * cos + v * sin);
+                            const y = centerY + (u * -sin + v * cos);
+                            const point = { x, y };
 
-                        if (isPointInPolygon(point, canvasCoords)) {
-                            const tooCloseToCorner = cornerSprinklers.some(
-                                (corner) =>
-                                    corner.canvasPosition &&
-                                    calculateDistance(point, corner.canvasPosition, scale) <
-                                        spacing * 0.9
-                            );
-
-                            if (tooCloseToCorner) continue;
-
-                            let shouldAvoid = false;
-
-                            if (zone.type === 'grass') {
-                                shouldAvoid = isPointInAvoidanceZone(point, zone.id);
-                            } else {
-                                shouldAvoid = gardenZones.some(
-                                    (forbiddenZone) =>
-                                        forbiddenZone.type === 'forbidden' &&
-                                        !forbiddenZone.parentZoneId &&
-                                        forbiddenZone.canvasCoordinates &&
-                                        isPointInPolygon(point, forbiddenZone.canvasCoordinates)
+                            if (isPointInPolygon(point, canvasCoords)) {
+                                const tooCloseToCorner = cornerSprinklers.some(
+                                    (corner) =>
+                                        corner.canvasPosition &&
+                                        calculateDistance(point, corner.canvasPosition, scale) <
+                                            spacing * 0.9
                                 );
+
+                                if (tooCloseToCorner) continue;
+
+                                let shouldAvoid = false;
+
+                                if (zone.type === 'grass') {
+                                    shouldAvoid = isPointInAvoidanceZone(point, zone.id);
+                                } else {
+                                    shouldAvoid = gardenZones.some(
+                                        (forbiddenZone) =>
+                                            forbiddenZone.type === 'forbidden' &&
+                                            !forbiddenZone.parentZoneId &&
+                                            forbiddenZone.canvasCoordinates &&
+                                            isPointInPolygon(point, forbiddenZone.canvasCoordinates)
+                                    );
+                                }
+
+                                if (!shouldAvoid) {
+                                    const gpsPos = canvasToGPS(
+                                        point,
+                                        isCanvas ? canvasData : imageData
+                                    );
+                                    newSprinklers.push({
+                                        id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
+                                        position: gpsPos,
+                                        canvasPosition: point,
+                                        type: sprinklerType,
+                                        zoneId: zone.id,
+                                        orientation: longestEdgeAngle,
+                                    });
+                                }
                             }
+                        }
+                    }
+                } else {
+                    const gpsCoords = coordinates as Coordinate[];
+                    const centerLat = centerY;
+                    const centerLng = centerX;
 
-                            if (!shouldAvoid) {
-                                const gpsPos = canvasToGPS(
-                                    point,
-                                    isCanvas ? canvasData : imageData
+                    const latSpacing = spacing / 111000;
+                    const lngSpacing = spacing / (111000 * Math.cos((centerLat * Math.PI) / 180));
+
+                    const cos = Math.cos(radians);
+                    const sin = Math.sin(radians);
+
+                    const rotatedPoints = gpsCoords.map((coord) => {
+                        const relLat = coord.lat - centerLat;
+                        const relLng = coord.lng - centerLng;
+                        return { u: relLng * cos - relLat * sin, v: relLng * sin + relLat * cos };
+                    });
+
+                    const minU = Math.min(...rotatedPoints.map((p) => p.u));
+                    const maxU = Math.max(...rotatedPoints.map((p) => p.u));
+                    const minV = Math.min(...rotatedPoints.map((p) => p.v));
+                    const maxV = Math.max(...rotatedPoints.map((p) => p.v));
+
+                    const rotatedLatSpacing = latSpacing;
+                    const rotatedLngSpacing = lngSpacing;
+
+                    for (let v = minV + rotatedLatSpacing / 2; v <= maxV; v += rotatedLatSpacing) {
+                        for (
+                            let u = minU + rotatedLngSpacing / 2;
+                            u <= maxU;
+                            u += rotatedLngSpacing
+                        ) {
+                            const lat = centerLat + (u * -sin + v * cos);
+                            const lng = centerLng + (u * cos + v * sin);
+                            const point = { lat, lng };
+
+                            if (isPointInPolygon(point, gpsCoords)) {
+                                const tooCloseToCorner = cornerSprinklers.some(
+                                    (corner) =>
+                                        calculateDistance(point, corner.position) < spacing * 0.9
                                 );
-                                newSprinklers.push({
-                                    id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
-                                    position: gpsPos,
-                                    canvasPosition: point,
-                                    type: sprinklerType,
-                                    zoneId: zone.id,
-                                    orientation: longestEdgeAngle,
-                                });
+
+                                if (tooCloseToCorner) continue;
+
+                                let shouldAvoid = false;
+
+                                if (zone.type === 'grass') {
+                                    shouldAvoid = isPointInAvoidanceZone(point, zone.id);
+                                } else {
+                                    shouldAvoid = gardenZones.some(
+                                        (forbiddenZone) =>
+                                            forbiddenZone.type === 'forbidden' &&
+                                            !forbiddenZone.parentZoneId &&
+                                            isPointInPolygon(point, forbiddenZone.coordinates)
+                                    );
+                                }
+
+                                if (!shouldAvoid) {
+                                    newSprinklers.push({
+                                        id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
+                                        position: point,
+                                        type: sprinklerType,
+                                        zoneId: zone.id,
+                                        orientation: longestEdgeAngle,
+                                    });
+                                }
                             }
                         }
                     }
                 }
-            } else {
-                const gpsCoords = coordinates as Coordinate[];
-                const centerLat = centerY;
-                const centerLng = centerX;
-
-                const latSpacing = spacing / 111000;
-                const lngSpacing = spacing / (111000 * Math.cos((centerLat * Math.PI) / 180));
-
-                const cos = Math.cos(radians);
-                const sin = Math.sin(radians);
-
-                const rotatedPoints = gpsCoords.map((coord) => {
-                    const relLat = coord.lat - centerLat;
-                    const relLng = coord.lng - centerLng;
-                    return { u: relLng * cos - relLat * sin, v: relLng * sin + relLat * cos };
-                });
-
-                const minU = Math.min(...rotatedPoints.map((p) => p.u));
-                const maxU = Math.max(...rotatedPoints.map((p) => p.u));
-                const minV = Math.min(...rotatedPoints.map((p) => p.v));
-                const maxV = Math.max(...rotatedPoints.map((p) => p.v));
-
-                const rotatedLatSpacing = latSpacing;
-                const rotatedLngSpacing = lngSpacing;
-
-                for (let v = minV + rotatedLatSpacing / 2; v <= maxV; v += rotatedLatSpacing) {
-                    for (let u = minU + rotatedLngSpacing / 2; u <= maxU; u += rotatedLngSpacing) {
-                        const lat = centerLat + (u * -sin + v * cos);
-                        const lng = centerLng + (u * cos + v * sin);
-                        const point = { lat, lng };
-
-                        if (isPointInPolygon(point, gpsCoords)) {
-                            const tooCloseToCorner = cornerSprinklers.some(
-                                (corner) =>
-                                    calculateDistance(point, corner.position) < spacing * 0.9
-                            );
-
-                            if (tooCloseToCorner) continue;
-
-                            let shouldAvoid = false;
-
-                            if (zone.type === 'grass') {
-                                shouldAvoid = isPointInAvoidanceZone(point, zone.id);
-                            } else {
-                                shouldAvoid = gardenZones.some(
-                                    (forbiddenZone) =>
-                                        forbiddenZone.type === 'forbidden' &&
-                                        !forbiddenZone.parentZoneId &&
-                                        isPointInPolygon(point, forbiddenZone.coordinates)
-                                );
-                            }
-
-                            if (!shouldAvoid) {
-                                newSprinklers.push({
-                                    id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
-                                    position: point,
-                                    type: sprinklerType,
-                                    zoneId: zone.id,
-                                    orientation: longestEdgeAngle,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
             }
 
             setSelectedSprinkler(null);

@@ -465,13 +465,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 return;
             }
 
-            // ตรวจสอบว่าเป็นพิกัดหรือไม่
             const isCoordinate = detectCoordinatePattern(value);
             setIsCoordinateSearch(isCoordinate);
 
             if (isCoordinate) {
-                // ถ้าเป็นพิกัด ไม่ต้องทำ autocomplete
-                setAutocompletePredictions([]);
 
                 searchTimeoutRef.current = setTimeout(async () => {
                     setIsLoading(true);
@@ -483,7 +480,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setError(result.error.message);
                             setSearchResults([]);
                         } else {
-                            // แปลง PlacesSearchResult เป็น SearchResult interface ของ component
                             const convertedResults: SearchResult[] = result.results.map(
                                 (place: PlacesSearchResult) => ({
                                     place_id: place.place_id,
@@ -509,7 +505,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     }
                 }, 300);
             } else {
-                // ถ้าเป็นข้อความธรรมดา ให้ทำ autocomplete และค้นหาแบบเดิม
                 searchWithPredictions(value);
 
                 searchTimeoutRef.current = setTimeout(async () => {
@@ -522,7 +517,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setError(result.error.message);
                             setSearchResults([]);
                         } else {
-                            // แปลง PlacesSearchResult เป็น SearchResult interface ของ component
                             const convertedResults: SearchResult[] = result.results.map(
                                 (place: PlacesSearchResult) => ({
                                     place_id: place.place_id,
@@ -723,7 +717,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     </button>
                 </div>
 
-                {/* Categories Dropdown */}
                 {showCategories && (
                     <div className="absolute mt-2 w-full rounded-lg border border-gray-600 bg-gray-900 shadow-xl">
                         <div className="p-3">
@@ -753,7 +746,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     </div>
                 )}
 
-                {/* Error Message */}
                 {error && (
                     <div className="mt-2 rounded-lg border border-red-600 bg-red-900 p-3 text-sm text-red-200 shadow-xl">
                         <div className="flex items-center gap-2">
@@ -769,10 +761,8 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     </div>
                 )}
 
-                {/* Search Results */}
                 {showResults && (
                     <div className="absolute mt-2 max-h-[500px] w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-2xl">
-                        {/* Recent Searches */}
                         {!searchQuery && recentSearches.length > 0 && (
                             <div className="border-b border-gray-200 p-3">
                                 <h3 className="mb-2 text-sm font-semibold text-gray-700">

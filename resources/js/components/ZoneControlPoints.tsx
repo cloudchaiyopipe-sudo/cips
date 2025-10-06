@@ -1,5 +1,3 @@
-// ZoneControlPoints.tsx - Component สำหรับแสดงจุดควบคุมการแก้ไขโซน
-
 import React from 'react';
 import { ZoneControlPoint } from '../utils/zoneEditUtils';
 import { Coordinate } from '../utils/irrigationZoneUtils';
@@ -28,11 +26,9 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
     draggedPointIndex,
     mapBounds,
 }) => {
-    // แปลงพิกัด lat/lng เป็น pixel coordinates สำหรับแสดงบนแผนที่
     const coordinateToPixel = (coord: Coordinate): { x: number; y: number } => {
         if (!mapBounds) return { x: 0, y: 0 };
 
-        // สมมติใช้ขนาดแผนที่ 800x600 pixels
         const mapWidth = 800;
         const mapHeight = 600;
 
@@ -64,7 +60,7 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
     React.useEffect(() => {
         if (isDragging) {
             const handleGlobalMouseMove = (e: MouseEvent) => {
-                onPointDrag(e as any);
+                onPointDrag(e as unknown as React.MouseEvent<Element, MouseEvent>);
             };
             const handleGlobalMouseUp = () => {
                 onPointDragEnd();
@@ -91,11 +87,11 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
             onMouseUp={handleMouseUp}
         >
             {controlPoints
-                .filter((point) => point.index % 1 === 0) // แสดงเฉพาะจุดยอด (ไม่แสดงจุดกึ่งกลาง)
+                .filter((point) => point.index % 1 === 0)
                 .map((point) => {
                     const pixelPos = coordinateToPixel(point.position);
                     const isBeingDragged = draggedPointIndex === point.index;
-                    const isMidPoint = point.index % 1 !== 0; // จุดกึ่งกลางมี index เป็นทศนิยม
+                    const isMidPoint = point.index % 1 !== 0;
 
                     return (
                         <div
@@ -129,7 +125,6 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
                             `}
                             />
 
-                            {/* แสดงเส้นขอบเพื่อให้เห็นการเชื่อมต่อ */}
                             {!isMidPoint && (
                                 <div className="absolute inset-0 border border-dashed border-orange-300 opacity-50" />
                             )}
@@ -137,7 +132,6 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
                     );
                 })}
 
-            {/* แสดงข้อความช่วยเหลือ */}
             {controlPoints.length > 0 && (
                 <div className="pointer-events-auto absolute left-4 top-4 max-w-sm rounded-lg border bg-white p-3 shadow-lg">
                     <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-800">

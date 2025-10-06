@@ -128,10 +128,12 @@ export default function Profile() {
             <div className="min-h-screen bg-gray-900">
                 <Head title="Profile" />
                 <Navbar />
-                <div className="flex items-center justify-center min-h-[50vh]">
+                <div className="flex min-h-[50vh] items-center justify-center">
                     <div className="text-center">
-                        <h1 className="text-2xl font-bold text-white mb-4">Loading Profile...</h1>
-                        <p className="text-gray-400">Please wait while we load your profile information.</p>
+                        <h1 className="mb-4 text-2xl font-bold text-white">Loading Profile...</h1>
+                        <p className="text-gray-400">
+                            Please wait while we load your profile information.
+                        </p>
                     </div>
                 </div>
                 <Footer />

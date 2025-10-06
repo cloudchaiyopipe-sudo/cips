@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
@@ -35,7 +36,8 @@ const Navbar: React.FC = () => {
             is_super_user: auth.user.is_super_user || false,
             tier: auth.user.tier || 'free',
             daily_tokens: auth.user.tier === 'pro' ? 100 : auth.user.tier === 'advanced' ? 200 : 50,
-            monthly_allowance: auth.user.tier === 'pro' ? 500 : auth.user.tier === 'advanced' ? 1000 : 100,
+            monthly_allowance:
+                auth.user.tier === 'pro' ? 500 : auth.user.tier === 'advanced' ? 1000 : 100,
         };
 
         setTokenStatus(userTokenStatus);
@@ -59,11 +61,9 @@ const Navbar: React.FC = () => {
         };
     }, [auth?.user]);
 
-
     // Function to refresh CSRF token
     const refreshCsrfToken = async () => {
         try {
-            console.log('Refreshing CSRF token...');
             const response = await axios.get('/csrf-token');
             if (response.data.token) {
                 axios.defaults.headers.common['X-CSRF-TOKEN'] = response.data.token;
@@ -71,7 +71,6 @@ const Navbar: React.FC = () => {
                 if (metaTag) {
                     metaTag.setAttribute('content', response.data.token);
                 }
-                console.log('CSRF token refreshed successfully');
                 return response.data.token;
             }
         } catch (error) {
@@ -83,9 +82,7 @@ const Navbar: React.FC = () => {
     // Test authentication function
     const testAuth = async () => {
         try {
-            console.log('Testing authentication...');
             const response = await axios.get('/api/test-auth');
-            console.log('Auth test response:', response.data);
             return response.data;
         } catch (error: any) {
             console.error('Auth test failed:', error);
@@ -101,23 +98,14 @@ const Navbar: React.FC = () => {
         notes: string;
     }) => {
         try {
-            console.log('Submitting token purchase request:', purchaseData);
-            console.log('CSRF Token before refresh:', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'));
-            
-            // Refresh CSRF token first
             await refreshCsrfToken();
-            
-            console.log('CSRF Token after refresh:', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'));
-            console.log('Axios defaults:', axios.defaults.headers.common);
-            
-            // Test authentication first
+
             const authTest = await testAuth();
             if (!authTest || !authTest.success) {
                 alert('Authentication failed. Please refresh the page and try again.');
                 return;
             }
-            
-            // Create FormData for file upload
+
             const formData = new FormData();
             formData.append('tokens', purchaseData.tokens.toString());
             formData.append('amount', purchaseData.amount.toString());
@@ -125,32 +113,33 @@ const Navbar: React.FC = () => {
             if (purchaseData.payment_proof) {
                 formData.append('payment_proof', purchaseData.payment_proof);
             }
-            
+
             const response = await axios.post('/api/payments/buy-tokens', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                }
+                },
             });
-            console.log('Token purchase response:', response.data);
-            
+
             if (response.data.success) {
-                alert('Token purchase request submitted successfully! You will receive tokens once approved by admin.');
+                alert(
+                    'Token purchase request submitted successfully! You will receive tokens once approved by admin.'
+                );
                 setShowTokenBuyModal(false);
             } else {
-                alert(response.data.message || 'Error submitting token purchase request. Please try again.');
+                alert(
+                    response.data.message ||
+                        'Error submitting token purchase request. Please try again.'
+                );
             }
         } catch (error: any) {
             console.error('Error submitting token purchase:', error);
             console.error('Error response:', error.response?.data);
             console.error('Error status:', error.response?.status);
-            
-            // If it's a CSRF token mismatch, try refreshing and retrying once
+
             if (error.response?.status === 419 || error.response?.data?.message?.includes('CSRF')) {
-                console.log('CSRF token mismatch detected, refreshing token and retrying...');
                 try {
                     await refreshCsrfToken();
-                    
-                    // Recreate FormData for retry
+
                     const retryFormData = new FormData();
                     retryFormData.append('tokens', purchaseData.tokens.toString());
                     retryFormData.append('amount', purchaseData.amount.toString());
@@ -158,16 +147,21 @@ const Navbar: React.FC = () => {
                     if (purchaseData.payment_proof) {
                         retryFormData.append('payment_proof', purchaseData.payment_proof);
                     }
-                    
-                    const retryResponse = await axios.post('/api/payments/buy-tokens', retryFormData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
+
+                    const retryResponse = await axios.post(
+                        '/api/payments/buy-tokens',
+                        retryFormData,
+                        {
+                            headers: {
+                                'Content-Type': 'multipart/form-data',
+                            },
                         }
-                    });
-                    console.log('Retry token purchase response:', retryResponse.data);
-                    
+                    );
+
                     if (retryResponse.data.success) {
-                        alert('Token purchase request submitted successfully! You will receive tokens once approved by admin.');
+                        alert(
+                            'Token purchase request submitted successfully! You will receive tokens once approved by admin.'
+                        );
                         setShowTokenBuyModal(false);
                         return;
                     }
@@ -175,22 +169,13 @@ const Navbar: React.FC = () => {
                     console.error('Retry also failed:', retryError);
                 }
             }
-            
-            const errorMessage = error.response?.data?.message || 'Error submitting token purchase request. Please try again.';
+
+            const errorMessage =
+                error.response?.data?.message ||
+                'Error submitting token purchase request. Please try again.';
             alert(errorMessage);
         }
     };
-
-    // ฟังก์ชันสำหรับเลื่อนไปยัง Footer
-    // const scrollToFooter = () => {
-    //     const footerElement = document.getElementById('contact-footer');
-    //     if (footerElement) {
-    //         footerElement.scrollIntoView({
-    //             behavior: 'smooth',
-    //             block: 'start'
-    //         });
-    //     }
-    // };
 
     return (
         <>
@@ -251,13 +236,12 @@ const Navbar: React.FC = () => {
                                 </button> */}
                                 {auth?.user?.is_super_user && (
                                     <button
-                                    onClick={() => (window.location.href = '/equipment-crud')}
-                                    className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
-                                >
-                                    ⚙️ {t('จัดการอุปกรณ์')}
-                                </button>
+                                        onClick={() => (window.location.href = '/equipment-crud')}
+                                        className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                                    >
+                                        ⚙️ {t('จัดการอุปกรณ์')}
+                                    </button>
                                 )}
-                                
                             </div>
 
                             {/* Token Display for Non-Admin Users */}
@@ -344,7 +328,7 @@ const Navbar: React.FC = () => {
                                         <div className="text-2xl font-bold text-white">฿50</div>
                                         <div className="text-sm text-gray-400">฿5 per token</div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setShowTokenPricingModal(false);
                                             setShowTokenBuyModal(true);
@@ -371,7 +355,7 @@ const Navbar: React.FC = () => {
                                         <div className="text-sm text-gray-400">฿4 per token</div>
                                         <div className="text-xs text-green-400">Save ฿50</div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setShowTokenPricingModal(false);
                                             setShowTokenBuyModal(true);
@@ -395,7 +379,7 @@ const Navbar: React.FC = () => {
                                         <div className="text-sm text-gray-400">฿3.5 per token</div>
                                         <div className="text-xs text-purple-400">Save ฿150</div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setShowTokenPricingModal(false);
                                             setShowTokenBuyModal(true);
@@ -420,7 +404,7 @@ const Navbar: React.FC = () => {
                                         Best Value - Save ฿1,000
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => {
                                         setShowTokenPricingModal(false);
                                         setShowTokenBuyModal(true);

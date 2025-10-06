@@ -251,7 +251,7 @@ export default function Register() {
                                     disabled={processing}
                                     placeholder="กรอกรายละเอียดเพิ่มเติมเกี่ยวกับคุณ..."
                                     rows={3}
-                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500 resize-none"
+                                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
                             <InputError message={errors.additional_details} />
@@ -401,7 +401,8 @@ export default function Register() {
                                         </TextLink>
                                     </Label>
                                     <p className="mt-1 text-xs text-gray-500">
-                                        รวมถึงการเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคลตามกฎหมาย PDPA
+                                        รวมถึงการเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคลตามกฎหมาย
+                                        PDPA
                                     </p>
                                 </div>
                             </div>
@@ -412,7 +413,7 @@ export default function Register() {
                         <Button
                             type="submit"
                             onClick={submit}
-                            className="w-full transform rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:from-green-700 hover:to-emerald-700 hover:shadow-xl focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            className="w-full transform rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:from-green-700 hover:to-emerald-700 hover:shadow-xl focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                             tabIndex={8}
                             disabled={processing || !data.accept_terms}
                         >
@@ -468,14 +469,8 @@ export default function Register() {
             </div>
 
             {/* Modals */}
-            <TermsModal 
-                isOpen={showTermsModal} 
-                onClose={() => setShowTermsModal(false)} 
-            />
-            <PrivacyModal 
-                isOpen={showPrivacyModal} 
-                onClose={() => setShowPrivacyModal(false)} 
-            />
+            <TermsModal isOpen={showTermsModal} onClose={() => setShowTermsModal(false)} />
+            <PrivacyModal isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} />
         </div>
     );
 }

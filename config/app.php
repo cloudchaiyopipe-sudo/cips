@@ -97,7 +97,9 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
-    'key' => env('APP_KEY'),
+    // 'key' => env('APP_KEY'),
+    // 'key' => env('APP_KEY'),
+'key' => 'base64:JgGIERRypXRnTuXwIz7Cv6adLp25PSFJ2qyImCBo0QE=', // ใส่คีย์ของคุณที่คัดลอกมาตรงนี้
 
     'previous_keys' => [
         ...array_filter(

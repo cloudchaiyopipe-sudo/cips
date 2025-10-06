@@ -144,18 +144,20 @@ const InputForm: React.FC<InputFormProps> = ({
     const initializeConnectionPointEquipments = useCallback(() => {
         console.log('🔍 initializeConnectionPointEquipments called for projectMode:', projectMode);
         const activeZoneId = activeZone?.id;
-        
+
         // สำหรับ field-crop mode ให้ใช้ fieldCropSystemData
         if (projectMode === 'field-crop' && fieldCropSystemDataRef.current) {
             console.log('🔍 Field-crop mode: fieldCropSystemData found');
             const equipments: ConnectionPointEquipment[] = [];
-            
+
             // โหลดการเลือกอุปกรณ์ที่เก็บไว้
             const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
             const selections = savedSelections ? JSON.parse(savedSelections) : {};
 
             // หาโซนที่ active
-            const activeZoneData = fieldCropSystemDataRef.current.zones?.find((z: any) => z.id === activeZoneId);
+            const activeZoneData = fieldCropSystemDataRef.current.zones?.find(
+                (z: any) => z.id === activeZoneId
+            );
             console.log('🔍 Active zone data:', activeZoneData);
             console.log('🔍 Active zone connection points:', activeZoneData?.connectionPoints);
             if (activeZoneData && activeZoneData.connectionPoints) {
@@ -169,7 +171,9 @@ const InputForm: React.FC<InputFormProps> = ({
                 ];
 
                 connectionTypes.forEach((type) => {
-                    const pointsOfType = activeZoneData.connectionPoints.filter((cp: any) => cp.type === type.key);
+                    const pointsOfType = activeZoneData.connectionPoints.filter(
+                        (cp: any) => cp.type === type.key
+                    );
                     if (pointsOfType.length > 0) {
                         const equipmentId = `${activeZoneData.id}-${type.key}`;
                         const savedSelection = selections[equipmentId];
@@ -1065,7 +1069,10 @@ const InputForm: React.FC<InputFormProps> = ({
                     <div className="grid grid-cols-3 gap-3 rounded-lg bg-gray-700 p-2">
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {projectMode === 'field-crop' ? t('ขนาดพื้นที่โซน') : t('ขนาดพื้นที่')} ({getAreaUnit()})
+                                {projectMode === 'field-crop'
+                                    ? t('ขนาดพื้นที่โซน')
+                                    : t('ขนาดพื้นที่')}{' '}
+                                ({getAreaUnit()})
                             </label>
                             <input
                                 type="number"

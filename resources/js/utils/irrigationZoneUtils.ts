@@ -1,5 +1,3 @@
-// irrigationZoneUtils.ts
-
 export interface Coordinate {
     lat: number;
     lng: number;

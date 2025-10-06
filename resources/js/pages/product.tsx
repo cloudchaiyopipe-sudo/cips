@@ -190,10 +190,13 @@ export default function Product() {
     const [gardenStats, setGardenStats] = useState<GardenStatistics | null>(null);
 
     const [fieldCropData, setFieldCropData] = useState<FieldCropData | null>(null);
-    const [fieldCropSystemData, setFieldCropSystemData] = useState<FieldCropSystemData | null>(null);
+    const [fieldCropSystemData, setFieldCropSystemData] = useState<FieldCropSystemData | null>(
+        null
+    );
 
     const [greenhouseData, setGreenhouseData] = useState<GreenhousePlanningData | null>(null);
-    const [greenhouseSummaryData, setGreenhouseSummaryData] = useState<GreenhouseSummaryData | null>(null);
+    const [greenhouseSummaryData, setGreenhouseSummaryData] =
+        useState<GreenhouseSummaryData | null>(null);
 
     const [projectData, setProjectData] = useState<HorticultureProject | null>(null);
     const [projectStats, setProjectStats] = useState<any>(null);
@@ -648,7 +651,10 @@ export default function Product() {
 
             longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longestLength || 30, 3),
             totalBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.totalLength || 100, 3),
-            longestSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.longestLength || 0, 3),
+            longestSecondaryPipeM: formatNumber(
+                fieldData.pipes.stats.submain.longestLength || 0,
+                3
+            ),
             totalSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.totalLength || 0, 3),
             longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longestLength || 0, 3),
             totalMainPipeM: formatNumber(fieldData.pipes.stats.main.totalLength || 0, 3),
@@ -1042,7 +1048,7 @@ export default function Product() {
             // First try to load summary data from green-house-summary page
             const summaryData = loadGreenhouseSummaryData();
             let currentData: GreenhousePlanningData | null = null;
-            
+
             if (summaryData) {
                 setGreenhouseSummaryData(summaryData);
                 // Convert summary data to enhanced data format
@@ -1166,7 +1172,7 @@ export default function Product() {
                         // Use zone data from system data if available
                         const zoneId = zone.id;
                         const fieldZone = fieldData.zones.info.find((z) => z.id === zoneId);
-                        
+
                         if (fieldZone) {
                             initialZoneInputs[zoneId] = createFieldCropZoneInput(
                                 fieldZone,
@@ -1180,7 +1186,7 @@ export default function Product() {
                                 zonesInfo.length
                             );
                         }
-                        
+
                         initialSelectedPipes[zoneId] = {
                             branch: undefined,
                             secondary: undefined,
@@ -1195,14 +1201,14 @@ export default function Product() {
                 } else if (zonesInfo.length === 1) {
                     const zone = zonesInfo[0];
                     const fieldZone = fieldData.zones.info.find((z) => z.id === zone.id);
-                    
+
                     let singleInput: IrrigationInput;
                     if (fieldZone) {
                         singleInput = createFieldCropZoneInput(fieldZone, fieldData, 1);
                     } else {
                         singleInput = createFieldCropZoneInputFromSystemData(zone, 1);
                     }
-                    
+
                     setZoneInputs({ [zone.id]: singleInput });
                     setSelectedPipes({
                         [zone.id]: { branch: undefined, secondary: undefined, main: undefined },
@@ -1684,7 +1690,10 @@ export default function Product() {
         console.log('📦 [PRODUCT] Field Crop Data:', fieldCropData);
         console.log('📦 [PRODUCT] Field Crop System Data:', fieldCropSystemData);
         if (fieldCropData?.crops?.zoneAssignments) {
-            console.log('📦 [PRODUCT] Field Crop Zone Assignments:', fieldCropData.crops.zoneAssignments);
+            console.log(
+                '📦 [PRODUCT] Field Crop Zone Assignments:',
+                fieldCropData.crops.zoneAssignments
+            );
         }
         if (fieldCropSystemData?.zones) {
             console.log('📦 [PRODUCT] Field Crop System Zones:', fieldCropSystemData.zones);
@@ -1697,7 +1706,7 @@ export default function Product() {
         console.log('📦 [PRODUCT] Active Zone ID:', activeZoneId);
         console.log('📦 [PRODUCT] Zone Operation Mode:', zoneOperationMode);
         console.log('📦 [PRODUCT] Zone Operation Groups:', zoneOperationGroups);
-        
+
         if (projectMode === 'garden' && gardenStats) {
             const zones = gardenStats.zones.map((z) => ({
                 id: z.zoneId,
@@ -1845,7 +1854,9 @@ export default function Product() {
                         id: zone.id,
                         name: zone.name,
                         area: zone.area,
-                        plantCount: zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10)), // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
+                        plantCount:
+                            zone.sprinklerCount ||
+                            Math.max(1, Math.ceil(zone.totalPlantingPoints / 10)), // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
                         totalWaterNeed: zone.totalWaterRequirementPerDay,
                         plantData: crop
                             ? {
@@ -2186,7 +2197,10 @@ export default function Product() {
 
                                         // หาสีของโซนจาก system data
                                         let zoneColor: string | null = null;
-                                        if (projectMode === 'field-crop' && fieldCropSystemData?.zones) {
+                                        if (
+                                            projectMode === 'field-crop' &&
+                                            fieldCropSystemData?.zones
+                                        ) {
                                             const systemZone = fieldCropSystemData.zones.find(
                                                 (fz: any) => fz.id === zone.id
                                             );

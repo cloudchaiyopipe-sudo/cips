@@ -38,9 +38,8 @@ interface LateralPipeInfoPanelProps {
     plantCount: number;
     startPoint: Coordinate | null;
     currentPoint: Coordinate | null;
-    snappedStartPoint?: Coordinate | null; // เพิ่มสำหรับคำนวณความยาวท่อสีเขียว
-    alignedCurrentPoint?: Coordinate | null; // เพิ่มสำหรับคำนวณความยาวท่อสีเขียว
-    // 🚀 เพิ่มสำหรับ multi-segment
+    snappedStartPoint?: Coordinate | null;
+    alignedCurrentPoint?: Coordinate | null;
     waypoints?: Coordinate[];
     isMultiSegmentMode?: boolean;
     segmentCount?: number;
@@ -59,7 +58,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     currentPoint,
     snappedStartPoint,
     alignedCurrentPoint,
-    // 🚀 เพิ่มสำหรับ multi-segment
     waypoints = [],
     isMultiSegmentMode = false,
     segmentCount = 1,
@@ -70,9 +68,7 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     if (!isVisible) return null;
 
     const calculateLength = (): number => {
-        // 🚀 รองรับ multi-segment calculation - เพิ่ม safety checks
         if (isMultiSegmentMode && Array.isArray(waypoints) && waypoints.length > 0) {
-            // Multi-segment: คำนวณความยาวรวมทุกส่วน
             const effectiveStartPoint = snappedStartPoint || startPoint;
             const effectiveEndPoint = alignedCurrentPoint || currentPoint;
 
@@ -85,7 +81,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 const segmentStart = allPoints[i];
                 const segmentEnd = allPoints[i + 1];
 
-                // ตรวจสอบ validity ของ segment points
                 if (
                     !segmentStart ||
                     !segmentEnd ||
@@ -98,12 +93,11 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                     !isFinite(segmentEnd.lat) ||
                     !isFinite(segmentEnd.lng)
                 ) {
-                    continue; // ข้าม segment ที่ไม่ valid
+                    continue;
                 }
 
-                // ใช้ haversine formula แบบ safe
                 try {
-                    const R = 6371000; // รัศมีโลกเป็นเมตร
+                    const R = 6371000;
                     const dLat = ((segmentEnd.lat - segmentStart.lat) * Math.PI) / 180;
                     const dLng = ((segmentEnd.lng - segmentStart.lng) * Math.PI) / 180;
                     const lat1Rad = (segmentStart.lat * Math.PI) / 180;
@@ -120,23 +114,20 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
 
                     const segmentLength = R * c;
                     if (isFinite(segmentLength) && segmentLength >= 0 && segmentLength < 100000) {
-                        // จำกัด max 100km
                         totalLength += segmentLength;
                     }
                 } catch (error) {
-                    continue; // ข้าม segment ที่คำนวณไม่ได้
+                    continue;
                 }
             }
 
             return Math.max(0, totalLength);
         } else {
-            // Single-segment (เดิม) - เพิ่ม safety checks
             const effectiveStartPoint = snappedStartPoint || startPoint;
             const effectiveEndPoint = alignedCurrentPoint || currentPoint;
 
             if (!effectiveStartPoint || !effectiveEndPoint) return 0;
 
-            // ตรวจสอบ validity ของพิกัด
             if (
                 !isFinite(effectiveStartPoint.lat) ||
                 !isFinite(effectiveStartPoint.lng) ||
@@ -147,7 +138,7 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
             }
 
             try {
-                const R = 6371000; // Earth's radius in meters
+                const R = 6371000;
                 const dLat = ((effectiveEndPoint.lat - effectiveStartPoint.lat) * Math.PI) / 180;
                 const dLng = ((effectiveEndPoint.lng - effectiveStartPoint.lng) * Math.PI) / 180;
                 const lat1Rad = (effectiveStartPoint.lat * Math.PI) / 180;
@@ -168,17 +159,14 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
 
     const length = calculateLength();
 
-    // ดึงข้อมูลหัวฉีด
     const sprinklerConfig = loadSprinklerConfig();
     const flowRatePerMinute = sprinklerConfig?.flowRatePerMinute || 0;
 
-    // คำนวณความต้องการน้ำ
     const totalFlowRatePerMinute = plantCount * flowRatePerMinute;
     const totalFlowRatePerHour = totalFlowRatePerMinute * 60;
 
     return (
         <div className="fixed right-[10px] top-[190px] z-[1000] min-w-[320px] rounded-lg border border-gray-200 bg-white p-4 shadow-xl">
-            {/* Header */}
             <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-lg font-bold text-gray-800">
                     <FaWater className="text-blue-600" />
@@ -193,7 +181,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 </button>
             </div>
 
-            {/* Placement Mode */}
             <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3">
                 <div className="mb-2 flex items-center gap-2 text-blue-700">
                     <FaInfoCircle size={14} />
@@ -214,7 +201,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 </div>
             </div>
 
-            {/* 🚀 Multi-segment Info */}
             {isMultiSegmentMode && waypoints.length > 0 && (
                 <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 p-3">
                     <div className="mb-2 flex items-center gap-2 text-orange-700">
@@ -241,7 +227,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 </div>
             )}
 
-            {/* Real-time Statistics */}
             <div className="mb-4 rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-blue-50 p-4">
                 <h4 className="text-md mb-3 flex items-center gap-2 font-semibold text-gray-800">
                     📊 สถิติแบบ Real-time
@@ -251,7 +236,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 </h4>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-1">
-                    {/* จำนวนต้นไม้ */}
                     <div className="flex items-center justify-between rounded-md border border-green-200 bg-green-50 p-3">
                         <div className="flex items-center gap-2 text-green-700">
                             <FaTree size={16} />
@@ -264,7 +248,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Q หัวฉีด */}
                     <div className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 p-3">
                         <div className="flex items-center gap-2 text-blue-700">
                             <FaTint size={16} />
@@ -277,7 +260,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* ความต้องการน้ำ/นาที */}
                     <div className="flex items-center justify-between rounded-md border border-cyan-200 bg-cyan-50 p-3">
                         <div className="flex items-center gap-2 text-cyan-700">
                             <FaWater size={16} />
@@ -290,7 +272,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* ความยาวท่อ */}
                     <div className="flex items-center justify-between rounded-md border border-orange-200 bg-orange-50 p-3">
                         <div className="flex items-center gap-2 text-orange-700">
                             <FaRulerCombined size={16} />
@@ -305,7 +286,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-2">
                 <button
                     onClick={onCancel}

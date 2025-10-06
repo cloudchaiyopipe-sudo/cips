@@ -8,10 +8,7 @@ interface TokenPurchaseModalProps {
     months: number;
     tokenCost: number;
     userTokens: number;
-    onSubmit: (purchaseData: {
-        plan_type: string;
-        months: number;
-    }) => void;
+    onSubmit: (purchaseData: { plan_type: string; months: number }) => void;
     onBuyTokens?: (purchaseData: {
         plan_type: string;
         months: number;
@@ -28,7 +25,7 @@ export default function TokenPurchaseModal({
     tokenCost,
     userTokens,
     onSubmit,
-    onBuyTokens
+    onBuyTokens,
 }: TokenPurchaseModalProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showBuyTokensForm, setShowBuyTokensForm] = useState(false);
@@ -37,7 +34,7 @@ export default function TokenPurchaseModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (userTokens < tokenCost) {
             alert('Insufficient tokens to purchase this plan');
             return;
@@ -47,7 +44,7 @@ export default function TokenPurchaseModal({
         try {
             await onSubmit({
                 plan_type: planType,
-                months: months
+                months: months,
             });
             onClose();
         } catch (error) {
@@ -60,7 +57,7 @@ export default function TokenPurchaseModal({
 
     const handleBuyTokens = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!paymentProof.trim()) {
             alert('Please provide payment proof');
             return;
@@ -73,7 +70,7 @@ export default function TokenPurchaseModal({
                     plan_type: planType,
                     months: months,
                     payment_proof: paymentProof,
-                    notes: notes
+                    notes: notes,
                 });
                 onClose();
             }
@@ -101,7 +98,7 @@ export default function TokenPurchaseModal({
                 </div>
 
                 <div className="mb-6 rounded-lg bg-gray-700 p-4">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="mb-3 flex items-center gap-3">
                         <FaCoins className="h-6 w-6 text-yellow-400" />
                         <div>
                             <h3 className="text-lg font-semibold text-white">
@@ -112,14 +109,18 @@ export default function TokenPurchaseModal({
                             </p>
                         </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
-                            <div className="text-2xl font-bold text-yellow-400">{tokenCost.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-yellow-400">
+                                {tokenCost.toLocaleString()}
+                            </div>
                             <div className="text-sm text-gray-400">Tokens Required</div>
                         </div>
                         <div>
-                            <div className="text-2xl font-bold text-blue-400">{userTokens.toLocaleString()}</div>
+                            <div className="text-2xl font-bold text-blue-400">
+                                {userTokens.toLocaleString()}
+                            </div>
                             <div className="text-sm text-gray-400">Your Tokens</div>
                         </div>
                     </div>
@@ -127,45 +128,60 @@ export default function TokenPurchaseModal({
 
                 <form onSubmit={handleSubmit}>
                     <div className="mb-6 space-y-3">
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-gray-700">
+                        <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
                             <span className="text-gray-300">Plan Cost:</span>
-                            <span className="text-yellow-400 font-semibold">{tokenCost.toLocaleString()} tokens</span>
+                            <span className="font-semibold text-yellow-400">
+                                {tokenCost.toLocaleString()} tokens
+                            </span>
                         </div>
-                        
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-gray-700">
+
+                        <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
                             <span className="text-gray-300">Your Tokens:</span>
-                            <span className="text-blue-400 font-semibold">{userTokens.toLocaleString()} tokens</span>
+                            <span className="font-semibold text-blue-400">
+                                {userTokens.toLocaleString()} tokens
+                            </span>
                         </div>
-                        
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-gray-700">
+
+                        <div className="flex items-center justify-between rounded-lg bg-gray-700 p-3">
                             <span className="text-gray-300">After Purchase:</span>
-                            <span className={`font-semibold ${canAfford ? 'text-green-400' : 'text-red-400'}`}>
+                            <span
+                                className={`font-semibold ${canAfford ? 'text-green-400' : 'text-red-400'}`}
+                            >
                                 {remainingTokens.toLocaleString()} tokens
                             </span>
                         </div>
                     </div>
 
                     {!canAfford && (
-                        <div className="mb-4 rounded-lg bg-red-900/30 border border-red-600 p-3">
+                        <div className="mb-4 rounded-lg border border-red-600 bg-red-900/30 p-3">
                             <div className="flex items-start gap-2">
-                                <FaTimes className="h-4 w-4 text-red-400 mt-0.5" />
+                                <FaTimes className="mt-0.5 h-4 w-4 text-red-400" />
                                 <div className="text-sm text-red-200">
                                     <p className="font-medium">Insufficient Tokens</p>
-                                    <p>You need {tokenCost.toLocaleString()} tokens but only have {userTokens.toLocaleString()} tokens.</p>
-                                    <p className="mt-1">You need {(tokenCost - userTokens).toLocaleString()} more tokens to purchase this plan.</p>
+                                    <p>
+                                        You need {tokenCost.toLocaleString()} tokens but only have{' '}
+                                        {userTokens.toLocaleString()} tokens.
+                                    </p>
+                                    <p className="mt-1">
+                                        You need {(tokenCost - userTokens).toLocaleString()} more
+                                        tokens to purchase this plan.
+                                    </p>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {canAfford && (
-                        <div className="mb-4 rounded-lg bg-green-900/30 border border-green-600 p-3">
+                        <div className="mb-4 rounded-lg border border-green-600 bg-green-900/30 p-3">
                             <div className="flex items-start gap-2">
-                                <FaCheck className="h-4 w-4 text-green-400 mt-0.5" />
+                                <FaCheck className="mt-0.5 h-4 w-4 text-green-400" />
                                 <div className="text-sm text-green-200">
                                     <p className="font-medium">Purchase Confirmed</p>
                                     <p>You have enough tokens to purchase this plan.</p>
-                                    <p className="mt-1">You will have {remainingTokens.toLocaleString()} tokens remaining after purchase.</p>
+                                    <p className="mt-1">
+                                        You will have {remainingTokens.toLocaleString()} tokens
+                                        remaining after purchase.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -184,7 +200,7 @@ export default function TokenPurchaseModal({
                                 <button
                                     type="button"
                                     onClick={() => setShowBuyTokensForm(true)}
-                                    className="rounded bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 flex items-center gap-2"
+                                    className="flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
                                 >
                                     💳 Buy Tokens with Money
                                 </button>
@@ -192,7 +208,7 @@ export default function TokenPurchaseModal({
                             <button
                                 type="submit"
                                 disabled={!canAfford || isSubmitting}
-                                className="rounded bg-yellow-600 px-4 py-2 text-white transition-colors hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                className="flex items-center gap-2 rounded bg-yellow-600 px-4 py-2 text-white transition-colors hover:bg-yellow-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isSubmitting ? (
                                     <>
@@ -210,7 +226,7 @@ export default function TokenPurchaseModal({
                     ) : (
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <label className="mb-2 block text-sm font-medium text-gray-300">
                                     Payment Proof (Transaction ID, Screenshot, etc.)
                                 </label>
                                 <textarea
@@ -223,7 +239,7 @@ export default function TokenPurchaseModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                <label className="mb-2 block text-sm font-medium text-gray-300">
                                     Additional Notes (Optional)
                                 </label>
                                 <textarea
@@ -246,7 +262,7 @@ export default function TokenPurchaseModal({
                                     type="button"
                                     onClick={handleBuyTokens}
                                     disabled={isSubmitting || !paymentProof.trim()}
-                                    className="rounded bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {isSubmitting ? (
                                         <>
@@ -254,9 +270,7 @@ export default function TokenPurchaseModal({
                                             Submitting...
                                         </>
                                     ) : (
-                                        <>
-                                            💳 Submit Payment Request
-                                        </>
+                                        <>💳 Submit Payment Request</>
                                     )}
                                 </button>
                             </div>

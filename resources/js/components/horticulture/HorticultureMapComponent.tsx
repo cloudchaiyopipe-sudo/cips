@@ -84,7 +84,6 @@ const MapComponent: React.FC<{
     children?: React.ReactNode;
     mapOptions?: Partial<google.maps.MapOptions>;
 }> = ({ center, zoom, onLoad, children, mapOptions }) => {
-    // Validate center coordinates
     const validCenter =
         center &&
         typeof center.lat === 'number' &&
@@ -94,7 +93,7 @@ const MapComponent: React.FC<{
         isFinite(center.lat) &&
         isFinite(center.lng)
             ? center
-            : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
+            : { lat: 13.7563, lng: 100.5018 };
 
     const validZoom = typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16;
     const ref = useRef<HTMLDivElement>(null);
@@ -225,7 +224,6 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
         return <MapErrorComponent onRetry={() => window.location.reload()} />;
     }
 
-    // Validate center coordinates
     const validCenter =
         center &&
         Array.isArray(center) &&
@@ -237,7 +235,7 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
         isFinite(center[0]) &&
         isFinite(center[1])
             ? { lat: center[0], lng: center[1] }
-            : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
+            : { lat: 13.7563, lng: 100.5018 };
 
     const validZoom = typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16;
 

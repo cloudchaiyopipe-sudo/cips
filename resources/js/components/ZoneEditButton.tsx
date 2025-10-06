@@ -1,5 +1,3 @@
-// ZoneEditButton.tsx - Component สำหรับปุ่มแก้ไขโซนอัตโนมัติ
-
 import React from 'react';
 import { IrrigationZone } from '../utils/irrigationZoneUtils';
 

@@ -18,7 +18,9 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                         <div className="rounded-full bg-blue-100 p-2">
                             <FileText className="h-5 w-5 text-blue-600" />
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900">เงื่อนไขการใช้บริการ</h2>
+                        <h2 className="text-xl font-semibold text-gray-900">
+                            เงื่อนไขการใช้บริการ
+                        </h2>
                     </div>
                     <Button
                         variant="ghost"
@@ -39,13 +41,18 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                             </p>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">1. การยอมรับเงื่อนไข</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            1. การยอมรับเงื่อนไข
+                        </h3>
                         <p className="mb-4 text-gray-700">
-                            การใช้บริการระบบคำนวณอุปกรณ์สำหรับชลประทาน ("บริการ") ของบริษัท กนก โปรดักส์ และ ไชโย ไปป์แอนด์ฟิตติ้ง จำกัด 
-                            ถือว่าท่านได้อ่าน เข้าใจ และยอมรับเงื่อนไขการใช้บริการนี้แล้ว
+                            การใช้บริการระบบคำนวณอุปกรณ์สำหรับชลประทาน ("บริการ") ของบริษัท กนก
+                            โปรดักส์ และ ไชโย ไปป์แอนด์ฟิตติ้ง จำกัด ถือว่าท่านได้อ่าน เข้าใจ
+                            และยอมรับเงื่อนไขการใช้บริการนี้แล้ว
                         </p>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">2. การใช้บริการ</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            2. การใช้บริการ
+                        </h3>
                         <ul className="mb-4 list-disc pl-6 text-gray-700">
                             <li>ท่านต้องมีอายุไม่ต่ำกว่า 18 ปี หรือได้รับอนุญาตจากผู้ปกครอง</li>
                             <li>ท่านต้องให้ข้อมูลที่ถูกต้องและเป็นจริงในการสมัครสมาชิก</li>
@@ -53,10 +60,10 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                             <li>ห้ามใช้บริการเพื่อวัตถุประสงค์ที่ผิดกฎหมายหรือเป็นอันตราย</li>
                         </ul>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">3. ความรับผิดชอบของผู้ใช้</h3>
-                        <p className="mb-4 text-gray-700">
-                            ท่านรับผิดชอบในการ:
-                        </p>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            3. ความรับผิดชอบของผู้ใช้
+                        </h3>
+                        <p className="mb-4 text-gray-700">ท่านรับผิดชอบในการ:</p>
                         <ul className="mb-4 list-disc pl-6 text-gray-700">
                             <li>ตรวจสอบความถูกต้องของข้อมูลที่ได้จากการคำนวณ</li>
                             <li>ใช้ผลการคำนวณอย่างเหมาะสมและปลอดภัย</li>
@@ -64,10 +71,10 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                             <li>ไม่แชร์ข้อมูลบัญชีกับบุคคลอื่น</li>
                         </ul>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">4. ข้อจำกัดความรับผิดชอบ</h3>
-                        <p className="mb-4 text-gray-700">
-                            บริษัทฯ ไม่รับผิดชอบต่อ:
-                        </p>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            4. ข้อจำกัดความรับผิดชอบ
+                        </h3>
+                        <p className="mb-4 text-gray-700">บริษัทฯ ไม่รับผิดชอบต่อ:</p>
                         <ul className="mb-4 list-disc pl-6 text-gray-700">
                             <li>ความเสียหายที่เกิดจากการใช้ข้อมูลจากระบบอย่างไม่ถูกต้อง</li>
                             <li>การหยุดชะงักของบริการที่เกิดจากสาเหตุเหนือการควบคุม</li>
@@ -75,34 +82,44 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                             <li>การสูญหายของข้อมูลที่เกิดจากเหตุสุดวิสัย</li>
                         </ul>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">5. ทรัพย์สินทางปัญญา</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            5. ทรัพย์สินทางปัญญา
+                        </h3>
                         <p className="mb-4 text-gray-700">
-                            ระบบ เนื้อหา และข้อมูลทั้งหมดในบริการเป็นทรัพย์สินทางปัญญาของบริษัทฯ 
+                            ระบบ เนื้อหา และข้อมูลทั้งหมดในบริการเป็นทรัพย์สินทางปัญญาของบริษัทฯ
                             ท่านไม่สามารถคัดลอก แจกจ่าย หรือใช้เพื่อการค้าโดยไม่ได้รับอนุญาต
                         </p>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">6. การยกเลิกบริการ</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            6. การยกเลิกบริการ
+                        </h3>
                         <p className="mb-4 text-gray-700">
-                            บริษัทฯ ขอสงวนสิทธิ์ในการยกเลิกหรือระงับบริการของท่านได้ 
+                            บริษัทฯ ขอสงวนสิทธิ์ในการยกเลิกหรือระงับบริการของท่านได้
                             หากมีการใช้บริการผิดเงื่อนไขหรือเป็นอันตรายต่อระบบ
                         </p>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">7. การแก้ไขเงื่อนไข</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            7. การแก้ไขเงื่อนไข
+                        </h3>
                         <p className="mb-4 text-gray-700">
-                            บริษัทฯ อาจแก้ไขเงื่อนไขการใช้บริการได้ตลอดเวลา 
+                            บริษัทฯ อาจแก้ไขเงื่อนไขการใช้บริการได้ตลอดเวลา
                             โดยจะแจ้งให้ทราบล่วงหน้าผ่านระบบหรือช่องทางการติดต่อ
                         </p>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">8. กฎหมายที่ใช้บังคับ</h3>
+                        <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                            8. กฎหมายที่ใช้บังคับ
+                        </h3>
                         <p className="mb-4 text-gray-700">
                             เงื่อนไขนี้อยู่ภายใต้กฎหมายไทย และข้อพิพาทจะอยู่ในเขตอำนาจศาลไทย
                         </p>
 
                         <div className="mt-8 rounded-lg bg-gray-50 p-4">
-                            <h4 className="font-semibold text-gray-900 mb-2">ติดต่อเรา</h4>
+                            <h4 className="mb-2 font-semibold text-gray-900">ติดต่อเรา</h4>
                             <p className="text-sm text-gray-600">
-                                หากมีข้อสงสัยเกี่ยวกับเงื่อนไขการใช้บริการ กรุณาติดต่อ:<br />
-                                <strong>บริษัท กนกส์โปรดักส์ จำกัด</strong><br />
+                                หากมีข้อสงสัยเกี่ยวกับเงื่อนไขการใช้บริการ กรุณาติดต่อ:
+                                <br />
+                                <strong>บริษัท กนกโปรดักส์ จำกัด</strong>
+                                <br />
                                 โทรศัพท์: 02-451-1111 กด 2<br />
                                 <strong>เวลาทำการ:</strong> จันทร์-เสาร์ 8:00-17:00 น.
                             </p>

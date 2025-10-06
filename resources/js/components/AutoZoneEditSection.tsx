@@ -1,5 +1,3 @@
-// AutoZoneEditSection.tsx - Section สำหรับการแก้ไขโซนอัตโนมัติ
-
 import React from 'react';
 import { IrrigationZone, PlantLocation, Coordinate } from '../utils/irrigationZoneUtils';
 import { useZoneEditor } from '../hooks/useZoneEditor';

@@ -15,10 +15,10 @@ import {
     validateHeadLossRatio,
     calculateSafetyFactor,
 } from '../utils/calculations';
-import { 
-    getEnhancedFieldCropData, 
+import {
+    getEnhancedFieldCropData,
     calculateEnhancedFieldStats,
-    FieldCropData 
+    FieldCropData,
 } from '../../utils/fieldCropData';
 
 export interface ZoneCalculationData {
@@ -123,20 +123,20 @@ const calculateSprinklerBasedFlow = (
         totalSprinklers = input.totalTrees;
         flowPerSprinkler = input.waterPerTreeLiters;
         totalWaterPerMinute = totalSprinklers * flowPerSprinkler;
-        
+
         console.log('🔍 calculateSprinklerBasedFlow for field-crop:');
         console.log('- input.totalTrees:', input.totalTrees);
         console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
         console.log('- totalSprinklers:', totalSprinklers);
         console.log('- flowPerSprinkler:', flowPerSprinkler);
         console.log('- totalWaterPerMinute:', totalWaterPerMinute);
-        
+
         // Additional debug for sprinkler count
         if (totalSprinklers === 1) {
             console.warn('⚠️ totalSprinklers is 1, this might be incorrect for field-crop mode');
             console.log('- input object:', input);
         }
-        
+
         // Debug for all field-crop calculations
         console.log('🔍 Field-crop sprinkler calculation result:');
         console.log('- totalSprinklers:', totalSprinklers);
@@ -145,7 +145,7 @@ const calculateSprinklerBasedFlow = (
         console.log('- input.totalTrees:', input.totalTrees);
         console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
         console.log('- projectMode:', projectMode);
-        
+
         // Ensure we have valid values
         if (totalWaterPerMinute === 0 || isNaN(totalWaterPerMinute)) {
             console.warn('⚠️ totalWaterPerMinute is 0 or NaN, using fallback calculation');
@@ -155,8 +155,12 @@ const calculateSprinklerBasedFlow = (
                 if (fieldCropSystemDataStr) {
                     const fieldCropSystemData = JSON.parse(fieldCropSystemDataStr);
                     if (fieldCropSystemData?.sprinklerConfig?.totalFlowRatePerMinute) {
-                        totalWaterPerMinute = fieldCropSystemData.sprinklerConfig.totalFlowRatePerMinute;
-                        console.log('✅ Using totalFlowRatePerMinute from fieldCropSystemData:', totalWaterPerMinute);
+                        totalWaterPerMinute =
+                            fieldCropSystemData.sprinklerConfig.totalFlowRatePerMinute;
+                        console.log(
+                            '✅ Using totalFlowRatePerMinute from fieldCropSystemData:',
+                            totalWaterPerMinute
+                        );
                     }
                 }
             } catch (error) {
@@ -202,7 +206,8 @@ const calculateFlowRequirements = (
     if (projectMode === 'field-crop' || projectMode === 'greenhouse' || projectMode === 'garden') {
         totalSprinklers = sprinklerFlow.sprinklersUsed || input.totalTrees;
         flowPerSprinklerLPM =
-            sprinklerFlow.sprinklerFlowLPM || (totalSprinklers > 0 ? sprinklerFlow.totalFlowLPM / totalSprinklers : 0);
+            sprinklerFlow.sprinklerFlowLPM ||
+            (totalSprinklers > 0 ? sprinklerFlow.totalFlowLPM / totalSprinklers : 0);
     } else {
         totalSprinklers =
             sprinklerFlow.sprinklersUsed ||
@@ -255,13 +260,13 @@ const calculateFlowRequirements = (
     }
 
     const secondaryFlowLPM =
-        input.longestSecondaryPipeM > 0 && projectMode !== 'greenhouse' 
-            ? branchFlowLPM * maxBranchesPerSecondary 
+        input.longestSecondaryPipeM > 0 && projectMode !== 'greenhouse'
+            ? branchFlowLPM * maxBranchesPerSecondary
             : 0;
 
     const mainFlowLPM =
-        input.longestMainPipeM > 0 
-            ? projectMode === 'greenhouse' 
+        input.longestMainPipeM > 0
+            ? projectMode === 'greenhouse'
                 ? sprinklerFlow.totalFlowLPM // Greenhouse: main pipe carries total flow directly
                 : Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2)
             : 0;
@@ -731,8 +736,8 @@ const autoSelectBestPump = (
 };
 
 // Helper function to get field-crop data and convert to calculation format
-const getFieldCropCalculationData = (): { 
-    fieldCropData: FieldCropData | null; 
+const getFieldCropCalculationData = (): {
+    fieldCropData: FieldCropData | null;
     convertedInput: IrrigationInput | null;
 } => {
     try {
@@ -745,7 +750,10 @@ const getFieldCropCalculationData = (): {
         const convertedInput: IrrigationInput = {
             farmSizeRai: fieldCropData.area.sizeInRai,
             totalTrees: fieldCropData.summary.totalPlantingPoints,
-            waterPerTreeLiters: fieldCropData.summary.totalWaterRequirementPerDay / fieldCropData.summary.totalPlantingPoints / 60, // Convert to LPM per plant
+            waterPerTreeLiters:
+                fieldCropData.summary.totalWaterRequirementPerDay /
+                fieldCropData.summary.totalPlantingPoints /
+                60, // Convert to LPM per plant
             numberOfZones: fieldCropData.zones.count,
             sprinklersPerTree: 1, // Default for field-crop
             longestBranchPipeM: fieldCropData.pipes.stats.lateral.longestLength,
@@ -758,10 +766,20 @@ const getFieldCropCalculationData = (): {
             staticHeadM: 5, // Default static head
             pressureHeadM: 20, // Default pressure head
             pipeAgeYears: 0, // Default pipe age
-            sprinklersPerBranch: Math.min(25, Math.ceil(fieldCropData.summary.totalPlantingPoints / fieldCropData.zones.count / 10)),
+            sprinklersPerBranch: Math.min(
+                25,
+                Math.ceil(
+                    fieldCropData.summary.totalPlantingPoints / fieldCropData.zones.count / 10
+                )
+            ),
             branchesPerSecondary: Math.min(12, Math.ceil(fieldCropData.zones.count / 2)),
             simultaneousZones: 1, // Default simultaneous zones
-            sprinklersPerLongestBranch: Math.min(25, Math.ceil(fieldCropData.summary.totalPlantingPoints / fieldCropData.zones.count / 10)),
+            sprinklersPerLongestBranch: Math.min(
+                25,
+                Math.ceil(
+                    fieldCropData.summary.totalPlantingPoints / fieldCropData.zones.count / 10
+                )
+            ),
             branchesPerLongestSecondary: Math.min(12, Math.ceil(fieldCropData.zones.count / 2)),
             secondariesPerLongestMain: Math.min(8, Math.ceil(fieldCropData.zones.count / 3)),
         };
@@ -1015,12 +1033,12 @@ export const useCalculations = (
 
     return useMemo(() => {
         if (loading || error) return null;
-        
+
         if (!sprinklerData.length || !pumpData.length || !pipeData.length) {
             console.warn('❌ Missing equipment data:', {
                 sprinklers: sprinklerData.length,
                 pumps: pumpData.length,
-                pipes: pipeData.length
+                pipes: pipeData.length,
             });
             return null;
         }
@@ -1043,7 +1061,7 @@ export const useCalculations = (
         // For field-crop mode, try to get enhanced data from fieldCropData
         let workingInput = input;
         let fieldCropData: FieldCropData | null = null;
-        
+
         if (projectMode === 'field-crop') {
             const { fieldCropData: fcData, convertedInput } = getFieldCropCalculationData();
             if (fcData && convertedInput) {
@@ -1087,31 +1105,37 @@ export const useCalculations = (
         const analyzedSprinklers = sprinklerData
             .map((sprinkler) => {
                 const enhancedSprinkler = { ...sprinkler };
-                
+
                 // For field-crop mode, enhance sprinkler data with field-crop specific calculations
                 if (projectMode === 'field-crop' && fieldCropData) {
                     // Calculate flow requirements based on field-crop data
                     const targetFlow = sanitizedInput.waterPerTreeLiters;
                     const minFlow = targetFlow * 0.8;
                     const maxFlow = targetFlow * 1.2;
-                    
+
                     // Check if sprinkler flow matches field-crop requirements
-                    const sprinklerFlow = sprinkler.waterVolumeLitersPerMinute || sprinkler.flow || 0;
-                    enhancedSprinkler.flowMatch = sprinklerFlow >= minFlow && sprinklerFlow <= maxFlow;
-                    enhancedSprinkler.flowCloseMatch = Math.abs(sprinklerFlow - targetFlow) <= targetFlow * 0.3;
+                    const sprinklerFlow =
+                        sprinkler.waterVolumeLitersPerMinute || sprinkler.flow || 0;
+                    enhancedSprinkler.flowMatch =
+                        sprinklerFlow >= minFlow && sprinklerFlow <= maxFlow;
+                    enhancedSprinkler.flowCloseMatch =
+                        Math.abs(sprinklerFlow - targetFlow) <= targetFlow * 0.3;
                     enhancedSprinkler.targetFlow = targetFlow;
                     enhancedSprinkler.minFlow = minFlow;
                     enhancedSprinkler.maxFlow = maxFlow;
-                    
+
                     // Calculate price per flow efficiency
-                    enhancedSprinkler.pricePerFlow = sprinklerFlow > 0 ? (sprinkler.price || 0) / sprinklerFlow : 0;
-                    
+                    enhancedSprinkler.pricePerFlow =
+                        sprinklerFlow > 0 ? (sprinkler.price || 0) / sprinklerFlow : 0;
+
                     // Set recommendation status based on field-crop criteria
-                    enhancedSprinkler.isRecommended = enhancedSprinkler.flowMatch && (sprinkler.price || 0) < 1000;
-                    enhancedSprinkler.isGoodChoice = enhancedSprinkler.flowCloseMatch && (sprinkler.price || 0) < 2000;
+                    enhancedSprinkler.isRecommended =
+                        enhancedSprinkler.flowMatch && (sprinkler.price || 0) < 1000;
+                    enhancedSprinkler.isGoodChoice =
+                        enhancedSprinkler.flowCloseMatch && (sprinkler.price || 0) < 2000;
                     enhancedSprinkler.isUsable = sprinklerFlow >= minFlow * 0.5;
                 }
-                
+
                 return enhancedSprinkler;
             })
             .sort((a, b) => {
@@ -1286,7 +1310,7 @@ export const useCalculations = (
             branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
         const connectionLoss = totalHeadLoss * 0.03;
         totalHeadLoss += connectionLoss;
-        
+
         // Debug logging for field-crop mode
         if (projectMode === 'field-crop') {
             console.log('🔍 Head Loss calculation for field-crop:');
@@ -1331,31 +1355,39 @@ export const useCalculations = (
         const analyzedPumps = pumpData
             .map((pump) => {
                 const enhancedPump = evaluatePumpOverall(pump, requiredPumpFlow, pumpHeadRequired);
-                
+
                 // For field-crop mode, enhance pump data with field-crop specific calculations
                 if (projectMode === 'field-crop' && fieldCropData) {
                     // Calculate flow and head ratios for field-crop requirements
                     const pumpFlow = pump.flow_rate_lpm || pump.maxFlow || 0;
                     const pumpHead = pump.head_m || pump.maxHead || 0;
-                    
+
                     enhancedPump.flowRatio = pumpFlow > 0 ? pumpFlow / requiredPumpFlow : 0;
                     enhancedPump.headRatio = pumpHead > 0 ? pumpHead / pumpHeadRequired : 0;
-                    
+
                     // Enhanced adequacy check for field-crop
                     enhancedPump.isFlowAdequate = pumpFlow >= requiredPumpFlow * 0.9; // Allow 10% tolerance
                     enhancedPump.isHeadAdequate = pumpHead >= pumpHeadRequired * 0.9; // Allow 10% tolerance
-                    
+
                     // Calculate efficiency score for field-crop
-                    const flowEfficiency = enhancedPump.isFlowAdequate ? 1 : pumpFlow / requiredPumpFlow;
-                    const headEfficiency = enhancedPump.isHeadAdequate ? 1 : pumpHead / pumpHeadRequired;
+                    const flowEfficiency = enhancedPump.isFlowAdequate
+                        ? 1
+                        : pumpFlow / requiredPumpFlow;
+                    const headEfficiency = enhancedPump.isHeadAdequate
+                        ? 1
+                        : pumpHead / pumpHeadRequired;
                     enhancedPump.efficiencyScore = (flowEfficiency + headEfficiency) / 2;
-                    
+
                     // Set recommendation status based on field-crop criteria
-                    enhancedPump.isRecommended = enhancedPump.isFlowAdequate && enhancedPump.isHeadAdequate && (pump.price || 0) < 50000;
-                    enhancedPump.isGoodChoice = enhancedPump.efficiencyScore > 0.8 && (pump.price || 0) < 100000;
+                    enhancedPump.isRecommended =
+                        enhancedPump.isFlowAdequate &&
+                        enhancedPump.isHeadAdequate &&
+                        (pump.price || 0) < 50000;
+                    enhancedPump.isGoodChoice =
+                        enhancedPump.efficiencyScore > 0.8 && (pump.price || 0) < 100000;
                     enhancedPump.isUsable = enhancedPump.efficiencyScore > 0.6;
                 }
-                
+
                 return enhancedPump;
             })
             .sort((a, b) => {

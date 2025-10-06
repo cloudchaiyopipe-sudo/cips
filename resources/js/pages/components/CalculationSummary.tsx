@@ -68,7 +68,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             console.log('- input.totalTrees:', input.totalTrees);
             console.log('- input object:', input);
         }
-    }, [projectMode, results.totalWaterRequiredLPM, results.totalSprinklers, input.waterPerTreeLiters, input.totalTrees, input]);
+    }, [
+        projectMode,
+        results.totalWaterRequiredLPM,
+        results.totalSprinklers,
+        input.waterPerTreeLiters,
+        input.totalTrees,
+        input,
+    ]);
 
     // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
     const getActualPipeHeadLoss = useCallback(() => {
@@ -76,10 +83,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         try {
             // ลองดึงข้อมูลจาก greenhouse_pipe_calculations ก่อน
             if (projectMode === 'greenhouse') {
-                const greenhousePipeCalculationsStr = localStorage.getItem('greenhouse_pipe_calculations');
+                const greenhousePipeCalculationsStr = localStorage.getItem(
+                    'greenhouse_pipe_calculations'
+                );
                 if (greenhousePipeCalculationsStr) {
                     const pipeCalculations = JSON.parse(greenhousePipeCalculationsStr);
-
 
                     // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลักและท่อย่อย
                     const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
@@ -91,7 +99,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                     // สำหรับ greenhouse mode: เฉพาะท่อเมนหลัก + ท่อย่อย
                     const totalHeadLoss = branchHeadLoss + mainHeadLoss;
-                    
 
                     return {
                         branch: branchHeadLoss,
@@ -175,7 +182,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     const [actualHeadLoss, setActualHeadLoss] = useState(() => getActualPipeHeadLoss());
     const actualHeadLossRef = useRef(actualHeadLoss);
-    
+
     // อัปเดต ref เมื่อ state เปลี่ยน
     useEffect(() => {
         actualHeadLossRef.current = actualHeadLoss;
@@ -196,7 +203,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             // เปรียบเทียบค่าเพื่อหลีกเลี่ยงการ re-render ที่ไม่จำเป็น
             const currentHeadLossString = JSON.stringify(actualHeadLossRef.current);
             const newHeadLossString = JSON.stringify(newHeadLoss);
-            
+
             if (currentHeadLossString !== newHeadLossString) {
                 setActualHeadLoss(newHeadLoss);
             }
@@ -344,7 +351,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         } else if (projectMode === 'greenhouse') {
             // สำหรับ greenhouse mode ใช้ข้อมูลจาก plot
             if (greenhouseData && activeZone) {
-                const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                const currentPlot = greenhouseData.summary.plotStats.find(
+                    (p: any) => p.plotId === activeZone.id
+                );
                 if (currentPlot) {
                     sprinklerPressureBar = 2.5; // ค่า default สำหรับ greenhouse
                 } else {
@@ -371,7 +380,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const calculatePumpHead = () => {
         // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลัก + ท่อย่อย
         if (projectMode === 'greenhouse') {
-            const greenhouseTotalHeadLoss = (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
+            const greenhouseTotalHeadLoss =
+                (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
             return greenhouseTotalHeadLoss + sprinklerHeadLoss;
         }
         // สำหรับ mode อื่นๆ ใช้ค่าเดิม
@@ -589,16 +599,19 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             // คำนวณข้อมูลสรุปจาก greenhouse data
             const totalPlotArea = greenhouseData.summary?.totalPlotArea || 0;
             const totalAreaInRai = totalPlotArea / 1600; // แปลงจากตารางเมตรเป็นไร่
-            
+
             // รวมข้อมูลจากทุกแปลง
             const plotStats = greenhouseData.summary?.plotStats || [];
-            const totalPlants = plotStats.reduce((sum: number, plot: any) => 
-                sum + (plot.production?.totalPlants || 0), 0);
-            
+            const totalPlants = plotStats.reduce(
+                (sum: number, plot: any) => sum + (plot.production?.totalPlants || 0),
+                0
+            );
+
             // คำนวณความต้องการน้ำรวม
             let totalDailyWaterNeed = 0;
             if (greenhouseData.summary?.waterManagement?.dailyRequirement?.optimal) {
-                totalDailyWaterNeed = greenhouseData.summary.waterManagement.dailyRequirement.optimal;
+                totalDailyWaterNeed =
+                    greenhouseData.summary.waterManagement.dailyRequirement.optimal;
             } else {
                 // fallback: รวมจากแต่ละแปลง
                 totalDailyWaterNeed = plotStats.reduce((sum: number, plot: any) => {
@@ -606,13 +619,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     return sum + (waterCalc?.dailyWaterNeed?.optimal || 0);
                 }, 0);
             }
-            
+
             // คำนวณผลผลิตและรายได้รวม
-            const totalEstimatedYield = plotStats.reduce((sum: number, plot: any) => 
-                sum + (plot.production?.estimatedYield || 0), 0);
-            const totalEstimatedIncome = plotStats.reduce((sum: number, plot: any) => 
-                sum + (plot.production?.estimatedIncome || 0), 0);
-            
+            const totalEstimatedYield = plotStats.reduce(
+                (sum: number, plot: any) => sum + (plot.production?.estimatedYield || 0),
+                0
+            );
+            const totalEstimatedIncome = plotStats.reduce(
+                (sum: number, plot: any) => sum + (plot.production?.estimatedIncome || 0),
+                0
+            );
+
             return {
                 totalArea: totalAreaInRai, // ใช้หน่วยไร่เพื่อให้สอดคล้องกับ mode อื่น
                 totalZones: plotStats.length,
@@ -653,12 +670,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     return input.waterPerTreeLiters.toFixed(1);
                                 } else if (projectMode === 'greenhouse') {
                                     // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouse data
-                                
-                                    return (input.waterPerTreeLiters.toLocaleString(undefined, {
+
+                                    return input.waterPerTreeLiters.toLocaleString(undefined, {
                                         minimumFractionDigits: 0,
                                         maximumFractionDigits: 2,
-                                    }));
-                                    
+                                    });
                                 } else if (projectMode === 'field-crop') {
                                     // สำหรับ field-crop mode ใช้ข้อมูลจาก input
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
@@ -680,15 +696,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {(() => {
                                 // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลัก + ท่อย่อย
                                 if (projectMode === 'greenhouse') {
-                                    const greenhouseTotalHeadLoss = (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
+                                    const greenhouseTotalHeadLoss =
+                                        (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
                                     return greenhouseTotalHeadLoss.toFixed(1);
                                 }
                                 // สำหรับ mode อื่นๆ ใช้ค่าเดิม
                                 return actualHeadLoss.total.toFixed(1);
-                            })()} m
+                            })()}{' '}
+                            m
                         </p>
                         <p className="text-xs text-green-100">
-                            {projectMode === 'greenhouse' 
+                            {projectMode === 'greenhouse'
                                 ? t('ท่อเมนหลัก + ท่อย่อย')
                                 : systemPerformance.headLossStatus === 'good'
                                   ? t('เหมาะสม')
@@ -756,10 +774,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             💧 {t('ความต้องการน้ำทั้งโซน')}
                         </h3>
                         <p className="text-lg font-bold">
-                        {input.waterPerTreeLiters.toLocaleString(undefined, {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 2,
-                                })}{' '}
+                            {input.waterPerTreeLiters.toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                            })}{' '}
                             {t('ลิตร/นาที')}
                         </p>
                         <div className="mt-1 space-y-1 text-sm text-gray-300">
@@ -789,11 +807,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     if (currentZone) {
                                         return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                                     }
-                                } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
-                                    const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                                } else if (
+                                    projectMode === 'greenhouse' &&
+                                    greenhouseData &&
+                                    activeZone
+                                ) {
+                                    const currentPlot = greenhouseData.summary.plotStats.find(
+                                        (p: any) => p.plotId === activeZone.id
+                                    );
                                     if (currentPlot && currentPlot.production?.waterCalculation) {
                                         const waterCalc = currentPlot.production.waterCalculation;
-                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                        const flowRate =
+                                            waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
                                         return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                                     }
                                 }
@@ -813,10 +838,19 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                       })()
                                     : projectMode === 'greenhouse' && greenhouseData && activeZone
                                       ? (() => {
-                                            const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                                            if (currentPlot && currentPlot.production?.waterCalculation) {
-                                                const waterCalc = currentPlot.production.waterCalculation;
-                                                const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                            const currentPlot =
+                                                greenhouseData.summary.plotStats.find(
+                                                    (p: any) => p.plotId === activeZone.id
+                                                );
+                                            if (
+                                                currentPlot &&
+                                                currentPlot.production?.waterCalculation
+                                            ) {
+                                                const waterCalc =
+                                                    currentPlot.production.waterCalculation;
+                                                const flowRate =
+                                                    waterCalc?.waterPerPlant?.litersPerMinute ||
+                                                    6.0;
                                                 return `${t('ค่าจาก greenhouse plot:')} ${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                                             }
                                             return `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
@@ -912,19 +946,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 </span>
                             </div>
 
-                            {results.hasValidSecondaryPipe && actualHeadLoss.secondary > 0 && projectMode !== 'greenhouse' && (
-                                <div className="flex justify-between">
-                                    <span>{t('ท่อรอง:')}</span>
-                                    <span className="font-bold text-gray-50">
-                                        {actualHeadLoss.secondary.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 3,
-                                        })}{' '}
-                                        m
-                                    </span>
-                                </div>
-                            )}
-                            {((results.hasValidMainPipe && actualHeadLoss.main > 0) || (projectMode === 'greenhouse' && actualHeadLoss.main > 0)) && (
+                            {results.hasValidSecondaryPipe &&
+                                actualHeadLoss.secondary > 0 &&
+                                projectMode !== 'greenhouse' && (
+                                    <div className="flex justify-between">
+                                        <span>{t('ท่อรอง:')}</span>
+                                        <span className="font-bold text-gray-50">
+                                            {actualHeadLoss.secondary.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 3,
+                                            })}{' '}
+                                            m
+                                        </span>
+                                    </div>
+                                )}
+                            {((results.hasValidMainPipe && actualHeadLoss.main > 0) ||
+                                (projectMode === 'greenhouse' && actualHeadLoss.main > 0)) && (
                                 <div className="flex justify-between">
                                     <span>{t('ท่อหลัก:')}</span>
                                     <span className="font-bold text-gray-50">
@@ -936,18 +973,20 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     </span>
                                 </div>
                             )}
-                            {results.hasValidEmitterPipe && actualHeadLoss.emitter > 0 && projectMode !== 'greenhouse' && (
-                                <div className="flex justify-between">
-                                    <span>{t('ท่อย่อยแยก:')}</span>
-                                    <span className="font-bold text-gray-50">
-                                        {actualHeadLoss.emitter.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 3,
-                                        })}{' '}
-                                        m
-                                    </span>
-                                </div>
-                            )}
+                            {results.hasValidEmitterPipe &&
+                                actualHeadLoss.emitter > 0 &&
+                                projectMode !== 'greenhouse' && (
+                                    <div className="flex justify-between">
+                                        <span>{t('ท่อย่อยแยก:')}</span>
+                                        <span className="font-bold text-gray-50">
+                                            {actualHeadLoss.emitter.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 3,
+                                            })}{' '}
+                                            m
+                                        </span>
+                                    </div>
+                                )}
                             <div className="mt-1 border-t border-gray-500 pt-1">
                                 <div className="flex justify-between">
                                     <span className="font-medium">{t('รวม:')}</span>
@@ -957,17 +996,23 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                         {(() => {
                                             // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลัก + ท่อย่อย + หัวฉีด
                                             if (projectMode === 'greenhouse') {
-                                                const greenhouseTotalHeadLoss = (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
-                                                return (greenhouseTotalHeadLoss + sprinklerHeadLoss).toLocaleString(
-                                                    undefined,
-                                                    { minimumFractionDigits: 0, maximumFractionDigits: 2 }
-                                                );
+                                                const greenhouseTotalHeadLoss =
+                                                    (actualHeadLoss.main || 0) +
+                                                    (actualHeadLoss.branch || 0);
+                                                return (
+                                                    greenhouseTotalHeadLoss + sprinklerHeadLoss
+                                                ).toLocaleString(undefined, {
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 2,
+                                                });
                                             }
                                             // สำหรับ mode อื่นๆ ใช้ค่าเดิม
-                                            return (actualHeadLoss.total + sprinklerHeadLoss).toLocaleString(
-                                                undefined,
-                                                { minimumFractionDigits: 0, maximumFractionDigits: 2 }
-                                            );
+                                            return (
+                                                actualHeadLoss.total + sprinklerHeadLoss
+                                            ).toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            });
                                         })()}{' '}
                                         m
                                     </span>

@@ -24,7 +24,6 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
 }) => {
     const [localRotationAngle, setLocalRotationAngle] = useState(currentRotationAngle);
 
-    // อัปเดต localRotationAngle เมื่อ currentRotationAngle prop เปลี่ยน
     useEffect(() => {
         setLocalRotationAngle(currentRotationAngle);
     }, [currentRotationAngle]);
@@ -34,14 +33,12 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
     const handleSliderChange = (value: number) => {
         setLocalRotationAngle(value);
         onRotationChange(value);
-        // เรียกใช้การปรับมุมเอียงทันที
         onApplyRotation();
     };
 
     const handleReset = () => {
         setLocalRotationAngle(0.0);
         onRotationChange(0.0);
-        // เรียกใช้การปรับมุมเอียงทันที
         onApplyRotation();
     };
 

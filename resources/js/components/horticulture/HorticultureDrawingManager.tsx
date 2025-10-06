@@ -170,13 +170,10 @@ const snapPointToMainAreaBoundary = (
     return point;
 };
 
-// ใช้ฟังก์ชัน findClosestPointOnLineSegment จาก horticultureUtils.ts
 const findClosestPointOnLineSegment = utilsFindClosestPointOnLineSegment;
 
-// ใช้ฟังก์ชัน calculateDistanceBetweenPoints จาก horticultureUtils.ts
 const calculateDistanceBetweenPoints = utilsCalculateDistanceBetweenPoints;
 
-// ใช้ฟังก์ชัน calculatePipeLength จาก horticultureUtils.ts
 const calculatePipeLength = utilsCalculatePipeLength;
 
 const snapCoordinatesToMainArea = (
@@ -273,17 +270,23 @@ const advancedSnapToMainArea = (
     ).length;
 
     if (snappedCount > 0) {
-        if (typeof window !== 'undefined' && (window as unknown as { showSnapNotification?: (message: string) => void }).showSnapNotification) {
-            (window as unknown as { showSnapNotification: (message: string) => void }).showSnapNotification(
-                `${snappedCount} points snapped to main area boundary`
-            );
+        if (
+            typeof window !== 'undefined' &&
+            (window as unknown as { showSnapNotification?: (message: string) => void })
+                .showSnapNotification
+        ) {
+            (
+                window as unknown as { showSnapNotification: (message: string) => void }
+            ).showSnapNotification(`${snappedCount} points snapped to main area boundary`);
         }
     }
 
     return snappedCoordinates;
 };
 
-const extractCoordinatesFromShape = (shape: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | google.maps.Polyline): Coordinate[] => {
+const extractCoordinatesFromShape = (
+    shape: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | google.maps.Polyline
+): Coordinate[] => {
     try {
         let coordinates: Coordinate[] = [];
 
@@ -496,12 +499,9 @@ const snapSubMainPipeCoordinates = (
     mainPipes: Pipe[],
     mainArea: Coordinate[]
 ): Coordinate[] => {
-    // 🚫 ปิดการ snap ท่อ sub main ทั้งหมด - ห้ามขยับท่อ sub main!
-    // ให้คืนค่า coordinates เดิมโดยไม่มีการแก้ไขใดๆ
     return coordinates;
 };
 
-// ฟังก์ชันใหม่สำหรับ snap ไปยังท่อเมน
 const snapPointToMainPipe = (
     point: Coordinate,
     mainPipes: Pipe[],
@@ -520,7 +520,6 @@ const snapPointToMainPipe = (
             continue;
         }
 
-        // ตรวจสอบทุกส่วนของท่อเมน
         for (let i = 0; i < mainPipe.coordinates.length - 1; i++) {
             const start = mainPipe.coordinates[i];
             const end = mainPipe.coordinates[i + 1];
@@ -543,7 +542,6 @@ const snapPointToMainPipe = (
     return point;
 };
 
-// ใช้ฟังก์ชัน snap จาก horticultureUtils.ts แทนฟังก์ชันเดิม
 const snapMainPipeEndToSubMainPipe = utilsSnapMainPipeEndToSubMainPipe;
 
 const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
@@ -600,7 +598,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         }
 
         try {
-            // ตั้งค่า default drawing mode ตาม editMode
             const defaultDrawingMode = getDrawingMode(editMode);
 
             const drawingManager = new google.maps.drawing.DrawingManager({
@@ -634,7 +631,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             drawingManagerRef.current = drawingManager;
             setIsDrawingEnabled(true);
 
-            // ไม่ต้องรีเซ็ต drawing mode เป็น null แล้ว เพราะเราตั้งค่า default ไว้แล้ว
 
             drawingManager.addListener('drawingmode_changed', () => {
                 const currentMode = drawingManager.getDrawingMode();
@@ -663,7 +659,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             drawingManager.addListener('mouseout', (event) => {});
 
             drawingManager.addListener('mousemove', (event) => {
-                // จัดการ mousemove สำหรับ lateral pipe
                 if (editMode === 'lateralPipe' && onLateralPipeMouseMove) {
                     onLateralPipeMouseMove(event);
                 }
@@ -681,7 +676,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     if (editMode === 'zone' && mainArea.length > 0) {
                         coordinates = advancedSnapToMainArea(coordinates, mainArea);
                     }
-                    // ลบการ snap สำหรับ manualZone ออก
 
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'polygon');
@@ -699,7 +693,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         if (editMode === 'zone' && mainArea.length > 0) {
                             coordinates = advancedSnapToMainArea(coordinates, mainArea);
                         }
-                        // ลบการ snap สำหรับ manualZone ออก
 
                         if (coordinates.length > 0) {
                             onCreated(coordinates, 'rectangle');
@@ -716,7 +709,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     if (editMode === 'zone' && mainArea.length > 0) {
                         coordinates = advancedSnapToMainArea(coordinates, mainArea);
                     }
-                    // ลบการ snap สำหรับ manualZone ออก
 
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'circle');
@@ -739,8 +731,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     } else if (editMode === 'subMainPipe') {
                         coordinates = snapSubMainPipeCoordinates(coordinates, mainPipes, mainArea);
                     } else if (editMode === 'lateralPipe') {
-                        // สำหรับ lateral pipe ใช้ coordinates ที่วาดได้เลย
-                        // การ snap และการจัดการจะทำใน handleLateralPipeClick
+                        console.log('lateralPipe', coordinates);
                     }
 
                     if (coordinates.length > 0) {
@@ -750,9 +741,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 })
             );
 
-            // เพิ่มการจัดการคลิกที่ท่อเมนเมื่ออยู่ในโหมดวาดท่อเมนรอง
             if (editMode === 'subMainPipe' && onMainPipeClick) {
-                // สร้าง polyline สำหรับท่อเมนที่มีอยู่เพื่อให้สามารถคลิกได้
                 mainPipes.forEach((mainPipe) => {
                     if (mainPipe.coordinates && mainPipe.coordinates.length >= 2) {
                         const mainPipePolyline = new google.maps.Polyline({
@@ -769,7 +758,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             zIndex: 998,
                         });
 
-                        // เพิ่ม hover effect
                         mainPipePolyline.addListener('mouseover', () => {
                             mainPipePolyline.setOptions({
                                 strokeColor: '#FF6B6B',
@@ -784,7 +772,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             });
                         });
 
-                        // เพิ่ม click listener สำหรับท่อเมน
                         mainPipePolyline.addListener(
                             'click',
                             (event: google.maps.MapMouseEvent) => {
@@ -795,7 +782,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                                     };
                                     onMainPipeClick(mainPipe.id, clickPosition);
 
-                                    // แสดง visual feedback
                                     mainPipePolyline.setOptions({
                                         strokeColor: '#00FF00',
                                         strokeWeight: 12,
@@ -811,7 +797,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             }
                         );
 
-                        // เก็บ reference เพื่อลบภายหลัง
                         setTimeout(() => {
                             mainPipePolyline.setMap(null);
                         }, 1000);
@@ -819,9 +804,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 });
             }
 
-            // เพิ่มการจัดการคลิกที่ท่อเมนรองเมื่ออยู่ในโหมดวาดท่อย่อย
             if (editMode === 'lateralPipe' && onLateralPipeClick) {
-                // สร้าง polyline สำหรับท่อเมนรองที่มีอยู่เพื่อให้สามารถคลิกได้
                 subMainPipes.forEach((subMainPipe) => {
                     if (subMainPipe.coordinates && subMainPipe.coordinates.length >= 2) {
                         const subMainPipePolyline = new google.maps.Polyline({
@@ -838,7 +821,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             zIndex: 998,
                         });
 
-                        // เพิ่ม hover effect
                         subMainPipePolyline.addListener('mouseover', () => {
                             subMainPipePolyline.setOptions({
                                 strokeColor: '#A78BFA',
@@ -853,7 +835,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             });
                         });
 
-                        // เพิ่ม click listener สำหรับท่อเมนรอง
                         subMainPipePolyline.addListener(
                             'click',
                             (event: google.maps.MapMouseEvent) => {
@@ -864,7 +845,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                                     };
                                     onLateralPipeClick(event);
 
-                                    // แสดง visual feedback
                                     subMainPipePolyline.setOptions({
                                         strokeColor: '#00FF00',
                                         strokeWeight: 10,
@@ -880,7 +860,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             }
                         );
 
-                        // เก็บ reference เพื่อลบภายหลัง
                         setTimeout(() => {
                             subMainPipePolyline.setMap(null);
                         }, 1000);
@@ -921,12 +900,10 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         onLateralPipeMouseMove,
     ]);
 
-    // ฟังก์ชันจัดการการเริ่มต้นการวาดแบบโค้ง
     const handleStartCurvedDrawing = () => {
         setIsCurvedDrawingActive(true);
         setAnchorPointsCount(0);
 
-        // ปิด regular drawing manager โดยสมบูรณ์
         if (drawingManagerRef.current) {
             try {
                 drawingManagerRef.current.setDrawingMode(null);
@@ -938,7 +915,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             }
         }
 
-        // ซ่อน drawing controls บน UI
         try {
             if (map) {
                 const mapDiv = map.getDiv();
@@ -950,50 +926,41 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 });
             }
         } catch (e) {
-            // ignore errors
+            console.error('Error hiding drawing controls:', e);
         }
     };
 
-    // ฟังก์ชันจัดการการจบการวาดแบบโค้ง
     const handleFinishCurvedDrawing = () => {
         setIsCurvedDrawingActive(false);
         setAnchorPointsCount(0);
     };
 
-    // ฟังก์ชันจัดการการยกเลิกการวาดแบบโค้ง
+
     const handleCancelCurvedDrawing = () => {
         setIsCurvedDrawingActive(false);
         setAnchorPointsCount(0);
         setShowCurvedPipePanel(false);
     };
 
-    // ฟังก์ชันจัดการการล้างทั้งหมด
+
     const handleClearAll = () => {
         setIsCurvedDrawingActive(false);
         setAnchorPointsCount(0);
     };
 
-    // Corner rounding functionality removed as it was unused
-
-    // ฟังก์ชันจัดการเมื่อท่อโค้งเสร็จสิ้น
     const handleCurvedPipeComplete = (coordinates: Coordinate[], pipeType: string) => {
         onCreated(coordinates, pipeType);
         setIsCurvedDrawingActive(false);
         setAnchorPointsCount(0);
-
-        // Log completion info for debugging
     };
 
-    // ฟังก์ชันอัปเดตจำนวนจุดควบคุม
     const handleAnchorPointsChange = (count: number) => {
         setAnchorPointsCount(count);
     };
 
-    // Effect สำหรับแสดง control panel เมื่อเริ่มวาดท่อ
     useEffect(() => {
         if (enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe')) {
             setShowCurvedPipePanel(true);
-            // เริ่มการวาดโค้งทันทีโดยไม่ต้องกดปุ่ม "เริ่มวาด"
             setIsCurvedDrawingActive(true);
             setAnchorPointsCount(0);
         } else {
@@ -1001,7 +968,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             setIsCurvedDrawingActive(false);
         }
     }, [enableCurvedDrawing, editMode]);
-
 
     useEffect(() => {
         return () => {
@@ -1011,7 +977,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     drawingManagerRef.current.setOptions({ drawingControl: false });
                     drawingManagerRef.current.setMap(null);
                 } catch (e) {
-                    // Ignore cleanup errors
+                    console.error('Error cleaning up DrawingManager:', e);
                 }
                 drawingManagerRef.current = null;
             }
@@ -1020,7 +986,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 
     return (
         <>
-            {/* Control Panel สำหรับการวาดแบบโค้ง */}
             {enableCurvedDrawing && showCurvedPipePanel && (
                 <CurvedPipeControlPanel
                     isActive={showCurvedPipePanel}
@@ -1034,7 +999,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 />
             )}
 
-            {/* Simple Curved Pipe Drawing Manager */}
             {enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe') && (
                 <CurvedPipeDrawingManager
                     map={map}

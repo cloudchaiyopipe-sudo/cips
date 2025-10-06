@@ -86,14 +86,15 @@ axios.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-        
+
         // If it's a CSRF token mismatch and we haven't already retried
-        if ((error.response?.status === 419 || error.response?.data?.message?.includes('CSRF')) 
-            && !originalRequest._retry) {
-            
+        if (
+            (error.response?.status === 419 || error.response?.data?.message?.includes('CSRF')) &&
+            !originalRequest._retry
+        ) {
             originalRequest._retry = true;
             console.log('CSRF token mismatch detected, refreshing token and retrying...');
-            
+
             try {
                 const newToken = await refreshCsrfToken();
                 if (newToken) {
@@ -106,7 +107,7 @@ axios.interceptors.response.use(
                 console.error('Failed to refresh CSRF token:', refreshError);
             }
         }
-        
+
         return Promise.reject(error);
     }
 );

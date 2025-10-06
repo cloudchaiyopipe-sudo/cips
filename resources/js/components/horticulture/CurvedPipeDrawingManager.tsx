@@ -28,7 +28,6 @@ interface CurvedPipeDrawingManagerProps {
     onAnchorPointsChange?: (count: number) => void;
 }
 
-// ฟังก์ชันคำนวณรัศมีโค้งจากระยะการลาก (ลดความโค้งลง 90%)
 const calculateRadiusFromDragDistance = (
     cornerPoint: Coordinate,
     draggedPoint: Coordinate
@@ -37,17 +36,14 @@ const calculateRadiusFromDragDistance = (
     const lngDiff = draggedPoint.lng - cornerPoint.lng;
     const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 
-    // ลดความโค้งลงมาก - ใช้ radius เล็กมากๆ
-    const minRadius = 0.000005; // ~0.5 เมตร
-    const maxRadius = 0.00005; // ~5 เมตร (ลดจาก 50 เมตร)
+    const minRadius = 0.000005; 
+    const maxRadius = 0.00005;
 
-    // ใช้เพียง 20% ของระยะลาก เพื่อให้โค้งเบาๆ
     const adjustedDistance = distance * 0.2;
 
     return Math.max(minRadius, Math.min(maxRadius, adjustedDistance));
 };
 
-// ฟังก์ชันสร้าง Circular Arc ง่ายๆ
 const createCircularCorner = (
     prev: Coordinate,
     corner: Coordinate,
@@ -63,7 +59,6 @@ const createCircularCorner = (
 } | null => {
     if (radius <= 0) return null;
 
-    // คำนวณ unit vectors
     const v1 = {
         lat: prev.lat - corner.lat,
         lng: prev.lng - corner.lng,
@@ -152,30 +147,25 @@ const createCircularCorner = (
     };
 };
 
-// ฟังก์ชันสร้างท่อแบบใหม่: รักษาแนวท่อ + ปรับรัศมีโค้งเท่านั้น
 const createSimpleDragCurvePipe = (
     anchorPoints: Coordinate[],
-    radiusControls: Map<number, number> // lineIndex -> radius
+    radiusControls: Map<number, number>
 ): { path: Coordinate[]; guides: GuideData[] } => {
     if (anchorPoints.length < 2) {
         return { path: anchorPoints, guides: [] };
     }
 
     if (anchorPoints.length === 2) {
-        // 2 จุด = เส้นตรงธรรมดา
         const path: Coordinate[] = [];
         const lineIndex = 0;
         const customRadius = radiusControls.get(lineIndex);
 
         if (customRadius && customRadius > 0.000005) {
-            // For 2-point lines, we can create a simple curved path
-            // This is a simplified implementation for basic corner rounding
             const midPoint = {
                 lat: (anchorPoints[0].lat + anchorPoints[1].lat) / 2,
                 lng: (anchorPoints[0].lng + anchorPoints[1].lng) / 2,
             };
-            
-            // Add slight curve by offsetting the midpoint
+
             const offset = customRadius * 0.1;
             const direction = {
                 lat: anchorPoints[1].lat - anchorPoints[0].lat,
@@ -185,21 +175,20 @@ const createSimpleDragCurvePipe = (
             if (length > 0) {
                 direction.lat /= length;
                 direction.lng /= length;
-                
+
                 const perpendicular = {
                     lat: -direction.lng,
                     lng: direction.lat,
                 };
-                
+
                 midPoint.lat += perpendicular.lat * offset;
                 midPoint.lng += perpendicular.lng * offset;
             }
-            
+
             path.push(anchorPoints[0], midPoint, anchorPoints[1]);
             return { path, guides: [] };
         }
 
-        // สร้างเส้นตรงปกติ
         for (let i = 0; i <= 50; i++) {
             const t = i / 50;
             path.push({
@@ -210,27 +199,22 @@ const createSimpleDragCurvePipe = (
         return { path, guides: [] };
     }
 
-    // 3+ จุด: สร้างเส้นตรงระหว่างจุด + โค้งที่มุม
     const path: Coordinate[] = [];
     const guides: GuideData[] = [];
 
-    // สร้างเส้นโดย rounding เฉพาะมุม
-    path.push(anchorPoints[0]); // เริ่มต้นที่จุดแรก
+    path.push(anchorPoints[0]);
 
     for (let i = 1; i < anchorPoints.length - 1; i++) {
         const prev = anchorPoints[i - 1];
         const current = anchorPoints[i];
         const next = anchorPoints[i + 1];
 
-        // ดู radius control สำหรับเส้นก่อนหน้าและถัดไป
-        const prevLineRadius = radiusControls.get(i - 1) || 0; // เส้น i-1 -> i
-        const nextLineRadius = radiusControls.get(i) || 0; // เส้น i -> i+1
+        const prevLineRadius = radiusControls.get(i - 1) || 0;
+        const nextLineRadius = radiusControls.get(i) || 0;
 
-        // ใช้ radius ที่ใหญ่กว่า หรือค่าเฉลี่ย
         const effectiveRadius = Math.max(prevLineRadius, nextLineRadius);
 
         if (effectiveRadius > 0.000005) {
-            // สร้างโค้งที่มุม
             const cornerData = createCircularCorner(prev, current, next, effectiveRadius);
 
             if (cornerData) {
@@ -243,20 +227,17 @@ const createSimpleDragCurvePipe = (
                     radiusLine2: cornerData.radiusLine2,
                 });
 
-                // เพิ่มโค้ง
                 path.push(...cornerData.arc.slice(1, -1));
             } else {
                 path.push(current);
             }
         } else {
-            path.push(current); // ใช้เส้นตรง
+            path.push(current);
         }
     }
 
-    // เพิ่มจุดสุดท้าย
     path.push(anchorPoints[anchorPoints.length - 1]);
 
-    // รักษาจุดเริ่มต้นและจุดสิ้นสุดให้แน่นอน
     if (path.length > 0) {
         path[0] = { ...anchorPoints[0] };
         path[path.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
@@ -285,9 +266,8 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [guides, setGuides] = useState<GuideData[]>([]);
 
-    // Virtual radius control - แยกจาก anchor points ต้นฉบับ
-    const [radiusControls, setRadiusControls] = useState<Map<number, number>>(new Map()); // index -> radius
-    const [virtualDragMarkers, setVirtualDragMarkers] = useState<google.maps.Marker[]>([]); // virtual markers สำหรับลาก
+    const [radiusControls, setRadiusControls] = useState<Map<number, number>>(new Map());  
+    const [virtualDragMarkers, setVirtualDragMarkers] = useState<google.maps.Marker[]>([]);
 
     const previewPolylineRef = useRef<google.maps.Polyline | null>(null);
     const anchorMarkersRef = useRef<google.maps.Marker[]>([]);
@@ -295,13 +275,11 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
     const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const rightClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
-    // Guide visualization refs
     const guidePolylinesRef = useRef<google.maps.Polyline[]>([]);
     const guideCentersRef = useRef<google.maps.Marker[]>([]);
     const guideCirclesRef = useRef<google.maps.Circle[]>([]);
     const dragGuideLineRef = useRef<google.maps.Polyline | null>(null);
 
-    // สร้าง marker สำหรับแต่ละจุด (แบบใหม่: อ่านอย่างเดียว + virtual radius controls)
     const createAnchorMarker = useCallback(
         (position: Coordinate, index: number): google.maps.Marker => {
             if (!map) throw new Error('Map not available');
@@ -311,7 +289,7 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
             const marker = new google.maps.Marker({
                 position: { lat: position.lat, lng: position.lng },
                 map: map,
-                draggable: false, // 🔒 ห้ามลาก anchor points เด็ดขาด - รักษาแนวท่อ
+                draggable: false,
                 icon: {
                     path: google.maps.SymbolPath.CIRCLE,
                     scale: isEndPoint ? 10 : 8,
@@ -330,28 +308,24 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         [map]
     );
 
-    // สร้าง Virtual Radius Control Markers (สำหรับลากปรับรัศมีโค้งเท่านั้น)
     const createVirtualRadiusMarker = useCallback(
         (lineStart: Coordinate, lineEnd: Coordinate, lineIndex: number): google.maps.Marker => {
             if (!map) throw new Error('Map not available');
 
-            // คำนวณจุดกึ่งกลางของเส้น
             const midPoint = {
                 lat: (lineStart.lat + lineEnd.lat) / 2,
                 lng: (lineStart.lng + lineEnd.lng) / 2,
             };
 
-            // คำนวณทิศทางตั้งฉาก (perpendicular) ของเส้น
             const lineVector = {
                 lat: lineEnd.lat - lineStart.lat,
                 lng: lineEnd.lng - lineStart.lng,
             };
             const perpVector = {
-                lat: -lineVector.lng, // ตั้งฉาก 90 องศา
+                lat: -lineVector.lng,
                 lng: lineVector.lat,
             };
 
-            // Normalize perpendicular vector
             const length = Math.sqrt(
                 perpVector.lat * perpVector.lat + perpVector.lng * perpVector.lng
             );
@@ -360,8 +334,7 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                 perpVector.lng /= length;
             }
 
-            // ตำแหน่งเริ่มต้นของ virtual marker (ห่างจากเส้น 20 เมตร)
-            const initialOffset = 0.0002; // ~20 เมตร
+            const initialOffset = 0.0002;
             const virtualPosition = {
                 lat: midPoint.lat + perpVector.lat * initialOffset,
                 lng: midPoint.lng + perpVector.lng * initialOffset,
@@ -370,25 +343,24 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
             const virtualMarker = new google.maps.Marker({
                 position: { lat: virtualPosition.lat, lng: virtualPosition.lng },
                 map: map,
-                draggable: true, // ✅ ลากได้เฉพาะ virtual markers
+                draggable: true,
                 icon: {
                     path: google.maps.SymbolPath.CIRCLE,
                     scale: 6,
-                    fillColor: '#ff6b35', // สีส้ม แตกต่างจาก anchor points
+                    fillColor: '#ff6b35',
                     fillOpacity: 0.8,
                     strokeColor: '#ffffff',
                     strokeWeight: 2,
                 },
                 title: `ลากเพื่อปรับรัศมีโค้ง`,
                 zIndex: 1001,
-                visible: showGuides, // แสดงเฉพาะเมื่อ showGuides = true
+                visible: showGuides,
             });
 
             virtualMarker.addListener('dragstart', () => {
                 setIsDragging(true);
                 setDragIndex(lineIndex);
 
-                // แสดง guide line จากจุดกึ่งกลางไปยัง virtual marker
                 if (dragGuideLineRef.current) {
                     dragGuideLineRef.current.setPath([midPoint, virtualPosition]);
                     dragGuideLineRef.current.setVisible(true);
@@ -403,7 +375,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                         lng: newPosition.lng(),
                     };
 
-                    // คำนวณระยะห่างจากจุดกึ่งกลาง = รัศมีโค้ง
                     const dragDistance = Math.sqrt(
                         Math.pow(draggedCoord.lat - midPoint.lat, 2) +
                             Math.pow(draggedCoord.lng - midPoint.lng, 2)
@@ -411,11 +382,10 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
 
                     setRadiusControls((prev) => {
                         const newMap = new Map(prev);
-                        newMap.set(lineIndex, Math.max(0.00001, Math.min(0.0001, dragDistance))); // 1-10 เมตร
+                        newMap.set(lineIndex, Math.max(0.00001, Math.min(0.0001, dragDistance)));
                         return newMap;
                     });
 
-                    // อัปเดต guide line
                     if (dragGuideLineRef.current) {
                         dragGuideLineRef.current.setPath([midPoint, draggedCoord]);
                     }
@@ -426,7 +396,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                 setIsDragging(false);
                 setDragIndex(-1);
 
-                // ซ่อน guide line
                 if (dragGuideLineRef.current) {
                     dragGuideLineRef.current.setVisible(false);
                 }
@@ -437,7 +406,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         [map, showGuides]
     );
 
-    // อัปเดต preview path
     useEffect(() => {
         if (anchorPoints.length === 0) {
             setPreviewPath([]);
@@ -461,9 +429,8 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         }
 
         if (onAnchorPointsChange) onAnchorPointsChange(anchorPoints.length);
-    }, [anchorPoints, currentMousePosition, isDrawing, radiusControls]); // เปลี่ยนจาก dragDistances เป็น radiusControls
+    }, [anchorPoints, currentMousePosition, isDrawing, radiusControls]);
 
-    // สร้าง drag guide line (ขณะลากจะเห็นเส้นจากจุดเดิมไปจุดที่ลาก)
     useEffect(() => {
         if (!map) return;
 
@@ -498,7 +465,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         };
     }, [map]);
 
-    // จัดการการเริ่มต้น/หยุดการวาด
     useEffect(() => {
         if (isActive && !isDrawing) {
             setIsDrawing(true);
@@ -506,7 +472,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
             setRadiusControls(new Map());
 
             if (map && !mouseListenerRef.current) {
-                // ซ่อน Google Maps Drawing Manager controls
                 try {
                     const mapDiv = map.getDiv();
                     const drawingControls = mapDiv?.querySelectorAll(
@@ -518,10 +483,9 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                         }
                     });
                 } catch (e) {
-                    // ignore errors
+                    console.error(e);
                 }
 
-                // ล้าง listeners เก่า
                 if (clickListenerRef.current) {
                     google.maps.event.removeListener(clickListenerRef.current);
                     clickListenerRef.current = null;
@@ -531,7 +495,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                     rightClickListenerRef.current = null;
                 }
 
-                // เมาส์ move
                 mouseListenerRef.current = map.addListener(
                     'mousemove',
                     (event: google.maps.MapMouseEvent) => {
@@ -544,7 +507,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                     }
                 );
 
-                // คลิกซ้าย = เพิ่มจุด
                 setTimeout(() => {
                     if (map && !clickListenerRef.current) {
                         clickListenerRef.current = map.addListener(
@@ -566,14 +528,12 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                     }
                 }, 500);
 
-                // แก้ไข pointer events
                 const mapElement = map.getDiv();
                 if (mapElement) {
                     mapElement.style.pointerEvents = 'auto';
                     mapElement.style.zIndex = '1';
                 }
 
-                // คลิกขวา = จบการวาด
                 rightClickListenerRef.current = map.addListener('rightclick', () => {
                     if (anchorPoints.length >= 2) {
                         const finalResult = createSimpleDragCurvePipe(anchorPoints, radiusControls);
@@ -598,7 +558,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         }
     }, [isActive, isDrawing, map, pipeType, onPipeComplete, onCancel, isDragging]);
 
-    // อัปเดต preview polyline
     useEffect(() => {
         if (!map) return;
 
@@ -630,22 +589,18 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         };
     }, [map, previewPath, strokeColor, strokeWeight, pipeType]);
 
-    // อัปเดต anchor markers + virtual radius markers
     useEffect(() => {
-        // ล้าง markers เก่า
         anchorMarkersRef.current.forEach((marker) => marker.setMap(null));
         anchorMarkersRef.current = [];
 
         virtualDragMarkers.forEach((marker) => marker.setMap(null));
         setVirtualDragMarkers([]);
 
-        // สร้าง anchor markers ใหม่ (อ่านอย่างเดียว)
         anchorPoints.forEach((point, index) => {
             const marker = createAnchorMarker(point, index);
             anchorMarkersRef.current.push(marker);
         });
 
-        // สร้าง virtual radius control markers ระหว่างทุกเส้น
         if (anchorPoints.length >= 2 && showGuides) {
             const virtualMarkers: google.maps.Marker[] = [];
 
@@ -663,9 +618,8 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
             anchorMarkersRef.current.forEach((marker) => marker.setMap(null));
             virtualDragMarkers.forEach((marker) => marker.setMap(null));
         };
-    }, [anchorPoints, createAnchorMarker, createVirtualRadiusMarker, showGuides]); // เพิ่ม showGuides
+    }, [anchorPoints, createAnchorMarker, createVirtualRadiusMarker, showGuides]);
 
-    // อัปเดต Visual Guides
     useEffect(() => {
         if (!map) {
             guidePolylinesRef.current.forEach((polyline) => polyline.setMap(null));
@@ -677,7 +631,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
             return;
         }
 
-        // ล้าง guides เก่า
         guidePolylinesRef.current.forEach((polyline) => polyline.setMap(null));
         guideCentersRef.current.forEach((marker) => marker.setMap(null));
         guideCirclesRef.current.forEach((circle) => circle.setMap(null));
@@ -685,10 +638,8 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         guideCentersRef.current = [];
         guideCirclesRef.current = [];
 
-        // สร้าง Visual Guides ใหม่
         if (showGuides) {
             guides.forEach((guide, index) => {
-                // เส้นรัศมี
                 const radiusLine1 = new google.maps.Polyline({
                     path: guide.radiusLine1,
                     strokeColor: '#ff6b35',
@@ -707,7 +658,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                     zIndex: 1002,
                 });
 
-                // จุดศูนย์กลาง
                 const centerMarker = new google.maps.Marker({
                     position: guide.center,
                     map: map,
@@ -723,7 +673,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
                     zIndex: 1004,
                 });
 
-                // วงกลมรัศมี
                 const radiusInMeters = guide.radius * 111320;
                 if (radiusInMeters > 0.5) {
                     const previewCircle = new google.maps.Circle({
@@ -746,7 +695,6 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         }
     }, [map, guides, showGuides]);
 
-    // Cleanup
     useEffect(() => {
         return () => {
             anchorMarkersRef.current.forEach((marker) => marker.setMap(null));

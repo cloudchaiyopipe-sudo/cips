@@ -27,7 +27,6 @@ interface CurvedPipeEditorProps {
     showVisualFeedback?: boolean;
 }
 
-// ฟังก์ชันสร้าง PE pipe curve แบบเหมาะสม
 const createPEPipeCurve = (
     anchorPoints: Coordinate[],
     tension: number = 0.3,
@@ -59,7 +58,6 @@ const createPEPipeCurve = (
         allPoints.push(...segmentPoints.slice(1));
     }
 
-    // รักษาจุดปลายท่อ
     if (allPoints.length > 0) {
         allPoints[0] = { ...anchorPoints[0] };
         allPoints[allPoints.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
@@ -88,19 +86,16 @@ const createCardinalSplineSegment = (
         const t2 = t * t;
         const t3 = t2 * t;
 
-        // Cardinal spline basis functions
         const h1 = 2 * t3 - 3 * t2 + 1;
         const h2 = -2 * t3 + 3 * t2;
         const h3 = t3 - 2 * t2 + t;
         const h4 = t3 - t2;
 
-        // Tangent vectors
         const m1_lat = s * (p2.lat - p0.lat);
         const m1_lng = s * (p2.lng - p0.lng);
         const m2_lat = s * (p3.lat - p1.lat);
         const m2_lng = s * (p3.lng - p1.lng);
 
-        // Calculate point
         const lat = h1 * p1.lat + h2 * p2.lat + h3 * m1_lat + h4 * m2_lat;
         const lng = h1 * p1.lng + h2 * p2.lng + h3 * m1_lng + h4 * m2_lng;
 
@@ -110,7 +105,6 @@ const createCardinalSplineSegment = (
     return points;
 };
 
-// Keep old function for compatibility
 const createCatmullRomSegment = (
     p0: Coordinate,
     p1: Coordinate,
@@ -136,23 +130,18 @@ const extractAnchorPoints = (coordinates: Coordinate[], maxPoints: number = 8): 
     return anchorPoints;
 };
 
-// ฟังก์ชันสร้างโค้งที่รักษาจุดปลายท่อสำหรับ PE
-// ใช้ Perfect Circular Corner Algorithm เดียวกับ CurvedPipeDrawingManager
-
-// Copy ฟังก์ชันจาก CurvedPipeDrawingManager เพื่อให้ใช้อัลกอริทึมเดียวกัน
 const calculateCornerRadius = (
     angle: number,
     tension: number = 0.3,
-    minRadius: number = 0.000025, // ~2.5 เมตร
-    maxRadius: number = 0.000085 // ~8.5 เมตร
+    minRadius: number = 0.000025,
+    maxRadius: number = 0.000085
 ): number => {
     const absAngle = Math.abs(angle);
-    if (absAngle < 0.12) return 0; // เกณฑ์มุมขั้นต่ำ - โค้งได้ง่ายขึ้น
+    if (absAngle < 0.12) return 0;
     const sharpnessFactor = Math.sin(absAngle / 2);
-    return minRadius + (maxRadius - minRadius) * sharpnessFactor * tension * 0.5; // ลดเป็น 50%
+    return minRadius + (maxRadius - minRadius) * sharpnessFactor * tension * 0.5;
 };
 
-// ฟังก์ชันง่ายๆ สำหรับสร้างโค้งที่เป็นธรรมชาติ
 const createCircularCorner = (
     prev: Coordinate,
     corner: Coordinate,
@@ -170,7 +159,6 @@ const createCircularCorner = (
 } | null => {
     if (radius <= 0) return null;
 
-    // สร้างเวกเตอร์ทิศทาง - วิธีเดิมที่ทำงานได้ดี
     const v1 = {
         lat: prev.lat - corner.lat,
         lng: prev.lng - corner.lng,
@@ -185,7 +173,6 @@ const createCircularCorner = (
 
     if (len1 === 0 || len2 === 0) return null;
 
-    // Normalize vectors
     v1.lat /= len1;
     v1.lng /= len1;
     v2.lat /= len2;
@@ -209,7 +196,6 @@ const createCircularCorner = (
         lng: corner.lng + v2.lng * tangentDistance,
     };
 
-    // หาจุดศูนย์กลาง
     const bisector = {
         lat: (v1.lat + v2.lat) / 2,
         lng: (v1.lng + v2.lng) / 2,
@@ -227,7 +213,6 @@ const createCircularCorner = (
         lng: corner.lng + bisector.lng * centerDistance,
     };
 
-    // สร้างส่วนโค้งแบบง่าย
     const startAngle = Math.atan2(tangent1.lat - center.lat, tangent1.lng - center.lng);
     const endAngle = Math.atan2(tangent2.lat - center.lat, tangent2.lng - center.lng);
 
@@ -289,29 +274,22 @@ const createPEPipeWithCircularCorners = (
         const prev = i > 0 ? anchorPoints[i - 1] : null;
         const next = i < anchorPoints.length - 1 ? anchorPoints[i + 1] : null;
 
-        if (i === 0) {
-            // จุดเริ่มต้น - เก็บไว้เป็นจุดแรก
+        if (i === 0) {  
             path.push(current);
         } else if (i === anchorPoints.length - 1) {
-            // จุดสุดท้าย - เก็บไว้เป็นจุดสุดท้าย
             path.push(current);
         } else {
-            // จุดกลาง - สร้างโค้งแบบที่ไม่ทำให้ท่อล้ม
             const angle = calculateCornerAngle(prev!, current, next!);
             const radius = calculateCornerRadius(angle, tension);
             const cornerData = createCircularCorner(prev!, current, next!, radius);
 
             if (cornerData && radius > 0 && Math.abs(angle) > 0.15) {
-                // เส้นตรงจากจุดก่อนหน้าไปยัง tangent1 (รักษาทิศทางเส้นตรงเดิม)
                 path.push(cornerData.tangent1);
 
-                // ส่วนโค้งที่จุดมุม
                 path.push(...cornerData.arc);
 
-                // เส้นตรงจาก tangent2 ไปยังจุดถัดไป (รักษาทิศทางเส้นตรงเดิม)
                 path.push(cornerData.tangent2);
             } else {
-                // มุมไม่ชัดพอ ให้เป็นเส้นตรงผ่าน
                 path.push(current);
             }
         }
@@ -333,7 +311,6 @@ const createSmoothCurvePreservingEnds = (
     return createPEPipeWithCircularCorners(anchorPoints, tension, segments);
 };
 
-// ฟังก์ชันคำนวณมุมที่จุดมุม
 const calculateCornerAngle = (p1: Coordinate, corner: Coordinate, p3: Coordinate): number => {
     const v1 = { x: p1.lat - corner.lat, y: p1.lng - corner.lng };
     const v2 = { x: p3.lat - corner.lat, y: p3.lng - corner.lng };
@@ -362,7 +339,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     );
     const [editingPipeId, setEditingPipeId] = useState<string | null>(null);
 
-    // เพิ่ม refs สำหรับเส้นไกด์เรียลไทม์
     const realTimeGuideRefs = useRef<Map<string, google.maps.Polyline[]>>(new Map());
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragMarkerInfo, setDragMarkerInfo] = useState<{
@@ -370,7 +346,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
         markerIndex: number;
     } | null>(null);
 
-    // ฟังก์ชันสำหรับแสดงเส้นไกด์เรียลไทม์
     const showRealTimeGuides = useCallback(
         (pipeId: string, markerIndex: number, currentPosition: Coordinate) => {
             if (!map || !showVisualFeedback || !editMode) return;
@@ -378,38 +353,30 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
             const pipe = pipes.find((p) => p.id === pipeId);
             if (!pipe || !pipe.isEditing) return;
 
-            // ตรวจสอบความถูกต้องของ markerIndex
             if (markerIndex < 0 || markerIndex >= pipe.anchorPoints.length) return;
 
-            // ล้างเส้นไกด์เก่า
             const existingGuides = realTimeGuideRefs.current.get(pipeId) || [];
             existingGuides.forEach((guide) => guide.setMap(null));
 
             const guides: google.maps.Polyline[] = [];
 
-            // คำนวณเส้นไกด์สำหรับมุมโค้ง
             const anchorPoints = [...pipe.anchorPoints];
             anchorPoints[markerIndex] = currentPosition;
 
-            // สร้างเส้นไกด์แสดงรัศมีโค้ง
             if (markerIndex > 0 && markerIndex < anchorPoints.length - 1) {
                 const prevPoint = anchorPoints[markerIndex - 1];
                 const nextPoint = anchorPoints[markerIndex + 1];
 
-                // ตรวจสอบว่า prevPoint และ nextPoint มีอยู่จริง
                 if (!prevPoint || !nextPoint || !pipe.anchorPoints[markerIndex]) return;
 
                 try {
-                    // คำนวณรัศมีจากระยะลาง - ใช้วิธีง่ายๆ
                     const dragDistance = Math.sqrt(
                         Math.pow(currentPosition.lat - pipe.anchorPoints[markerIndex].lat, 2) +
                             Math.pow(currentPosition.lng - pipe.anchorPoints[markerIndex].lng, 2)
                     );
 
-                    // ปรับความโค้งให้เหมาะสม - ลางนิดเดียวได้โค้งนิดเดียว แต่เห็นชัดเจน
                     const radius = Math.max(0.000004, Math.min(0.000015, dragDistance * 0.25));
 
-                    // สร้าง circular corner preview
                     const cornerResult = createCircularCorner(
                         prevPoint,
                         currentPosition,
@@ -418,37 +385,31 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                     );
 
                     if (cornerResult && cornerResult.arc && cornerResult.arc.length > 0) {
-                        // สร้างท่อโค้งตามความต้องการ: เส้นตรง -> โค้ง -> เส้นตรง
                         const realPipePath: Coordinate[] = [];
 
-                        // เส้นตรงจาก prevPoint ไปยัง tangent1
                         realPipePath.push(prevPoint);
                         realPipePath.push(cornerResult.tangent1);
 
-                        // ส่วนโค้ง
                         realPipePath.push(...cornerResult.arc);
 
-                        // เส้นตรงจาก tangent2 ไปยัง nextPoint
                         realPipePath.push(cornerResult.tangent2);
                         realPipePath.push(nextPoint);
 
-                        // สร้างเส้นไกด์ท่อโค้งที่เห็นชัดมาก
                         const pipeGuide = new google.maps.Polyline({
                             path: realPipePath.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                             geodesic: false,
-                            strokeColor: '#00FF00', // เขียวสดใส
-                            strokeOpacity: 1.0, // ทึบสนิท
-                            strokeWeight: 6, // หนามาก
+                            strokeColor: '#00FF00',
+                            strokeOpacity: 1.0,
+                            strokeWeight: 6,
                             map: map,
-                            zIndex: 2000, // zIndex สูงสุด
+                            zIndex: 2000,
                             clickable: false,
                         });
 
                         guides.push(pipeGuide);
                     }
                 } catch (error) {
-                    console.warn('Error creating real-time guides:', error);
-                    // ไม่ทำอะไรเพิ่มเติมเพื่อป้องกัน crash
+                    console.error(error);
                 }
             }
 
@@ -457,7 +418,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
         [map, pipes, showVisualFeedback]
     );
 
-    // ฟังก์ชันสำหรับซ่อนเส้นไกด์
     const hideRealTimeGuides = useCallback((pipeId: string) => {
         const guides = realTimeGuideRefs.current.get(pipeId) || [];
         guides.forEach((guide) => guide.setMap(null));
@@ -497,12 +457,10 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                     return;
                 }
 
-                // เริ่มการแสดงเส้นไกด์เรียลไทม์
                 setIsDragging(true);
                 setDragMarkerInfo({ pipeId, markerIndex: index });
             });
 
-            // เพิ่ม drag event สำหรับการแสดงเส้นไกด์เรียลไทม์
             marker.addListener('drag', () => {
                 const currentPosition = marker.getPosition();
                 if (currentPosition && !isEndPoint && showVisualFeedback) {
@@ -515,7 +473,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
             });
 
             marker.addListener('dragend', () => {
-                // ซ่อนเส้นไกด์เรียลไทม์
                 setIsDragging(false);
                 setDragMarkerInfo(null);
                 hideRealTimeGuides(pipeId);
@@ -531,7 +488,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                             lng: newPosition.lng(),
                         };
 
-                        // รักษาจุดปลายท่อให้คงที่ (วิธีง่ายๆ)
                         if (updatedAnchorPoints.length > 0) {
                             const originalEndPoints = originalEndPointsRef.current.get(pipeId);
                             const originalFirst = originalEndPoints?.first || {
@@ -550,12 +506,10 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                                 });
                             }
 
-                            // บังคับให้จุดปลายคงที่
                             updatedAnchorPoints[0] = originalFirst;
                             updatedAnchorPoints[updatedAnchorPoints.length - 1] = originalLast;
                         }
 
-                        // สร้างท่อใหม่ด้วยการตั้งค่าที่เพิ่มความโค้ง
                         const newCoordinates = createPEPipeWithCircularCorners(
                             updatedAnchorPoints,
                             0.25,
@@ -564,7 +518,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                         onPipeUpdate(pipeId, newCoordinates);
                     }
                 } else if (newPosition && isEndPoint) {
-                    // จุดปลายไม่สามารถเลื่อนได้
                     marker.setPosition({ lat: position.lat, lng: position.lng });
                 }
             });
@@ -595,13 +548,12 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
         (pipe: EditablePipe): google.maps.Polyline => {
             if (!map) throw new Error('Map not available');
 
-            // กำหนดสีตามประเภทท่อ
             let pipeColor = strokeColor;
             if (!pipe.isEditing) {
                 if (pipe.type === 'mainPipe') {
-                    pipeColor = '#FF0000'; // สีแดงสำหรับท่อเมน
+                    pipeColor = '#FF0000';
                 } else if (pipe.type === 'subMainPipe') {
-                    pipeColor = '#8B5CF6'; // สีม่วงสำหรับท่อเมนรอง
+                    pipeColor = '#8B5CF6';
                 }
             }
 
@@ -819,10 +771,8 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
         });
     }, [editMode]);
 
-    // ทำความสะอาดเส้นไกด์เรียลไทม์เมื่อออกจากโหมดการแก้ไข
     useEffect(() => {
         if (!editMode) {
-            // ล้างเส้นไกด์ทั้งหมดเมื่อออกจากโหมดการแก้ไข
             realTimeGuideRefs.current.forEach((guides) => {
                 guides.forEach((guide) => guide.setMap(null));
             });
@@ -834,7 +784,6 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
 
     useEffect(() => {
         return () => {
-            // ทำความสะอาดเมื่อ component ถูก unmount
             polylineRefs.current.forEach((polyline) => polyline.setMap(null));
             anchorMarkerRefs.current.forEach((markers) => {
                 markers.forEach((marker) => marker.setMap(null));

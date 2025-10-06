@@ -15,10 +15,10 @@ import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
-import { 
+import {
     FieldCropSystemData,
     getEnhancedFieldCropData,
-    calculateEnhancedFieldStats
+    calculateEnhancedFieldStats,
 } from '../../utils/fieldCropData';
 
 // Reduce verbose logs in production/dev by toggling these flags
@@ -3217,12 +3217,12 @@ const buildZoneConnectivityLongestFlows = (
 
     // Flow from lateral sprinklers
     const perSprinkler = flowSettings?.sprinkler_system?.flow ?? 0;
-    
+
     // Debug logging for flow settings
     if (perSprinkler === 0) {
         // No flow settings available
     }
-    
+
     // ฟังก์ชันสำหรับหาสปริงเกลอร์ที่เชื่อมต่อกับท่อย่อยแบบโหมดระหว่างแถว
     const findNearbyConnectedSprinklersBetweenRows = (
         coordinates: Coordinate[],
@@ -3836,13 +3836,15 @@ export default function FieldCropSummary() {
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<
         Record<string, ZoneSummary>
     >({});
-    const [zoneIrrigationCounts, setZoneIrrigationCounts] = useState<Array<{
-        sprinkler: number;
-        dripTape: number;
-        pivot: number;
-        waterJetTape: number;
-        total: number;
-    }>>([]);
+    const [zoneIrrigationCounts, setZoneIrrigationCounts] = useState<
+        Array<{
+            sprinkler: number;
+            dripTape: number;
+            pivot: number;
+            waterJetTape: number;
+            total: number;
+        }>
+    >([]);
 
     // Enhanced state for Google Maps and image capture
     const [mapImageCaptured, setMapImageCaptured] = useState<boolean>(false);
@@ -4238,7 +4240,13 @@ export default function FieldCropSummary() {
 
             return () => clearTimeout(timer);
         }
-    }, [summaryData, mapImageCaptured, isCapturingImage, handleCaptureMapImage, zoneIrrigationCounts]);
+    }, [
+        summaryData,
+        mapImageCaptured,
+        isCapturingImage,
+        handleCaptureMapImage,
+        zoneIrrigationCounts,
+    ]);
 
     // Enhanced manual capture function with user feedback
     const handleManualCapture = async () => {
@@ -4409,8 +4417,7 @@ export default function FieldCropSummary() {
     }, [summaryData]);
 
     // Debug logging for irrigation settings
-    useEffect(() => {
-    }, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
+    useEffect(() => {}, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
 
     // Build global pipe network connectivity & flow summary
     const pipeNetworkSummary = useMemo(() => {
@@ -4464,11 +4471,11 @@ export default function FieldCropSummary() {
                 waterJetTape: number;
                 total: number;
             }> = [];
-            
+
             // Load zoneAssignments and irrigationAssignments from localStorage if not in props
             let zAssign: Record<string, string> = {};
             let iAssign: Record<string, string> = {};
-            
+
             if (zoneAssignments && typeof zoneAssignments === 'object') {
                 zAssign = zoneAssignments as Record<string, string>;
             } else {
@@ -4484,7 +4491,7 @@ export default function FieldCropSummary() {
                 } catch (error) {
                     console.warn('Failed to load zoneAssignments from localStorage:', error);
                 }
-                
+
                 // If still empty, create from zones with cropType
                 if (Object.keys(zAssign).length === 0) {
                     zones.forEach((zone) => {
@@ -4494,7 +4501,7 @@ export default function FieldCropSummary() {
                     });
                 }
             }
-            
+
             if (irrigationAssignments && typeof irrigationAssignments === 'object') {
                 iAssign = irrigationAssignments as Record<string, string>;
             } else {
@@ -4510,7 +4517,7 @@ export default function FieldCropSummary() {
                 } catch (error) {
                     console.warn('Failed to load irrigationAssignments from localStorage:', error);
                 }
-                
+
                 // If still empty, create default irrigation assignments
                 if (Object.keys(iAssign).length === 0) {
                     zones.forEach((zone) => {
@@ -4549,12 +4556,15 @@ export default function FieldCropSummary() {
             console.log('🌾 [FIELD-CROP-SUMMARY] Zones Array:', zones);
             console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (from props):', zoneAssignments);
             console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (loaded):', zAssign);
-            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (from props):', irrigationAssignments);
+            console.log(
+                '🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (from props):',
+                irrigationAssignments
+            );
             console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (loaded):', iAssign);
             console.log('🌾 [FIELD-CROP-SUMMARY] Pipes Data:', pipes);
             console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Points:', irrigationPoints);
             console.log('🌾 [FIELD-CROP-SUMMARY] Plant Points:', actualPlantPoints);
-            
+
             // Detailed zone information
             const allZonesData = zones.map((zone: Zone) => ({
                 id: zone.id,
@@ -4563,11 +4573,11 @@ export default function FieldCropSummary() {
                 coordinates: zone.coordinates,
                 cropType: zone.cropType,
                 assignedCrop: zAssign[zone.id.toString()],
-                irrigationType: iAssign[zone.id.toString()]
+                irrigationType: iAssign[zone.id.toString()],
             }));
             console.log('🌾 [FIELD-CROP-SUMMARY] All Zones Detailed Data:', allZonesData);
             console.log('🌾 [FIELD-CROP-SUMMARY] ===== END ZONE DATA =====');
-            
+
             zones.forEach((zone: Zone) => {
                 const zoneId = zone.id.toString();
                 let assignedCropValue = zone.cropType || zAssign[zoneId];
@@ -4597,12 +4607,15 @@ export default function FieldCropSummary() {
                         // Use plant count from zone object first (calculated in zone-obstacle.tsx)
                         let totalPlantingPoints = 0;
                         let actualPlantsInZone = 0;
-                        
+
                         // Check if zone has plantCount property (from zone-obstacle.tsx calculation)
                         if (typeof zone.plantCount === 'number' && zone.plantCount > 0) {
                             totalPlantingPoints = zone.plantCount;
                             actualPlantsInZone = zone.plantCount;
-                            console.log(`Using zone plantCount for zone ${zoneId}:`, totalPlantingPoints);
+                            console.log(
+                                `Using zone plantCount for zone ${zoneId}:`,
+                                totalPlantingPoints
+                            );
                         } else {
                             // Fallback to calculation methods
                             try {
@@ -4624,7 +4637,9 @@ export default function FieldCropSummary() {
                                     ]);
                                     actualPlantsInZone = actualPlantPoints.reduce((acc, pt) => {
                                         const p = turf.point([pt.lng, pt.lat]);
-                                        return acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0);
+                                        return (
+                                            acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0)
+                                        );
                                     }, 0);
                                 }
                             } catch {
@@ -4688,7 +4703,7 @@ export default function FieldCropSummary() {
                             zone,
                             actualIrrigationPoints
                         );
-                        
+
                         // เก็บ zoneIrrigationCounts ไว้ใน array
                         newZoneIrrigationCounts.push(zoneIrrigationCounts);
 
@@ -5024,13 +5039,22 @@ export default function FieldCropSummary() {
         calculateZoneIrrigationCounts(zone, uniqueIrrigationPoints)
     );
 
-    const sprinklerPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + counts.sprinkler, 0);
-    const pivotPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + (counts.pivot || 0), 0);
+    const sprinklerPoints = calculatedZoneIrrigationCounts.reduce(
+        (sum, counts) => sum + counts.sprinkler,
+        0
+    );
+    const pivotPoints = calculatedZoneIrrigationCounts.reduce(
+        (sum, counts) => sum + (counts.pivot || 0),
+        0
+    );
     const waterJetPoints = calculatedZoneIrrigationCounts.reduce(
         (sum, counts) => sum + (counts.waterJetTape || 0),
         0
     );
-    const dripPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + counts.dripTape, 0);
+    const dripPoints = calculatedZoneIrrigationCounts.reduce(
+        (sum, counts) => sum + counts.dripTape,
+        0
+    );
 
     // Debug: ตรวจสอบการคำนวณจำนวน irrigation points รวม
     dbg('🔍 Total irrigation points calculation:', {
@@ -5156,7 +5180,7 @@ export default function FieldCropSummary() {
         try {
             // Capture map image first
             setCaptureStatus('กำลังบันทึกภาพแผนที่...');
-            
+
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
             const html2canvas = await import('html2canvas');
@@ -5254,8 +5278,11 @@ export default function FieldCropSummary() {
 
                 if (fieldData && zoneIrrigationCounts.length > 0) {
                     // คำนวณจำนวนสปริงเกลอร์รวมทั้งหมด
-                    const totalSprinklerCount = zoneIrrigationCounts.reduce((total, count) => total + count.sprinkler, 0);
-                    
+                    const totalSprinklerCount = zoneIrrigationCounts.reduce(
+                        (total, count) => total + count.sprinkler,
+                        0
+                    );
+
                     // ใช้ค่าอัตราการไหลจาก irrigationSettingsData
                     const sprinklerSettings = irrigationSettingsData?.sprinkler_system;
                     const flowRatePerSprinkler = sprinklerSettings?.flow || 2.5; // ลิตร/นาที ต่อหัวฉีด
@@ -5273,16 +5300,22 @@ export default function FieldCropSummary() {
                         connectionStats: [], // Can be enhanced later
                         zones: fieldData.zones.info.map((zone, index) => {
                             // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts state แทน totalPlantingPoints
-                            const zoneIrrigationCount = zoneIrrigationCounts[index] || { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
+                            const zoneIrrigationCount = zoneIrrigationCounts[index] || {
+                                sprinkler: 0,
+                                dripTape: 0,
+                                pivot: 0,
+                                waterJetTape: 0,
+                                total: 0,
+                            };
                             // ใช้แค่จำนวนสปริงเกลอร์ ไม่รวม drip tape, pivot, water jet tape
                             const actualSprinklerCount = zoneIrrigationCount.sprinkler;
-                            
+
                             // คำนวณน้ำต่อต้น (หัวฉีด) = อัตราการไหลต่อหัวฉีด
                             const waterPerTree = flowRatePerSprinkler; // ลิตร/นาที ต่อหัวฉีด
 
                             // คำนวณปริมาณน้ำต่อครั้ง (ลิตร/ครั้ง) จากข้อมูลที่คำนวณไว้แล้ว
                             const waterPerIrrigation = actualSprinklerCount * waterPerTree * 30; // ลิตร/ครั้ง
-                            
+
                             return {
                                 id: zone.id,
                                 name: zone.name,
@@ -5326,15 +5359,27 @@ export default function FieldCropSummary() {
                     };
 
                     // Save system data to localStorage (similar to horticulture and greenhouse)
-                    localStorage.setItem('fieldCropSystemData', JSON.stringify(fieldCropSystemData));
-                    
+                    localStorage.setItem(
+                        'fieldCropSystemData',
+                        JSON.stringify(fieldCropSystemData)
+                    );
+
                     // Debug: แสดงข้อมูลที่สร้าง fieldCropSystemData
-                    console.log('🌾 [FIELD-CROP-SUMMARY] Created fieldCropSystemData:', fieldCropSystemData);
-                    console.log('🌾 [FIELD-CROP-SUMMARY] Zone Irrigation Counts:', zoneIrrigationCounts);
-                    console.log('🌾 [FIELD-CROP-SUMMARY] Total Sprinkler Count:', totalSprinklerCount);
+                    console.log(
+                        '🌾 [FIELD-CROP-SUMMARY] Created fieldCropSystemData:',
+                        fieldCropSystemData
+                    );
+                    console.log(
+                        '🌾 [FIELD-CROP-SUMMARY] Zone Irrigation Counts:',
+                        zoneIrrigationCounts
+                    );
+                    console.log(
+                        '🌾 [FIELD-CROP-SUMMARY] Total Sprinkler Count:',
+                        totalSprinklerCount
+                    );
                     localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
                     localStorage.setItem('projectType', 'field-crop');
-                    
+
                     // Navigate to product page using router (similar to greenhouse)
                     router.visit('/product?mode=field-crop');
                 } else {
@@ -6893,6 +6938,7 @@ export default function FieldCropSummary() {
                                                                                                             {t(
                                                                                                                 'longest'
                                                                                                             )}
+
                                                                                                             )
                                                                                                         </td>
                                                                                                         <td className="border border-cyan-700/50 px-2 py-1 font-bold print:border-cyan-300">
@@ -6922,6 +6968,7 @@ export default function FieldCropSummary() {
                                                                                                             {t(
                                                                                                                 'longest'
                                                                                                             )}
+
                                                                                                             )
                                                                                                         </td>
                                                                                                         <td className="border border-cyan-700/50 px-2 py-1 font-bold print:border-cyan-300">
@@ -6951,6 +6998,7 @@ export default function FieldCropSummary() {
                                                                                                             {t(
                                                                                                                 'longest'
                                                                                                             )}
+
                                                                                                             )
                                                                                                         </td>
                                                                                                         <td className="border border-cyan-700/50 px-2 py-1 font-bold print:border-cyan-300">
@@ -7158,6 +7206,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'Most outlets'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     <span className="font-bold">
                                                                                                         {(most.units <
@@ -7531,6 +7580,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'L-shape'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.red
@@ -7543,6 +7593,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'T-shape'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.blue
@@ -7555,6 +7606,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         '+ shape'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.purple
@@ -7567,6 +7619,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'Junction'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.yellow
@@ -7579,6 +7632,7 @@ export default function FieldCropSummary() {
                                                                                                     {t(
                                                                                                         'Crossing'
                                                                                                     )}
+
                                                                                                     :{' '}
                                                                                                     {
                                                                                                         zoneConnectionCounts.green
