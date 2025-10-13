@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
@@ -16,10 +15,7 @@ import {
 import {
     universalSearch,
     detectCoordinatePattern,
-    formatCoordinatesDisplay,
-    createMapsUrlFromCoordinates,
     SearchResult as PlacesSearchResult,
-    SearchError,
 } from '../../utils/placesApiUtils';
 
 interface SearchResult {
@@ -100,7 +96,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [showCategories, setShowCategories] = useState(false);
     const [isCoordinateSearch, setIsCoordinateSearch] = useState(false);
-    const [lastSearchType, setLastSearchType] = useState<'text' | 'coordinate'>('text');
+    const [, setLastSearchType] = useState<'text' | 'coordinate'>('text');
 
     useEffect(() => {
         const stored = localStorage.getItem('recentMapSearches');
@@ -159,6 +155,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 document.body.removeChild(mapDiv);
             };
         } catch (error) {
+            console.error('Failed to initialize search system:', error);
             setError('ไม่สามารถเริ่มต้นระบบค้นหาได้');
         }
     }, [isGoogleMapsReady]);
@@ -276,13 +273,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return '฿'.repeat(priceLevel);
     };
 
-    const formatDistance = (meters: number): string => {
-        if (meters < 1000) {
-            return `${Math.round(meters)} ม.`;
-        }
-        return `${(meters / 1000).toFixed(1)} กม.`;
-    };
-
     const searchWithPredictions = useCallback(async (query: string) => {
         if (!autocompleteServiceRef.current || query.length < 2) {
             setAutocompletePredictions([]);
@@ -300,47 +290,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 setAutocompletePredictions(predictions.slice(0, 5));
             } else {
                 setAutocompletePredictions([]);
-            }
-        });
-    }, []);
-
-    const performTextSearch = useCallback(async (query: string) => {
-        if (!searchServiceRef.current || !query.trim()) return;
-
-        setIsLoading(true);
-        setError(null);
-
-        const request: google.maps.places.TextSearchRequest = {
-            query: query,
-            language: 'th',
-        };
-
-        searchServiceRef.current.textSearch(request, (results, status) => {
-            setIsLoading(false);
-
-            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                const detailedResults = results.slice(0, 10).map((place) => ({
-                    place_id: place.place_id || '',
-                    name: place.name || '',
-                    formatted_address: place.formatted_address || place.vicinity || '',
-                    geometry: place.geometry!,
-                    types: place.types || [],
-                    rating: place.rating,
-                    user_ratings_total: place.user_ratings_total,
-                    photos: place.photos,
-                    opening_hours: place.opening_hours,
-                    price_level: place.price_level,
-                    business_status: place.business_status,
-                    vicinity: place.vicinity,
-                }));
-
-                setSearchResults(detailedResults);
-                setShowResults(true);
-            } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                setSearchResults([]);
-                setError('ไม่พบผลการค้นหา');
-            } else {
-                setError('เกิดข้อผิดพลาดในการค้นหา');
             }
         });
     }, []);
@@ -498,6 +447,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowResults(true);
                         }
                     } catch (err) {
+                        console.error('Error in search:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -535,6 +485,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowResults(true);
                         }
                     } catch (err) {
+                        console.error('Error in search:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -650,7 +601,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         if (!photos || photos.length === 0) return null;
         try {
             return photos[0].getUrl({ maxWidth: 100, maxHeight: 100 });
-        } catch (e) {
+        } catch {
             return null;
         }
     };
@@ -768,7 +719,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                 <h3 className="mb-2 text-sm font-semibold text-gray-700">
                                     ค้นหาล่าสุด
                                 </h3>
-                                {recentSearches.map((recent, index) => (
+                                {recentSearches.map((recent) => (
                                     <div
                                         key={recent.place_id}
                                         onClick={() => handleRecentSearchSelect(recent)}

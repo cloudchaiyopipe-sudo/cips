@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
@@ -27,108 +26,108 @@ interface CurvedPipeEditorProps {
     showVisualFeedback?: boolean;
 }
 
-const createPEPipeCurve = (
-    anchorPoints: Coordinate[],
-    tension: number = 0.3,
-    segments: number = 50
-): Coordinate[] => {
-    if (anchorPoints.length < 2) return anchorPoints;
+// const createPEPipeCurve = (
+//     anchorPoints: Coordinate[],
+//     tension: number = 0.3,
+//     segments: number = 50
+// ): Coordinate[] => {
+//     if (anchorPoints.length < 2) return anchorPoints;
 
-    if (anchorPoints.length === 2) {
-        const points: Coordinate[] = [];
-        for (let i = 0; i <= segments; i++) {
-            const t = i / segments;
-            const lat = anchorPoints[0].lat + t * (anchorPoints[1].lat - anchorPoints[0].lat);
-            const lng = anchorPoints[0].lng + t * (anchorPoints[1].lng - anchorPoints[0].lng);
-            points.push({ lat, lng });
-        }
-        return points;
-    }
+//     if (anchorPoints.length === 2) {
+//         const points: Coordinate[] = [];
+//         for (let i = 0; i <= segments; i++) {
+//             const t = i / segments;
+//             const lat = anchorPoints[0].lat + t * (anchorPoints[1].lat - anchorPoints[0].lat);
+//             const lng = anchorPoints[0].lng + t * (anchorPoints[1].lng - anchorPoints[0].lng);
+//             points.push({ lat, lng });
+//         }
+//         return points;
+//     }
 
-    const allPoints: Coordinate[] = [];
-    allPoints.push(anchorPoints[0]);
+//     const allPoints: Coordinate[] = [];
+//     allPoints.push(anchorPoints[0]);
 
-    for (let i = 0; i < anchorPoints.length - 1; i++) {
-        const p0 = i === 0 ? anchorPoints[0] : anchorPoints[i - 1];
-        const p1 = anchorPoints[i];
-        const p2 = anchorPoints[i + 1];
-        const p3 = i === anchorPoints.length - 2 ? anchorPoints[i + 1] : anchorPoints[i + 2];
+//     for (let i = 0; i < anchorPoints.length - 1; i++) {
+//         const p0 = i === 0 ? anchorPoints[0] : anchorPoints[i - 1];
+//         const p1 = anchorPoints[i];
+//         const p2 = anchorPoints[i + 1];
+//         const p3 = i === anchorPoints.length - 2 ? anchorPoints[i + 1] : anchorPoints[i + 2];
 
-        const segmentPoints = createCardinalSplineSegment(p0, p1, p2, p3, tension, segments);
-        allPoints.push(...segmentPoints.slice(1));
-    }
+//         const segmentPoints = createCardinalSplineSegment(p0, p1, p2, p3, tension, segments);
+//         allPoints.push(...segmentPoints.slice(1));
+//     }
 
-    if (allPoints.length > 0) {
-        allPoints[0] = { ...anchorPoints[0] };
-        allPoints[allPoints.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
-    }
+//     if (allPoints.length > 0) {
+//         allPoints[0] = { ...anchorPoints[0] };
+//         allPoints[allPoints.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
+//     }
 
-    return allPoints;
-};
+//     return allPoints;
+// };
 
-const createSmoothCurve = (anchorPoints: Coordinate[], segments: number = 30): Coordinate[] => {
-    return createPEPipeCurve(anchorPoints, 0.3, segments);
-};
+    // const createSmoothCurve = (anchorPoints: Coordinate[], segments: number = 30): Coordinate[] => {
+    //     return createPEPipeCurve(anchorPoints, 0.3, segments);
+    // };
 
-const createCardinalSplineSegment = (
-    p0: Coordinate,
-    p1: Coordinate,
-    p2: Coordinate,
-    p3: Coordinate,
-    tension: number,
-    segments: number
-): Coordinate[] => {
-    const points: Coordinate[] = [];
-    const s = (1 - tension) / 2;
+// const createCardinalSplineSegment = (
+//     p0: Coordinate,
+//     p1: Coordinate,
+//     p2: Coordinate,
+//     p3: Coordinate,
+//     tension: number,
+//     segments: number
+// ): Coordinate[] => {
+//     const points: Coordinate[] = [];
+//     const s = (1 - tension) / 2;
 
-    for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const t2 = t * t;
-        const t3 = t2 * t;
+//     for (let i = 0; i <= segments; i++) {
+//         const t = i / segments;
+//         const t2 = t * t;
+//         const t3 = t2 * t;
 
-        const h1 = 2 * t3 - 3 * t2 + 1;
-        const h2 = -2 * t3 + 3 * t2;
-        const h3 = t3 - 2 * t2 + t;
-        const h4 = t3 - t2;
+//         const h1 = 2 * t3 - 3 * t2 + 1;
+//         const h2 = -2 * t3 + 3 * t2;
+//         const h3 = t3 - 2 * t2 + t;
+//         const h4 = t3 - t2;
 
-        const m1_lat = s * (p2.lat - p0.lat);
-        const m1_lng = s * (p2.lng - p0.lng);
-        const m2_lat = s * (p3.lat - p1.lat);
-        const m2_lng = s * (p3.lng - p1.lng);
+//         const m1_lat = s * (p2.lat - p0.lat);
+//         const m1_lng = s * (p2.lng - p0.lng);
+//         const m2_lat = s * (p3.lat - p1.lat);
+//         const m2_lng = s * (p3.lng - p1.lng);
 
-        const lat = h1 * p1.lat + h2 * p2.lat + h3 * m1_lat + h4 * m2_lat;
-        const lng = h1 * p1.lng + h2 * p2.lng + h3 * m1_lng + h4 * m2_lng;
+//         const lat = h1 * p1.lat + h2 * p2.lat + h3 * m1_lat + h4 * m2_lat;
+//         const lng = h1 * p1.lng + h2 * p2.lng + h3 * m1_lng + h4 * m2_lng;
 
-        points.push({ lat, lng });
-    }
+//         points.push({ lat, lng });
+//     }
 
-    return points;
-};
+//     return points;
+// };
 
-const createCatmullRomSegment = (
-    p0: Coordinate,
-    p1: Coordinate,
-    p2: Coordinate,
-    p3: Coordinate,
-    segments: number
-): Coordinate[] => {
-    return createCardinalSplineSegment(p0, p1, p2, p3, 0.3, segments);
-};
+// const createCatmullRomSegment = (
+//     p0: Coordinate,
+//     p1: Coordinate,
+//     p2: Coordinate,
+//     p3: Coordinate,
+//     segments: number
+// ): Coordinate[] => {
+//     return createCardinalSplineSegment(p0, p1, p2, p3, 0.3, segments);
+// };
 
-const extractAnchorPoints = (coordinates: Coordinate[], maxPoints: number = 8): Coordinate[] => {
-    if (coordinates.length <= maxPoints) {
-        return coordinates;
-    }
-    const anchorPoints: Coordinate[] = [];
-    const step = Math.floor(coordinates.length / (maxPoints - 1));
-    anchorPoints.push(coordinates[0]);
-    for (let i = step; i < coordinates.length - step; i += step) {
-        anchorPoints.push(coordinates[i]);
-    }
-    anchorPoints.push(coordinates[coordinates.length - 1]);
+// const extractAnchorPoints = (coordinates: Coordinate[], maxPoints: number = 8): Coordinate[] => {
+//     if (coordinates.length <= maxPoints) {
+//         return coordinates;
+//     }
+//     const anchorPoints: Coordinate[] = [];
+//     const step = Math.floor(coordinates.length / (maxPoints - 1));
+//     anchorPoints.push(coordinates[0]);
+//     for (let i = step; i < coordinates.length - step; i += step) {
+//         anchorPoints.push(coordinates[i]);
+//     }
+//     anchorPoints.push(coordinates[coordinates.length - 1]);
 
-    return anchorPoints;
-};
+//     return anchorPoints;
+// };
 
 const calculateCornerRadius = (
     angle: number,
@@ -329,7 +328,7 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     strokeColor = '#2563eb',
     strokeWeight = 3,
     editMode = false,
-    tension = 0.3,
+    // tension = 0.3,
     showVisualFeedback = true,
 }) => {
     const polylineRefs = useRef<Map<string, google.maps.Polyline>>(new Map());
@@ -337,11 +336,11 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     const originalEndPointsRef = useRef<Map<string, { first: Coordinate; last: Coordinate }>>(
         new Map()
     );
-    const [editingPipeId, setEditingPipeId] = useState<string | null>(null);
+    const [, setEditingPipeId] = useState<string | null>(null);
 
     const realTimeGuideRefs = useRef<Map<string, google.maps.Polyline[]>>(new Map());
-    const [isDragging, setIsDragging] = useState<boolean>(false);
-    const [dragMarkerInfo, setDragMarkerInfo] = useState<{
+    const [, setIsDragging] = useState<boolean>(false);
+    const [, setDragMarkerInfo] = useState<{
         pipeId: string;
         markerIndex: number;
     } | null>(null);

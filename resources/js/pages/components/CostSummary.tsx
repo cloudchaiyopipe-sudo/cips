@@ -1,4 +1,3 @@
-// resources\js\pages\components\CostSummary.tsx
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
@@ -139,12 +138,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     };
 
     const getAreaUnit = () => {
-        // Fix: All project modes now consistently use rai
         return t('ไร่');
     };
 
     const formatArea = (area: number | undefined | null) => {
-        // Fix: Since farmSizeRai is now consistently in rai for all modes
         const safeArea = area || 0;
         return `${safeArea.toFixed(1)} ไร่`;
     };
@@ -178,7 +175,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             zoneInput: IrrigationInput,
             sprinklerCount: number
         ) => {
-            // Legacy support for extraPipePerSprinkler (kept for backward compatibility)
             if (
                 zoneInput.extraPipePerSprinkler &&
                 zoneInput.extraPipePerSprinkler.pipeId &&
@@ -268,7 +264,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 return false;
             }
 
-            // New support for sprinklerEquipmentSet
             if (
                 zoneInput.sprinklerEquipmentSet &&
                 zoneInput.sprinklerEquipmentSet.selectedItems &&
@@ -282,7 +277,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
                     if (isPipe && item.quantity > 0) {
                         const extraPipeId = item.equipment.id;
-                        const extraLength = item.quantity; // quantity is already length for pipes
+                        const extraLength = item.quantity; 
 
                         const zonePipes = selectedPipes[zoneId] || {};
                         const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
@@ -291,7 +286,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
                         const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
 
-                        // Check if extra pipe is same as branch pipe
                         if (branchPipe && branchPipe.id === extraPipeId) {
                             const key = `${branchPipe.id}`;
                             if (!pipeSummary.branch[key]) {
@@ -315,7 +309,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             return;
                         }
 
-                        // Check if extra pipe is same as secondary pipe
                         if (secondaryPipe && secondaryPipe.id === extraPipeId) {
                             const key = `${secondaryPipe.id}`;
                             if (!pipeSummary.secondary[key]) {
@@ -339,7 +332,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             return;
                         }
 
-                        // Check if extra pipe is same as main pipe
                         if (mainPipe && mainPipe.id === extraPipeId) {
                             const key = `${mainPipe.id}`;
                             if (!pipeSummary.main[key]) {
@@ -363,7 +355,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             return;
                         }
 
-                        // Check if extra pipe is same as emitter pipe
                         if (emitterPipe && emitterPipe.id === extraPipeId) {
                             const key = `${emitterPipe.id}`;
                             if (!pipeSummary.emitter[key]) {
@@ -387,14 +378,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             return;
                         }
 
-                        // If not matching any main pipes, create as separate extra pipe
                         const pipeData = {
                             id: item.equipment.id,
                             name: item.equipment.name,
                             productCode: item.equipment.product_code,
                             price: item.equipment.price || 0,
-                            sizeMM: 20, // fallback size for pipes
-                            lengthM: 100, // standard roll length
+                            sizeMM: 20, 
+                            lengthM: 100, 
                             image: item.equipment.image,
                         };
 
@@ -423,14 +413,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
         if (projectMode === 'garden' && gardenStats) {
             gardenStats.zones.forEach((zone) => {
-                // Fix: Handle both single-zone ('main-area') and multi-zone (actual zone ID) cases
                 const effectiveZoneId = gardenStats.zones.length === 1 ? 'main-area' : zone.zoneId;
                 const zoneSprinkler = zoneSprinklers[effectiveZoneId];
                 const zonePipes = selectedPipes[effectiveZoneId] || {};
                 const zoneInput = zoneInputs[effectiveZoneId];
 
                 if (zoneSprinkler) {
-                    // Fix: Use zoneInput.totalTrees instead of zone.sprinklerCount for garden mode
                     const sprinklerQuantity = zoneInput?.totalTrees || zone.sprinklerCount || 0;
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
@@ -450,7 +438,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    // Fix: Use zoneInput.totalTrees for extra pipe calculation too
                     const sprinklerCount = zoneInput?.totalTrees || zone.sprinklerCount || 0;
                     processExtraPipe(effectiveZoneId, zoneInput, sprinklerCount);
 
@@ -510,7 +497,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 const zoneInput = zoneInputs[zone.id];
 
                 if (zoneSprinkler) {
-                    // For field-crop mode, prioritize sprinkler count from zone summaries (most accurate)
                     let sprinklerQuantity = 0;
 
                     if (
@@ -519,7 +505,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         fieldCropData.zoneSummaries[zone.id]
                     ) {
                         const zoneSummary = fieldCropData.zoneSummaries[zone.id];
-                        // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
                         if (
                             zoneSummary.totalIrrigationPoints &&
                             zoneSummary.totalIrrigationPoints > 0
@@ -530,7 +515,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         }
                     }
 
-                    // Fallback to zoneInput or zone data if no summary data
                     if (sprinklerQuantity === 0) {
                         sprinklerQuantity =
                             zoneInput?.totalTrees ||
@@ -555,7 +539,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    // For field-crop mode, prioritize sprinkler count from zone summaries (most accurate)
                     let sprinklerCount = 0;
 
                     if (
@@ -564,7 +547,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         fieldCropData.zoneSummaries[zone.id]
                     ) {
                         const zoneSummary = fieldCropData.zoneSummaries[zone.id];
-                        // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
                         if (
                             zoneSummary.totalIrrigationPoints &&
                             zoneSummary.totalIrrigationPoints > 0
@@ -575,7 +557,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         }
                     }
 
-                    // Fallback to zoneInput or zone data if no summary data
                     if (sprinklerCount === 0) {
                         sprinklerCount =
                             zoneInput?.totalTrees ||
@@ -660,7 +641,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 const zoneInput = zoneInputs[plot.plotId];
 
                 if (zoneSprinkler) {
-                    // ใช้จำนวนหัวฉีดแทนจำนวนพืช
                     const sprinklerQuantity =
                         plot.equipmentCount.sprinklers || plot.production.totalPlants || 100;
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
@@ -681,7 +661,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    // ใช้จำนวนหัวฉีดแทนจำนวนพืช
                     const sprinklerCount =
                         plot.equipmentCount.sprinklers || plot.production.totalPlants || 100;
                     processExtraPipe(plot.plotId, zoneInput, sprinklerCount);
@@ -853,7 +832,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
             });
         } else {
-            // แสดงสรุปอุปกรณ์ทั้งหมดรวมกัน ไม่แยกตามโซนที่เลือก
             Object.keys(zoneInputs).forEach((zoneId) => {
                 const zoneSprinkler = zoneSprinklers[zoneId];
                 const zonePipes = selectedPipes[zoneId] || {};
@@ -1041,7 +1019,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             });
         }
 
-        // คำนวณราคาปั๊มน้ำรวมอุปกรณ์ประกอบ
         let pumpCost = 0;
         let pumpAccessoriesCost = 0;
         if (showPump) {
@@ -1049,7 +1026,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             if (effectivePump) {
                 pumpCost = effectivePump.price || 0;
 
-                // คำนวณราคาอุปกรณ์ประกอบ (เฉพาะที่ไม่ได้รวมในชุด)
                 if (effectivePump.pumpAccessories && effectivePump.pumpAccessories.length > 0) {
                     pumpAccessoriesCost = effectivePump.pumpAccessories
                         .filter((accessory: any) => !accessory.is_included)
@@ -1059,23 +1035,16 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
             }
         }
-        // คำนวณราคา Sprinkler Equipment Sets
         let sprinklerEquipmentSetsCost = 0;
         if (sprinklerEquipmentSets && Object.keys(sprinklerEquipmentSets).length > 0) {
-            console.log('🔍 Debug sprinklerEquipmentSets:', sprinklerEquipmentSets);
             Object.values(sprinklerEquipmentSets).forEach((equipmentSet: any) => {
-                console.log('🔍 Debug equipmentSet:', equipmentSet);
                 if (equipmentSet.selectedItems) {
-                    // ใช้ selectedItems แทน groups
                     equipmentSet.selectedItems.forEach((item: any) => {
-                        console.log('🔍 Debug item:', item);
                         const itemCost =
                             (item.unit_price || item.equipment?.price || 0) * (item.quantity || 0);
-                        console.log('🔍 Debug itemCost:', itemCost);
                         sprinklerEquipmentSetsCost += itemCost;
                     });
                 } else if (equipmentSet.groups) {
-                    // Fallback สำหรับโครงสร้างเดิม
                     equipmentSet.groups.forEach((group: any) => {
                         if (group.items) {
                             group.items.forEach((item: any) => {
@@ -1088,7 +1057,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             });
         }
 
-        // คำนวณราคา Connection Equipment
         let connectionEquipmentsCost = 0;
         if (connectionEquipments && Object.keys(connectionEquipments).length > 0) {
             Object.values(connectionEquipments).forEach((equipments: any[]) => {
@@ -1184,10 +1152,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             return gardenStats.summary.totalArea / 1600;
         }
         if (projectMode === 'field-crop' && fieldCropData) {
-            return fieldCropData.area.sizeInRai; // ใช้ sizeInRai ที่คำนวณแล้ว
+            return fieldCropData.area.sizeInRai; 
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
-            return greenhouseData.summary.totalPlotArea; // ใช้ตารางเมตรโดยตรง
+            return greenhouseData.summary.totalPlotArea; 
         }
         return projectData?.totalArea ? projectData.totalArea / 1600 : 0;
     };
@@ -1205,17 +1173,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
     const getProjectSummary = () => {
         if (projectMode === 'field-crop') {
-            // Try to get field-crop data from props first, then from localStorage
             const fcData = fieldCropData || getEnhancedFieldCropData();
             if (fcData) {
-                // Try to get water requirement from fieldCropSystemData first
                 let totalWaterNeed = fcData.summary?.totalWaterRequirementPerDay || 0;
                 try {
                     const fieldCropSystemDataStr = localStorage.getItem('fieldCropSystemData');
                     if (fieldCropSystemDataStr) {
                         const fieldCropSystemData = JSON.parse(fieldCropSystemDataStr);
                         if (fieldCropSystemData?.sprinklerConfig?.totalFlowRatePerMinute) {
-                            // Convert LPM to liters per irrigation (assuming 30 minutes irrigation)
                             totalWaterNeed =
                                 fieldCropSystemData.sprinklerConfig.totalFlowRatePerMinute * 30;
                         }
@@ -1224,24 +1189,21 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     console.error('Error parsing fieldCropSystemData in CostSummary:', error);
                 }
 
-                // Calculate total sprinklers from zone summaries (most accurate)
                 let totalSprinklers = 0;
                 let totalIrrigationPoints = 0;
 
                 if (fcData.zoneSummaries) {
                     const sprinklerCounts = Object.values(fcData.zoneSummaries).map(
                         (zoneSummary: any) => {
-                            // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
                             return (
                                 zoneSummary.totalIrrigationPoints || zoneSummary.sprinklerCount || 0
                             );
                         }
                     );
                     totalSprinklers = sprinklerCounts.reduce((sum, count) => sum + count, 0);
-                    totalIrrigationPoints = totalSprinklers; // Same value for field-crop
+                    totalIrrigationPoints = totalSprinklers; 
                 }
 
-                // Fallback to old data if no zone summaries
                 if (totalSprinklers === 0) {
                     totalSprinklers = fcData.summary?.totalPlantingPoints || 0;
                     totalIrrigationPoints = fcData.irrigation?.totalCount || 0;
@@ -1289,119 +1251,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             <h2 className="mb-4 text-2xl font-bold text-yellow-400">
                 💰 {t('สรุปอุปกรณ์ทั้งหมด')} {getProjectIcon()}
             </h2>
-
-            {projectSummary && (
-                <div className="mb-6 rounded-lg bg-blue-900 p-4">
-                    <h3 className="mb-3 text-lg font-bold text-blue-300">
-                        📊 {t('สรุปโครงการทั้งหมด')}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        <div>
-                            <p className="text-blue-200">{t('พื้นที่รวม:')}</p>
-                            <p className="font-bold text-white">
-                                {projectMode === 'greenhouse'
-                                    ? formatArea(totalArea)
-                                    : formatArea(totalArea)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">{t('ความต้องการน้ำ:')}</p>
-                            <p className="font-bold text-white">
-                                {(projectSummary.totalWaterNeed || 0).toLocaleString()}{' '}
-                                {projectSummary.waterUnit}
-                            </p>
-                        </div>
-                        {projectMode === 'greenhouse' && projectSummary.totalSprinklers > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('จำนวนหัวฉีดรวม:')}</p>
-                                <p className="font-bold text-white">
-                                    {(projectSummary.totalSprinklers || 0).toLocaleString()}{' '}
-                                    {t('หัว')}
-                                </p>
-                            </div>
-                        )}
-                        {projectMode === 'field-crop' &&
-                            (projectSummary.totalIrrigationPoints || 0) > 0 && (
-                                <div>
-                                    <p className="text-blue-200">{t('จุดให้น้ำรวม:')}</p>
-                                    <p className="font-bold text-white">
-                                        {(
-                                            projectSummary.totalIrrigationPoints || 0
-                                        ).toLocaleString()}{' '}
-                                        {t('จุด')}
-                                    </p>
-                                </div>
-                            )}
-                        {(projectSummary.totalProduction || 0) > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('ผลผลิตประมาณ:')}</p>
-                                <p className="font-bold text-green-300">
-                                    {(projectSummary.totalProduction || 0).toLocaleString()}{' '}
-                                    {projectSummary.productionUnit}
-                                </p>
-                            </div>
-                        )}
-                        {(projectSummary.totalIncome || 0) > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('รายได้ประมาณ:')}</p>
-                                <p className="font-bold text-green-300">
-                                    {Number(
-                                        (projectSummary.totalIncome || 0).toFixed(2)
-                                    ).toLocaleString('th-TH')}{' '}
-                                    {t('บาท')}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Field-crop specific irrigation information */}
-                    {projectMode === 'field-crop' && projectSummary.irrigationByType && (
-                        <div className="mt-3 border-t border-blue-700 pt-3">
-                            <h4 className="mb-2 text-sm font-semibold text-blue-200">
-                                🌱 {t('ประเภทระบบให้น้ำ')}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                {projectSummary.irrigationByType.sprinkler > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('สปริงเกลอร์:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.sprinkler.toLocaleString()}{' '}
-                                            {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                                {projectSummary.irrigationByType.dripTape > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('เทปหยด:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.dripTape.toLocaleString()}{' '}
-                                            {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                                {projectSummary.irrigationByType.pivot > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('ปิโวต์:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.pivot.toLocaleString()}{' '}
-                                            {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                                {projectSummary.irrigationByType.waterJetTape > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('เทปน้ำพุ่ง:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.waterJetTape.toLocaleString()}{' '}
-                                            {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {uniqueSprinklers > 0 && (
                 <div className="mb-4 rounded bg-green-900 p-3">
@@ -2062,7 +1911,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 {connectionEquipments && Object.keys(connectionEquipments).length > 0 && (
                     <div className="rounded bg-gray-600 p-4">
                         <h4 className="font-medium text-orange-300">🔗 {t('อุปกรณ์เชื่อมต่อ')}</h4>
-                        <div className="space-y-1 text-sm">
+                        {/* <div className="space-y-1 text-sm">
                             {Object.entries(connectionEquipments).map(([zoneId, equipments]) => (
                                 <div key={zoneId} className="border-l-2 border-orange-400 pl-2">
                                     <p className="text-xs text-gray-300">
@@ -2085,7 +1934,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                     ))}
                                 </div>
                             ))}
-                        </div>
+                        </div> */}
                         <p className="text-xl font-bold">
                             ราคา{' '}
                             {Number(

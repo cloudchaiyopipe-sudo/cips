@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Field Map Utility Functions
 // ปรับให้ใช้งาน algorithms พื้นฐานแทนการใช้ turf.js เพื่อหลีกเลี่ยงปัญหา type
 

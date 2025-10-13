@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import {
@@ -9,7 +8,6 @@ import {
     FaCheck,
     FaTimes,
     FaTint,
-    FaClock,
 } from 'react-icons/fa';
 import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 
@@ -51,8 +49,6 @@ interface LateralPipeInfoPanelProps {
 const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     isVisible,
     placementMode,
-    selectedPlants,
-    totalWaterNeed,
     plantCount,
     startPoint,
     currentPoint,
@@ -60,7 +56,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     alignedCurrentPoint,
     waypoints = [],
     isMultiSegmentMode = false,
-    segmentCount = 1,
     onCancel,
     onConfirm,
     t,
@@ -68,35 +63,35 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     if (!isVisible) return null;
 
     const calculateLength = (): number => {
-        if (isMultiSegmentMode && Array.isArray(waypoints) && waypoints.length > 0) {
-            const effectiveStartPoint = snappedStartPoint || startPoint;
-            const effectiveEndPoint = alignedCurrentPoint || currentPoint;
+        try {
+            if (isMultiSegmentMode && Array.isArray(waypoints) && waypoints.length > 0) {
+                const effectiveStartPoint = snappedStartPoint || startPoint;
+                const effectiveEndPoint = alignedCurrentPoint || currentPoint;
 
-            if (!effectiveStartPoint || !effectiveEndPoint) return 0;
+                if (!effectiveStartPoint || !effectiveEndPoint) return 0;
 
-            const allPoints = [effectiveStartPoint, ...waypoints, effectiveEndPoint];
-            let totalLength = 0;
+                const allPoints = [effectiveStartPoint, ...waypoints, effectiveEndPoint];
+                let totalLength = 0;
 
-            for (let i = 0; i < allPoints.length - 1; i++) {
-                const segmentStart = allPoints[i];
-                const segmentEnd = allPoints[i + 1];
+                for (let i = 0; i < allPoints.length - 1; i++) {
+                    const segmentStart = allPoints[i];
+                    const segmentEnd = allPoints[i + 1];
 
-                if (
-                    !segmentStart ||
-                    !segmentEnd ||
-                    typeof segmentStart.lat !== 'number' ||
-                    typeof segmentStart.lng !== 'number' ||
-                    typeof segmentEnd.lat !== 'number' ||
-                    typeof segmentEnd.lng !== 'number' ||
-                    !isFinite(segmentStart.lat) ||
-                    !isFinite(segmentStart.lng) ||
-                    !isFinite(segmentEnd.lat) ||
-                    !isFinite(segmentEnd.lng)
-                ) {
-                    continue;
-                }
+                    if (
+                        !segmentStart ||
+                        !segmentEnd ||
+                        typeof segmentStart.lat !== 'number' ||
+                        typeof segmentStart.lng !== 'number' ||
+                        typeof segmentEnd.lat !== 'number' ||
+                        typeof segmentEnd.lng !== 'number' ||
+                        !isFinite(segmentStart.lat) ||
+                        !isFinite(segmentStart.lng) ||
+                        !isFinite(segmentEnd.lat) ||
+                        !isFinite(segmentEnd.lng)
+                    ) {
+                        continue;
+                    }
 
-                try {
                     const R = 6371000;
                     const dLat = ((segmentEnd.lat - segmentStart.lat) * Math.PI) / 180;
                     const dLng = ((segmentEnd.lng - segmentStart.lng) * Math.PI) / 180;
@@ -116,28 +111,24 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                     if (isFinite(segmentLength) && segmentLength >= 0 && segmentLength < 100000) {
                         totalLength += segmentLength;
                     }
-                } catch (error) {
-                    continue;
                 }
-            }
 
-            return Math.max(0, totalLength);
-        } else {
-            const effectiveStartPoint = snappedStartPoint || startPoint;
-            const effectiveEndPoint = alignedCurrentPoint || currentPoint;
+                return Math.max(0, totalLength);
+            } else {
+                const effectiveStartPoint = snappedStartPoint || startPoint;
+                const effectiveEndPoint = alignedCurrentPoint || currentPoint;
 
-            if (!effectiveStartPoint || !effectiveEndPoint) return 0;
+                if (!effectiveStartPoint || !effectiveEndPoint) return 0;
 
-            if (
-                !isFinite(effectiveStartPoint.lat) ||
-                !isFinite(effectiveStartPoint.lng) ||
-                !isFinite(effectiveEndPoint.lat) ||
-                !isFinite(effectiveEndPoint.lng)
-            ) {
-                return 0;
-            }
+                if (
+                    !isFinite(effectiveStartPoint.lat) ||
+                    !isFinite(effectiveStartPoint.lng) ||
+                    !isFinite(effectiveEndPoint.lat) ||
+                    !isFinite(effectiveEndPoint.lng)
+                ) {
+                    return 0;
+                }
 
-            try {
                 const R = 6371000;
                 const dLat = ((effectiveEndPoint.lat - effectiveStartPoint.lat) * Math.PI) / 180;
                 const dLng = ((effectiveEndPoint.lng - effectiveStartPoint.lng) * Math.PI) / 180;
@@ -151,9 +142,10 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
 
                 const distance = R * c;
                 return isFinite(distance) && distance >= 0 && distance < 100000 ? distance : 0;
-            } catch (error) {
-                return 0;
             }
+        } catch (error) {
+            console.warn('Error calculating pipe length:', error);
+            return 0;
         }
     };
 
@@ -163,7 +155,7 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     const flowRatePerMinute = sprinklerConfig?.flowRatePerMinute || 0;
 
     const totalFlowRatePerMinute = plantCount * flowRatePerMinute;
-    const totalFlowRatePerHour = totalFlowRatePerMinute * 60;
+    // const totalFlowRatePerHour = totalFlowRatePerMinute * 60;
 
     return (
         <div className="fixed right-[10px] top-[190px] z-[1000] min-w-[320px] rounded-lg border border-gray-200 bg-white p-4 shadow-xl">

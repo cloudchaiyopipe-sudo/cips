@@ -1,12 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
-
-interface Coordinate {
-    lat: number;
-    lng: number;
-}
 
 interface HorticultureMapComponentProps {
     center: [number, number];
@@ -189,7 +183,7 @@ const MapComponent: React.FC<{
         <>
             <div ref={ref} style={{ width: '100%', height: '100%' }} />
 
-            {React.Children.map(children, (child) => {
+            {React.Children.map(children as React.ReactNode, (child) => {
                 if (React.isValidElement(child)) {
                     return React.cloneElement(child, { map } as any);
                 }

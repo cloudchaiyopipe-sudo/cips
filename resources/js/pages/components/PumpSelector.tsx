@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\components\PumpSelector.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,8 +17,8 @@ interface PumpSelectorProps {
     projectSummary?: any;
     zoneOperationMode?: string;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
-    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
-    fieldCropData?: any; // เพิ่มสำหรับ field-crop mode
+    greenhouseData?: any;
+    fieldCropData?: any;
 }
 
 interface ZoneOperationGroup {
@@ -49,11 +48,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
 
-    // ประกาศตัวแปรที่จำเป็นก่อน
     const requiredFlow = results.flows.main;
     const requiredHead = results.pumpHeadRequired;
 
-    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture, garden และ greenhouse mode
     const getHorticultureRequirements = () => {
         if (
             projectMode !== 'horticulture' &&
@@ -67,9 +64,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             };
         }
 
-        // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
         if (projectMode === 'garden') {
-            // ดึงข้อมูลจาก localStorage หรือ props
             const gardenDataStr = localStorage.getItem('garden_planner_data');
             if (!gardenDataStr) {
                 return {
@@ -92,18 +87,16 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
                 const gardenStats = JSON.parse(gardenStatsStr);
 
-                // คำนวณความต้องการน้ำรวมจากทุกโซน
                 let totalWaterRequirement = 0;
                 if (gardenStats.zones && gardenStats.zones.length > 0) {
-                    // ดึงข้อมูลรูปแบบการเปิดโซนจาก garden_planner_data
                     const gardenPlannerDataStr = localStorage.getItem('garden_planner_data');
-                    let simultaneousZones = gardenStats.zones.length; // default: เปิดทุกโซนพร้อมกัน
+                    let simultaneousZones = gardenStats.zones.length;
 
                     if (gardenPlannerDataStr) {
                         try {
                             const gardenPlannerData = JSON.parse(gardenPlannerDataStr);
                             if (gardenPlannerData.zoneOperationMode === 'sequential') {
-                                simultaneousZones = 1; // เปิดทีละโซน
+                                simultaneousZones = 1;
                             } else if (gardenPlannerData.zoneOperationMode === 'group') {
                                 simultaneousZones = gardenPlannerData.simultaneousZones || 1;
                             }
@@ -112,9 +105,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         }
                     }
 
-                    // คำนวณความต้องการน้ำตามรูปแบบการเปิดโซน
                     if (simultaneousZones >= gardenStats.zones.length) {
-                        // เปิดทุกโซนพร้อมกัน
                         totalWaterRequirement = gardenStats.zones.reduce(
                             (total: number, zone: any) => {
                                 return total + zone.sprinklerFlowRate * zone.sprinklerCount;
@@ -122,7 +113,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             0
                         );
                     } else {
-                        // หาโซนที่ใช้น้ำมากที่สุด
                         const maxZoneRequirement = Math.max(
                             ...gardenStats.zones.map(
                                 (zone: any) => zone.sprinklerFlowRate * zone.sprinklerCount
@@ -147,10 +137,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             }
         }
 
-        // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouse data
         if (projectMode === 'greenhouse') {
             try {
-                // ดึงข้อมูลจาก localStorage
                 const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
                 if (!greenhouseSystemDataStr) {
                     return {
@@ -163,9 +151,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 const greenhouseSystemData = JSON.parse(greenhouseSystemDataStr);
                 const plotPipeData = greenhouseSystemData.plotPipeData || [];
 
-                // ดึงข้อมูลรูปแบบการเปิดโซนจาก product page
                 const productDataStr = localStorage.getItem('product_data');
-                let zoneOperationMode = 'sequential'; // default: เปิดทีละโซน
+                let zoneOperationMode = 'sequential';
 
                 if (productDataStr) {
                     try {
@@ -179,40 +166,32 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 let totalWaterRequirement = 0;
 
                 if (zoneOperationMode === 'simultaneous') {
-                    // เปิดพร้อมกันทุกโซน: รวมความต้องการน้ำทุกแปลง
                     totalWaterRequirement = plotPipeData.reduce(
                         (total: number, plot: any) => total + (plot.totalFlowRate || 0),
                         0
                     );
                 } else {
-                    // เปิดทีละโซน: ใช้แปลงที่ต้องการน้ำมากที่สุด
                     totalWaterRequirement = Math.max(
                         ...plotPipeData.map((plot: any) => plot.totalFlowRate || 0)
                     );
                 }
 
-                // คำนวณ Pump Head ให้ตรงกับ CalculationSummary.tsx
-                // ใช้ค่าคงที่ที่ไม่เปลี่ยนตามโซน
                 const getGreenhousePumpHead = () => {
-                    // ดึงข้อมูลหัวฉีดจาก greenhouse planning data
-                    let sprinklerHeadLoss = 25; // ค่าเริ่มต้น (2.5 bar = 25 เมตร)
+                    let sprinklerHeadLoss = 25;
                     try {
                         const greenhousePlanningDataStr =
                             localStorage.getItem('greenhousePlanningData');
                         if (greenhousePlanningDataStr) {
                             const planningData = JSON.parse(greenhousePlanningDataStr);
                             const sprinklerPressureBar = planningData.sprinklerPressure || 2.5;
-                            sprinklerHeadLoss = sprinklerPressureBar * 10; // ใช้ x10 เหมือน CalculationSummary.tsx
+                            sprinklerHeadLoss = sprinklerPressureBar * 10;
                         }
                     } catch (e) {
                         console.error('Error loading sprinkler pressure:', e);
                     }
 
-                    // ใช้ค่าคงที่สำหรับ Pump Head - ไม่เปลี่ยนตามโซน
-                    // ค่านี้ควรเป็นค่าสูงสุดที่เคยคำนวณได้จากทุกโซน
                     let maxPipeHeadLoss = 0;
 
-                    // ดึงค่าสูงสุดที่เก็บไว้ หรือใช้ค่าปัจจุบัน
                     const maxHeadLossStr = localStorage.getItem('greenhouse_max_head_loss');
                     if (maxHeadLossStr) {
                         try {
@@ -223,7 +202,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         }
                     }
 
-                    // ถ้าไม่มีค่าสูงสุดที่เก็บไว้ ให้ใช้ค่าปัจจุบัน
                     if (maxPipeHeadLoss === 0) {
                         const pipeCalculationsStr = localStorage.getItem(
                             'greenhouse_pipe_calculations'
@@ -244,7 +222,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 return {
                     requiredFlowLPM: totalWaterRequirement || requiredFlow,
                     minRequiredHead: maxPumpHead || requiredHead,
-                    qHeadSpray: 6.0, // ค่าเริ่มต้นสำหรับ greenhouse
+                    qHeadSpray: 6.0,
                 };
             } catch (error) {
                 console.error('Error parsing greenhouse data:', error);
@@ -319,17 +297,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     const horticultureReq = getHorticultureRequirements();
 
-    // Garden mode: ดึงข้อมูล flow requirement และ pump head
-    // คำนวณ maxPumpHeadM แบบคงที่ (ไม่เปลี่ยนตามโซน)
     const [cachedMaxPumpHead, setCachedMaxPumpHead] = React.useState<number | null>(null);
 
-    // Reset cachedMaxPumpHead เมื่อโหลดหน้าใหม่
     React.useEffect(() => {
-        // รีเซ็ตค่าเมื่อโหลดครั้งแรก
         setCachedMaxPumpHead(null);
-    }, []); // รันครั้งเดียวเมื่อ component mount
+    }, []);
 
-    // คำนวณ pump head ใหม่เมื่อมีข้อมูลครบหรือเปลี่ยนแปลง
     React.useEffect(() => {
         if (projectMode !== 'garden') {
             return;
@@ -356,27 +329,21 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     try {
                         const pipeCalculations = JSON.parse(pipeCalculationsStr);
 
-                        // คำนวณ Head Loss รวมของทุกโซน
                         gardenStats.zones.forEach((zone: any, index: number) => {
-                            // Head Loss ท่อ (เดียวกันทุกโซน)
                             const pipeHeadLoss =
                                 (pipeCalculations.branch?.headLoss || 0) +
                                 (pipeCalculations.secondary?.headLoss || 0) +
                                 (pipeCalculations.main?.headLoss || 0) +
                                 (pipeCalculations.emitter?.headLoss || 0);
 
-                            // Head Loss หัวฉีดของโซนนี้
                             const sprinklerHeadLoss = (zone.sprinklerPressure || 2.5) * 10;
 
-                            // Head Loss รวมของโซนนี้
                             const totalZoneHeadLoss = pipeHeadLoss + sprinklerHeadLoss;
                             allZoneHeadLoss.push(totalZoneHeadLoss);
                         });
 
-                        // เลือกค่าสูงสุดมาเป็น Pump Head
                         const maxHead = Math.max(...allZoneHeadLoss);
 
-                        // อัปเดตเฉพาะเมื่อค่าใหม่สูงกว่าค่าเดิม (keep max value)
                         if (cachedMaxPumpHead === null || maxHead > cachedMaxPumpHead) {
                             setCachedMaxPumpHead(maxHead);
                         }
@@ -385,13 +352,11 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         setCachedMaxPumpHead(null);
                     }
                 } else {
-                    // ถ้าไม่มี pipe calculations ให้ใช้ sprinkler pressure ของโซนที่สูงที่สุด
                     const maxZonePressure = Math.max(
                         ...gardenStats.zones.map((zone: any) => zone.sprinklerPressure || 2.5)
                     );
                     const fallbackHead = maxZonePressure * 10;
 
-                    // อัปเดตเฉพาะเมื่อค่าใหม่สูงกว่าค่าเดิม (keep max value)
                     if (cachedMaxPumpHead === null || fallbackHead > cachedMaxPumpHead) {
                         setCachedMaxPumpHead(fallbackHead);
                     }
@@ -402,19 +367,16 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             }
         };
 
-        // คำนวณทันที
         calculateMaxPumpHead();
 
-        // ฟังการเปลี่ยนแปลงของ localStorage
         const handleStorageChange = () => {
             calculateMaxPumpHead();
         };
 
         window.addEventListener('storage', handleStorageChange);
 
-        // Polling เพื่อตรวจสอบการเปลี่ยนแปลงของ localStorage (สำหรับ same-tab updates)
         let pollCount = 0;
-        const maxPollCount = 10; // ตรวจสอบสูงสุด 10 ครั้ง (20 วินาที)
+        const maxPollCount = 10; 
 
         const pollInterval = setInterval(() => {
             pollCount++;
@@ -434,55 +396,122 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 }
             }
 
-            // หยุด polling หลังจาก 10 ครั้ง
             if (pollCount >= maxPollCount) {
                 clearInterval(pollInterval);
             }
-        }, 2000); // Check every 2 seconds
+        }, 2000);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             clearInterval(pollInterval);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [projectMode]); // Note: cachedMaxPumpHead ใช้ใน comparison แต่ไม่ใส่ใน deps เพื่อหลีกเลี่ยง infinite loop
+    }, [projectMode, cachedMaxPumpHead]);
 
-    const getFieldCropRequirements = () => {
-        // Try to get field-crop data from props first, then from localStorage
-        const fcData = fieldCropData || getEnhancedFieldCropData();
-        if (fcData) {
-            // Calculate flow requirement based on field-crop data
-            const totalWaterRequirement = fcData.summary?.totalWaterRequirementPerDay || 0;
-            const requiredFlowLPM = totalWaterRequirement / 60; // Convert to LPM
-
-            // Calculate pump head based on field-crop pipe system
-            const maxPipeLength = Math.max(
-                fcData.pipes.stats.main.longest || 0,
-                fcData.pipes.stats.submain.longest || 0,
-                fcData.pipes.stats.lateral.longest || 0
-            );
-
-            // Estimate pump head based on pipe length and irrigation requirements
-            const estimatedPumpHead = Math.max(20, maxPipeLength * 0.1 + 15); // Base head + pipe friction
-
+    const fieldCropRequirements = useMemo(() => {
+        if (projectMode !== 'field-crop') {
             return {
-                requiredFlowLPM: requiredFlowLPM,
-                pumpHeadM: estimatedPumpHead,
+                requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                pumpHeadM: (results.headLoss?.total || 0) + (results.pressureFromSprinkler || 0),
             };
         }
 
-        // Fallback to horticulture requirements if no field-crop data
+        // อัตราการไหล: ใช้ค่าจาก input.waterPerTreeLiters เหมือนกับ CalculationSummary.tsx
+        let maxFlowLPM = 0;
+        
+        // หาค่าที่มากที่สุดจาก zoneInputs (เหมือนกับ CalculationSummary.tsx)
+        if (zoneInputs && Object.keys(zoneInputs).length > 0) {
+            const zoneFlows = Object.values(zoneInputs).map((zoneInput: any) => {
+                const flowLPM = zoneInput.waterPerTreeLiters || 0;
+                console.log(`🔍 Zone Input Flow: ${flowLPM} LPM`);
+                return flowLPM;
+            });
+            maxFlowLPM = Math.max(...zoneFlows, 0);
+            console.log(`🔍 Field Crop Flow Rates (from zoneInputs):`, zoneFlows, `Max: ${maxFlowLPM}`);
+        }
+
+        // ถ้าไม่มีข้อมูลจาก zoneInputs ให้ใช้จาก fieldCropData
+        if (maxFlowLPM === 0) {
+            const fcData = fieldCropData || getEnhancedFieldCropData();
+            if (fcData && fcData.zoneSummaries) {
+                const zoneFlows = Object.values(fcData.zoneSummaries).map((zoneSummary: any) => {
+                    const sprinklerFlow = zoneSummary.sprinklerCount * (fcData.irrigationSettings?.sprinkler_system?.flow || 30);
+                    const pivotFlow = zoneSummary.pivotCount * (fcData.irrigationSettings?.pivot_system?.flow || 50);
+                    const totalFlow = sprinklerFlow + pivotFlow;
+                    console.log(`🔍 Zone ${zoneSummary.zoneName}: sprinklerCount=${zoneSummary.sprinklerCount}, pivotCount=${zoneSummary.pivotCount}, sprinklerFlow=${sprinklerFlow}, pivotFlow=${pivotFlow}, totalFlow=${totalFlow}`);
+                    return totalFlow;
+                });
+                maxFlowLPM = Math.max(...zoneFlows, 0);
+                console.log(`🔍 Field Crop Flow Rates (from zoneSummaries):`, zoneFlows, `Max: ${maxFlowLPM}`);
+            }
+        }
+
+        // Pump Head: หาค่าที่สูงที่สุดจากทุกโซน (เหมือนกับ CalculationSummary.tsx)
+        let maxPumpHeadM = 0;
+        
+        const fcData = fieldCropData || getEnhancedFieldCropData();
+        if (fcData) {
+            // Head Loss หัวฉีด (เหมือนกับ CalculationSummary.tsx) - ค่าคงที่สำหรับทุกโซน
+            const sprinklerHeadLoss = fcData?.irrigationSettings?.sprinkler_system?.pressure || 2.7;
+            const sprinklerHeadLossM = sprinklerHeadLoss * 10;
+            
+            // หา Head Loss ท่อ ที่สูงที่สุดจากทุกโซน
+            let maxPipeHeadLoss = 0;
+            
+            // ใช้ข้อมูลจาก fieldCropData โดยตรง (ข้อมูลของทุกโซน)
+            if (fcData.pipes?.stats) {
+                // คำนวณ Head Loss ท่อ จากข้อมูลท่อใน fieldCropData (ข้อมูลของทุกโซน)
+                const mainPipeLength = fcData.pipes.stats.main?.longest || 0;
+                const submainPipeLength = fcData.pipes.stats.submain?.longest || 0;
+                const lateralPipeLength = fcData.pipes.stats.lateral?.longest || 0;
+                
+                // คำนวณ Head Loss แบบง่าย (ประมาณการ)
+                const mainHeadLoss = mainPipeLength * 0.01; // 1% ต่อ 100m
+                const submainHeadLoss = submainPipeLength * 0.01;
+                const lateralHeadLoss = lateralPipeLength * 0.01;
+                
+                maxPipeHeadLoss = mainHeadLoss + submainHeadLoss + lateralHeadLoss;
+                console.log(`🔍 Field Crop Pipe Head Loss (from fieldCropData - all zones): main=${mainHeadLoss}, submain=${submainHeadLoss}, lateral=${lateralHeadLoss}, total=${maxPipeHeadLoss}`);
+            }
+            
+            // ถ้าไม่มีข้อมูลจาก fieldCropData ให้ใช้จาก localStorage
+            if (maxPipeHeadLoss === 0) {
+                try {
+                    const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                    if (fieldCropPipeCalculationsStr) {
+                        const pipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
+                        
+                        // Head Loss ท่อ (เหมือนกับ CalculationSummary.tsx)
+                        maxPipeHeadLoss = (pipeCalculations.branch?.headLoss || 0) + 
+                                         (pipeCalculations.secondary?.headLoss || 0) + 
+                                         (pipeCalculations.main?.headLoss || 0) + 
+                                         (pipeCalculations.emitter?.headLoss || 0);
+                        console.log(`🔍 Field Crop Pipe Head Loss (from localStorage): ${maxPipeHeadLoss}`);
+                    }
+                } catch (error) {
+                    console.error('Error parsing field_crop_pipe_calculations:', error);
+                }
+            }
+            
+            // ถ้ายังไม่มีข้อมูล ให้ใช้ค่าคงที่
+            if (maxPipeHeadLoss === 0) {
+                maxPipeHeadLoss = 0.6; // ค่าคงที่ตามที่เห็นใน CalculationSummary
+                console.log(`🔍 Field Crop Pipe Head Loss (fallback constant): ${maxPipeHeadLoss}`);
+            }
+            
+            // Pump Head = Head Loss ท่อ + Head Loss หัวฉีด (เหมือนกับ CalculationSummary.tsx)
+            maxPumpHeadM = maxPipeHeadLoss + sprinklerHeadLossM;
+            console.log(`🔍 Field Crop Pump Head (max from all zones): pipeHeadLoss=${maxPipeHeadLoss}, sprinklerHeadLossM=${sprinklerHeadLossM}, total=${maxPumpHeadM}`);
+        }
+
         return {
-            requiredFlowLPM: horticultureReq.requiredFlowLPM,
-            pumpHeadM: (results.headLoss?.total || 0) + (results.pressureFromSprinkler || 0),
+            requiredFlowLPM: maxFlowLPM,
+            pumpHeadM: maxPumpHeadM,
         };
-    };
+    }, [projectMode, fieldCropData, zoneInputs, horticultureReq.requiredFlowLPM, results.headLoss?.total, results.pressureFromSprinkler]);
 
     const getGardenRequirements = () => {
-        // Calculate fallback pump head locally to avoid hoisting issues
         const fallbackPumpHead = (() => {
             if (allZoneResults && allZoneResults.length > 1) {
-                // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด
                 return Math.max(
                     ...allZoneResults.map((zone: any) => {
                         const zoneHeadLoss = zone.headLoss?.total || 0;
@@ -492,13 +521,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     })
                 );
             } else {
-                // โซนเดียว ใช้การคำนวณปกติ
                 return (results.headLoss?.total || 0) + (results.pressureFromSprinkler || 0);
             }
         })();
 
         if (projectMode === 'field-crop') {
-            return getFieldCropRequirements();
+            return fieldCropRequirements;
         }
 
         if (projectMode !== 'garden') {
@@ -522,19 +550,16 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             let requiredFlowLPM = 0;
 
             if (gardenStats.zones && gardenStats.zones.length > 0) {
-                // คำนวณ flow requirement
                 if (
                     results.projectSummary?.operationMode === 'sequential' ||
                     results.projectSummary?.operationMode === 'single'
                 ) {
-                    // เปิดทีละโซน - ใช้ค่าของโซนที่มากที่สุด
                     requiredFlowLPM = Math.max(
                         ...gardenStats.zones.map(
                             (zone: any) => zone.sprinklerFlowRate * zone.sprinklerCount
                         )
                     );
                 } else {
-                    // เปิดพร้อมกันทุกโซน - รวมทุกโซน
                     requiredFlowLPM = gardenStats.zones.reduce((total: number, zone: any) => {
                         return total + zone.sprinklerFlowRate * zone.sprinklerCount;
                     }, 0);
@@ -558,7 +583,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     const gardenReq = getGardenRequirements();
 
-    // ประเมินความเพียงพอของปั๊มตามเงื่อนไขใหม่
     const evaluatePumpAdequacy = (pump: any) => {
         if (!pump) {
             return {
@@ -569,7 +593,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             };
         }
 
-        // ใช้ฟังก์ชันเดียวกันกับ dropdown เพื่อความสอดคล้อง
         return checkPumpAdequacy(pump);
     };
 
@@ -607,10 +630,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 const zoneInput = zoneInputs[zoneId];
                 if (!zoneInput) return { zoneId, flow: 0, head: 0 };
 
-                // For field-crop and horticulture mode, waterPerTreeLiters is now in LPM
                 let flowLPM = zoneInput.totalTrees * zoneInput.waterPerTreeLiters;
 
-                // Fallback for field-crop mode if flow is 0
                 if (projectMode === 'field-crop' && flowLPM === 0) {
                     try {
                         const fieldCropSystemDataStr = localStorage.getItem('fieldCropSystemData');
@@ -664,15 +685,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const autoSelectedPump = results.autoSelectedPump;
     const analyzedPumps = useMemo(() => results.analyzedPumps || [], [results.analyzedPumps]);
 
-    // คำนวณ Pump Head เหมือนใน CalculationSummary.tsx
     const calculatePumpHead = () => {
-        // ดึงท่อที่เลือกปัจจุบัน
         const actualBranchPipe = results.autoSelectedBranchPipe;
         const actualSecondaryPipe = results.autoSelectedSecondaryPipe;
         const actualMainPipe = results.autoSelectedMainPipe;
         const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
-        // รวม Head Loss จากท่อทุกประเภท
         const branchHeadLoss = actualBranchPipe?.headLoss || 0;
         const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
         const mainHeadLoss = actualMainPipe?.headLoss || 0;
@@ -680,11 +698,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         const totalPipeHeadLoss =
             branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-        // คำนวณ Head Loss หัวฉีด (แรงดัน(บาร์) * 10)
-        let sprinklerPressureBar = 2.5; // default
+        let sprinklerPressureBar = 2.5;
 
         if (projectMode === 'horticulture') {
-            // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
             try {
                 const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
                 if (horticultureSystemDataStr) {
@@ -697,13 +713,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 console.error('Error parsing horticulture system data:', error);
             }
         } else if (projectMode === 'garden') {
-            // สำหรับ garden mode ใช้ข้อมูลจาก gardenStats
+
             try {
                 const gardenStatsStr = localStorage.getItem('garden_statistics');
                 if (gardenStatsStr) {
                     const gardenStats = JSON.parse(gardenStatsStr);
                     if (gardenStats.zones && gardenStats.zones.length > 0) {
-                        // ใช้แรงดันจากโซนแรก หรือค่าเฉลี่ย
+
                         sprinklerPressureBar = gardenStats.zones[0].sprinklerPressure || 2.5;
                     }
                 }
@@ -711,7 +727,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 console.error('Error parsing garden stats:', error);
             }
         } else if (projectMode === 'field-crop') {
-            // สำหรับ field-crop mode ใช้ข้อมูลจาก fieldCropSystemData
+
             try {
                 const fieldCropSystemDataStr = localStorage.getItem('fieldCropSystemData');
                 if (fieldCropSystemDataStr) {
@@ -724,13 +740,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 console.error('Error parsing field crop system data:', error);
             }
         } else if (projectMode === 'greenhouse') {
-            // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouseData
+
             if (greenhouseData && greenhouseData.summary) {
-                // ใช้ค่า default สำหรับ greenhouse
                 sprinklerPressureBar = 2.5;
             }
         } else {
-            // สำหรับ mode อื่นๆ ใช้ข้อมูลจาก results
+
             if (results.analyzedSprinklers && results.analyzedSprinklers.length > 0) {
                 const firstSprinkler = results.analyzedSprinklers[0];
                 if (firstSprinkler.pressureBar) {
@@ -746,19 +761,19 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         return totalPipeHeadLoss + sprinklerHeadLoss;
     };
 
-    // สำหรับกรณีหลายโซน ให้หาค่าสูงสุด
+
     const getMaxPumpHeadFromAllZones = () => {
         if (allZoneResults && allZoneResults.length > 0) {
-            // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด (ใช้ค่าสูงสุดเสมอ)
+
             return Math.max(
                 ...allZoneResults.map((zone: any) => {
                     const zoneHeadLoss = zone.headLoss?.total || 0;
 
-                    // หา sprinkler pressure ที่ถูกต้องของโซนนี้
-                    let zoneSprinklerPressure = 2.5; // default pressure (bar)
+
+                    let zoneSprinklerPressure = 2.5;
 
                     if (projectMode === 'horticulture') {
-                        // ใช้ข้อมูลจาก horticultureSystemData
+
                         try {
                             const horticultureSystemDataStr =
                                 localStorage.getItem('horticultureSystemData');
@@ -774,43 +789,43 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             console.error('Error parsing horticulture system data:', error);
                         }
                     } else {
-                        // สำหรับ mode อื่นๆ ใช้ค่า default หรือจาก zone data
                         if (zone.sprinklerPressure) {
                             zoneSprinklerPressure = zone.sprinklerPressure;
                         }
                     }
 
-                    const zoneSprinklerHeadLoss = zoneSprinklerPressure * 10; // pressure (bar) × 10 = head loss (m)
+                    const zoneSprinklerHeadLoss = zoneSprinklerPressure * 10;
                     return zoneHeadLoss + zoneSprinklerHeadLoss;
                 })
             );
         } else {
-            // ไม่มี allZoneResults ใช้การคำนวณปกติ
             return calculatePumpHead();
         }
     };
 
     const actualPumpHead = getMaxPumpHeadFromAllZones();
 
-    // ฟังก์ชันตรวจสอบความเหมาะสมของปั๊ม สำหรับ dropdown
     const checkPumpAdequacy = useCallback(
         (pump: any) => {
             const maxFlow = pump.maxFlow || 0;
             const maxHead = pump.maxHead || 0;
 
-            // ใช้ค่าเดียวกันกับที่แสดงใน UI
             const requiredFlowLPM =
                 projectMode === 'garden'
                     ? gardenReq.requiredFlowLPM
                     : projectMode === 'greenhouse'
                       ? horticultureReq.requiredFlowLPM
-                      : horticultureReq.requiredFlowLPM;
+                      : projectMode === 'field-crop'
+                        ? fieldCropRequirements.requiredFlowLPM
+                        : horticultureReq.requiredFlowLPM;
             const requiredHeadM =
                 projectMode === 'garden'
                     ? gardenReq.pumpHeadM
                     : projectMode === 'greenhouse'
                       ? horticultureReq.minRequiredHead
-                      : actualPumpHead;
+                      : projectMode === 'field-crop'
+                        ? fieldCropRequirements.pumpHeadM
+                        : actualPumpHead;
 
             const isFlowAdequate = maxFlow >= requiredFlowLPM;
             const isHeadAdequate = maxHead >= requiredHeadM;
@@ -822,16 +837,14 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 headRatio: requiredHeadM > 0 ? maxHead / requiredHeadM : 0,
             };
         },
-        [projectMode, gardenReq, horticultureReq, actualPumpHead]
+        [projectMode, gardenReq, horticultureReq, fieldCropRequirements, actualPumpHead]
     );
 
-    // แสดงปั๊มทั้งหมด - เรียงตามความเหมาะสมก่อน แล้วตามราคา
     const getFilteredPumps = useCallback(() => {
         return analyzedPumps.sort((a, b) => {
             const adequacyA = checkPumpAdequacy(a);
             const adequacyB = checkPumpAdequacy(b);
 
-            // 1. เรียงตามความเหมาะสม: ดี > พอใช้ > ไม่เหมาะสม
             const scoreA =
                 adequacyA.isFlowAdequate && adequacyA.isHeadAdequate
                     ? 3
@@ -846,30 +859,24 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                       : 1;
 
             if (scoreA !== scoreB) {
-                return scoreB - scoreA; // เรียงจากดีที่สุดไปแย่ที่สุด
+                return scoreB - scoreA;
             }
 
-            // 2. ถ้าคะแนนเท่ากัน ให้เรียงตามราคา (ถูกที่สุดก่อน)
             return a.price - b.price;
         });
     }, [analyzedPumps, checkPumpAdequacy]);
 
     const sortedPumps = useMemo(() => getFilteredPumps(), [getFilteredPumps]);
 
-    // Auto-select pump based on system requirements
     useEffect(() => {
         if (analyzedPumps.length > 0) {
-            // ตรวจสอบว่าปั๊มที่เลือกอยู่เหมาะสมหรือไม่
             let shouldReselect = false;
 
             if (!selectedPump) {
-                // หากยังไม่มีปั๊มที่เลือก ให้เลือกปั๊มที่เหมาะสม
                 shouldReselect = true;
             } else {
-                // ตรวจสอบว่าปั๊มที่เลือกอยู่เหมาะสมหรือไม่
                 const currentAdequacy = checkPumpAdequacy(selectedPump);
                 if (!(currentAdequacy.isFlowAdequate && currentAdequacy.isHeadAdequate)) {
-                    // หากปั๊มที่เลือกอยู่ไม่เหมาะสม ให้หาปั๊มที่เหมาะสมกว่า
                     shouldReselect = true;
                 }
             }
@@ -887,14 +894,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     }))
                 );
 
-                // 1. หาปั๊มที่เหมาะสมที่สุด (เพียงพอทั้ง Flow และ Head) ที่ราคาถูกที่สุด
                 const suitablePumps = sortedPumps.filter((pump) => {
                     const adequacy = checkPumpAdequacy(pump);
                     return adequacy.isFlowAdequate && adequacy.isHeadAdequate;
                 });
 
                 if (suitablePumps.length > 0) {
-                    // เลือกปั๊มที่เหมาะสม ราคาถูกที่สุด
                     const bestPump = suitablePumps[0];
                     if (bestPump && bestPump.id !== selectedPump?.id) {
                         console.log(
@@ -910,14 +915,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     console.log('No suitable pumps found (Flow ✅ + Head ✅)');
                 }
 
-                // 2. หากไม่มีปั๊มที่เหมาะสม ให้เลือกปั๊มที่ Head หรือ Flow เพียงพอแค่อย่างเดียว ราคาถูกที่สุด
                 const partialAdequatePumps = sortedPumps.filter((pump) => {
                     const adequacy = checkPumpAdequacy(pump);
                     return adequacy.isFlowAdequate || adequacy.isHeadAdequate;
                 });
 
                 if (partialAdequatePumps.length > 0) {
-                    // เลือกปั๊มที่เพียงพอแค่อย่างเดียว ราคาถูกที่สุด
                     const bestPartialPump = partialAdequatePumps[0];
                     if (bestPartialPump && bestPartialPump.id !== selectedPump?.id) {
                         onPumpChange(bestPartialPump);
@@ -925,7 +928,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     }
                 }
 
-                // 3. หากยังไม่มี ให้เลือกปั๊มราคาถูกที่สุด
                 if (sortedPumps.length > 0) {
                     const cheapestPump = sortedPumps[0];
                     if (cheapestPump && cheapestPump.id !== selectedPump?.id) {
@@ -1039,19 +1041,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                     ? gardenReq.requiredFlowLPM
                                     : projectMode === 'greenhouse'
                                       ? horticultureReq.requiredFlowLPM
-                                      : horticultureReq.requiredFlowLPM
+                                      : projectMode === 'field-crop'
+                                        ? fieldCropRequirements.requiredFlowLPM
+                                        : horticultureReq.requiredFlowLPM
                                 ).toFixed(2)
                             ).toLocaleString()}{' '}
                             {t('LPM')}
                         </span>
-                        {projectMode === 'garden' && (
-                            <span className="ml-2 text-xs text-green-400">(จาก garden input)</span>
-                        )}
-                        {projectMode === 'greenhouse' && (
-                            <span className="ml-2 text-xs text-green-400">
-                                (จาก greenhouse zones)
-                            </span>
-                        )}
                     </span>
                     <span>
                         {t('Pump Head:')}{' '}
@@ -1062,19 +1058,13 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                         ? gardenReq.pumpHeadM
                                         : projectMode === 'greenhouse'
                                           ? horticultureReq.minRequiredHead
-                                          : actualPumpHead;
+                                          : projectMode === 'field-crop'
+                                            ? fieldCropRequirements.pumpHeadM
+                                            : actualPumpHead;
                                 return Number(displayValue.toFixed(2)).toLocaleString();
                             })()}{' '}
                             {t('เมตร')}
                         </span>
-                        {projectMode === 'garden' && (
-                            <span className="ml-2 text-xs text-green-400">(จาก Head Loss รวม)</span>
-                        )}
-                        {projectMode === 'greenhouse' && (
-                            <span className="ml-2 text-xs text-green-400">
-                                (ท่อเมนหลัก + ท่อย่อย + หัวฉีด)
-                            </span>
-                        )}
                     </span>
                 </div>
             </div>
@@ -1090,22 +1080,19 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     }}
                     options={[
                         { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
-                        ...(() => {
-                            // สร้าง options จาก pumps - แสดงปั๊มทั้งหมดแต่เรียงตามความเหมาะสม
+                        ...(() => { 
                             const pumpOptions = sortedPumps.map((pump) => {
                                 const group = getPumpGrouping(pump);
-                                const isAuto = pump.id === currentPump?.id; // ปั๊มที่เลือกอยู่คือปั๊มที่แนะนำ
+                                const isAuto = pump.id === currentPump?.id;
                                 const adequacy = checkPumpAdequacy(pump);
                                 const isSelected = pump.id === currentPump?.id;
 
-                                // สร้าง label พร้อมสถานะความเหมาะสม
                                 const flowStatus = adequacy.isFlowAdequate ? '✅' : '❌';
                                 const headStatus = adequacy.isHeadAdequate ? '✅' : '❌';
                                 const flowRatio = adequacy.flowRatio.toFixed(1);
                                 const headRatio = adequacy.headRatio.toFixed(1);
                                 const statusText = `Flow:${flowStatus} ${flowRatio} Head:${headStatus} (${headRatio}x)`;
 
-                                // กำหนดสถานะความเหมาะสม
                                 let suitabilityText = '';
                                 if (adequacy.isFlowAdequate && adequacy.isHeadAdequate) {
                                     suitabilityText = '✅ ดี';
@@ -1137,14 +1124,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                     unit: t('บาท'),
                                     isAutoSelected: isAuto,
                                     isSelected: isSelected,
-                                    // เพิ่มข้อมูลความเหมาะสม
-                                    isRecommended: isAuto, // แนะนำ = ตัวที่เลือกอัตโนมัติเท่านั้น
+                                    isRecommended: isAuto, 
                                     isGoodChoice:
-                                        adequacy.isFlowAdequate && adequacy.isHeadAdequate, // ดี = Head และ Flow เพียงพอทั้งคู่
+                                        adequacy.isFlowAdequate && adequacy.isHeadAdequate, 
                                     isUsable:
                                         (adequacy.isFlowAdequate || adequacy.isHeadAdequate) &&
-                                        !(adequacy.isFlowAdequate && adequacy.isHeadAdequate), // พอใช้ = เพียงพอแค่ตัวเดียว
-                                    // เพิ่มข้อมูล Flow/Head adequacy สำหรับ dropdown
+                                        !(adequacy.isFlowAdequate && adequacy.isHeadAdequate), 
                                     isFlowAdequate: adequacy.isFlowAdequate,
                                     isHeadAdequate: adequacy.isHeadAdequate,
                                     flowRatio: adequacy.flowRatio,
@@ -1169,31 +1154,23 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                 };
                             });
 
-                            // เรียงลำดับตามเงื่อนไข:
-                            // 1. แนะนำ (ตัวที่เลือกอัตโนมัติ) - อยู่บนสุด
-                            // 2. ดี (Head และ Flow เพียงพอทั้งคู่) - ราคาถูกก่อน
-                            // 3. พอใช้ (เพียงพอแค่ตัวเดียว) - ราคาถูกก่อน
-                            // 4. ไม่เหมาะสม (ไม่เพียงพอทั้งคู่) - ราคาถูกก่อน
+                            
                             return pumpOptions.sort((a, b) => {
-                                // 1. แนะนำ (ตัวที่เลือกอัตโนมัติ) - อยู่บนสุด
                                 if (a.isRecommended && !b.isRecommended) return -1;
                                 if (!a.isRecommended && b.isRecommended) return 1;
 
-                                // 2. ดี (Head และ Flow เพียงพอทั้งคู่) - ราคาถูกก่อน
                                 if (a.isGoodChoice && !b.isGoodChoice) return -1;
                                 if (!a.isGoodChoice && b.isGoodChoice) return 1;
                                 if (a.isGoodChoice && b.isGoodChoice) {
                                     return (a.price || 0) - (b.price || 0);
                                 }
 
-                                // 3. พอใช้ (เพียงพอแค่ตัวเดียว) - ราคาถูกก่อน
                                 if (a.isUsable && !b.isUsable) return -1;
                                 if (!a.isUsable && b.isUsable) return 1;
                                 if (a.isUsable && b.isUsable) {
                                     return (a.price || 0) - (b.price || 0);
                                 }
 
-                                // 4. ไม่เหมาะสม (ไม่เพียงพอทั้งคู่) - ราคาถูกก่อน
                                 return (a.price || 0) - (b.price || 0);
                             });
                         })(),

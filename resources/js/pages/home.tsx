@@ -1081,8 +1081,6 @@ export default function Home() {
     let auth: any = null;
     try {
         auth = (page.props as any).auth;
-        console.log('🔐 Auth object:', auth);
-        console.log('👤 User:', auth?.user);
     } catch (error) {
         // Silently handle the error - this is expected during initial render
         // The context will be available after the component mounts
@@ -1114,10 +1112,8 @@ export default function Home() {
         try {
             // Check if router is available and has the visit method
             if (router && typeof router.visit === 'function') {
-                console.log('Using Inertia router for navigation to:', route);
                 router.visit(route);
             } else {
-                console.log('Router not ready, using window.location for:', route);
                 window.location.href = route;
             }
         } catch (error) {
@@ -1141,8 +1137,6 @@ export default function Home() {
     const getAllFolders = () => {
         // Only return root folders (folders without parent_id)
         const rootFolders = folders.filter((folder) => !folder.parent_id);
-        console.log('📂 All folders:', folders);
-        console.log('🏠 Root folders:', rootFolders);
         return rootFolders;
     };
 
@@ -1198,27 +1192,16 @@ export default function Home() {
         // Load saved fields and folders from database
         const fetchData = async () => {
             try {
-                console.log('🔄 Fetching data from API...');
-                console.log('📋 Axios defaults:', {
-                    baseURL: axios.defaults.baseURL,
-                    headers: axios.defaults.headers.common,
-                    withCredentials: axios.defaults.withCredentials,
-                });
-
                 const [fieldsResponse, foldersResponse] = await Promise.all([
                     axios.get('/fields-api'), // Updated to use new endpoint
                     axios.get('/folders-api'), // Updated to use new route path
                 ]);
-
-                console.log('📁 Folders response:', foldersResponse.data);
-                console.log('🌾 Fields response:', fieldsResponse.data);
 
                 if (fieldsResponse.data.fields) {
                     setFields(fieldsResponse.data.fields);
                 }
 
                 if (foldersResponse.data.folders) {
-                    console.log('✅ Setting folders:', foldersResponse.data.folders);
                     setFolders(foldersResponse.data.folders);
 
                     // Commented out automatic mock field creation to avoid issues
@@ -1284,7 +1267,6 @@ export default function Home() {
         // Add to fields state
         setFields((prev) => [...prev, mockField]);
 
-        console.log('Mock field created for testing:', mockField);
     };
 
     const handleCategorySelect = (category: PlantCategory) => {
@@ -1294,7 +1276,6 @@ export default function Home() {
         localStorage.removeItem('editingFieldId'); // Clear editing field ID for new projects
         localStorage.removeItem('currentFieldId'); // Clear current field ID for new projects
         localStorage.removeItem('currentFieldName'); // Clear current field name for new projects
-        console.log('🆕 Starting new project - cleared field IDs from localStorage');
 
         // Add a small delay to ensure router is fully initialized
         setTimeout(() => {
@@ -1318,11 +1299,9 @@ export default function Home() {
             // Store field ID in localStorage for later use in product page
             localStorage.setItem('currentFieldId', field.id);
             localStorage.setItem('currentFieldName', field.name);
-            console.log('📋 Opening existing field - set currentFieldId:', field.id);
 
             // Check if field is finished - if so, go directly to product page with appropriate mode
             if (field.status === 'finished' || field.isCompleted) {
-                console.log('🔄 Opening finished field, navigating to product page');
                 const productModeMap: { [key: string]: string } = {
                     horticulture: '',
                     'home-garden': '?mode=garden',
@@ -1333,12 +1312,6 @@ export default function Home() {
                 navigateToRoute(`/product${modeParam}`);
                 return;
             }
-
-            // For unfinished fields, go to appropriate planner to continue editing
-            console.log(
-                '🔄 Opening unfinished field, navigating to planner for category:',
-                field.category
-            );
 
             // Route to appropriate planner based on field category
             switch (field.category) {
@@ -1435,7 +1408,6 @@ export default function Home() {
             const fieldIdStr = String(fieldId);
             if (fieldIdStr.startsWith('mock-')) {
                 // For mock fields, just update frontend state
-                console.log('Updating mock field status:', fieldIdStr);
                 setFields((prev) =>
                     prev.map((f) => (f.id === fieldId ? { ...f, status, isCompleted } : f))
                 );
@@ -1463,34 +1435,18 @@ export default function Home() {
 
         setDeleting(true);
         try {
-            // Debug: Log the field ID type and value
-            console.log('Field to delete:', {
-                id: fieldToDelete.id,
-                idType: typeof fieldToDelete.id,
-                field: fieldToDelete,
-            });
-
             // Convert ID to string and check if this is a mock field (ID starts with 'mock-')
             const fieldId = String(fieldToDelete.id);
             if (fieldId.startsWith('mock-')) {
                 // For mock fields, just remove from frontend state
-                console.log('Deleting mock field:', fieldId);
                 setFields((prev) => prev.filter((f) => f.id !== fieldToDelete.id));
                 setShowDeleteConfirm(false);
                 setFieldToDelete(null);
             } else {
                 // For real fields, make API call to delete from database
-                console.log('Making API call to delete field:', fieldToDelete.id);
-                console.log('Axios config:', {
-                    headers: axios.defaults.headers.common,
-                    withCredentials: axios.defaults.withCredentials,
-                });
                 const response = await axios.delete(`/api/fields/${fieldToDelete.id}`);
-                console.log('Delete response:', response.data);
-                console.log('Response status:', response.status);
 
                 if (response.data.success) {
-                    console.log('Field deleted successfully, updating UI');
                     // Remove the field from the list
                     setFields((prev) => prev.filter((f) => f.id !== fieldToDelete.id));
                     setShowDeleteConfirm(false);
@@ -1507,13 +1463,11 @@ export default function Home() {
 
             // Check if it's a CSRF token error
             if (error.response?.status === 419) {
-                console.log('CSRF token error, attempting to refresh token and retry');
                 try {
                     await refreshCsrfToken();
                     // Retry the delete request
                     const retryResponse = await axios.delete(`/api/fields/${fieldToDelete.id}`);
                     if (retryResponse.data.success) {
-                        console.log('Field deleted successfully on retry');
                         setFields((prev) => prev.filter((f) => f.id !== fieldToDelete.id));
                         setShowDeleteConfirm(false);
                         setFieldToDelete(null);
@@ -1526,7 +1480,6 @@ export default function Home() {
 
             // Check if the field was actually deleted despite the error
             if (error.response?.status === 200 || error.response?.status === 204) {
-                console.log('Field was deleted despite error, updating UI');
                 setFields((prev) => prev.filter((f) => f.id !== fieldToDelete.id));
                 setShowDeleteConfirm(false);
                 setFieldToDelete(null);
@@ -1594,14 +1547,7 @@ export default function Home() {
         if (!folderToDelete) return;
 
         try {
-            console.log('Attempting to delete folder:', folderToDelete);
-            console.log('CSRF Token:', axios.defaults.headers.common['X-CSRF-TOKEN']);
-            console.log('Axios config:', {
-                headers: axios.defaults.headers.common,
-                withCredentials: axios.defaults.withCredentials,
-            });
             const response = await axios.post(`/folders-api/${folderToDelete.id}/delete`);
-            console.log('Delete folder response:', response.data);
 
             if (response.data.success) {
                 // Move fields to uncategorized folder
@@ -1663,11 +1609,6 @@ export default function Home() {
                 });
 
                 if (response.data.success) {
-                    console.log('Field moved successfully:', {
-                        fieldId: draggedField.id,
-                        oldFolderId: draggedField.folderId,
-                        newFolderId: newFolderId,
-                    });
 
                     // Update field in frontend
                     setFields((prev) =>
@@ -1683,7 +1624,6 @@ export default function Home() {
                 // For mock fields, still update the frontend state even if backend fails
                 const draggedFieldId = String(draggedField.id);
                 if (draggedFieldId.startsWith('mock-')) {
-                    console.log('Mock field - updating frontend state only');
                     setFields((prev) =>
                         prev.map((f) =>
                             f.id === draggedField.id ? { ...f, folderId: newFolderId } : f
@@ -2060,7 +2000,6 @@ export default function Home() {
                                             // Check if field matches this category
                                             const matchesCategory = field.category === category.id;
 
-                                            // Special case: if no category is set, treat as horticulture (for existing fields)
                                             const isLegacyHorticulture =
                                                 !field.category && category.id === 'horticulture';
 
@@ -2069,22 +2008,6 @@ export default function Home() {
                                                 (matchesCategory || isLegacyHorticulture)
                                             );
                                         });
-
-                                        // Debug logging
-                                        console.log(
-                                            `🔍 Category ${category.name} (${category.id}):`,
-                                            {
-                                                totalFields: fields.length,
-                                                categoryFields: categoryFields.length,
-                                                fieldsInFolder: fields.filter(
-                                                    (f) => f.folderId === selectedFolder.id
-                                                ).length,
-                                                sampleField: fields.find(
-                                                    (f) => f.folderId === selectedFolder.id
-                                                ),
-                                            }
-                                        );
-
                                         return { category, fields: categoryFields };
                                     });
 

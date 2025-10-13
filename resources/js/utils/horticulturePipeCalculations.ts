@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getPipeData, getPipeDataWithSmartSize } from '../pages/components/PipeFrictionLoss';
 import { PressureLossCorrectionFactorTableData } from '../pages/components/PressureLossCorrectionFactorTable';
@@ -257,6 +256,13 @@ export function validatePipeSelection(
     selectedPipes: { [key: string]: any } = {}
 ): { isValid: boolean; reason?: string } {
     try {
+        if (typeof pipe.pn !== 'number' || typeof sprinklerPressure.pressureBar !== 'number') {
+            return {
+                isValid: false,
+                reason: 'ข้อมูลแรงดันไม่ถูกต้อง',
+            };
+        }
+
         if (pipe.pn < sprinklerPressure.pressureBar) {
             return {
                 isValid: false,
@@ -265,10 +271,11 @@ export function validatePipeSelection(
         }
 
         if (pipeType === 'branch' || pipeType === 'emitter') {
-            if (pipe.sizeMM > 32) {
+            const sizeMM = pipe.sizeMM || (pipe.sizeInch ? parseFloat(pipe.sizeInch) * 25.4 : 0);
+            if (sizeMM > 32) {
                 return {
                     isValid: false,
-                    reason: `ท่อ${pipeType === 'branch' ? 'ย่อย' : 'ย่อยแยก'}ต้องมีขนาด ≤ 32mm (ขนาดปัจจุบัน: ${pipe.sizeMM}mm)`,
+                    reason: `ท่อ${pipeType === 'branch' ? 'ย่อย' : 'ย่อยแยก'}ต้องมีขนาด ≤ 32mm (ขนาดปัจจุบัน: ${sizeMM}mm)`,
                 };
             }
         }
@@ -448,10 +455,10 @@ export function validatePipeSizeHierarchy(
         case 'emitter': {   
             const maxAllowed = 32;
             const isBelowLimit = currentSizeMM <= maxAllowed;
-            const isSmaller2 =
-                currentSizeMM <
-                Math.max(mainSize || Number.MAX_VALUE, secondarySize || Number.MAX_VALUE);
-            return isBelowLimit && (mainSize === 0 && secondarySize === 0 ? true : isSmaller2);
+            const hasLargerPipes = mainSize > 0 || secondarySize > 0;
+            const isSmallerThanLargerPipes = !hasLargerPipes || 
+                currentSizeMM < Math.max(mainSize || 0, secondarySize || 0);
+            return isBelowLimit && isSmallerThanLargerPipes;
         }
 
         default:
@@ -477,7 +484,6 @@ export function selectBestPipeByHeadLoss(
     selectedPipeType: string,
     selectedPipeSizes: SelectedPipeSizes,
     head20Percent: number,
-    _targetHeadLoss?: number 
 ): any | null {
     if (!availablePipes.length || !bestPipeInfo) {
         return null;
@@ -539,7 +545,7 @@ export function selectBestPipeByHeadLoss(
             `${pipe.sizeMM}mm`
         );
 
-        if (calculation && calculation.headLoss > 0) {
+        if (calculation && calculation.headLoss >= 0) {
             candidates.push({
                 pipe,
                 headLoss: calculation.headLoss,
@@ -577,8 +583,10 @@ export function selectBestPipeByHeadLoss(
     }
 
     bestCandidates.sort((a, b) => {
-        if (a.pipe.price !== b.pipe.price) {
-            return a.pipe.price - b.pipe.price;
+        const priceA = a.pipe.price || 0;
+        const priceB = b.pipe.price || 0;
+        if (priceA !== priceB) {
+            return priceA - priceB;
         }
         return a.pipe.sizeMM - b.pipe.sizeMM;
     });

@@ -1,14 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import React, { useEffect, useRef, useState } from 'react';
 import CurvedPipeDrawingManager from './CurvedPipeDrawingManager';
 import CurvedPipeControlPanel from './CurvedPipeControlPanel';
 import {
-    snapMainPipeEndToSubMainPipe as utilsSnapMainPipeEndToSubMainPipe,
     findClosestPointOnLineSegment as utilsFindClosestPointOnLineSegment,
     calculateDistanceBetweenPoints as utilsCalculateDistanceBetweenPoints,
-    calculatePipeLength as utilsCalculatePipeLength,
 } from '../../utils/horticultureUtils';
 
 interface Coordinate {
@@ -35,7 +32,6 @@ interface HorticultureDrawingManagerProps {
     pump?: Coordinate | null;
     mainPipes?: Pipe[];
     subMainPipes?: Pipe[];
-    onMainPipesUpdate?: (updatedMainPipes: Pipe[]) => void;
     enableCurvedDrawing?: boolean;
     t?: (key: string) => string;
     onMainPipeClick?: (pipeId: string, clickPosition: Coordinate) => void;
@@ -61,80 +57,7 @@ const snapPointToPump = (
     return point;
 };
 
-const snapPointToMainPipeEnd = (
-    point: Coordinate,
-    mainPipes: Pipe[],
-    snapThreshold: number = 5
-): Coordinate => {
-    if (!mainPipes || mainPipes.length === 0) {
-        return point;
-    }
 
-    let closestPoint = point;
-    let minDistance = Infinity;
-    let closestPipeId = '';
-
-    for (const mainPipe of mainPipes) {
-        if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) {
-            continue;
-        }
-
-        const pipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-        const distance = calculateDistanceBetweenPoints(point, pipeEnd);
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestPoint = pipeEnd;
-            closestPipeId = mainPipe.id;
-        }
-    }
-
-    if (minDistance <= snapThreshold) {
-        return closestPoint;
-    }
-
-    return point;
-};
-
-const snapPointToSubMainPipe = (
-    point: Coordinate,
-    subMainPipes: Pipe[],
-    snapThreshold: number = 5
-): Coordinate => {
-    if (!subMainPipes || subMainPipes.length === 0) {
-        return point;
-    }
-
-    let closestPoint = point;
-    let minDistance = Infinity;
-    let closestPipeId = '';
-
-    for (const subMainPipe of subMainPipes) {
-        if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
-            continue;
-        }
-
-        for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
-            const start = subMainPipe.coordinates[i];
-            const end = subMainPipe.coordinates[i + 1];
-
-            const closestPointOnSegment = findClosestPointOnLineSegment(point, start, end);
-            const distance = calculateDistanceBetweenPoints(point, closestPointOnSegment);
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestPoint = closestPointOnSegment;
-                closestPipeId = subMainPipe.id;
-            }
-        }
-    }
-
-    if (minDistance <= snapThreshold) {
-        return closestPoint;
-    }
-
-    return point;
-};
 
 const snapPointToMainAreaBoundary = (
     point: Coordinate,
@@ -147,7 +70,6 @@ const snapPointToMainAreaBoundary = (
 
     let closestPoint = point;
     let minDistance = Infinity;
-    let snappedEdgeIndex = -1;
 
     for (let i = 0; i < mainArea.length; i++) {
         const start = mainArea[i];
@@ -159,7 +81,6 @@ const snapPointToMainAreaBoundary = (
         if (distance < minDistance) {
             minDistance = distance;
             closestPoint = closestPointOnSegment;
-            snappedEdgeIndex = i;
         }
     }
 
@@ -174,62 +95,20 @@ const findClosestPointOnLineSegment = utilsFindClosestPointOnLineSegment;
 
 const calculateDistanceBetweenPoints = utilsCalculateDistanceBetweenPoints;
 
-const calculatePipeLength = utilsCalculatePipeLength;
 
-const snapCoordinatesToMainArea = (
-    coordinates: Coordinate[],
-    mainArea: Coordinate[]
-): Coordinate[] => {
-    if (!mainArea || mainArea.length < 3) {
-        return coordinates;
-    }
 
-    let snappedCount = 0;
-    const snappedCoordinates = coordinates.map((coord, index) => {
-        const snappedCoord = snapPointToMainAreaBoundary(coord, mainArea);
-        if (snappedCoord.lat !== coord.lat || snappedCoord.lng !== coord.lng) {
-            snappedCount++;
-        }
-        return snappedCoord;
-    });
-
-    return snappedCoordinates;
-};
-
-const debugMainAreaBoundaries = (mainArea: Coordinate[]): void => {
-    if (!mainArea || mainArea.length < 3) {
-        return;
-    }
-
-    for (let i = 0; i < mainArea.length; i++) {
-        const start = mainArea[i];
-        const end = mainArea[(i + 1) % mainArea.length];
-        const edgeLength = calculateDistanceBetweenPoints(start, end);
-
-        const latDiff = Math.abs(end.lat - start.lat);
-        const lngDiff = Math.abs(end.lng - start.lng);
-        const isVertical = latDiff > lngDiff * 10;
-        const isHorizontal = lngDiff > latDiff * 10;
-
-        let edgeType = 'Diagonal';
-        if (isVertical) edgeType = 'Vertical';
-        else if (isHorizontal) edgeType = 'Horizontal';
-    }
-};
 
 const advancedSnapToMainArea = (
     coordinates: Coordinate[],
-    mainArea: Coordinate[]
+    mainArea?: Coordinate[]
 ): Coordinate[] => {
     if (!mainArea || mainArea.length < 3) {
         return coordinates;
     }
-    debugMainAreaBoundaries(mainArea);
 
     let longestEdge = 0;
     let longestEdgeStart: Coordinate | null = null;
     let longestEdgeEnd: Coordinate | null = null;
-    let longestEdgeIndex = -1;
 
     for (let i = 0; i < mainArea.length; i++) {
         const start = mainArea[i];
@@ -240,7 +119,6 @@ const advancedSnapToMainArea = (
             longestEdge = edgeLength;
             longestEdgeStart = start;
             longestEdgeEnd = end;
-            longestEdgeIndex = i;
         }
     }
     const snappedCoordinates = coordinates.map((coord) => {
@@ -263,7 +141,6 @@ const advancedSnapToMainArea = (
         return snapPointToMainAreaBoundary(coord, mainArea, 5);
     });
 
-    const originalCount = coordinates.length;
     const snappedCount = snappedCoordinates.filter(
         (coord, index) =>
             coord.lat !== coordinates[index].lat || coord.lng !== coordinates[index].lng
@@ -478,9 +355,7 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
 
 const snapMainPipeCoordinates = (
     coordinates: Coordinate[],
-    pumpPosition: Coordinate | null,
-    mainArea: Coordinate[],
-    subMainPipes: Pipe[] = []
+    pumpPosition: Coordinate | null
 ): Coordinate[] => {
     if (coordinates.length === 0) {
         return coordinates;
@@ -495,54 +370,83 @@ const snapMainPipeCoordinates = (
 };
 
 const snapSubMainPipeCoordinates = (
-    coordinates: Coordinate[],
-    mainPipes: Pipe[],
-    mainArea: Coordinate[]
+    coordinates: Coordinate[]
 ): Coordinate[] => {
     return coordinates;
 };
 
-const snapPointToMainPipe = (
-    point: Coordinate,
-    mainPipes: Pipe[],
-    snapThreshold: number = 10
-): Coordinate => {
-    if (!mainPipes || mainPipes.length === 0) {
-        return point;
+const optimizeLateralPipeCoordinates = (
+    startPoint: Coordinate,
+    endPoint: Coordinate,
+    originalCoordinates: Coordinate[]
+): Coordinate[] => {
+    if (originalCoordinates.length <= 2) {
+        return [startPoint, endPoint];
     }
-
-    let closestPoint = point;
-    let minDistance = Infinity;
-    let closestPipeId = '';
-
-    for (const mainPipe of mainPipes) {
-        if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) {
-            continue;
-        }
-
-        for (let i = 0; i < mainPipe.coordinates.length - 1; i++) {
-            const start = mainPipe.coordinates[i];
-            const end = mainPipe.coordinates[i + 1];
-
-            const closestPointOnSegment = findClosestPointOnLineSegment(point, start, end);
-            const distance = calculateDistanceBetweenPoints(point, closestPointOnSegment);
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestPoint = closestPointOnSegment;
-                closestPipeId = mainPipe.id;
-            }
+    
+    const optimized: Coordinate[] = [startPoint];
+    
+    for (let i = 1; i < originalCoordinates.length - 1; i++) {
+        const current = originalCoordinates[i];
+        const prev = optimized[optimized.length - 1];
+        
+        const distance = calculateDistanceBetweenPoints(prev, current);
+        
+        if (distance > 2) {
+            optimized.push(current);
         }
     }
-
-    if (minDistance <= snapThreshold) {
-        return closestPoint;
-    }
-
-    return point;
+    
+    optimized.push(endPoint);
+    
+    return optimized;
 };
 
-const snapMainPipeEndToSubMainPipe = utilsSnapMainPipeEndToSubMainPipe;
+const validateLateralPipeInput = (
+    coordinates: Coordinate[],
+    placementMode: string | null
+): boolean => {
+    if (!coordinates || coordinates.length < 2) {
+        return false;
+    }
+    
+    if (!placementMode) {
+        return false;
+    }
+    
+    for (const coord of coordinates) {
+        if (
+            typeof coord.lat !== 'number' ||
+            typeof coord.lng !== 'number' ||
+            !isFinite(coord.lat) ||
+            !isFinite(coord.lng)
+        ) {
+            return false;
+        }
+    }
+    
+    return true;
+};
+
+const enhanceLateralPipeDrawing = (
+    coordinates: Coordinate[],
+    placementMode: string | null
+): Coordinate[] => {
+    if (!validateLateralPipeInput(coordinates, placementMode)) {
+        return coordinates;
+    }
+    
+    if (coordinates.length === 2) {
+        return coordinates;
+    }
+    
+    const startPoint = coordinates[0];
+    const endPoint = coordinates[coordinates.length - 1];
+    
+    return optimizeLateralPipeCoordinates(startPoint, endPoint, coordinates);
+};
+
+
 
 const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     map,
@@ -551,11 +455,10 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     fillColor,
     strokeColor,
     isEditModeEnabled = false,
-    mainArea = [],
+    mainArea,
     pump = null,
     mainPipes = [],
     subMainPipes = [],
-    onMainPipesUpdate,
     enableCurvedDrawing = false,
     t = (key: string) => key,
     onMainPipeClick,
@@ -563,7 +466,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     onLateralPipeMouseMove,
 }) => {
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
-    const [isDrawingEnabled, setIsDrawingEnabled] = useState(false);
     const [showCurvedPipePanel, setShowCurvedPipePanel] = useState(false);
     const [isCurvedDrawingActive, setIsCurvedDrawingActive] = useState(false);
     const [anchorPointsCount, setAnchorPointsCount] = useState(0);
@@ -629,34 +531,8 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 
             drawingManager.setMap(map);
             drawingManagerRef.current = drawingManager;
-            setIsDrawingEnabled(true);
 
 
-            drawingManager.addListener('drawingmode_changed', () => {
-                const currentMode = drawingManager.getDrawingMode();
-            });
-
-            drawingManager.addListener('overlaycomplete', (event) => {});
-
-            drawingManager.addListener('click', (event) => {});
-
-            drawingManager.addListener('mousedown', (event) => {});
-
-            drawingManager.addListener('mouseup', (event) => {});
-
-            drawingManager.addListener('dblclick', (event) => {});
-
-            drawingManager.addListener('rightclick', (event) => {});
-
-            drawingManager.addListener('dragstart', (event) => {});
-
-            drawingManager.addListener('dragend', (event) => {});
-
-            drawingManager.addListener('drag', (event) => {});
-
-            drawingManager.addListener('mouseover', (event) => {});
-
-            drawingManager.addListener('mouseout', (event) => {});
 
             drawingManager.addListener('mousemove', (event) => {
                 if (editMode === 'lateralPipe' && onLateralPipeMouseMove) {
@@ -664,8 +540,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 }
             });
 
-            drawingManager.addListener('contextmenu', (event) => {});
-            drawingManager.addListener('tilt_changed', (event) => {});
 
             const listeners: google.maps.MapsEventListener[] = [];
 
@@ -673,7 +547,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 drawingManager.addListener('polygoncomplete', (polygon: google.maps.Polygon) => {
                     let coordinates = extractCoordinatesFromShape(polygon);
 
-                    if (editMode === 'zone' && mainArea.length > 0) {
+                    if (editMode === 'zone' && mainArea && mainArea.length > 0) {
                         coordinates = advancedSnapToMainArea(coordinates, mainArea);
                     }
 
@@ -690,7 +564,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     (rectangle: google.maps.Rectangle) => {
                         let coordinates = extractCoordinatesFromShape(rectangle);
 
-                        if (editMode === 'zone' && mainArea.length > 0) {
+                        if (editMode === 'zone' && mainArea && mainArea.length > 0) {
                             coordinates = advancedSnapToMainArea(coordinates, mainArea);
                         }
 
@@ -706,7 +580,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 drawingManager.addListener('circlecomplete', (circle: google.maps.Circle) => {
                     let coordinates = extractCoordinatesFromShape(circle);
 
-                    if (editMode === 'zone' && mainArea.length > 0) {
+                    if (editMode === 'zone' && mainArea && mainArea.length > 0) {
                         coordinates = advancedSnapToMainArea(coordinates, mainArea);
                     }
 
@@ -724,14 +598,12 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     if (editMode === 'mainPipe') {
                         coordinates = snapMainPipeCoordinates(
                             coordinates,
-                            pump,
-                            mainArea,
-                            subMainPipes
+                            pump
                         );
                     } else if (editMode === 'subMainPipe') {
-                        coordinates = snapSubMainPipeCoordinates(coordinates, mainPipes, mainArea);
+                        coordinates = snapSubMainPipeCoordinates(coordinates);
                     } else if (editMode === 'lateralPipe') {
-                        console.log('lateralPipe', coordinates);
+                        coordinates = enhanceLateralPipeDrawing(coordinates, editMode);
                     }
 
                     if (coordinates.length > 0) {
@@ -776,11 +648,10 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             'click',
                             (event: google.maps.MapMouseEvent) => {
                                 if (event.latLng) {
-                                    const clickPosition = {
+                                    onMainPipeClick(mainPipe.id, {
                                         lat: event.latLng.lat(),
                                         lng: event.latLng.lng(),
-                                    };
-                                    onMainPipeClick(mainPipe.id, clickPosition);
+                                    });
 
                                     mainPipePolyline.setOptions({
                                         strokeColor: '#00FF00',
@@ -839,10 +710,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             'click',
                             (event: google.maps.MapMouseEvent) => {
                                 if (event.latLng) {
-                                    const clickPosition = {
-                                        lat: event.latLng.lat(),
-                                        lng: event.latLng.lng(),
-                                    };
                                     onLateralPipeClick(event);
 
                                     subMainPipePolyline.setOptions({
@@ -878,11 +745,9 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     drawingManagerRef.current.setMap(null);
                     drawingManagerRef.current = null;
                 }
-                setIsDrawingEnabled(false);
             };
         } catch (error) {
             console.error('Error creating DrawingManager:', error);
-            setIsDrawingEnabled(false);
         }
     }, [
         map,
@@ -900,35 +765,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         onLateralPipeMouseMove,
     ]);
 
-    const handleStartCurvedDrawing = () => {
-        setIsCurvedDrawingActive(true);
-        setAnchorPointsCount(0);
-
-        if (drawingManagerRef.current) {
-            try {
-                drawingManagerRef.current.setDrawingMode(null);
-                drawingManagerRef.current.setOptions({ drawingControl: false });
-                drawingManagerRef.current.setMap(null);
-                drawingManagerRef.current = null;
-            } catch (e) {
-                drawingManagerRef.current = null;
-            }
-        }
-
-        try {
-            if (map) {
-                const mapDiv = map.getDiv();
-                const drawingControls = mapDiv?.querySelectorAll('.gmnoprint');
-                drawingControls?.forEach((control) => {
-                    if (control instanceof HTMLElement) {
-                        control.style.display = 'none';
-                    }
-                });
-            }
-        } catch (e) {
-            console.error('Error hiding drawing controls:', e);
-        }
-    };
 
     const handleFinishCurvedDrawing = () => {
         setIsCurvedDrawingActive(false);
@@ -954,9 +790,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         setAnchorPointsCount(0);
     };
 
-    const handleAnchorPointsChange = (count: number) => {
-        setAnchorPointsCount(count);
-    };
 
     useEffect(() => {
         if (enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe')) {

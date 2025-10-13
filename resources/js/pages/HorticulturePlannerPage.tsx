@@ -1,6 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
 import axios from 'axios';
@@ -25,7 +23,6 @@ import {
 } from '../utils/horticultureUtils';
 import {
     createAutomaticZones,
-    validateZones,
     AutoZoneConfig,
     AutoZoneResult,
     clipPolygonToMainArea,
@@ -39,7 +36,6 @@ import {
     generateEmitterLinesForMultiSegment,
     isPointOnSubMainPipe,
     findClosestConnectionPoint,
-    computeAlignedLateral,
     computeAlignedLateralFromMainPipe,
     findLateralSubMainIntersection,
     calculateLateralPipeSegmentStats,
@@ -54,16 +50,13 @@ import {
 import {
     generateAutoLateralPipes,
     validateAutoLateralPipes,
-    AutoLateralPipeResult,
 } from '../utils/autoLateralPipeUtils';
 
 import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import Navbar from '../components/Navbar';
 import SprinklerConfigModal from '../components/horticulture/SprinklerConfigModal';
-import HeadLossCalculationModal, {
-    HeadLossResult,
-} from '../components/horticulture/HeadLossCalculationModal';
+
 import {
     SprinklerFormData,
     calculateTotalFlowRate,
@@ -97,45 +90,82 @@ import {
     FaBezierCurve,
 } from 'react-icons/fa';
 
-const cleanupLocalStorage = () => {
+const cleanupLocalStorage = (): boolean => {
     try {
-        const keys = Object.keys(localStorage);
-        const projectKeys = keys.filter(
-            (key) =>
-                key.startsWith('horticultureIrrigationData') ||
-                key.startsWith('savedProductProject_') ||
-                key.startsWith('projectMapImage')
+        // Get all keys and their sizes
+        const items: { key: string; size: number; timestamp?: number }[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key) || '';
+                const size = new Blob([value]).size;
+                let timestamp: number | undefined;
+                
+                // Try to extract timestamp from project data
+                if (key.startsWith('horticultureIrrigationData') || 
+                    key.startsWith('horticultureSystemData') || 
+                    key.startsWith('savedProductProject_')) {
+                    try {
+                        const data = JSON.parse(value);
+                        timestamp = new Date(data.updatedAt || data.createdAt || 0).getTime();
+                    } catch {
+                        timestamp = 0;
+                    }
+                }
+                
+                items.push({ key, size, timestamp });
+            }
+        }
+
+        // Sort by timestamp (oldest first) and size (largest first)
+        items.sort((a, b) => {
+            if (a.timestamp && b.timestamp) {
+                return a.timestamp - b.timestamp;
+            }
+            return b.size - a.size;
+        });
+
+        // Remove old project data (keep only the 2 most recent)
+        const projectKeys = items.filter(item => 
+            item.key.startsWith('horticultureIrrigationData') || 
+            item.key.startsWith('horticultureSystemData') || 
+            item.key.startsWith('savedProductProject_')
         );
-
-
+        
         if (projectKeys.length > 2) {
             const keysToRemove = projectKeys.slice(0, projectKeys.length - 2);
-            keysToRemove.forEach((key) => {
-                localStorage.removeItem(key);
+            keysToRemove.forEach(item => {
+                localStorage.removeItem(item.key);
             });
         }
 
-        const mockKeys = keys.filter((key) => key.startsWith('mock-'));
-        if (mockKeys.length > 0) {
-            mockKeys.forEach((key) => {
-                localStorage.removeItem(key);
-            });
-        }
+        // Remove mock data
+        const mockKeys = items.filter(item => item.key.startsWith('mock-'));
+        mockKeys.forEach(item => {
+            localStorage.removeItem(item.key);
+        });
 
-        const otherKeys = keys.filter(
-            (key) =>
-                key.startsWith('fieldCropData') ||
-                key.startsWith('fieldMapData') ||
-                key.startsWith('autoZoneConfig') ||
-                key.startsWith('plantRotation')
+        // Remove temporary data
+        const tempKeys = items.filter(item => 
+            item.key.startsWith('temp_') || 
+            item.key.startsWith('_temp_') ||
+            item.key.includes('temp')
         );
+        tempKeys.forEach(item => {
+            localStorage.removeItem(item.key);
+        });
 
-        if (otherKeys.length > 0) {
-            otherKeys.forEach((key) => {
-                localStorage.removeItem(key);
-            });
+        // Calculate remaining size
+        let remainingSize = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key) || '';
+                remainingSize += new Blob([value]).size;
+            }
         }
 
+        console.log(`✅ Cleanup completed. Remaining storage: ${(remainingSize / 1024).toFixed(2)}KB`);
         return true;
     } catch (error) {
         console.error('❌ localStorage cleanup failed:', error);
@@ -144,14 +174,13 @@ const cleanupLocalStorage = () => {
 };
 
 if (typeof window !== 'undefined') {
-    (window as unknown as { clearHorticultureStorage: () => void }).clearHorticultureStorage =
-        () => {
-            if (cleanupLocalStorage()) {
-                alert('localStorage cleanup completed successfully!');
-            } else {
-                alert('localStorage cleanup failed!');
-            }
-        };
+    (window as unknown as { clearHorticultureStorage: () => void }).clearHorticultureStorage = () => {
+        if (cleanupLocalStorage()) {
+            alert('localStorage cleanup completed successfully!');
+        } else {
+            alert('localStorage cleanup failed!');
+        }
+    };
 
     (window as unknown as { clearAllStorage: () => void }).clearAllStorage = () => {
         localStorage.clear();
@@ -172,11 +201,8 @@ if (typeof window !== 'undefined') {
             }
         }
 
-        items
-            .sort((a, b) => b.size - a.size)
-            .forEach((item) => {
-            });
-
+        items.sort((a, b) => b.size - a.size);
+        console.table(items);
         alert(`localStorage usage: ${(totalSize / 1024).toFixed(2)}KB\nCheck console for details.`);
     };
 }
@@ -255,54 +281,93 @@ const compressProjectData = (data: any): any => {
             tempData: undefined,
             _temp: undefined,
         };
-
         return compressed;
     } catch (error) {
-        console.warn('Failed to compress data, using original:', error);
+        console.warn('⚠️ Compression failed, returning original data:', error);
         return data;
+    }
+};
+
+// Function to synchronize data between different localStorage keys
+const syncHorticultureData = (data: any): void => {
+    try {
+        // Save to both keys to ensure compatibility
+        const dataString = JSON.stringify(data);
+        
+        // Save to the main key used by HorticulturePlannerPage
+        localStorage.setItem('horticultureIrrigationData', dataString);
+        
+        // Also save to the key expected by product.tsx
+        localStorage.setItem('horticultureSystemData', dataString);
+    } catch (error) {
+        console.error('❌ Failed to sync horticulture data:', error);
     }
 };
 
 const safeLocalStorageSet = (key: string, value: string): boolean => {
     try {
         const dataSizeKB = new Blob([value]).size / 1024;
+        console.log(`💾 Attempting to save ${dataSizeKB.toFixed(2)}KB to localStorage...`);
 
-        if (dataSizeKB > 2000) {
-            console.warn(
-                `⚠️ Large data detected (${dataSizeKB.toFixed(2)}KB), attempting compression...`
-            );
-            try {
-                const parsedData = JSON.parse(value);
-                const compressedData = compressProjectData(parsedData);
-                const compressedValue = JSON.stringify(compressedData);
-                const compressedSizeKB = new Blob([compressedValue]).size / 1024;
-
-                localStorage.setItem(key, compressedValue);
-                return true;
-            } catch (compressError) {
-                console.warn('Compression failed, trying original data:', compressError);
-            }
-        }
-
+        // Try to save directly first
         localStorage.setItem(key, value);
         return true;
     } catch (error) {
         if (error instanceof Error && error.name === 'QuotaExceededError') {
             console.warn('⚠️ localStorage quota exceeded, attempting cleanup...');
+            
+            // First attempt: cleanup and try again
             if (cleanupLocalStorage()) {
                 try {
-                    const parsedData = JSON.parse(value);
-                    const compressedData = compressProjectData(parsedData);
-                    const compressedValue = JSON.stringify(compressedData);
-
-                    localStorage.setItem(key, compressedValue);
+                    localStorage.setItem(key, value);
                     return true;
-                } catch (retryError) {
-                    console.error('❌ Still failed after cleanup and compression:', retryError);
-                    return false;
+                } catch {
+                    console.warn('⚠️ Still failed after cleanup, attempting compression...');
                 }
             }
+            
+            // Second attempt: compress and try again
+            try {
+                const originalSizeKB = new Blob([value]).size / 1024;
+                const parsedData = JSON.parse(value);
+                const compressedData = compressProjectData(parsedData);
+                const compressedValue = JSON.stringify(compressedData);
+                const compressedSizeKB = new Blob([compressedValue]).size / 1024;
+                
+                console.log(`🗜️ Compressed from ${originalSizeKB.toFixed(2)}KB to ${compressedSizeKB.toFixed(2)}KB`);
+
+                localStorage.setItem(key, compressedValue);
+                return true;
+            } catch (compressError) {
+                console.error('❌ Compression failed:', compressError);
+            }
+            
+            // Third attempt: aggressive cleanup and compression
+            console.warn('⚠️ Attempting aggressive cleanup...');
+            try {
+                // Remove all non-essential data
+                const keys = Object.keys(localStorage);
+                keys.forEach(storageKey => {
+                    if (storageKey !== key && 
+                        !storageKey.startsWith('horticultureIrrigationData') && 
+                        !storageKey.startsWith('horticultureSystemData') && 
+                        !storageKey.startsWith('savedProductProject_')) {
+                        localStorage.removeItem(storageKey);
+                    }
+                });
+                
+                const parsedData = JSON.parse(value);
+                const compressedData = compressProjectData(parsedData);
+                const compressedValue = JSON.stringify(compressedData);
+                
+                localStorage.setItem(key, compressedValue);
+                return true;
+            } catch (finalError) {
+                console.error('❌ All attempts failed:', finalError);
+                return false;
+            }
         }
+        
         console.error('❌ localStorage save failed:', error);
         return false;
     }
@@ -335,23 +400,6 @@ const isPointInPolygon = (
     }
 };
 
-const getDragOrientation = (
-    start: { lat: number; lng: number },
-    end: { lat: number; lng: number }
-): 'rows' | 'columns' => {
-    const dLat = Math.abs(end.lat - start.lat);
-    const dLng = Math.abs(end.lng - start.lng);
-
-    const threshold = 0.1;
-
-    if (dLat > dLng * (1 + threshold)) {
-        return 'columns';
-    } else if (dLng > dLat * (1 + threshold)) {
-        return 'rows';
-    } else {
-        return dLat > dLng ? 'columns' : 'rows';
-    }
-};
 
 const generateUniqueId = (prefix: string = 'id'): string => {
     const timestamp = Date.now();
@@ -577,42 +625,6 @@ const findClosestPointOnPipe = (
         : null;
 };
 
-const findClosestPointOnPipeExtended = (
-    position: { lat: number; lng: number },
-    pipeCoordinates: { lat: number; lng: number }[]
-): { position: { lat: number; lng: number }; distance: number; segmentIndex: number } | null => {
-    if (!pipeCoordinates || pipeCoordinates.length < 2) return null;
-
-    let closestPoint: { lat: number; lng: number } | null = null;
-    let minDistance = Infinity;
-    let bestSegmentIndex = 0;
-
-    for (let i = 0; i < pipeCoordinates.length - 1; i++) {
-        const a = pipeCoordinates[i];
-        const b = pipeCoordinates[i + 1];
-
-        const ab = { lat: b.lat - a.lat, lng: b.lng - a.lng };
-        const ap = { lat: position.lat - a.lat, lng: position.lng - a.lng };
-
-        const abLenSq = ab.lat * ab.lat + ab.lng * ab.lng;
-        if (abLenSq === 0) continue;
-
-        const t = (ap.lat * ab.lat + ap.lng * ab.lng) / abLenSq;
-
-        const proj = { lat: a.lat + t * ab.lat, lng: a.lng + t * ab.lng };
-        const distance = calculateDistanceBetweenPoints(position, proj);
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestPoint = proj;
-            bestSegmentIndex = i;
-        }
-    }
-
-    return closestPoint
-        ? { position: closestPoint, distance: minDistance, segmentIndex: bestSegmentIndex }
-        : null;
-};
 
 const trimSubMainPipeToFitBranches = (
     subMainCoordinates: { lat: number; lng: number }[],
@@ -669,20 +681,6 @@ const trimSubMainPipeToFitBranches = (
     }
 };
 
-const _calculateBranchEndPosition = (
-    startPos: { lat: number; lng: number },
-    direction: { lat: number; lng: number },
-    multiplier: number,
-    length: number
-) => {
-    return {
-        lat: startPos.lat + (direction.lat * multiplier * length) / 111000,
-        lng:
-            startPos.lng +
-            (direction.lng * multiplier * length) /
-                (111000 * Math.cos((startPos.lat * Math.PI) / 180)),
-    };
-};
 
 const checkBoundaryOverlap = (
     areaBounds: { minLat: number; maxLat: number; minLng: number; maxLng: number },
@@ -1296,40 +1294,6 @@ const generateDimensionLines = (
     return generatePerpendicularDimensionLines(exclusionArea, mainArea, angleOffset);
 };
 
-const _distanceFromPointToLineSegment = (
-    point: { lat: number; lng: number },
-    lineStart: { lat: number; lng: number },
-    lineEnd: { lat: number; lng: number }
-): number => {
-    const A = point.lat - lineStart.lat;
-    const B = point.lng - lineStart.lng;
-    const C = lineEnd.lat - lineStart.lat;
-    const D = lineEnd.lng - lineStart.lng;
-
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-
-    if (lenSq === 0) {
-        return calculateDistanceBetweenPoints(point, lineStart);
-    }
-
-    const param = dot / lenSq;
-
-    let closestPointOnSegment: { lat: number; lng: number };
-
-    if (param < 0) {
-        closestPointOnSegment = lineStart;
-    } else if (param > 1) {
-        closestPointOnSegment = lineEnd;
-    } else {
-        closestPointOnSegment = {
-            lat: lineStart.lat + param * C,
-            lng: lineStart.lng + param * D,
-        };
-    }
-
-    return calculateDistanceBetweenPoints(point, closestPointOnSegment);
-};
 
 interface Coordinate {
     lat: number;
@@ -1984,7 +1948,6 @@ const formatWaterVolumeWithFlowRate = (
         radiusMeters: number;
     } | null,
     t: (key: string) => string,
-    _showFlowRate: boolean = true
 ): string => {
     const flowRate = plantCount * (sprinklerConfig?.flowRatePerMinute || 0);
     return `${flowRate.toFixed(2)} ${t('ลิตร/นาที')}`;
@@ -2491,7 +2454,6 @@ const SimpleMousePlantEditModal = ({
     availablePlants,
     onCreateCustomPlant,
     onEditPlant,
-    onShowPlantSelector,
     t,
 }: {
     isOpen: boolean;
@@ -2502,7 +2464,6 @@ const SimpleMousePlantEditModal = ({
     availablePlants: PlantData[];
     onCreateCustomPlant: () => void;
     onEditPlant: (plantData: PlantData) => void;
-    onShowPlantSelector?: () => void;
     t: (key: string) => string;
 }) => {
     const [selectedPlantData, setSelectedPlantData] = useState<PlantData | null>(null);
@@ -4626,297 +4587,12 @@ const RealTimeBranchControlModal = ({
     );
 };
 
-const _calculatePipeWaterFlowByZone = (
-    mainPipes: { id: string; coordinates: { lat: number; lng: number }[]; zoneId?: string }[],
-    subMainPipes: { id: string; coordinates: { lat: number; lng: number }[]; zoneId?: string }[],
-    lateralPipes: {
-        id: string;
-        coordinates: { lat: number; lng: number }[];
-        plants: { id: string; position: { lat: number; lng: number } }[];
-    }[],
-    plants: { id: string; position: { lat: number; lng: number }; zoneId?: string }[],
-    irrigationZones: { id: string; name: string; coordinates: { lat: number; lng: number }[] }[]
-) => {
-    const sprinklerConfig = loadSprinklerConfig();
-    const flowRatePerPlant = sprinklerConfig?.flowRatePerMinute || 2.5;
-
-    const plantToZoneMap = new Map();
-    const positionToZoneMap = new Map();
-
-    plants.forEach((plant) => {
-        if (plant.zoneId) {
-            plantToZoneMap.set(plant.id, plant.zoneId);
-            positionToZoneMap.set(`${plant.position.lat},${plant.position.lng}`, plant.zoneId);
-        }
-    });
-
-    const findZoneFromCoordinate = (coordinate: any): string => {
-        if (!irrigationZones || irrigationZones.length === 0) return 'no-zone';
-
-        for (const zone of irrigationZones) {
-            if (isPointInPolygon(coordinate, zone.coordinates)) {
-                return zone.id;
-            }
-        }
-        return 'no-zone';
-    };
-
-    const isPointInPolygon = (point: any, polygon: any[]): boolean => {
-        if (!point || !polygon || polygon.length < 3) return false;
-
-        const x = point.lat;
-        const y = point.lng;
-        let inside = false;
-
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const xi = polygon[i].lat,
-                yi = polygon[i].lng;
-            const xj = polygon[j].lat,
-                yj = polygon[j].lng;
-
-            if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-                inside = !inside;
-            }
-        }
-
-        return inside;
-    };
-
-    const calculateLateralPipeFlow = () => {
-        const lateralByZone = new Map();
-
-        lateralPipes.forEach((lateral) => {
-            const plantCount = lateral.plants?.length || 0;
-            const flowRate = plantCount * flowRatePerPlant;
-
-            let zoneId = 'no-zone';
-            if (lateral.plants && lateral.plants.length > 0) {
-                const firstPlant = lateral.plants[0];
-                zoneId =
-                    (firstPlant as any).zoneId ||
-                    findZoneFromCoordinate(firstPlant.position) ||
-                    'no-zone';
-            } else if (lateral.coordinates && lateral.coordinates.length > 0) {
-                zoneId = findZoneFromCoordinate(lateral.coordinates[0]) || 'no-zone';
-            }
-
-            if (!lateralByZone.has(zoneId)) {
-                lateralByZone.set(zoneId, []);
-            }
-
-            lateralByZone.get(zoneId).push({
-                id: lateral.id,
-                length: (lateral as any).length || 0,
-                flowRate,
-                plantCount,
-            });
-        });
-
-        return lateralByZone;
-    };
-
-    const calculateSubMainPipeFlow = () => {
-        const subMainByZone = new Map();
-
-        subMainPipes.forEach((subMain) => {
-            const allBranchPipes = (subMain as any).branchPipes || [];
-            let totalFlowRate = 0;
-            let zoneId = 'no-zone';
-
-            allBranchPipes.forEach((branch) => {
-                const plantCount = branch.plants?.length || 0;
-                const branchFlowRate = plantCount * flowRatePerPlant;
-
-                if (branch.plants && branch.plants.length > 0) {
-                    const branchZone =
-                        branch.plants[0].zoneId ||
-                        findZoneFromCoordinate(branch.plants[0].position) ||
-                        'no-zone';
-                    if (zoneId === 'no-zone' || branchZone !== 'no-zone') {
-                        zoneId = branchZone;
-                    }
-                    if (branchZone === zoneId) {
-                        totalFlowRate += branchFlowRate;
-                    }
-                }
-            });
-
-            lateralPipes.forEach((lateral) => {
-                if ((lateral as any).subMainPipeId === subMain.id) {
-                    const plantCount = lateral.plants?.length || 0;
-                    const lateralFlowRate = plantCount * flowRatePerPlant;
-
-                    if (lateral.plants && lateral.plants.length > 0) {
-                        const lateralZone =
-                            (lateral.plants[0] as any).zoneId ||
-                            findZoneFromCoordinate(lateral.plants[0].position) ||
-                            'no-zone';
-                        if (zoneId === 'no-zone' || lateralZone !== 'no-zone') {
-                            zoneId = lateralZone;
-                        }
-                        if (lateralZone === zoneId) {
-                            totalFlowRate += lateralFlowRate;
-                        }
-                    }
-                }
-            });
-
-            if (zoneId === 'no-zone' && subMain.coordinates && subMain.coordinates.length > 0) {
-                zoneId = findZoneFromCoordinate(subMain.coordinates[0]) || 'no-zone';
-            }
-
-            if (!subMainByZone.has(zoneId)) {
-                subMainByZone.set(zoneId, []);
-            }
-
-            subMainByZone.get(zoneId).push({
-                id: subMain.id,
-                length: (subMain as any).length || 0,
-                flowRate: totalFlowRate,
-                branchCount:
-                    allBranchPipes.filter((branch) => {
-                        if (!branch.plants || branch.plants.length === 0) return false;
-                        const branchZone =
-                            branch.plants[0].zoneId ||
-                            findZoneFromCoordinate(branch.plants[0].position) ||
-                            'no-zone';
-                        return branchZone === zoneId;
-                    }).length +
-                    lateralPipes.filter((l) => {
-                        if (
-                            (l as any).subMainPipeId !== subMain.id ||
-                            !l.plants ||
-                            l.plants.length === 0
-                        )
-                            return false;
-                        const lateralZone =
-                            (l.plants[0] as any).zoneId ||
-                            findZoneFromCoordinate(l.plants[0].position) ||
-                            'no-zone';
-                        return lateralZone === zoneId;
-                    }).length,
-            });
-        });
-
-        return subMainByZone;
-    };
-
-    const calculateMainPipeFlow = () => {
-        const mainByZone = new Map();
-
-        const subMainToMainMapping = new Map();
-
-        subMainPipes.forEach((subMain) => {
-            if (!subMain.coordinates || subMain.coordinates.length === 0) return;
-
-            const subMainStart = subMain.coordinates[0];
-            let closestMainId: string | null = null;
-            let minDistanceToAnyMain = Infinity;
-
-            mainPipes.forEach((main) => {
-                if (!main.coordinates || main.coordinates.length === 0) return;
-
-                let minDistance = Infinity;
-
-                for (const mainPoint of main.coordinates) {
-                    const R = 6371000;
-                    const dLat = ((subMainStart.lat - mainPoint.lat) * Math.PI) / 180;
-                    const dLng = ((subMainStart.lng - mainPoint.lng) * Math.PI) / 180;
-                    const a =
-                        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                        Math.cos((mainPoint.lat * Math.PI) / 180) *
-                            Math.cos((subMainStart.lat * Math.PI) / 180) *
-                            Math.sin(dLng / 2) *
-                            Math.sin(dLng / 2);
-                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                    const distance = R * c;
-
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                    }
-                }
-
-                if (minDistance < minDistanceToAnyMain) {
-                    minDistanceToAnyMain = minDistance;
-                    closestMainId = main.id;
-                }
-            });
-
-            if (closestMainId && minDistanceToAnyMain < 200) {
-                subMainToMainMapping.set(subMain.id, {
-                    mainId: closestMainId,
-                    distance: minDistanceToAnyMain,
-                });
-            }
-        });
-
-        mainPipes.forEach((main) => {
-            if (!main.coordinates || main.coordinates.length === 0) return;
-
-            const mainEndPoint = main.coordinates[main.coordinates.length - 1];
-            const mainZoneId = findZoneFromCoordinate(mainEndPoint) || 'no-zone';
-
-            let totalFlowRate = 0;
-            let connectedSubMains = 0;
-            const connectedSubMainIds: string[] = [];
-            const connectedSubMainDetails: any[] = [];
-
-            for (const [subMainId, connection] of subMainToMainMapping.entries()) {
-                if (connection.mainId === main.id) {
-                    connectedSubMains++;
-                    connectedSubMainIds.push(subMainId);
-
-                    let subMainFlowRate = 0;
-                    for (const [zoneId, subMainsInZone] of subMainByZone.entries()) {
-                        const foundSubMain = subMainsInZone.find((sm) => sm.id === subMainId);
-                        if (foundSubMain) {
-                            subMainFlowRate = foundSubMain.flowRate;
-                            connectedSubMainDetails.push({
-                                id: subMainId,
-                                zoneId: zoneId,
-                                flowRate: foundSubMain.flowRate,
-                                distance: connection.distance.toFixed(1) + 'm',
-                            });
-                            break;
-                        }
-                    }
-
-                    totalFlowRate += subMainFlowRate;
-                }
-            }
-
-            if (!mainByZone.has(mainZoneId)) {
-                mainByZone.set(mainZoneId, []);
-            }
-
-            mainByZone.get(mainZoneId).push({
-                id: main.id,
-                length: (main as any).length || 0,
-                flowRate: totalFlowRate,
-                connectedSubMains: connectedSubMains,
-                endZone: mainZoneId,
-                connectedSubMainIds,
-                connectedSubMainDetails,
-            });
-        });
-
-        return mainByZone;
-    };
-
-    const lateralByZone = calculateLateralPipeFlow();
-    const subMainByZone = calculateSubMainPipeFlow();
-    const mainByZone = calculateMainPipeFlow();
-
-    return {
-        lateralByZone,
-        subMainByZone,
-        mainByZone,
-        flowRatePerPlant,
-    };
-};
 
 export default function EnhancedHorticulturePlannerPage() {
     const { t } = useLanguage();
+    
+    // Separate state for lateral pipes to bypass history management issues
+    const [lateralPipesState, setLateralPipesState] = useState<LateralPipe[]>([]);
 
     const hasLargeModalOpen = () => {
         return (
@@ -5189,10 +4865,6 @@ export default function EnhancedHorticulturePlannerPage() {
             return `${totalFlowRate.toFixed(2)} ${t('ลิตร/นาที')}`;
         };
 
-        const _formatFlowRatePerHour = (plantCount: number, flowRate: number): string => {
-            const totalFlowRate = plantCount * flowRate;
-            return `${totalFlowRate.toFixed(2)} ${t('ลิตร/ชั่วโมง')}`;
-        };
 
         const getDifferenceText = () => {
             const absDifference = Math.abs(difference);
@@ -5216,40 +4888,7 @@ export default function EnhancedHorticulturePlannerPage() {
             }
         };
 
-        const _getIcon = () => {
-            const absDifference = Math.abs(difference);
-            if (absDifference < 5) {
-                return (
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
-                        ✓
-                    </div>
-                );
-            } else if (isMoreThanFirst) {
-                return (
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                        ↑
-                    </div>
-                );
-            } else {
-                return (
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
-                        ↓
-                    </div>
-                );
-            }
-        };
 
-        const _getWarningIcon = () => {
-            const absDifference = Math.abs(difference);
-            if (absDifference >= 15) {
-                return (
-                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white">
-                        !
-                    </div>
-                );
-            }
-            return null;
-        };
 
         return (
             <div className="fixed bottom-4 left-[350px] z-50">
@@ -5312,100 +4951,10 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const [showAutoLateralPipeModal, setShowAutoLateralPipeModal] = useState(false);
 
-    const [showHeadLossModal, setShowHeadLossModal] = useState(false);
-    const [selectedPipeForHeadLoss, setSelectedPipeForHeadLoss] = useState<{
-        pipeId: string;
-        pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe';
-        zoneName: string;
-        zoneId: string;
-        length: number;
-        pipeName?: string;
-    } | null>(null);
-    const [headLossResults, setHeadLossResults] = useState<HeadLossResult[]>([]);
-    const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
     const [isEditingExistingField, setIsEditingExistingField] = useState<boolean>(false);
 
-    const _toggleZoneExpansion = (zoneId: string) => {
-        setExpandedZones((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(zoneId)) {
-                newSet.delete(zoneId);
-            } else {
-                newSet.add(zoneId);
-            }
-            return newSet;
-        });
-    };
 
-    const _isZoneExpanded = (zoneId: string) => {
-        return expandedZones.has(zoneId);
-    };
 
-    const _getShortenedPipeName = (
-        pipeName: string | undefined,
-        pipeType: string,
-        index: number
-    ): string => {
-        if (!pipeName) {
-            switch (pipeType) {
-                case 'mainPipe':
-                    return `ท่อเมน #${index + 1}`;
-                case 'subMainPipe':
-                    return `ท่อเมนรอง #${index + 1}`;
-                case 'branchPipe':
-                    return `ท่อย่อย #${index + 1}`;
-                default:
-                    return `ท่อ #${index + 1}`;
-            }
-        }
-
-        if (pipeName.length > 15) {
-            const parts = pipeName.split('_');
-            if (parts.length > 2) {
-                return `${parts[0]}_${parts[parts.length - 1]}`;
-            }
-            return pipeName.substring(0, 12) + '...';
-        }
-
-        return pipeName;
-    };
-    const _handlePipeClick = (
-        pipeId: string,
-        pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe',
-        zoneName: string,
-        zoneId: string,
-        length: number,
-        pipeName?: string
-    ) => {
-        setSelectedPipeForHeadLoss({
-            pipeId,
-            pipeType,
-            zoneName,
-            zoneId,
-            length,
-            pipeName,
-        });
-        setShowHeadLossModal(true);
-    };
-
-    const handleHeadLossCalculationSave = (result: HeadLossResult) => {
-        setHeadLossResults((prev) => {
-            const existingIndex = prev.findIndex((r) => r.pipeId === result.pipeId);
-            if (existingIndex >= 0) {
-                const updated = [...prev];
-                updated[existingIndex] = result;
-                return updated;
-            } else {
-                setExpandedZones((prev) => new Set([...prev, result.zoneId]));
-                return [...prev, result];
-            }
-        });
-        setShowHeadLossModal(false);
-    };
-
-    const getHeadLossForPipe = (pipeId: string): HeadLossResult | undefined => {
-        return headLossResults.find((r) => r.pipeId === pipeId);
-    };
 
     useEffect(() => {
         const savedConfig = loadSprinklerConfig();
@@ -5460,12 +5009,12 @@ export default function EnhancedHorticulturePlannerPage() {
     const [isZoneEditMode, setIsZoneEditMode] = useState(false);
     const [selectedZoneForEdit, setSelectedZoneForEdit] = useState<IrrigationZone | null>(null);
     const [zoneControlPoints, setZoneControlPoints] = useState<Coordinate[]>([]);
-    const [_draggedControlPointIndex, setDraggedControlPointIndex] = useState<number | null>(null);
+    const [, setDraggedControlPointIndex] = useState<number | null>(null);
 
     const [showPlantTypeSelectionModal, setShowPlantTypeSelectionModal] = useState(false);
     const [showPlantAreaSelectionModal, setShowPlantAreaSelectionModal] = useState(false);
     const [currentPlantArea, setCurrentPlantArea] = useState<PlantArea | null>(null);
-    const [_isDrawingPlantArea, setIsDrawingPlantArea] = useState(false);
+    const [, setIsDrawingPlantArea] = useState(false);
 
 
     const [activeTab, setActiveTab] = useState('area');
@@ -5476,20 +5025,19 @@ export default function EnhancedHorticulturePlannerPage() {
     const [isRetrying, setIsRetrying] = useState(false);
 
     const [mapCenter, setMapCenter] = useState<[number, number]>([12.609731, 102.050412]);
-    const [_map, setMap] = useState<google.maps.Map | null>(null);
-    const [_selectedZone, _setSelectedZone] = useState<Zone | null>(null);
+    const [, setMap] = useState<google.maps.Map | null>(null);
     const [selectedExclusionType, setSelectedExclusionType] =
         useState<keyof typeof EXCLUSION_COLORS>('building');
-    const [_drawingMainPipe, setDrawingMainPipe] = useState<{ toZone: string | null }>({
+    const [, setDrawingMainPipe] = useState<{ toZone: string | null }>({
         toZone: null,
     });
 
-    const [_isNewPlantMode, setIsNewPlantMode] = useState(false);
+    const [, setIsNewPlantMode] = useState(false);
     const [isCreatingConnection, setIsCreatingConnection] = useState(false);
     const [connectionStartPlant, setConnectionStartPlant] = useState<PlantLocation | null>(null);
     const [plantPlacementMode, setPlantPlacementMode] = useState<'free' | 'plant_grid'>('free');
     const [highlightedPipes, setHighlightedPipes] = useState<string[]>([]);
-    const [_dragMode, setDragMode] = useState<'none' | 'connecting'>('none');
+    const [, setDragMode] = useState<'none' | 'connecting'>('none');
     const [tempConnectionLine, setTempConnectionLine] = useState<Coordinate[] | null>(null);
 
     const [showQuickActionPanel, setShowQuickActionPanel] = useState(false);
@@ -5529,8 +5077,6 @@ export default function EnhancedHorticulturePlannerPage() {
     const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
     const polygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
     const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
-    const _featureGroupRef = useRef<any>(null);
-    const _lateralPipeMouseMoveRef = useRef<NodeJS.Timeout | null>(null);
     const lastMouseMoveTime = useRef<number>(0);
     const mouseMoveCacheRef = useRef<{
         lastRawPoint: Coordinate | null;
@@ -5699,14 +5245,6 @@ export default function EnhancedHorticulturePlannerPage() {
         return history.present.plants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
     }, [history.present.plants]);
 
-    const canEnableEditMode = useMemo(() => {
-        return (
-            history.present.mainArea.length > 0 &&
-            history.present.pump &&
-            history.present.plants.length > 0 &&
-            (history.present.mainPipes.length > 0 || history.present.subMainPipes.length > 0)
-        );
-    }, [history.present]);
 
     const selectedItemsCount = useMemo(() => {
         return (
@@ -6047,20 +5585,6 @@ export default function EnhancedHorticulturePlannerPage() {
         }
     }, []);
 
-    const _clearRulerMeasurements = useCallback(() => {
-        try {
-            if (rafIdRef.current) {
-                cancelAnimationFrame(rafIdRef.current);
-                rafIdRef.current = null;
-            }
-
-            setRulerStartPoint(null);
-            setCurrentMousePosition(null);
-            setCurrentDistance(0);
-        } catch (error) {
-            console.error('Error in clearRulerMeasurements:', error);
-        }
-    }, []);
 
     const handleRulerClick = useCallback(
         (position: Coordinate) => {
@@ -6321,10 +5845,6 @@ export default function EnhancedHorticulturePlannerPage() {
             if (toPoint.type === 'plant') {
                 plants.push(toPoint.data);
             }
-            const totalWaterNeed = plants.reduce(
-                (sum, plant) => sum + (plant.plantData?.waterNeed || 0),
-                0
-            );
             const pipeLength = calculateDistanceBetweenPoints(fromPoint.position, toPoint.position);
 
             const currentLateralPipes = latestLateralPipesRef.current;
@@ -6732,6 +6252,26 @@ export default function EnhancedHorticulturePlannerPage() {
     );
 
     useEffect(() => {
+        // Check for data migration between localStorage keys
+        const irrigationData = localStorage.getItem('horticultureIrrigationData');
+        const systemData = localStorage.getItem('horticultureSystemData');
+        
+        if (irrigationData && !systemData) {
+            // Migrate from irrigationData to systemData
+            try {
+                localStorage.setItem('horticultureSystemData', irrigationData);
+            } catch (error) {
+                console.warn('⚠️ Failed to migrate data:', error);
+            }
+        } else if (systemData && !irrigationData) {
+            // Migrate from systemData to irrigationData
+            try {
+                localStorage.setItem('horticultureIrrigationData', systemData);
+            } catch (error) {
+                console.warn('⚠️ Failed to migrate data:', error);
+            }
+        }
+
         const isEditingExisting = localStorage.getItem('isEditingExistingProject');
         const savedData = localStorage.getItem('horticultureIrrigationData');
 
@@ -6743,7 +6283,7 @@ export default function EnhancedHorticulturePlannerPage() {
         } else if (isEditingExisting === 'true' && savedData) {
             try {
                 const projectData = JSON.parse(savedData);
-
+                
                 const loadedState: ProjectState = {
                     ...initialState,
                     mainArea: projectData.mainArea || [],
@@ -6767,6 +6307,9 @@ export default function EnhancedHorticulturePlannerPage() {
                 };
 
                 dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
+                
+                // Update lateral pipes state with loaded data
+                setLateralPipesState(loadedState.lateralPipes || []);
 
                 if (projectData.mainArea && projectData.mainArea.length > 0) {
                     setTimeout(() => {
@@ -6799,53 +6342,6 @@ export default function EnhancedHorticulturePlannerPage() {
         }
     }, [initialState, t]);
 
-    const regeneratePlantsForAllZones = (state: ProjectState) => {
-        try {
-            if (state.plants && state.plants.length > 0) {
-                return;
-            }
-
-            const updatedState = { ...state };
-            let allPlants: PlantLocation[] = [];
-
-            if (state.useZones && state.zones.length > 0) {
-                state.zones.forEach((zone) => {
-                    const zoneSubMainPipes = state.subMainPipes.filter(
-                        (pipe) => pipe.zoneId === zone.id
-                    );
-
-                    zoneSubMainPipes.forEach((_subMainPipe) => {
-                        const branchPipes: any[] = [];
-
-                        branchPipes.forEach((branch) => {
-                            if (branch.plants) {
-                                allPlants = [...allPlants, ...branch.plants];
-                            }
-                        });
-                    });
-                });
-            } else {
-                state.subMainPipes.forEach((subMainPipe) => {
-                    const branchPipes: any[] = [];
-
-                    branchPipes.forEach((branch) => {
-                        if (branch.plants) {
-                            allPlants = [...allPlants, ...branch.plants];
-                        }
-                    });
-                });
-            }
-
-            if (allPlants.length > 0) {
-                updatedState.plants = allPlants;
-                dispatchHistory({ type: 'PUSH_STATE', state: updatedState });
-            } else {
-                console.log('⚠️ No plants generated, keeping existing plants');
-            }
-        } catch (error) {
-            console.error('❌ Error regenerating plants:', error);
-        }
-    };
 
     const loadFieldDataFromDatabase = async (fieldId: string) => {
         try {
@@ -6854,6 +6350,10 @@ export default function EnhancedHorticulturePlannerPage() {
             if (response.data.success && response.data.field) {
                 const fieldData = response.data.field;
                 const projectData = fieldData.project_data || {};
+
+                if (projectData.lateralPipes && projectData.lateralPipes.length === 0) {
+                    console.warn('⚠️ No lateralPipes data in database');
+                }
 
                 const loadedState: ProjectState = {
                     ...initialState,
@@ -6893,13 +6393,15 @@ export default function EnhancedHorticulturePlannerPage() {
                 setIsEditingExistingField(true);
 
                 dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
+                
+                // Update lateral pipes state with loaded data
+                setLateralPipesState(loadedState.lateralPipes || []);
 
                 setTimeout(() => {
                     if (mapRef.current) {
                         google.maps.event.trigger(mapRef.current, 'resize');
                     }
-
-                    regeneratePlantsForAllZones(loadedState);
+                    // ไม่ต้องเรียก regeneratePlantsForAllZones เพราะข้อมูลพืชมีอยู่แล้ว
                 }, 500);
 
                 if (projectData.mainArea && projectData.mainArea.length > 0) {
@@ -6928,11 +6430,11 @@ export default function EnhancedHorticulturePlannerPage() {
 
             } else {
                 console.error('❌ Failed to load field data:', response.data);
-                alert(t('failed_to_load_field'));
+                alert(t('ไม่สามารถโหลดข้อมูลโปรเจคได้ กรุณาลองใหม่อีกครั้ง'));
             }
         } catch (error) {
             console.error('❌ Error loading field data:', error);
-            alert(t('error_loading_field'));
+            alert(t('เกิดข้อผิดพลาดในการโหลดข้อมูลโปรเจค กรุณาลองใหม่อีกครั้ง'));
         }
     };
 
@@ -6957,34 +6459,6 @@ export default function EnhancedHorticulturePlannerPage() {
         },
     ];
 
-    const _handleToggleEditMode = useCallback(() => {
-        if (!canEnableEditMode) {
-            alert(t('กรุณาสร้างพื้นที่หลัก ปั๊ม และสร้างท่อพร้อมต้นไม้ก่อนเข้าสู่โหมดแก้ไข'));
-            return;
-        }
-
-        const newEditModeEnabled = !history.present.isEditModeEnabled;
-
-        pushToHistory({
-            isEditModeEnabled: newEditModeEnabled,
-            selectedItems: { plants: [], pipes: [], zones: [] },
-        });
-
-        if (!newEditModeEnabled) {
-            setEditMode(null);
-            setShowQuickActionPanel(false);
-        } else {
-            setShowQuickActionPanel(true);
-        }
-
-        setIsNewPlantMode(false);
-        setIsCreatingConnection(false);
-        setConnectionStartPlant(null);
-        setHighlightedPipes([]);
-        setDragMode('none');
-        setTempConnectionLine(null);
-        setIsDeleteMode(false); 
-    }, [canEnableEditMode, history.present.isEditModeEnabled, pushToHistory, t]);
 
     const handleSelectItem = useCallback(
         (id: string, type: 'plants' | 'pipes' | 'zones') => {
@@ -7015,37 +6489,6 @@ export default function EnhancedHorticulturePlannerPage() {
         ]
     );
 
-    const _handleSelectAll = useCallback(
-        (type: 'plants' | 'pipes' | 'zones') => {
-            let allIds: string[] = [];
-
-            switch (type) {
-                case 'plants':
-                    allIds = history.present.plants.map((plant) => plant.id);
-                    break;
-                case 'pipes':
-                    allIds = [
-                        ...history.present.mainPipes.map((pipe) => pipe.id),
-                        ...history.present.subMainPipes.map((pipe) => pipe.id),
-                        ...history.present.subMainPipes.flatMap((sm) =>
-                            sm.branchPipes.map((bp) => bp.id)
-                        ),
-                    ];
-                    break;
-                case 'zones':
-                    allIds = history.present.zones.map((zone) => zone.id);
-                    break;
-            }
-
-            pushToHistory({
-                selectedItems: {
-                    ...history.present.selectedItems,
-                    [type]: allIds,
-                },
-            });
-        },
-        [history.present, pushToHistory]
-    );
 
     const handleClearSelection = useCallback(() => {
         pushToHistory({
@@ -7303,45 +6746,12 @@ export default function EnhancedHorticulturePlannerPage() {
     }, [history.present, pushToHistory]);
 
     const handleCreateTemplate = useCallback(
-        (name: string) => {
-            const { plants: plantIds, pipes: _pipeIds } = history.present.selectedItems;
-
-            const selectedPlants = history.present.plants.filter((plant) =>
-                plantIds.includes(plant.id)
-            );
-
-            const _template = {
-                name,
-                plants: selectedPlants,
-                createdAt: new Date().toISOString(),
-            };
+        () => {
         },
-        [history.present]
+        []
     );
 
-    const _handleToggleLayer = useCallback(
-        (layer: keyof ProjectState['layerVisibility']) => {
-            pushToHistory({
-                layerVisibility: {
-                    ...history.present.layerVisibility,
-                    [layer]: !history.present.layerVisibility[layer],
-                },
-            });
-        },
-        [history.present.layerVisibility, pushToHistory]
-    );
 
-    const _handleUpdateEditSettings = useCallback(
-        (settings: Partial<ProjectState['editModeSettings']>) => {
-            pushToHistory({
-                editModeSettings: {
-                    ...history.present.editModeSettings,
-                    ...settings,
-                },
-            });
-        },
-        [history.present.editModeSettings, pushToHistory]
-    );
 
     const handleRealTimeBranchAngleChange = useCallback(
         (newAngle: number) => {
@@ -7383,10 +6793,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 }
             }
 
-            const _originalSubMainPipe = {
-                ...subMainPipe,
-                coordinates: originalSubMainCoordinates,
-            };
 
             const newBranchPipes: any[] = [];
             const trimmedCoordinates = trimSubMainPipeToFitBranches(
@@ -7422,7 +6828,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 },
             });
         },
-        [history.present, pushToHistory]
+        [pushToHistory, history.present.mainArea, history.present.mainPipes, history.present.plants, history.present.realTimeEditing, history.present.selectedPlantType, history.present.subMainPipes, history.present.useZones, history.present.zones]
     );
 
     const handleApplyRealTimeBranchEdit = useCallback(() => {
@@ -7883,38 +7289,6 @@ export default function EnhancedHorticulturePlannerPage() {
         [handleDeleteSpecificPlants]
     );
 
-    const _handleAddPlant = useCallback(
-        (position: Coordinate, plantData?: PlantData) => {
-            const newPlant: PlantLocation = {
-                id: generateUniqueId('plant'),
-                position,
-                plantData: plantData || history.present.selectedPlantType,
-                isSelected: false,
-                isEditable: true,
-                health: 'good',
-                zoneId: history.present.useZones
-                    ? findZoneContainingPoint(position, history.present.zones)?.id
-                    : 'main-area',
-            };
-
-            const updatedPlants = [...history.present.plants, newPlant];
-            pushToHistory({ plants: updatedPlants });
-
-            setConnectionStartPlant(newPlant);
-            setIsCreatingConnection(true);
-            setDragMode('connecting');
-            setIsNewPlantMode(true);
-            setSelectedPlantForEdit(newPlant);
-            setShowPlantEditModal(true);
-        },
-        [
-            history.present.plants,
-            history.present.selectedPlantType,
-            history.present.useZones,
-            history.present.zones,
-            pushToHistory,
-        ]
-    );
 
     const handleCreatePlantConnection = useCallback(
         (plantId: string) => {
@@ -8122,9 +7496,6 @@ export default function EnhancedHorticulturePlannerPage() {
         setMap(map);
 
         map.addListener('zoom_changed', () => {
-            if (mapRef.current) {
-                const currentZoom = mapRef.current.getZoom();
-            }
         });
     }, []);
 
@@ -8176,7 +7547,7 @@ export default function EnhancedHorticulturePlannerPage() {
     }, [history.present.mainArea]);
 
     const handleDrawingComplete = useCallback(
-        (coordinates: Coordinate[], _shapeType: string) => {
+        (coordinates: Coordinate[]) => {
             if (!coordinates || coordinates.length === 0) {
                 return;
             }
@@ -8326,6 +7697,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 setShowPlantAreaSelectionModal(true);
                 setTimeout(() => autoZoomToMainArea(), 100);
             } else if (editMode === 'mainPipe' && history.present.pump) {
+                
                 const pipeLength = calculatePipeLength(coordinates);
                 const targetZoneId = findTargetZoneForMainPipe(
                     coordinates,
@@ -8339,7 +7711,9 @@ export default function EnhancedHorticulturePlannerPage() {
                     toZone: targetZoneId,
                     coordinates,
                     length: pipeLength,
-                    diameter: 50,
+                    diameter: 100,
+                    material: 'pvc',
+                    flowRate: 1000,
                 };
 
                 pushToHistory({ mainPipes: [...history.present.mainPipes, newMainPipe] });
@@ -8349,7 +7723,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 setTimeout(() => autoZoomToMainArea(), 100);
             } else if (editMode === 'lateralPipe' && history.present.lateralPipeDrawing.isActive) {
                 if (coordinates.length >= 2) {
-                    const startPoint = coordinates[0];
                     const endPoint = coordinates[coordinates.length - 1];
 
                     if (!history.present.lateralPipeDrawing.startPoint) {
@@ -8359,9 +7732,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                 ...history.present,
                                 lateralPipeDrawing: {
                                     ...history.present.lateralPipeDrawing,
-                                    startPoint: startPoint,
-                                    currentPoint: startPoint,
-                                    rawCurrentPoint: startPoint,
+                                    startPoint: coordinates[0],
+                                    currentPoint: coordinates[0],
+                                    rawCurrentPoint: coordinates[0],
                                 },
                             },
                         });
@@ -8371,11 +7744,10 @@ export default function EnhancedHorticulturePlannerPage() {
                 }
                 return;
             } else if (editMode === 'subMainPipe') {
+                
                 let targetZone: Zone;
                 if (history.present.useZones) {
-                    if (_selectedZone) {
-                        targetZone = _selectedZone;
-                    } else {
+                    {
                         const detectedZone = findZoneForPipe(coordinates, history.present.zones);
                         if (!detectedZone) {
                             alert('กรุณาเลือกโซนก่อนวางปั๊ม');
@@ -8470,43 +7842,9 @@ export default function EnhancedHorticulturePlannerPage() {
             autoZoomToMainArea,
             selectedExclusionType,
             dimensionLineAngleOffset,
-            _selectedZone,
         ]
     );
 
-    const _getNearestPointOnBranchPipes = useCallback(
-        (
-            point: Coordinate
-        ): { snapped: Coordinate; branchPipeId: string | null; distance: number } | null => {
-            let closest: {
-                snapped: Coordinate;
-                branchPipeId: string | null;
-                distance: number;
-            } | null = null;
-
-            for (const sub of history.present.subMainPipes) {
-                if (!sub.branchPipes || sub.branchPipes.length === 0) continue;
-                for (const bp of sub.branchPipes) {
-                    if (!bp.coordinates || bp.coordinates.length < 2) continue;
-                    const res =
-                        findClosestPointOnPipeExtended(point, bp.coordinates) ||
-                        findClosestPointOnPipe(point, bp.coordinates);
-                    if (res) {
-                        if (!closest || res.distance < closest.distance) {
-                            closest = {
-                                snapped: res.position,
-                                branchPipeId: bp.id,
-                                distance: res.distance,
-                            };
-                        }
-                    }
-                }
-            }
-
-            return closest;
-        },
-        [history.present.subMainPipes]
-    );
 
     const getNearestPointOnPlantGrid = useCallback(
         (
@@ -8632,8 +7970,9 @@ export default function EnhancedHorticulturePlannerPage() {
             const clickPoint = { lat, lng };
 
             if (
-                history.present.lateralPipeDrawing.isActive &&
-                history.present.lateralPipeDrawing.placementMode
+                (history.present.lateralPipeDrawing.isActive &&
+                history.present.lateralPipeDrawing.placementMode) ||
+                editMode === 'lateralPipe'
             ) {
                 if (!history.present.lateralPipeDrawing.startPoint) {
                     const clickedPlant = findClosestPlantToPoint(
@@ -8793,6 +8132,31 @@ export default function EnhancedHorticulturePlannerPage() {
 
                 return;
             }
+
+            // จัดการ editMode สำหรับท่อ - เริ่มการลากแทนการสร้างท่อทันที
+            if (editMode === 'mainPipe') {
+                
+                if (!history.present.pump) {
+                    alert(t('กรุณาวางปั๊มก่อนวางท่อเมน'));
+                    return;
+                }
+
+                // เริ่มการลากท่อเมนจากปั๊ม
+                // ระบบจะใช้ handleDrawingComplete เมื่อเสร็จการลาก
+                return;
+            }
+
+            if (editMode === 'subMainPipe') {
+                
+                if (history.present.mainPipes.length === 0) {
+                    alert(t('กรุณาวางท่อเมนก่อนวางท่อเมนรอง'));
+                    return;
+                }
+
+                // เริ่มการลากท่อเมนรอง
+                // ระบบจะใช้ handleDrawingComplete เมื่อเสร็จการลาก
+                return;
+            }
         },
         [
             isRulerMode,
@@ -8803,10 +8167,22 @@ export default function EnhancedHorticulturePlannerPage() {
             autoZoomToMainArea,
             plantPlacementMode,
             getNearestPointOnPlantGrid,
+            history.present.irrigationZones,
+            history.present.lateralPipeDrawing.isActive,
+            history.present.lateralPipeDrawing.placementMode,
+            history.present.lateralPipeDrawing.startPoint,
+            history.present.mainArea,
+            history.present.mainPipes.length,
+            history.present.plants,
+            history.present.pump,
+            history.present.selectedPlantType,
+            history.present.subMainPipes,
+            history.present.useZones,
+            history.present.zones,
         ]
     );
 
-    const handleSaveDraft = useCallback(async () => {
+    const handleSaveDraft = useCallback(async (customLateralPipes?: LateralPipe[]) => {
         const existingFieldId = localStorage.getItem('currentFieldId');
         const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-');
 
@@ -8815,6 +8191,10 @@ export default function EnhancedHorticulturePlannerPage() {
               `Draft - ${new Date().toLocaleString('th-TH')}`
             : `Draft - ${new Date().toLocaleString('th-TH')}`;
 
+        // Use customLateralPipes if provided, otherwise use lateralPipesState if available, otherwise fall back to history state
+        const currentLateralPipes = customLateralPipes || (lateralPipesState.length > 0 ? lateralPipesState : history.present.lateralPipes);
+        
+        
         const projectData = {
             projectName: draftName,
             customerName: customerName || 'Draft Customer',
@@ -8823,13 +8203,16 @@ export default function EnhancedHorticulturePlannerPage() {
             mainArea: history.present.mainArea,
             pump: history.present.pump,
             zones: history.present.zones,
+            irrigationZones: history.present.irrigationZones, // Add irrigation zones
             mainPipes: history.present.mainPipes,
             subMainPipes: history.present.subMainPipes,
+            lateralPipes: currentLateralPipes,
             exclusionAreas: history.present.exclusionAreas,
             plants: history.present.plants,
             useZones: history.present.useZones,
             selectedPlantType: history.present.selectedPlantType,
             branchPipeSettings: history.present.branchPipeSettings,
+            lateralPipeSettings: history.present.lateralPipeSettings,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -8838,10 +8221,39 @@ export default function EnhancedHorticulturePlannerPage() {
             'horticultureIrrigationData',
             JSON.stringify(projectData)
         );
+        
+        // Also sync to the key expected by product.tsx
+        if (saveSuccess) {
+            syncHorticultureData(projectData);
+        }
         if (!saveSuccess) {
             console.error('❌ Failed to save to horticultureIrrigationData');
-            alert('ไม่สามารถบันทึกข้อมูลได้เนื่องจากพื้นที่เก็บข้อมูลเต็ม กรุณาลองใหม่อีกครั้ง');
-            return;
+            const userChoice = confirm(
+                'ไม่สามารถบันทึกข้อมูลได้เนื่องจากพื้นที่เก็บข้อมูลเต็ม\n\n' +
+                'ต้องการล้างข้อมูลเก่าออกเพื่อให้มีพื้นที่เพียงพอหรือไม่?\n\n' +
+                'คลิก "ตกลง" เพื่อล้างข้อมูลเก่า หรือ "ยกเลิก" เพื่อยกเลิกการบันทึก'
+            );
+            
+            if (userChoice) {
+                // Force cleanup and try again
+                cleanupLocalStorage();
+                const retrySuccess = safeLocalStorageSet(
+                    'horticultureIrrigationData',
+                    JSON.stringify(projectData)
+                );
+                
+                // Also sync to the key expected by product.tsx
+                if (retrySuccess) {
+                    syncHorticultureData(projectData);
+                }
+                
+                if (!retrySuccess) {
+                    alert('ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ');
+                    return;
+                }
+            } else {
+                return;
+            }
         }
 
         const fieldSpecificKey = `savedProductProject_${existingFieldId || 'new'}`;
@@ -8857,6 +8269,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 zones: history.present.zones.length,
                 mainPipes: history.present.mainPipes.length,
                 subMainPipes: history.present.subMainPipes.length,
+                lateralPipes: currentLateralPipes.length,
                 branchPipes: history.present.subMainPipes.reduce(
                     (total, pipe) => total + (pipe.branchPipes?.length || 0),
                     0
@@ -8884,6 +8297,7 @@ export default function EnhancedHorticulturePlannerPage() {
             console.error('❌ Failed to save to field-specific storage');
         }
 
+
         const fieldData = {
             name: draftName,
             field_name: draftName, 
@@ -8897,25 +8311,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 history.present.plants.length *
                 (history.present.selectedPlantType?.waterNeed || 50),
             area_coordinates: history.present.mainArea, 
-            plant_type_id: (() => {
-                const frontendToDbIdMap: { [key: number]: number } = {
-                    1: 21, 
-                    2: 22, 
-                    3: 23, 
-                    4: 24, 
-                    5: 25, 
-                    6: 26, 
-                    7: 27, 
-                    8: 28, 
-                    9: 29, 
-                    10: 30, 
-                };
-
-                const frontendId = history.present.selectedPlantType?.id;
-                return frontendId && frontendToDbIdMap[frontendId]
-                    ? frontendToDbIdMap[frontendId]
-                    : 21; 
-            })(),
+            plant_type_id: history.present.selectedPlantType?.id || 1,
             area_type: 'polygon',
             zone_operation_mode: 'sequential', 
             zone_operation_groups: [], 
@@ -8944,6 +8340,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 zones: history.present.zones.length,
                 mainPipes: history.present.mainPipes.length,
                 subMainPipes: history.present.subMainPipes.length,
+                lateralPipes: currentLateralPipes.length,
                 branchPipes: history.present.subMainPipes.reduce(
                     (total, pipe) => total + (pipe.branchPipes?.length || 0),
                     0
@@ -8986,24 +8383,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         history.present.plants.length *
                         (history.present.selectedPlantType?.waterNeed || 50),
                     area_coordinates: history.present.mainArea,
-                    plant_type_id: (() => {
-                        const frontendToDbIdMap: { [key: number]: number } = {
-                            1: 21,
-                            2: 22,
-                            3: 23,
-                            4: 24,
-                            5: 25,
-                            6: 26,
-                            7: 27,
-                            8: 28,
-                            9: 29,
-                            10: 30,
-                        };
-                        const frontendId = history.present.selectedPlantType?.id;
-                        return frontendId && frontendToDbIdMap[frontendId]
-                            ? frontendToDbIdMap[frontendId]
-                            : 21;
-                    })(),
+                    plant_type_id: history.present.selectedPlantType?.id || 1,
                     area_type: 'polygon',
                 };
 
@@ -9039,6 +8419,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         zones: history.present.zones.length,
                         mainPipes: history.present.mainPipes.length,
                         subMainPipes: history.present.subMainPipes.length,
+                        lateralPipes: currentLateralPipes.length,
                         branchPipes: history.present.subMainPipes.reduce(
                             (total, pipe) => total + (pipe.branchPipes?.length || 0),
                             0
@@ -9068,8 +8449,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     : t('บันทึกร่างสำเร็จ! แปลงจะถูกเก็บในโฟลเดอร์ "ยังไม่เสร็จ"');
 
                 alert(message);
-
-                router.visit('/');
+                // ไม่ redirect ไปหน้า home ให้อยู่หน้าเดิม
             } else {
                 throw new Error('Failed to save draft');
             }
@@ -9083,6 +8463,7 @@ export default function EnhancedHorticulturePlannerPage() {
         history.present.mainArea,
         history.present.pump,
         history.present.zones,
+        history.present.irrigationZones,
         history.present.mainPipes,
         history.present.subMainPipes,
         history.present.exclusionAreas,
@@ -9090,6 +8471,9 @@ export default function EnhancedHorticulturePlannerPage() {
         history.present.useZones,
         history.present.selectedPlantType,
         history.present.branchPipeSettings,
+        history.present.lateralPipeSettings,
+        history.present.lateralPipes,
+        lateralPipesState,
         customerName,
         totalArea,
         t,
@@ -9127,10 +8511,39 @@ export default function EnhancedHorticulturePlannerPage() {
             'horticultureIrrigationData',
             JSON.stringify(projectData)
         );
+        
+        // Also sync to the key expected by product.tsx
+        if (saveSuccess) {
+            syncHorticultureData(projectData);
+        }
         if (!saveSuccess) {
             console.error('❌ Failed to save to horticultureIrrigationData');
-            alert('ไม่สามารถบันทึกข้อมูลได้เนื่องจากพื้นที่เก็บข้อมูลเต็ม กรุณาลองใหม่อีกครั้ง');
-            return;
+            const userChoice = confirm(
+                'ไม่สามารถบันทึกข้อมูลได้เนื่องจากพื้นที่เก็บข้อมูลเต็ม\n\n' +
+                'ต้องการล้างข้อมูลเก่าออกเพื่อให้มีพื้นที่เพียงพอหรือไม่?\n\n' +
+                'คลิก "ตกลง" เพื่อล้างข้อมูลเก่า หรือ "ยกเลิก" เพื่อยกเลิกการบันทึก'
+            );
+            
+            if (userChoice) {
+                // Force cleanup and try again
+                cleanupLocalStorage();
+                const retrySuccess = safeLocalStorageSet(
+                    'horticultureIrrigationData',
+                    JSON.stringify(projectData)
+                );
+                
+                // Also sync to the key expected by product.tsx
+                if (retrySuccess) {
+                    syncHorticultureData(projectData);
+                }
+                
+                if (!retrySuccess) {
+                    alert('ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ');
+                    return;
+                }
+            } else {
+                return;
+            }
         }
 
         const params = new URLSearchParams({
@@ -9210,22 +8623,6 @@ export default function EnhancedHorticulturePlannerPage() {
         setEditMode('plantArea');
     };
 
-    const _handlePlantAreaCreated = (coordinates: Coordinate[], plantData: PlantData) => {
-        const newPlantArea: PlantArea = {
-            id: generateUniqueId('plantArea'),
-            name: `พื้นที่ปลูก ${plantData.name}`,
-            coordinates,
-            plantData,
-            color: getZoneColor(history.present.plantAreas.length),
-            isCompleted: false,
-        };
-
-        pushToHistory({
-            plantAreas: [...history.present.plantAreas, newPlantArea],
-        });
-
-        setCurrentPlantArea(newPlantArea);
-    };
 
     const handleCompletePlantAreas = () => {
         const incompleteAreas = history.present.plantAreas.filter((area) => !area.isCompleted);
@@ -9296,7 +8693,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     referenceArea.plantData
                 );
 
-                completedAreas.forEach((area, areaIndex) => {
+                completedAreas.forEach((area) => {
                     try {
                         const plants = generatePlantsInAreaWithSmartBoundary(
                             area.coordinates,
@@ -9527,7 +8924,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 referenceArea.plantData
             );
 
-            history.present.plantAreas.forEach((area, areaIndex) => {
+            history.present.plantAreas.forEach((area) => {
                 const plants = generatePlantsInAreaWithSmartBoundary(
                     area.coordinates,
                     area.plantData,
@@ -9618,7 +9015,7 @@ export default function EnhancedHorticulturePlannerPage() {
         });
     };
 
-    const handleTogglePlantAreaVisibility = (areaId: string) => {
+    const handleTogglePlantAreaVisibility = () => {
         pushToHistory({
             layerVisibility: {
                 ...history.present.layerVisibility,
@@ -9627,9 +9024,6 @@ export default function EnhancedHorticulturePlannerPage() {
         });
     };
 
-    const handleGenerateIrrigationZones = () => {
-        console.warn('การสร้างโซนอัตโนมัติถูกลบออกแล้ว กรุณาใช้การสร้างโซนด้วยตัวเอง');
-    };
 
     const handleRegenerateIrrigationZones = () => {
         console.warn('การสร้างโซนอัตโนมัติถูกลบออกแล้ว กรุณาใช้การสร้างโซนด้วยตัวเอง');
@@ -9841,7 +9235,7 @@ export default function EnhancedHorticulturePlannerPage() {
         setZoneControlPoints(newControlPoints);
     };
 
-    const handleManualZoneDrawingComplete = (coordinates: Coordinate[], shapeType: string) => {
+    const handleManualZoneDrawingComplete = (coordinates: Coordinate[]) => {
         const plantsInZone = history.present.plants.filter((plant) =>
             isPointInPolygon(plant.position, coordinates)
         );
@@ -9989,7 +9383,8 @@ export default function EnhancedHorticulturePlannerPage() {
 
             const configWithRandomSeed = {
                 ...autoZoneConfig,
-                randomSeed: undefined, 
+                randomSeed: Date.now(),
+                debugMode: true, // เปิด debug mode เพื่อดูการนับต้นไม้จริงๆ
             };
 
             const result = createAutomaticZones(
@@ -10002,21 +9397,26 @@ export default function EnhancedHorticulturePlannerPage() {
 
             if (result.success && result.zones.length > 0) {
                 
-                const validation = validateZones(result.zones, history.present.mainArea);
 
-                if (validation.errors.length > 0) {
-                    console.warn('🚨 Zone validation warnings:', validation.errors);
-                    if (typeof window !== 'undefined' && (window as any).showNotification) {
-                        (window as any).showNotification(
-                            `พบปัญหาในการแบ่งโซน: ${validation.errors.join(', ')}`,
-                            'warning'
-                        );
-                    }
-                }
+                // if (validation.errors.length > 0) {
+                //     console.warn('🚨 Zone validation errors:', validation.errors);
+                //     // Show critical errors to user
+                //     const errorMessage = `พบปัญหาสำคัญในการแบ่งโซน:\n${validation.errors.slice(0, 3).join('\n')}${validation.errors.length > 3 ? '\n...' : ''}`;
+                //     if (typeof window !== 'undefined' && (window as any).showNotification) {
+                //         (window as any).showNotification(errorMessage, 'error');
+                //     }
+                // }
 
-                if (validation.warnings.length > 0) {
-                    console.warn('⚠️ Zone validation warnings:', validation.warnings);
-                }
+                // if (validation.warnings.length > 0) {
+                //     // Only show warnings if there are many of them
+                //     if (validation.warnings.length > 10) {
+                //         const warningMessage = `พบคำเตือนในการแบ่งโซน ${validation.warnings.length} รายการ\n\nส่วนใหญ่เป็นเรื่องต้นไม้ที่อยู่นอกขอบเขตโซนเล็กน้อย ซึ่งไม่ส่งผลต่อการทำงาน`;
+                //         const userChoice = confirm(warningMessage + '\n\nต้องการดูรายละเอียดใน Console หรือไม่?');
+                //         if (userChoice) {
+                //             console.table(validation.warnings);
+                //         }
+                //     }
+                // }
 
                 
                 const irrigationZones = result.zones.map((zone, index) => ({
@@ -10050,11 +9450,24 @@ export default function EnhancedHorticulturePlannerPage() {
                     return plant;
                 });
 
+                // แปลง irrigationZones เป็น zones ที่มี interface ถูกต้อง
+                const zones = irrigationZones.map((irrigationZone) => ({
+                    id: irrigationZone.id,
+                    name: irrigationZone.name,
+                    coordinates: irrigationZone.coordinates,
+                    plantData: history.present.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
+                    plantCount: irrigationZone.plants.length,
+                    totalWaterNeed: irrigationZone.totalWaterNeed,
+                    area: 0, // จะคำนวณใหม่ในภายหลัง
+                    color: irrigationZone.color,
+                }));
+
                 pushToHistory({
                     irrigationZones,
+                    zones: zones, // ใช้ zones ที่แปลงแล้ว
+                    useZones: true, // เปิดใช้โซน
                     plants: updatedPlants,
                 });
-
 
                 const stats = result.debugInfo;
                 const config = loadSprinklerConfig();
@@ -10114,42 +9527,52 @@ export default function EnhancedHorticulturePlannerPage() {
         setIsCreatingAutoZones(true);
 
         try {
+            // Store existing zone colors to preserve them
+            const existingZoneColors = history.present.irrigationZones.map(zone => zone.color);
+            
             pushToHistory({ irrigationZones: [] });
 
-            const newSeed = Date.now() + Math.floor(Math.random() * 10000);
-            const configWithNewSeed = {
+            // Use the same seed to maintain consistent colors
+            const configWithSameSeed = {
                 ...autoZoneConfig,
-                randomSeed: newSeed, 
+                randomSeed: autoZoneConfig.randomSeed, // Keep the same seed
             };
 
             const result = createAutomaticZones(
                 history.present.plants,
                 history.present.mainArea,
-                configWithNewSeed
+                configWithSameSeed
             );
 
             setAutoZoneResult(result);
 
             if (result.success && result.zones.length > 0) {
-                const validation = validateZones(result.zones, history.present.mainArea);
+                // const validation = validateZones(result.zones, history.present.mainArea);
 
-                if (validation.errors.length > 0) {
-                    console.warn('🚨 Zone validation warnings:', validation.errors);
-                    if (typeof window !== 'undefined' && (window as any).showNotification) {
-                        (window as any).showNotification(
-                            `พบปัญหาในการแบ่งโซน: ${validation.errors.join(', ')}`,
-                            'warning'
-                        );
-                    }
-                }
+                // if (validation.errors.length > 0) {
+                //     console.warn('🚨 Zone validation errors:', validation.errors);
+                //     // Show critical errors to user
+                //     const errorMessage = `พบปัญหาสำคัญในการแบ่งโซน:\n${validation.errors.slice(0, 3).join('\n')}${validation.errors.length > 3 ? '\n...' : ''}`;
+                //     alert(errorMessage);
+                // }
 
-                if (validation.warnings.length > 0) {
-                    console.warn('⚠️ Zone validation warnings:', validation.warnings);
-                }
+                // if (validation.warnings.length > 0) {
+                //     console.warn('⚠️ Zone validation warnings:', validation.warnings);
+                //     // Only show warnings if there are many of them
+                //     if (validation.warnings.length > 10) {
+                //         const warningMessage = `พบคำเตือนในการแบ่งโซน ${validation.warnings.length} รายการ\n\nส่วนใหญ่เป็นเรื่องต้นไม้ที่อยู่นอกขอบเขตโซนเล็กน้อย ซึ่งไม่ส่งผลต่อการทำงาน`;
+                //         const userChoice = confirm(warningMessage + '\n\nต้องการดูรายละเอียดใน Console หรือไม่?');
+                //         if (userChoice) {
+                //             console.table(validation.warnings);
+                //         }
+                //     }
+                // }
 
                 const irrigationZones = result.zones.map((zone, index) => ({
                     ...zone,
                     layoutIndex: index,
+                    // Preserve existing color if available, otherwise use the generated color
+                    color: existingZoneColors[index] || zone.color,
                 }));
 
                 const updatedPlants = history.present.plants.map((plant) => {
@@ -10163,8 +9586,22 @@ export default function EnhancedHorticulturePlannerPage() {
                     return plant;
                 });
 
+                // แปลง irrigationZones เป็น zones ที่มี interface ถูกต้อง
+                const zones = irrigationZones.map((irrigationZone) => ({
+                    id: irrigationZone.id,
+                    name: irrigationZone.name,
+                    coordinates: irrigationZone.coordinates,
+                    plantData: history.present.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
+                    plantCount: irrigationZone.plants.length,
+                    totalWaterNeed: irrigationZone.totalWaterNeed,
+                    area: 0, // จะคำนวณใหม่ในภายหลัง
+                    color: irrigationZone.color,
+                }));
+
                 pushToHistory({
                     irrigationZones,
+                    zones: zones, // ใช้ zones ที่แปลงแล้ว
+                    useZones: true, // เปิดใช้โซน
                     plants: updatedPlants,
                 });
 
@@ -10374,6 +9811,8 @@ export default function EnhancedHorticulturePlannerPage() {
                 (pipe) => pipe.id !== pipeId
             );
             pushToHistory({ lateralPipes: updatedLateralPipes });
+            // Update lateralPipesState to ensure the deletion is visible
+            setLateralPipesState(updatedLateralPipes);
         } else if (pipeType === 'branchPipe') {
             const updatedSubMainPipes = history.present.subMainPipes.map((subMain) => {
                 return {
@@ -10415,15 +9854,6 @@ export default function EnhancedHorticulturePlannerPage() {
         }
     };
 
-    const prevStateRef = useRef({
-        mainArea: history.present.mainArea,
-        zones: history.present.zones,
-        exclusionAreas: history.present.exclusionAreas,
-        pump: history.present.pump,
-        mainPipes: history.present.mainPipes,
-        subMainPipes: history.present.subMainPipes,
-        plants: history.present.plants,
-    });
 
     const currentStateHash = useMemo(() => {
         const state = {
@@ -10538,33 +9968,8 @@ export default function EnhancedHorticulturePlannerPage() {
         }
     };
 
-    const handleTogglePlantSelectionMode = () => {
-        setIsPlantSelectionMode(!isPlantSelectionMode);
-        if (!isPlantSelectionMode) {
-            if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
-                (window as any).showSnapNotification(
-                    'เข้าสู่โหมดเลือกต้นไม้ - คลิกต้นไม้เพื่อเลือก แล้วใช้ปุ่มลูกศรเลื่อน'
-                );
-            }
-        } else {
-            setSelectedPlantsForMove(new Set());
-        }
-    };
 
-    const handleSelectAllPlants = () => {
-        const allPlantIds = new Set(history.present.plants.map((plant) => plant.id));
-        setSelectedPlantsForMove(allPlantIds);
-        if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
-            (window as any).showSnapNotification(`เลือกต้นไม้ทั้งหมด ${allPlantIds.size} ต้น`);
-        }
-    };
 
-    const handleDeselectAllPlants = () => {
-        setSelectedPlantsForMove(new Set());
-        if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
-            (window as any).showSnapNotification('ยกเลิกการเลือกต้นไม้ทั้งหมด');
-        }
-    };
 
     const handlePlantMoveModeChange = (mode: 'all' | 'selected' | 'area') => {
         setPlantMoveMode(mode);
@@ -10606,17 +10011,6 @@ export default function EnhancedHorticulturePlannerPage() {
         }
     };
 
-    const handleTogglePlantSelection = (plantId: string) => {
-        setSelectedPlantsForMove((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(plantId)) {
-                newSet.delete(plantId);
-            } else {
-                newSet.add(plantId);
-            }
-            return newSet;
-        });
-    };
 
     const findClosestPlantToPoint = (
         clickPoint: Coordinate,
@@ -10664,7 +10058,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 pipeZone.id === 'main-area'; 
 
             if (!isZoneCompatible) {
-                console.log('❌ Zone incompatible, skipping pipe:', subMainPipe.id);
                 continue;
             }
 
@@ -10883,12 +10276,13 @@ export default function EnhancedHorticulturePlannerPage() {
     };
 
     const handleStartAutoLateralPipeDrawing = () => {
+
         if (history.present.subMainPipes.length === 0) {
             alert(t('กรุณาวางท่อเมนรองก่อนใช้ระบบลากอัตโนมัติ'));
             return;
         }
 
-        if (history.present.irrigationZones.length === 0) {
+        if (history.present.zones.length === 0) {
             alert(t('กรุณาสร้างโซนก่อนใช้ระบบลากอัตโนมัติ'));
             return;
         }
@@ -10908,45 +10302,64 @@ export default function EnhancedHorticulturePlannerPage() {
             zoneId: pipe.zoneId,
         }));
 
-        let zones = history.present.irrigationZones.map((zone) => ({
+        // สร้าง zones สำหรับ generateAutoLateralPipes (IrrigationZone format)
+        let irrigationZones: IrrigationZone[] = history.present.zones.map((zone, index) => ({
             id: zone.id,
             name: zone.name,
             coordinates: zone.coordinates,
-            plants: zone.plants,
+            plants: history.present.plants.filter(plant => plant.zoneId === zone.id).map((plant) => ({
+                ...plant,
+                rotationAngle: plant.rotationAngle || 0
+            })),
+            totalWaterNeed: zone.totalWaterNeed,
+            color: zone.color,
+            layoutIndex: index,
         }));
 
         if (selectedZoneId) {
-            zones = zones.filter((zone) => zone.id === selectedZoneId);
+            irrigationZones = irrigationZones.filter((zone) => zone.id === selectedZoneId);
         }
-
 
         if (subMainPipes.length === 0) {
             alert(t('ไม่พบท่อ Sub Main ในระบบ'));
             return;
         }
 
-        if (zones.length === 0) {
+        if (irrigationZones.length === 0) {
             alert(t('ไม่พบโซนในระบบ'));
             return;
         }
 
-        const totalPlants = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
+        const totalPlants = irrigationZones.reduce((sum, zone) => sum + zone.plants.length, 0);
         if (totalPlants === 0) {
             alert(t('ไม่พบต้นไม้ในโซน กรุณาสร้างต้นไม้ก่อน'));
             return;
         }
 
         try {
-            const autoLateralPipes = generateAutoLateralPipes(mode, subMainPipes, zones, {
+
+            const autoLateralPipes = generateAutoLateralPipes(mode, subMainPipes, irrigationZones, {
                 snapThreshold: 50, 
                 minPipeLength: 1, 
                 maxPipeLength: 500, 
             });
 
-            const { valid, invalid } = validateAutoLateralPipes(autoLateralPipes, zones);
+
+            const { valid, invalid } = validateAutoLateralPipes(autoLateralPipes, irrigationZones);
+
 
             if (invalid.length > 0) {
-                console.warn('Invalid lateral pipes:', invalid);
+                
+                // Show user-friendly message about invalid pipes
+                const invalidReasons = [...new Set(invalid.map(item => item.reason))];
+                const message = `พบท่อย่อยที่ไม่ถูกต้อง ${invalid.length} เส้น:\n${invalidReasons.join('\n')}\n\nจะใช้เฉพาะท่อที่ถูกต้อง (${valid.length} เส้น)`;
+                
+                if (valid.length > 0) {
+                    const userChoice = confirm(message + '\n\nต้องการดำเนินการต่อหรือไม่?');
+                    if (!userChoice) {
+                        return;
+                    }
+                }
             }
 
             if (valid.length === 0) {
@@ -10976,7 +10389,7 @@ export default function EnhancedHorticulturePlannerPage() {
                           total: {
                               length: pipe.length,
                               plants: pipe.plants,
-                              waterNeed: pipe.totalFlowRate,
+                              waterNeed: (pipe as any).totalFlowRate,
                           },
                       }
                     : undefined;
@@ -10990,7 +10403,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     plants: pipe.plants,
                     placementMode: pipe.placementMode,
                     emitterLines: [], 
-                    totalWaterNeed: pipe.totalFlowRate,
+                    totalWaterNeed: (pipe as any).totalFlowRate,
                     plantCount: pipe.plants.length,
                     connectionPoint: pipe.connectionPoint,
                     zoneId: pipe.zoneId,
@@ -11005,13 +10418,94 @@ export default function EnhancedHorticulturePlannerPage() {
                 } as LateralPipe;
             });
 
+
+            // Convert AutoLateralPipeResult to LateralPipe format
+            const convertedLateralPipes: LateralPipe[] = newLateralPipes.map((pipe) => ({
+                id: pipe.id,
+                subMainPipeId: pipe.intersectionData?.subMainPipeId || '',
+                coordinates: pipe.coordinates,
+                length: pipe.length,
+                diameter: 16, // Default diameter for lateral pipes
+                plants: pipe.plants,
+                placementMode: pipe.placementMode,
+                emitterLines: [], // Empty emitter lines for now
+                isEditable: true,
+                isSelected: false,
+                isHovered: false,
+                isHighlighted: false,
+                isDisabled: false,
+                isVisible: true,
+                isActive: false,
+                connectionPoint: pipe.connectionPoint,
+                totalWaterNeed: (pipe as any).totalFlowRate,
+                plantCount: pipe.plants.length,
+                intersectionData: pipe.intersectionData ? {
+                    point: pipe.intersectionData.point,
+                    subMainPipeId: pipe.intersectionData.subMainPipeId,
+                    segmentIndex: pipe.intersectionData.segmentIndex,
+                    segmentStats: {
+                        segment1: {
+                            length: pipe.length / 2,
+                            plants: pipe.plants.slice(0, Math.ceil(pipe.plants.length / 2)),
+                            waterNeed: (pipe as any).totalFlowRate / 2
+                        },
+                        segment2: {
+                            length: pipe.length / 2,
+                            plants: pipe.plants.slice(Math.ceil(pipe.plants.length / 2)),
+                            waterNeed: (pipe as any).totalFlowRate / 2
+                        },
+                        total: {
+                            length: pipe.length,
+                            plants: pipe.plants,
+                            waterNeed: (pipe as any).totalFlowRate
+                        }
+                    }
+                } : undefined
+            })) as LateralPipe[];
+
+            // Force update state directly using pushToHistory with explicit change detection
+            const newLateralPipesArray = [...history.present.lateralPipes, ...convertedLateralPipes];
+            
+            
+            // Update both history state and separate lateral pipes state
+            // Update history state - force update by creating a new object
+            const forceUpdatedState = {
+                ...history.present,
+                lateralPipes: newLateralPipesArray,
+                // Add a timestamp to force change detection
+                _lastUpdate: Date.now()
+            };
+            
             dispatchHistory({
                 type: 'PUSH_STATE',
-                state: {
-                    ...history.present,
-                    lateralPipes: [...history.present.lateralPipes, ...newLateralPipes],
-                },
+                state: forceUpdatedState,
             });
+            
+            // Update separate lateral pipes state
+            setLateralPipesState(newLateralPipesArray);
+            
+            
+            // Force update the ref to prevent future conflicts
+            prevHistoryRef.current = forceUpdatedState;
+            
+
+            
+            // Debug: ตรวจสอบ state หลังจากเพิ่มท่อย่อย
+            setTimeout(() => {
+                
+                // Force re-render by updating a dummy state
+                if (history.present.lateralPipes.length === 0) {
+                    console.warn('⚠️ Lateral pipes still 0, forcing state refresh');
+                    // Try to trigger a re-render
+                    dispatchHistory({
+                        type: 'PUSH_STATE',
+                        state: {
+                            ...history.present,
+                            lateralPipes: newLateralPipesArray,
+                        },
+                    });
+                }
+            }, 500);
 
             alert(t(`สร้างท่อย่อยอัตโนมัติสำเร็จ ${valid.length} เส้น`));
         } catch (error) {
@@ -11034,6 +10528,7 @@ export default function EnhancedHorticulturePlannerPage() {
             type: 'PUSH_STATE',
             state: {
                 ...history.present,
+                editMode: 'lateralPipe',
                 isEditModeEnabled: true,
                 lateralPipeDrawing: {
                     ...history.present.lateralPipeDrawing,
@@ -11105,13 +10600,6 @@ export default function EnhancedHorticulturePlannerPage() {
         });
     };
 
-    const handleLateralPipeDrawingComplete = (coordinates: Coordinate[], shapeType: string) => {
-        if (shapeType === 'polyline' && coordinates.length >= 2) {
-            const startPoint = coordinates[0];
-            const endPoint = coordinates[coordinates.length - 1];
-            handleFinishLateralPipeDrawing(endPoint);
-        }
-    };
 
     const handleCancelLateralPipeDrawing = () => {
         dispatchHistory({
@@ -11390,8 +10878,8 @@ export default function EnhancedHorticulturePlannerPage() {
         }
 
         if (
-            !history.present.lateralPipeDrawing.isActive ||
-            !history.present.lateralPipeDrawing.placementMode ||
+            (!history.present.lateralPipeDrawing.isActive && editMode !== 'lateralPipe') ||
+            (!history.present.lateralPipeDrawing.placementMode && editMode !== 'lateralPipe') ||
             !event.latLng
         ) {
             return;
@@ -11426,7 +10914,6 @@ export default function EnhancedHorticulturePlannerPage() {
                     history.present.plants.length > 0
                 ) {
                     try {
-                        let closestPlant: any = null;
                         let minDistance = Infinity;
 
                         for (const plant of history.present.plants) {
@@ -11436,7 +10923,6 @@ export default function EnhancedHorticulturePlannerPage() {
                             );
                             if (distance < minDistance) {
                                 minDistance = distance;
-                                closestPlant = plant;
                             }
                         }
 
@@ -11631,7 +11117,6 @@ export default function EnhancedHorticulturePlannerPage() {
             }
         }
 
-        const allPathPoints = [history.present.lateralPipeDrawing.startPoint, ...newWaypoints];
 
         const multiSegmentResult = computeMultiSegmentAlignment(
             history.present.lateralPipeDrawing.startPoint,
@@ -11911,13 +11396,15 @@ export default function EnhancedHorticulturePlannerPage() {
 
         const shouldContinueDrawing = history.present.lateralPipeDrawing.isContinuousMode;
 
+        const newLateralPipes = [...history.present.lateralPipes, lateralPipe];
+        
         dispatchHistory({
             type: 'PUSH_STATE',
             state: {
                 ...history.present,
                 editMode: shouldContinueDrawing ? 'lateralPipe' : null, 
                 isEditModeEnabled: shouldContinueDrawing, 
-                lateralPipes: [...history.present.lateralPipes, lateralPipe],
+                lateralPipes: newLateralPipes,
                 firstLateralPipeWaterNeeds: updatedFirstLateralPipeWaterNeeds,
                 firstLateralPipePlantCounts: updatedFirstLateralPipePlantCounts,
                 lateralPipeComparison: updatedLateralPipeComparison,
@@ -11942,6 +11429,9 @@ export default function EnhancedHorticulturePlannerPage() {
                 },
             },
         });
+
+        // Update lateralPipesState to ensure the new pipe is visible
+        setLateralPipesState(newLateralPipes);
 
         if (!shouldContinueDrawing) {
             setHighlightedPlants(new Set());
@@ -12008,9 +11498,14 @@ export default function EnhancedHorticulturePlannerPage() {
                                     {t('ระบบออกแบบระบบน้ำพืชสวน')}
                                 </h1>
                                 {isEditingExistingField && (
-                                    <div className="flex items-center space-x-1 rounded-lg bg-blue-600 px-2 py-1 text-xs text-white">
-                                        <span>✏️</span>
-                                        <span>{t('แก้ไขแปลง')}</span>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-1 rounded-lg bg-blue-600 px-2 py-1 text-xs text-white">
+                                            <span>✏️</span>
+                                            <span>{t('แก้ไขแปลง')}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-300">
+                                            {t('สามารถทำต่อเดิม ลบ หรือแก้ไขได้ทุกอย่าง')}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -12761,9 +12256,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                             </button>
                                                                                             <button
                                                                                                 onClick={() =>
-                                                                                                    handleTogglePlantAreaVisibility(
-                                                                                                        area.id
-                                                                                                    )
+                                                                                                    handleTogglePlantAreaVisibility()
                                                                                                 }
                                                                                                 className={`rounded px-2 py-1 text-xs ${
                                                                                                     history
@@ -13794,29 +13287,34 @@ export default function EnhancedHorticulturePlannerPage() {
 
                                             <div className="space-y-2">
                                                 <button
-                                                    onClick={() =>
+                                                    onClick={() => {
                                                         setEditMode(
                                                             editMode === 'mainPipe'
                                                                 ? null
                                                                 : 'mainPipe'
-                                                        )
-                                                    }
+                                                        );
+                                                    }}
                                                     disabled={
                                                         !history.present.pump ||
                                                         (history.present.useZones &&
-                                                            history.present.irrigationZones
-                                                                .length === 0)
+                                                            history.present.zones.length === 0)
                                                     }
                                                     className={`w-full rounded-lg border px-4 py-3 font-medium transition-colors ${
                                                         !history.present.pump ||
                                                         (history.present.useZones &&
-                                                            history.present.irrigationZones
-                                                                .length === 0)
+                                                            history.present.zones.length === 0)
                                                             ? 'cursor-not-allowed border-red-300 bg-red-300 text-red-700'
                                                             : editMode === 'mainPipe'
                                                               ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                                                               : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                                                     }`}
+                                                    title={
+                                                        !history.present.pump
+                                                            ? t('กรุณาวางปั๊มก่อนวางท่อเมน')
+                                                            : history.present.useZones && history.present.zones.length === 0
+                                                              ? t('กรุณาสร้างโซนก่อนวางท่อเมน')
+                                                              : ''
+                                                    }
                                                 >
                                                     {editMode === 'mainPipe' ? (
                                                         <>❌ {t('หยุดวางท่อเมน')}</>
@@ -13826,26 +13324,24 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 </button>
 
                                                 <button
-                                                    onClick={() =>
+                                                    onClick={() => {
                                                         setEditMode(
                                                             editMode === 'subMainPipe'
                                                                 ? null
                                                                 : 'subMainPipe'
-                                                        )
-                                                    }
+                                                        );
+                                                    }}
                                                     disabled={
                                                         !history.present.pump ||
                                                         (history.present.useZones &&
-                                                            history.present.irrigationZones
-                                                                .length === 0) ||
+                                                            history.present.zones.length === 0) ||
                                                         (!history.present.useZones &&
                                                             history.present.mainArea.length === 0)
                                                     }
                                                     className={`w-full rounded-lg border px-4 py-3 font-medium transition-colors ${
                                                         !history.present.pump ||
                                                         (history.present.useZones &&
-                                                            history.present.irrigationZones
-                                                                .length === 0) ||
+                                                            history.present.zones.length === 0) ||
                                                         (!history.present.useZones &&
                                                             history.present.mainArea.length === 0)
                                                             ? 'cursor-not-allowed border-purple-300 bg-purple-300 text-purple-900'
@@ -13853,6 +13349,15 @@ export default function EnhancedHorticulturePlannerPage() {
                                                               ? 'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100'
                                                               : 'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100'
                                                     }`}
+                                                    title={
+                                                        !history.present.pump
+                                                            ? t('กรุณาวางปั๊มก่อนวางท่อเมนรอง')
+                                                            : history.present.useZones && history.present.zones.length === 0
+                                                              ? t('กรุณาสร้างโซนก่อนวางท่อเมนรอง')
+                                                              : !history.present.useZones && history.present.mainArea.length === 0
+                                                                ? t('กรุณากำหนดพื้นที่หลักก่อนวางท่อเมนรอง')
+                                                                : ''
+                                                    }
                                                 >
                                                     {editMode === 'subMainPipe' ? (
                                                         <>❌ {t('หยุดวางท่อเมนรอง')}</>
@@ -13862,7 +13367,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 </button>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <button
-                                                        onClick={handleStartLateralPipeDrawing}
+                                                        onClick={() => {
+                                                            handleStartLateralPipeDrawing();
+                                                        }}
                                                         disabled={
                                                             history.present.subMainPipes.length ===
                                                             0
@@ -13873,21 +13380,28 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                 ? 'cursor-not-allowed border-yellow-300 bg-yellow-300 text-yellow-700'
                                                                 : 'border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
                                                         }`}
+                                                        title={
+                                                            history.present.subMainPipes.length === 0
+                                                                ? t('กรุณาวางท่อเมนรองก่อนวางท่อย่อย')
+                                                                : ''
+                                                        }
                                                     >
                                                         🔧 {t('วางท่อย่อย')}
                                                     </button>
                                                     <button
-                                                        onClick={handleStartAutoLateralPipeDrawing}
+                                                        onClick={() => {
+                                                            handleStartAutoLateralPipeDrawing();
+                                                        }}
                                                         disabled={
                                                             history.present.subMainPipes.length ===
                                                                 0 ||
-                                                            history.present.irrigationZones
+                                                            history.present.zones
                                                                 .length === 0
                                                         }
                                                         className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors ${
                                                             history.present.subMainPipes.length ===
                                                                 0 ||
-                                                            history.present.irrigationZones
+                                                            history.present.zones
                                                                 .length === 0
                                                                 ? 'cursor-not-allowed border-orange-300 bg-orange-300 text-orange-700'
                                                                 : 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100'
@@ -14167,7 +13681,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         </div>
                     )}
                     <button
-                        onClick={handleSaveDraft}
+                        onClick={() => handleSaveDraft()}
                         disabled={!canSaveDraft}
                         className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
                             canSaveDraft
@@ -14178,7 +13692,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         {!isCompactMode ? (
                             <div className="flex items-center space-x-2">
                                 <FaSave />
-                                <span>{t('บันทึกร่าง')}</span>
+                                <span>{isEditingExistingField ? t('บันทึกร่าง') : t('บันทึกร่าง')}</span>
                             </div>
                         ) : (
                             <FaSave />
@@ -14196,7 +13710,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         {!isCompactMode ? (
                             <div className="flex items-center space-x-2">
                                 <FaSave />
-                                <span>{t('บันทึกโครงการ')}</span>
+                                <span>{isEditingExistingField ? t('บันทึกโครงการ') : t('บันทึกโครงการ')}</span>
                             </div>
                         ) : (
                             <FaSave />
@@ -14257,9 +13771,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                 pump={history.present.pump?.position || null}
                                 mainPipes={history.present.mainPipes}
                                 subMainPipes={history.present.subMainPipes}
-                                onMainPipesUpdate={(updatedMainPipes) => {
-                                    pushToHistory({ mainPipes: updatedMainPipes as any });
-                                }}
+                                // onMainPipesUpdate={(updatedMainPipes) => {
+                                //     pushToHistory({ mainPipes: updatedMainPipes as any });
+                                // }}
                                 enableCurvedDrawing={true}
                                 t={t}
                                 onMainPipeClick={handleMainPipeClick}
@@ -14320,9 +13834,10 @@ export default function EnhancedHorticulturePlannerPage() {
                                 return null;
                             })()}
                             <EnhancedGoogleMapsOverlays
-                                key={`overlays-${history.present.mainArea.length}-${history.present.exclusionAreas.length}-${history.present.zones.length}`}
+                                key={`overlays-${history.present.mainArea.length}-${history.present.exclusionAreas.length}-${history.present.zones.length}-${lateralPipesState.length}`}
                                 map={mapRef.current}
                                 data={history.present}
+                                lateralPipesState={lateralPipesState}
                                 currentDrawnZone={currentDrawnZone}
                                 showSprinklerRadius={showSprinklerRadius}
                                 manualZones={manualZones}
@@ -14334,8 +13849,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                 onManualZoneSelect={handleManualZoneSelect}
                                 onZoneUpdate={handleUpdateZone}
                                 setDraggedControlPointIndex={setDraggedControlPointIndex}
-                                setZoneControlPoints={setZoneControlPoints}
-                                generateZoneControlPoints={generateZoneControlPoints}
                                 onLateralPipeClick={handleLateralPipeClick}
                                 onLateralPipeMouseMove={handleLateralPipeMouseMove}
                                 onPlantClickInConnectionMode={handlePlantClickInConnectionMode}
@@ -14471,7 +13984,11 @@ export default function EnhancedHorticulturePlannerPage() {
                             isVisible={showAutoLateralPipeModal && !hasLargeModalOpen()}
                             onModeSelect={handleAutoLateralPipeModeSelect}
                             onCancel={handleCancelAutoLateralPipe}
-                            zones={history.present.irrigationZones}
+                            zones={history.present.zones.map((zone) => ({
+                                id: zone.id,
+                                name: zone.name,
+                                plants: history.present.plants.filter(plant => plant.zoneId === zone.id)
+                            }))}
                             t={t}
                         />
 
@@ -14813,8 +14330,6 @@ export default function EnhancedHorticulturePlannerPage() {
                     setShouldShowPlantSelectorAfterSave(true);
                     handleCreateCustomPlant(plantData);
                 }}
-                onShowPlantSelector={() => {
-                }}
                 t={t}
             />
 
@@ -14940,19 +14455,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 t={t}
             />
 
-            <HeadLossCalculationModal
-                isOpen={showHeadLossModal}
-                onClose={() => setShowHeadLossModal(false)}
-                onSave={handleHeadLossCalculationSave}
-                pipeInfo={selectedPipeForHeadLoss}
-                previousResult={
-                    selectedPipeForHeadLoss
-                        ? getHeadLossForPipe(selectedPipeForHeadLoss.pipeId)
-                        : undefined
-                }
-                t={t}
-            />
-
             <ManualIrrigationZoneModal
                 isOpen={showManualIrrigationZoneModal}
                 onClose={() => setShowManualIrrigationZoneModal(false)}
@@ -15058,6 +14560,7 @@ export default function EnhancedHorticulturePlannerPage() {
 const EnhancedGoogleMapsOverlays: React.FC<{
     map: google.maps.Map | null;
     data: ProjectState;
+    lateralPipesState: LateralPipe[];
     currentDrawnZone?: ManualIrrigationZone | null;
     manualZones?: ManualIrrigationZone[];
     onMapClick: (event: google.maps.MapMouseEvent) => void;
@@ -15069,8 +14572,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     onManualZoneSelect?: (zone: ManualIrrigationZone) => void;
     onZoneUpdate?: (updatedCoordinates: Coordinate[]) => void;
     setDraggedControlPointIndex?: (index: number | null) => void;
-    setZoneControlPoints?: (controlPoints: Coordinate[]) => void;
-    generateZoneControlPoints?: (zoneCoordinates: Coordinate[]) => Coordinate[];
     onPlantEdit: (plant: PlantLocation) => void;
     onConnectToPipe: (position: Coordinate, pipeId: string, pipeType: 'subMain' | 'branch') => void;
     onConnectToPlant: (plantId: string) => void;
@@ -15116,6 +14617,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 }> = ({
     map,
     data,
+    lateralPipesState,
     currentDrawnZone,
     manualZones,
     onMapClick,
@@ -15127,8 +14629,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     onManualZoneSelect,
     onZoneUpdate,
     setDraggedControlPointIndex,
-    setZoneControlPoints,
-    generateZoneControlPoints,
     onPlantEdit,
     onConnectToPipe,
     onConnectToPlant,
@@ -15380,30 +14880,61 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         let backupListener: google.maps.MapsEventListener | null = null;
 
         try {
-            map.set('draggable', true);
-            map.set('disableDoubleClickZoom', false);
-            map.set('clickableIcons', true);
+            // Safely set map properties with error handling
+            try {
+                map.set('draggable', true);
+                map.set('disableDoubleClickZoom', false);
+                map.set('clickableIcons', true);
+            } catch (mapSetError) {
+                console.warn('⚠️ Failed to set map properties:', mapSetError);
+            }
 
-            lateralMouseMoveListener = map.addListener('mousemove', lateralPipeMouseMove);
+            // Add event listeners with error handling
+            try {
+                lateralMouseMoveListener = map.addListener('mousemove', lateralPipeMouseMove);
+            } catch (listenerError) {
+                console.warn('⚠️ Failed to add mousemove listener:', listenerError);
+            }
 
-            lateralRightClickListener = map.addListener('rightclick', lateralPipeRightClick);
+            try {
+                lateralRightClickListener = map.addListener('rightclick', lateralPipeRightClick);
+            } catch (listenerError) {
+                console.warn('⚠️ Failed to add rightclick listener:', listenerError);
+            }
 
-            backupListener = google.maps.event.addListener(map, 'mousemove', lateralPipeMouseMove);
+            try {
+                backupListener = google.maps.event.addListener(map, 'mousemove', lateralPipeMouseMove);
+            } catch (listenerError) {
+                console.warn('⚠️ Failed to add backup listener:', listenerError);
+            }
 
             const mapDiv = map.getDiv();
             if (mapDiv) {
                 const globalMouseMove = (e: MouseEvent) => {
                     try {
+                        // Check if map is still valid
+                        if (!map || !map.getDiv()) {
+                            return;
+                        }
+
                         const bounds = map.getBounds();
+                        if (!bounds) {
+                            return;
+                        }
+
                         const mapSize = { width: mapDiv.offsetWidth, height: mapDiv.offsetHeight };
 
-                        if (bounds && mapSize.width > 0 && mapSize.height > 0) {
+                        if (mapSize.width > 0 && mapSize.height > 0) {
                             const rect = mapDiv.getBoundingClientRect();
                             const x = e.clientX - rect.left;
                             const y = e.clientY - rect.top;
 
                             const ne = bounds.getNorthEast();
                             const sw = bounds.getSouthWest();
+
+                            if (!ne || !sw) {
+                                return;
+                            }
 
                             const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / mapSize.height);
                             const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / mapSize.width);
@@ -15417,6 +14948,11 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                             lateralPipeMouseMove(syntheticEvent);
                         }
                     } catch (error) {
+                        // Silently handle Google Maps drawing library errors
+                        if (error instanceof Error && error.message.includes('__gm')) {
+                            // This is a known Google Maps drawing library issue, ignore it
+                            return;
+                        }
                         console.warn('Global fallback error:', error);
                     }
                 };
@@ -15486,7 +15022,8 @@ const EnhancedGoogleMapsOverlays: React.FC<{
             }
         }
 
-        if (layerVisibility.zones) {
+        // Only render zones if not using irrigation zones to avoid double rendering
+        if (layerVisibility.zones && !data.useZones) {
             data.zones.forEach((zone) => {
                 const isSelected = data.selectedItems.zones.includes(zone.id);
 
@@ -15723,7 +15260,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         }
 
         if (manualZones && manualZones.length > 0) {
-            manualZones.forEach((zone, index) => {
+            manualZones.forEach((zone) => {
                 if (zone.coordinates.length > 0) {
                     const isSelectedForEdit =
                         isZoneEditMode && selectedZoneForEdit && selectedZoneForEdit.id === zone.id;
@@ -15783,7 +15320,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         }
 
         if (data.irrigationZones && data.irrigationZones.length > 0) {
-            data.irrigationZones.forEach((zone, index) => {
+            data.irrigationZones.forEach((zone) => {
                 if (zone && zone.coordinates && zone.coordinates.length >= 3) {
                     const isSelectedForEdit =
                         isZoneEditMode && selectedZoneForEdit && selectedZoneForEdit.id === zone.id;
@@ -15866,7 +15403,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
         if (isZoneEditMode && selectedZoneForEdit && zoneControlPoints.length > 0) {
             zoneControlPoints.forEach((point, index) => {
-                const isCornerPoint = true;
                 const controlPointMarker = new google.maps.Marker({
                     position: { lat: point.lat, lng: point.lng },
                     map: map,
@@ -15920,12 +15456,8 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     });
                 });
 
-                controlPointMarker.addListener('drag', (event: google.maps.MapMouseEvent) => {
-                    if (event.latLng) {
-                        const newLat = event.latLng.lat();
-                        const newLng = event.latLng.lng();
-
-                    }
+                controlPointMarker.addListener('drag', () => {
+                    // Drag event handler - no action needed
                 });
 
                 controlPointMarker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
@@ -16271,7 +15803,10 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 }
             }
 
-            data.lateralPipes.forEach((lateralPipe) => {
+            // Use lateralPipesState if available, otherwise fall back to data.lateralPipes
+            const currentLateralPipes = lateralPipesState.length > 0 ? lateralPipesState : data.lateralPipes;
+            
+            currentLateralPipes.forEach((lateralPipe) => {
                 if (!data.layerVisibility.lateralPipes) return;
 
                 const isSelectedInConnectionMode =
@@ -16365,14 +15900,14 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                                 <div class="space-y-1 text-sm">
                                     <p><strong>ท่อเส้นรวม:</strong> ${lateralPipe.intersectionData.segmentStats.total.length.toFixed(1)} ม.</p>
                                     <p><strong>ต้นไม้ทั้งหมด:</strong> ${lateralPipe.intersectionData.segmentStats.total.plants.length} ต้น</p>
-                                    <p><strong>น้ำรวม:</strong> ${lateralPipe.intersectionData.segmentStats.total.waterNeed.toFixed(1)} ลิตร/นาที</p>
+                                    <p><strong>น้ำรวม:</strong> ${(lateralPipe.intersectionData.segmentStats.total.waterNeed || 0).toFixed(1)} ลิตร/นาที</p>
                                     <hr class="my-2">
                                     <p><strong>ส่วนที่ 1:</strong> ${lateralPipe.intersectionData.segmentStats.segment1.length.toFixed(1)} ม. 
                                     (${lateralPipe.intersectionData.segmentStats.segment1.plants.length} ต้น, 
-                                    ${lateralPipe.intersectionData.segmentStats.segment1.waterNeed.toFixed(1)} ลิตร/นาที)</p>
+                                    ${(lateralPipe.intersectionData.segmentStats.segment1.waterNeed || 0).toFixed(1)} ลิตร/นาที)</p>
                                     <p><strong>ส่วนที่ 2:</strong> ${lateralPipe.intersectionData.segmentStats.segment2.length.toFixed(1)} ม. 
                                     (${lateralPipe.intersectionData.segmentStats.segment2.plants.length} ต้น, 
-                                    ${lateralPipe.intersectionData.segmentStats.segment2.waterNeed.toFixed(1)} ลิตร/นาที)</p>
+                                    ${(lateralPipe.intersectionData.segmentStats.segment2.waterNeed || 0).toFixed(1)} ลิตร/นาที)</p>
                                 </div>
                             </div>
                         `,
@@ -16500,10 +16035,9 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     data.subMainPipes,
                     data.zones,
                     data.irrigationZones || manualZones,
-                    15 
                 );
 
-                endToEndConnections.forEach((connection, index) => {
+                endToEndConnections.forEach((connection) => {
                     const connectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
                             connection.connectionPoint.lat,
@@ -16548,10 +16082,9 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     data.subMainPipes,
                     data.zones, 
                     data.irrigationZones || manualZones, 
-                    15 
                 );
 
-                mainToSubMainConnections.forEach((connection, index) => {
+                mainToSubMainConnections.forEach((connection) => {
                    
                     const connectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
@@ -16600,7 +16133,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     data.irrigationZones || manualZones
                 );
 
-                subMainToMainMidConnections.forEach((connection, index) => {
+                subMainToMainMidConnections.forEach((connection) => {
                     const midConnectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
                             connection.connectionPoint.lat,
@@ -16648,7 +16181,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     10 
                 );
 
-                subMainToLateralConnections.forEach((connection, index) => {
+                subMainToLateralConnections.forEach((connection) => {
                     const connectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
                             connection.connectionPoint.lat,
@@ -16695,7 +16228,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     data.irrigationZones || manualZones 
                 );
 
-                subMainToMainIntersections.forEach((intersection, index) => {
+                subMainToMainIntersections.forEach((intersection) => {
                     const intersectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
                             intersection.intersectionPoint.lat,
@@ -16741,10 +16274,9 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     data.subMainPipes,
                     data.zones,
                     data.irrigationZones || manualZones,
-                    10 
                 );
 
-                lateralToSubMainIntersections.forEach((intersection, index) => {
+                lateralToSubMainIntersections.forEach((intersection) => {
                     const intersectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
                             intersection.intersectionPoint.lat,
@@ -16785,7 +16317,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     });
                 });
 
-                const mainToSubMainMidConnections = findMidConnections(
+                findMidConnections(
                     data.mainPipes,
                     data.subMainPipes,
                     10, 
@@ -17004,23 +16536,19 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
                 let plantColor = '#22C55E';
                 let plantSymbol = '🌳';
-                let symbolFontSize = 16;
                 let circleRadius = 12;
 
                 if (isSelectedInConnectionMode) {
                     plantColor = '#FF6B35';
                     plantSymbol = '🔗';
-                    symbolFontSize = 18;
                     circleRadius = 14;
                 } else if (isHighlightedForLateralPipe) {
                     plantColor = '#10B981';
                     plantSymbol = '🌳';
-                    symbolFontSize = 20; 
                     circleRadius = 16; 
                 } else if (data.pipeConnection.isActive) {
                     plantColor = '#9CA3AF';
                     plantSymbol = '🌳';
-                    symbolFontSize = 14;
                     circleRadius = 10;
                 } else if (
                     data.plantSelectionMode.type === 'multiple' &&
@@ -17028,7 +16556,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 ) {
                     plantColor = (plant as any).plantAreaColor;
                     plantSymbol = '🌳';
-                    symbolFontSize = 10;
                     circleRadius = 8;
                 }
 
@@ -17372,6 +16899,25 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         onMapDoubleClick,
         setSelectedPlantsForMove,
         onLateralPipeClick,
+        connectionStartPlant?.id,
+        editMode,
+        handleCurvedPipeEditingChange,
+        handleDeletePipe,
+        highlightedPipes,
+        isDeleteMode,
+        isZoneEditMode,
+        lateralPipesState,
+        onLateralPipeMouseMove,
+        onManualZoneSelect,
+        onPipeClickInConnectionMode,
+        onPlantClickInConnectionMode,
+        onZoneSelect,
+        onZoneUpdate,
+        selectedZoneForEdit,
+        setDraggedControlPointIndex,
+        showSprinklerRadius,
+        tempConnectionLine,
+        zoneControlPoints,
     ]);
 
     useEffect(() => {
@@ -17383,28 +16929,3 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     return null;
 };
 
-const extractCoordinatesFromLayer = (layer: any): Coordinate[] => {
-    if (!layer) return [];
-
-    try {
-        if (layer.getLatLngs) {
-            const latlngs = layer.getLatLngs();
-            if (Array.isArray(latlngs)) {
-                return latlngs.map((latlng: any) => ({
-                    lat: latlng.lat,
-                    lng: latlng.lng,
-                }));
-            }
-        }
-
-        if (layer.getLatLng) {
-            const latlng = layer.getLatLng();
-            return [{ lat: latlng.lat, lng: latlng.lng }];
-        }
-
-        return [];
-    } catch (error) {
-        console.error('Error extracting coordinates from layer:', error);
-        return [];
-    }
-};

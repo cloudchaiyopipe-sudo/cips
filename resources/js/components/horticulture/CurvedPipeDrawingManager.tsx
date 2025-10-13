@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
@@ -28,21 +27,21 @@ interface CurvedPipeDrawingManagerProps {
     onAnchorPointsChange?: (count: number) => void;
 }
 
-const calculateRadiusFromDragDistance = (
-    cornerPoint: Coordinate,
-    draggedPoint: Coordinate
-): number => {
-    const latDiff = draggedPoint.lat - cornerPoint.lat;
-    const lngDiff = draggedPoint.lng - cornerPoint.lng;
-    const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+// const calculateRadiusFromDragDistance = (
+//     cornerPoint: Coordinate,
+//     draggedPoint: Coordinate
+// ): number => {
+//     const latDiff = draggedPoint.lat - cornerPoint.lat;
+//     const lngDiff = draggedPoint.lng - cornerPoint.lng;
+//     const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 
-    const minRadius = 0.000005; 
-    const maxRadius = 0.00005;
+//     const minRadius = 0.000005; 
+//     const maxRadius = 0.00005;
 
-    const adjustedDistance = distance * 0.2;
+//     const adjustedDistance = distance * 0.2;
 
-    return Math.max(minRadius, Math.min(maxRadius, adjustedDistance));
-};
+//     return Math.max(minRadius, Math.min(maxRadius, adjustedDistance));
+// };
 
 const createCircularCorner = (
     prev: Coordinate,
@@ -261,9 +260,9 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
     const [previewPath, setPreviewPath] = useState<Coordinate[]>([]);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentMousePosition, setCurrentMousePosition] = useState<Coordinate | null>(null);
-    const [dragDistances, setDragDistances] = useState<Map<number, Coordinate>>(new Map());
+    // const [dragDistances, setDragDistances] = useState<Map<number, Coordinate>>(new Map());
     const [isDragging, setIsDragging] = useState(false);
-    const [dragIndex, setDragIndex] = useState<number>(-1);
+    const [, setDragIndex] = useState<number>(-1);
     const [guides, setGuides] = useState<GuideData[]>([]);
 
     const [radiusControls, setRadiusControls] = useState<Map<number, number>>(new Map());  
@@ -639,7 +638,7 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
         guideCirclesRef.current = [];
 
         if (showGuides) {
-            guides.forEach((guide, index) => {
+            guides.forEach((guide) => {
                 const radiusLine1 = new google.maps.Polyline({
                     path: guide.radiusLine1,
                     strokeColor: '#ff6b35',

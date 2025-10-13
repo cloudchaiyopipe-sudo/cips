@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { FaRedo, FaTimes, FaUndo, FaCheck, FaSpinner } from 'react-icons/fa';
@@ -39,10 +38,6 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
     const handleReset = () => {
         setLocalRotationAngle(0.0);
         onRotationChange(0.0);
-        onApplyRotation();
-    };
-
-    const handleApply = () => {
         onApplyRotation();
     };
 

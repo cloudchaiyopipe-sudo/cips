@@ -1,5 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Coordinate, PlantLocation } from './horticultureUtils';
+import { 
+    groupPlantsByRows as groupPlantsByRowsWithRotation,
+    groupPlantsByColumns as groupPlantsByColumnsWithRotation,
+    hasRotation,
+    transformToRotatedCoordinate
+} from './lateralPipeUtils';
 
 export interface SubMainPipe {
     id: string;
@@ -35,95 +40,6 @@ export interface AutoLateralPipeConfig {
     snapThreshold: number;
     minPipeLength: number;
     maxPipeLength: number;
-}
-
-function clipPipeToZone(coordinates: Coordinate[], zone: IrrigationZone): Coordinate[] {
-    if (coordinates.length < 2) return coordinates;
-
-    const start = coordinates[0];
-    const end = coordinates[coordinates.length - 1];
-
-    const startInZone = isPointInZone(start, zone);
-    const endInZone = isPointInZone(end, zone);
-
-    if (startInZone && endInZone) {
-        return coordinates;
-    }
-
-    const intersections = findZoneBoundaryIntersections(start, end, zone);
-
-    if (intersections.length === 0) {
-        const clippedPoint = findNearestPointInZone(startInZone ? end : start, zone);
-        if (startInZone) {
-            return [start, clippedPoint];
-        } else if (endInZone) {
-            return [clippedPoint, end];
-        } else {
-            return coordinates;
-        }
-    }
-
-    if (startInZone && !endInZone) {
-        const closestIntersection = intersections.reduce((closest, current) => {
-            const distToStart = calculateDistance(start, current);
-            const distToClosest = calculateDistance(start, closest);
-            return distToStart < distToClosest ? current : closest;
-        });
-        return [start, closestIntersection];
-    } else if (!startInZone && endInZone) {
-        const closestIntersection = intersections.reduce((closest, current) => {
-            const distToEnd = calculateDistance(end, current);
-            const distToClosest = calculateDistance(end, closest);
-            return distToEnd < distToClosest ? current : closest;
-        });
-        return [closestIntersection, end];
-    } else if (!startInZone && !endInZone) {
-        if (intersections.length >= 2) {
-            return [intersections[0], intersections[1]];
-        } else {
-            const intersection = intersections[0];
-            const nearestBoundaryPoint = findNearestPointInZone(intersection, zone);
-            return [intersection, nearestBoundaryPoint];
-        }
-    }
-    return coordinates;
-}
-
-function findNearestPointInZone(point: Coordinate, zone: IrrigationZone): Coordinate {
-    let nearestPoint = point;
-    let minDistance = Infinity;
-
-    for (let i = 0; i < zone.coordinates.length; i++) {
-        const boundaryPoint = zone.coordinates[i];
-        const distance = calculateDistance(point, boundaryPoint);
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            nearestPoint = boundaryPoint;
-        }
-    }
-
-    return nearestPoint;
-}
-
-function findZoneBoundaryIntersections(
-    start: Coordinate,
-    end: Coordinate,
-    zone: IrrigationZone
-): Coordinate[] {
-    const intersections: Coordinate[] = [];
-
-    for (let i = 0; i < zone.coordinates.length; i++) {
-        const boundaryStart = zone.coordinates[i];
-        const boundaryEnd = zone.coordinates[(i + 1) % zone.coordinates.length];
-
-        const intersection = findLineIntersection(start, end, boundaryStart, boundaryEnd);
-        if (intersection) {
-            intersections.push(intersection);
-        }
-    }
-
-    return intersections;
 }
 
 export const isPointInZone = (point: Coordinate, zone: IrrigationZone): boolean => {
@@ -202,66 +118,11 @@ export const findClosestPointOnLine = (
 };
 
 export const groupPlantsByRows = (plants: PlantLocation[]): PlantLocation[][] => {
-    if (plants.length === 0) return [];
-
-    const sortedPlants = [...plants].sort((a, b) => a.position.lat - b.position.lat);
-
-    const rows: PlantLocation[][] = [];
-    const tolerance = 0.00005; 
-
-    let currentRow: PlantLocation[] = [sortedPlants[0]];
-
-    for (let i = 1; i < sortedPlants.length; i++) {
-        const currentPlant = sortedPlants[i];
-        const lastPlantInRow = currentRow[currentRow.length - 1];
-        const latDiff = Math.abs(currentPlant.position.lat - lastPlantInRow.position.lat);
-
-        if (latDiff <= tolerance) {
-            currentRow.push(currentPlant);
-        } else {
-            currentRow.sort((a, b) => a.position.lng - b.position.lng);
-            rows.push(currentRow);
-            currentRow = [currentPlant];
-        }
-    }
-
-    if (currentRow.length > 0) {
-        currentRow.sort((a, b) => a.position.lng - b.position.lng);
-        rows.push(currentRow);
-    }
-
-    return rows;
+    return groupPlantsByRowsWithRotation(plants);
 };
 
 export const groupPlantsByColumns = (plants: PlantLocation[]): PlantLocation[][] => {
-    if (plants.length === 0) return [];
-
-    const sortedPlants = [...plants].sort((a, b) => a.position.lng - b.position.lng);
-
-    const columns: PlantLocation[][] = [];
-    const tolerance = 0.00001; 
-
-    let currentColumn: PlantLocation[] = [sortedPlants[0]];
-
-    for (let i = 1; i < sortedPlants.length; i++) {
-        const currentPlant = sortedPlants[i];
-        const lastPlantInColumn = currentColumn[currentColumn.length - 1];
-
-        if (Math.abs(currentPlant.position.lng - lastPlantInColumn.position.lng) <= tolerance) {
-            currentColumn.push(currentPlant);
-        } else {
-            currentColumn.sort((a, b) => a.position.lat - b.position.lat);
-            columns.push(currentColumn);
-            currentColumn = [currentPlant];
-        }
-    }
-
-    if (currentColumn.length > 0) {
-        currentColumn.sort((a, b) => a.position.lat - b.position.lat);
-        columns.push(currentColumn);
-    }
-
-    return columns;
+    return groupPlantsByColumnsWithRotation(plants);
 };
 
 export const findLineIntersection = (
@@ -315,8 +176,31 @@ export const generateThroughSubMainPipes = (
         for (const row of plantRows) {
             if (row.length < 1) continue; 
 
-            const rowStart = row[0].position;
-            const rowEnd = row[row.length - 1].position;
+            const rotationInfo = hasRotation(row);
+            let rowStart: Coordinate;
+            let rowEnd: Coordinate;
+
+            if (rotationInfo.hasRotation) {
+                const plantsWithTransformed = row.map((plant) => ({
+                    plant,
+                    transformedPosition: transformToRotatedCoordinate(
+                        plant.position,
+                        rotationInfo.center,
+                        rotationInfo.rotationAngle
+                    ),
+                }));
+
+                const sortedByTransformed = plantsWithTransformed.sort(
+                    (a, b) => a.transformedPosition.lng - b.transformedPosition.lng
+                );
+
+                rowStart = sortedByTransformed[0].plant.position;
+                rowEnd = sortedByTransformed[sortedByTransformed.length - 1].plant.position;
+            } else {
+                const sortedByLng = [...row].sort((a, b) => a.position.lng - b.position.lng);
+                rowStart = sortedByLng[0].position;
+                rowEnd = sortedByLng[sortedByLng.length - 1].position;
+            }
 
             const direction = {
                 lat: rowEnd.lat - rowStart.lat,
@@ -366,7 +250,6 @@ export const generateThroughSubMainPipes = (
                         if (intersectionInZone) {
                             const rowStart = row[0].position;
                             const rowEnd = row[row.length - 1].position;
-                            const pipeCoordinates = [intersection, rowStart, rowEnd];
                             const pipeLength = calculateDistance(rowStart, rowEnd);
 
                             if (
@@ -412,114 +295,6 @@ export const generateThroughSubMainPipes = (
     return results;
 };
 
-const generateFallbackLateralPipes = (
-    subMainPipes: SubMainPipe[],
-    zones: IrrigationZone[],
-    config: AutoLateralPipeConfig
-): AutoLateralPipeResult[] => {
-    const results: AutoLateralPipeResult[] = [];
-
-    for (const zone of zones) {
-        const plantsInZone = zone.plants;
-        if (plantsInZone.length === 0) continue;
-
-        const plantRows = groupPlantsByRows(plantsInZone);
-
-        for (const row of plantRows) {
-            if (row.length < 1) continue;
-
-            const rowStart = row[0].position;
-            const rowEnd = row[row.length - 1].position;
-
-            const direction = {
-                lat: rowEnd.lat - rowStart.lat,
-                lng: rowEnd.lng - rowStart.lng,
-            };
-            const length = Math.sqrt(direction.lat * direction.lat + direction.lng * direction.lng);
-
-            if (length === 0) continue;
-
-            const normalizedDir = {
-                lat: direction.lat / length,
-                lng: direction.lng / length,
-            };
-
-            const extendedStart = {
-                lat: rowStart.lat - normalizedDir.lat * 0.0001,
-                lng: rowStart.lng - normalizedDir.lng * 0.0001,
-            };
-            const extendedEnd = {
-                lat: rowEnd.lat + normalizedDir.lat * 0.0001,
-                lng: rowEnd.lng + normalizedDir.lng * 0.0001,
-            };
-
-            let closestSubMainPipe: SubMainPipe | null = null;
-            let minDistance = Infinity;
-            let closestPoint: Coordinate | null = null;
-
-            for (const subMainPipe of subMainPipes) {
-                if (subMainPipe.zoneId && subMainPipe.zoneId !== zone.id) continue;
-
-                const subMainInZone = subMainPipe.coordinates.some((coord) =>
-                    isPointInZone(coord, zone)
-                );
-                if (!subMainInZone) continue;
-
-                const rowCenter = {
-                    lat: (rowStart.lat + rowEnd.lat) / 2,
-                    lng: (rowStart.lng + rowEnd.lng) / 2,
-                };
-
-                for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
-                    const segmentStart = subMainPipe.coordinates[i];
-                    const segmentEnd = subMainPipe.coordinates[i + 1];
-
-                    const closestOnSegment = findClosestPointOnLine(
-                        rowCenter,
-                        segmentStart,
-                        segmentEnd
-                    );
-                    const distance = calculateDistance(rowCenter, closestOnSegment);
-
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestSubMainPipe = subMainPipe;
-                        closestPoint = closestOnSegment;
-                    }
-                }
-            }
-
-            if (closestSubMainPipe && closestPoint && minDistance <= config.snapThreshold * 2) {
-                const pipeLength = calculateDistance(extendedStart, extendedEnd);
-
-                if (pipeLength >= config.minPipeLength && pipeLength <= config.maxPipeLength) {
-                    const lateralPipe: AutoLateralPipeResult = {
-                        id: `auto-lateral-fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        coordinates: [extendedStart, extendedEnd],
-                        length: pipeLength,
-                        plants: row,
-                        placementMode: 'over_plants',
-                        totalFlowRate: row.reduce(
-                            (sum, plant) => sum + plant.plantData.waterNeed,
-                            0
-                        ),
-                        connectionPoint: closestPoint,
-                        zoneId: zone.id,
-                        intersectionData: {
-                            subMainPipeId: closestSubMainPipe.id,
-                            point: closestPoint,
-                            segmentIndex: 0,
-                        },
-                    };
-
-                    results.push(lateralPipe);
-                }
-            }
-        }
-    }
-    return results;
-};
-
 const getSubMainDirection = (subMainPipe: SubMainPipe): 'horizontal' | 'vertical' => {
     if (subMainPipe.coordinates.length < 2) return 'horizontal';
 
@@ -551,32 +326,100 @@ const createPerpendicularLateralPipe = (
         throw new Error('No plants provided');
     }
 
+    const rotationInfo = hasRotation(plants);
     let start: Coordinate, end: Coordinate;
 
-    if (subMainDirection === 'vertical') {
-        const sortedByLng = [...plants].sort((a, b) => a.position.lng - b.position.lng);
-        const avgLat = plants.reduce((sum, plant) => sum + plant.position.lat, 0) / plants.length;
+    if (rotationInfo.hasRotation) {
+        const plantsWithTransformed = plants.map((plant) => ({
+            plant,
+            transformedPosition: transformToRotatedCoordinate(
+                plant.position,
+                rotationInfo.center,
+                rotationInfo.rotationAngle
+            ),
+        }));
 
-        start = {
-            lat: avgLat,
-            lng: sortedByLng[0].position.lng,
-        };
-        end = {
-            lat: avgLat,
-            lng: sortedByLng[sortedByLng.length - 1].position.lng,
-        };
+        if (subMainDirection === 'vertical') {
+            const sortedByTransformedLng = plantsWithTransformed.sort(
+                (a, b) => a.transformedPosition.lng - b.transformedPosition.lng
+            );
+            const avgTransformedLat = plantsWithTransformed.reduce(
+                (sum, item) => sum + item.transformedPosition.lat, 0
+            ) / plantsWithTransformed.length;
+
+            const startTransformed = {
+                lat: avgTransformedLat,
+                lng: sortedByTransformedLng[0].transformedPosition.lng,
+            };
+            const endTransformed = {
+                lat: avgTransformedLat,
+                lng: sortedByTransformedLng[sortedByTransformedLng.length - 1].transformedPosition.lng,
+            };
+
+            start = transformToRotatedCoordinate(
+                startTransformed,
+                rotationInfo.center,
+                -rotationInfo.rotationAngle
+            );
+            end = transformToRotatedCoordinate(
+                endTransformed,
+                rotationInfo.center,
+                -rotationInfo.rotationAngle
+            );
+        } else {
+            const sortedByTransformedLat = plantsWithTransformed.sort(
+                (a, b) => a.transformedPosition.lat - b.transformedPosition.lat
+            );
+            const avgTransformedLng = plantsWithTransformed.reduce(
+                (sum, item) => sum + item.transformedPosition.lng, 0
+            ) / plantsWithTransformed.length;
+
+            const startTransformed = {
+                lat: sortedByTransformedLat[0].transformedPosition.lat,
+                lng: avgTransformedLng,
+            };
+            const endTransformed = {
+                lat: sortedByTransformedLat[sortedByTransformedLat.length - 1].transformedPosition.lat,
+                lng: avgTransformedLng,
+            };
+
+            start = transformToRotatedCoordinate(
+                startTransformed,
+                rotationInfo.center,
+                -rotationInfo.rotationAngle
+            );
+            end = transformToRotatedCoordinate(
+                endTransformed,
+                rotationInfo.center,
+                -rotationInfo.rotationAngle
+            );
+        }
     } else {
-        const sortedByLat = [...plants].sort((a, b) => a.position.lat - b.position.lat);
-        const avgLng = plants.reduce((sum, plant) => sum + plant.position.lng, 0) / plants.length;
+        if (subMainDirection === 'vertical') {
+            const sortedByLng = [...plants].sort((a, b) => a.position.lng - b.position.lng);
+            const avgLat = plants.reduce((sum, plant) => sum + plant.position.lat, 0) / plants.length;
 
-        start = {
-            lat: sortedByLat[0].position.lat,
-            lng: avgLng,
-        };
-        end = {
-            lat: sortedByLat[sortedByLat.length - 1].position.lat,
-            lng: avgLng,
-        };
+            start = {
+                lat: avgLat,
+                lng: sortedByLng[0].position.lng,
+            };
+            end = {
+                lat: avgLat,
+                lng: sortedByLng[sortedByLng.length - 1].position.lng,
+            };
+        } else {
+            const sortedByLat = [...plants].sort((a, b) => a.position.lat - b.position.lat);
+            const avgLng = plants.reduce((sum, plant) => sum + plant.position.lng, 0) / plants.length;
+
+            start = {
+                lat: sortedByLat[0].position.lat,
+                lng: avgLng,
+            };
+            end = {
+                lat: sortedByLat[sortedByLat.length - 1].position.lat,
+                lng: avgLng,
+            };
+        }
     }
 
     const length = calculateDistance(start, end);
@@ -836,10 +679,16 @@ export const validateAutoLateralPipes = (
             isValid = false;
             reason = 'ไม่พบโซนที่ระบุ';
         } else {
-            const allPointsInZone = pipe.coordinates.every((coord) => isPointInZone(coord, zone));
-            if (!allPointsInZone) {
+            // Check if most points are in zone (allow some tolerance)
+            const pointsInZone = pipe.coordinates.filter((coord) => isPointInZone(coord, zone));
+            const pointsInZonePercentage = (pointsInZone.length / pipe.coordinates.length) * 100;
+            
+            if (pointsInZonePercentage < 80) {
                 isValid = false;
-                reason = 'ท่อออกนอกขอบเขตโซน';
+                reason = `ท่อออกนอกขอบเขตโซน (${pointsInZonePercentage.toFixed(1)}% อยู่ในโซน)`;
+            } else if (pointsInZonePercentage < 95) {
+                // Log warning but don't mark as invalid
+                console.warn(`ท่อ ${pipe.id}: ${pointsInZonePercentage.toFixed(1)}% อยู่ในโซน`);
             }
         }
 

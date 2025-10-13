@@ -5212,6 +5212,7 @@ export default function FieldCropSummary() {
                             totalPlantingPoints: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
                             totalSprinklerCount: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
                         },
+                        irrigationSettings: irrigationSettingsData, // ส่ง irrigationSettings ไปยัง product.tsx
                     };
 
                     // Save field crop data to localStorage in the format expected by product page

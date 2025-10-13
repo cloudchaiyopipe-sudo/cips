@@ -1,6 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import {
     HorticultureProjectData,
     ProjectSummaryData,
@@ -12,13 +10,9 @@ import {
     formatWaterVolume,
     EnhancedProjectData,
     BestPipeInfo,
-    IrrigationZoneExtended,
-    LateralPipe,
-    Coordinate,
     isCoordinateInZone,
     calculateWaterFlowRate,
     isPointInPolygon,
-    distanceFromPointToLineSegment,
     calculateDistanceBetweenPoints,
 } from './horticultureUtils';
 import {
@@ -63,6 +57,7 @@ export const getProjectStats = (): ProjectSummaryData | null => {
         const summary = calculateProjectSummary(projectData);
         return summary;
     } catch (error) {
+        console.error('Error getting project stats:', error);
         return null;
     }
 };
@@ -200,36 +195,6 @@ export const getLongestBranchPipeStats = ():
             };
         }[] = [];
 
-        // ปิดการใช้งาน zones แบบเดิม รอการพัฒนาระบบโซนใหม่
-        // if (projectData.useZones && projectData.zones && projectData.zones.length > 0) {
-        //     projectData.zones.forEach((zone) => {
-        //         const zoneSubMainPipes =
-        //             projectData.subMainPipes?.filter((pipe) => pipe.zoneId === zone.id) || [];
-        //         const allBranchPipes = zoneSubMainPipes.flatMap(
-        //             (subMain) => subMain.branchPipes || []
-        //         );
-
-        //         if (allBranchPipes.length > 0) {
-        //             const longestBranchPipe = allBranchPipes.reduce((longest, current) =>
-        //                 current.length > longest.length ? current : longest
-        //             );
-        //             const plantCount = longestBranchPipe.plants?.length || 0;
-        //             const plantNames =
-        //             longestBranchPipe.plants?.map((plant) => plant.plantData.name) || [];
-
-        //             stats.push({
-        //                 zoneId: zone.id,
-        //                 zoneName: zone.name,
-        //                 longestBranchPipe: {
-        //                     id: longestBranchPipe.id,
-        //                     length: longestBranchPipe.length,
-        //                     plantCount,
-        //                     plantNames,
-        //                 },
-        //             });
-        //         }
-        //     });
-        // } else {
         const allBranchPipes =
             projectData.subMainPipes?.flatMap((subMain) => subMain.branchPipes || []) || [];
 
@@ -255,6 +220,7 @@ export const getLongestBranchPipeStats = ():
 
         return stats;
     } catch (error) {
+        console.error('Error getting longest branch pipe stats:', error);
         return null;
     }
 };
@@ -338,6 +304,7 @@ export const getSubMainPipeBranchCount = ():
 
         return stats;
     } catch (error) {
+        console.error('Error getting sub main pipe branch count:', error);
         return null;
     }
 };
@@ -387,6 +354,7 @@ export const getDetailedBranchPipeStats = ():
 
         return detailedStats;
     } catch (error) {
+        console.error('Error getting detailed branch pipe stats:', error);
         return null;
     }
 };
@@ -566,7 +534,6 @@ export const createMapImage = async (
         quality = 0.9,
         scale = 2,
         backgroundColor = '#1F2937',
-        filename: _finalFilename = 'horticulture-layout',
     } = options;
 
     try {
@@ -1045,17 +1012,17 @@ export const findPipeZoneForConnection = (
 
     const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
 
-    if (irrigationZones) {
+    if (irrigationZones && irrigationZones.length > 0) {
         for (const zone of irrigationZones) {
-            if (zone.coordinates && isPointInPolygon(endPoint, zone.coordinates)) {
+            if (zone.coordinates && zone.coordinates.length >= 3 && isPointInPolygon(endPoint, zone.coordinates)) {
                 return zone.id;
             }
         }
     }
 
-    if (zones) {
+    if (zones && zones.length > 0) {
         for (const zone of zones) {
-            if (zone.coordinates && isPointInPolygon(endPoint, zone.coordinates)) {
+            if (zone.coordinates && zone.coordinates.length >= 3 && isPointInPolygon(endPoint, zone.coordinates)) {
                 return zone.id;
             }
         }
@@ -1357,7 +1324,6 @@ export const findBestMainPipeInZone = (
             projectData.subMainPipes,
             projectData.zones || [],
             irrigationZones || [],
-            100 
         );
 
         for (const connection of endToEndConnections) {
@@ -1554,13 +1520,13 @@ export const countConnectionPointsByZone = (
         };
 
         const countedConnections = new Set<string>();
+        const globalConnectionKeys = new Set<string>();
 
         const endToEndConnections = findEndToEndConnections(
             projectData.mainPipes,
             projectData.subMainPipes,
             projectData.zones || [],
             irrigationZones,
-            15 
         );
 
         const mainToSubMainConnections = findMainToSubMainConnections(
@@ -1568,7 +1534,6 @@ export const countConnectionPointsByZone = (
             projectData.subMainPipes,
             projectData.zones || [],
             irrigationZones,
-            15 
         );
 
         for (const connection of endToEndConnections) {
@@ -1591,9 +1556,11 @@ export const countConnectionPointsByZone = (
 
                 if (mainZoneId === zone.id && subMainZoneId === zone.id) {
                     const connectionKey = `end-to-end-${connection.mainPipeId}-${connection.subMainPipeId}`;
-                    if (!countedConnections.has(connectionKey)) {
+                    const globalKey = `global-end-to-end-${connection.mainPipeId}-${connection.subMainPipeId}`;
+                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
                         zoneStats.mainToSubMain++; 
                         countedConnections.add(connectionKey);
+                        globalConnectionKeys.add(globalKey);
                     }
                 }
             }
@@ -1618,10 +1585,12 @@ export const countConnectionPointsByZone = (
                 );
 
                 if (mainZoneId === zone.id && subMainZoneId === zone.id) {
-                    const connectionKey = `mid-connection-${connection.mainPipeId}-${connection.subMainPipeId}`;
-                    if (!countedConnections.has(connectionKey)) {
+                    const connectionKey = `main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`;
+                    const globalKey = `global-main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`;
+                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
                         zoneStats.subMainToMainMid++; 
                         countedConnections.add(connectionKey);
+                        globalConnectionKeys.add(globalKey);
                     }
                 }
             }
@@ -1654,10 +1623,12 @@ export const countConnectionPointsByZone = (
                 );
 
                 if (subMainZoneId === zone.id && mainZoneId === zone.id) {
-                    const connectionKey = `submain-main-${connection.sourcePipeId}-${connection.targetPipeId}`;
-                    if (!countedConnections.has(connectionKey)) {
+                    const connectionKey = `mid-connection-${connection.sourcePipeId}-${connection.targetPipeId}`;
+                    const globalKey = `global-mid-connection-${connection.sourcePipeId}-${connection.targetPipeId}`;
+                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
                         zoneStats.subMainToLateral++; 
                         countedConnections.add(connectionKey);
+                        globalConnectionKeys.add(globalKey);
                     }
                 }
             }
@@ -1692,10 +1663,12 @@ export const countConnectionPointsByZone = (
                 );
 
                 if (subMainZoneId === zone.id && lateralZoneId === zone.id) {
-                    const connectionKey = `submain-lateral-${connection.subMainPipeId}-${connection.lateralPipeId}`;
-                    if (!countedConnections.has(connectionKey)) {
+                    const connectionKey = `submain-lateral-start-${connection.subMainPipeId}-${connection.lateralPipeId}`;
+                    const globalKey = `global-submain-lateral-start-${connection.subMainPipeId}-${connection.lateralPipeId}`;
+                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
                         zoneStats.subMainToMainIntersection++; 
                         countedConnections.add(connectionKey);
+                        globalConnectionKeys.add(globalKey);
                     }
                 }
             }
@@ -1728,9 +1701,11 @@ export const countConnectionPointsByZone = (
 
                 if (subMainZoneId === zone.id && mainZoneId === zone.id) {
                     const intersectionKey = `submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`;
-                    if (!countedConnections.has(intersectionKey)) {
-                        zoneStats.subMainToMainMid++; 
+                    const globalKey = `global-submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`;
+                    if (!countedConnections.has(intersectionKey) && !globalConnectionKeys.has(globalKey)) {
+                        zoneStats.subMainToMainIntersection++; 
                         countedConnections.add(intersectionKey);
+                        globalConnectionKeys.add(globalKey);
                     }
                 }
             }
@@ -1741,7 +1716,6 @@ export const countConnectionPointsByZone = (
             projectData.subMainPipes,
             projectData.zones || [],
             irrigationZones,
-            10 
         );
 
         for (const intersection of lateralToSubMainIntersections) {
@@ -1766,19 +1740,21 @@ export const countConnectionPointsByZone = (
 
                 if (lateralZoneId === zone.id && subMainZoneId === zone.id) {
                     const intersectionKey = `lateral-submain-intersection-${intersection.lateralPipeId}-${intersection.subMainPipeId}`;
+                    const globalKey = `global-lateral-submain-intersection-${intersection.lateralPipeId}-${intersection.subMainPipeId}`;
 
-                    if (!countedConnections.has(intersectionKey)) {
+                    if (!countedConnections.has(intersectionKey) && !globalConnectionKeys.has(globalKey)) {
                         zoneStats.lateralToSubMainIntersection++;
                         countedConnections.add(intersectionKey);
+                        globalConnectionKeys.add(globalKey);
                     }
                 }
             }
         }
 
-        const originalYellow = zoneStats.subMainToMainIntersection;
+        const originalSubMainToMainIntersection = zoneStats.subMainToMainIntersection;
         zoneStats.subMainToMainIntersection = Math.max(
             0,
-            zoneStats.subMainToMainIntersection - zoneStats.lateralToSubMainIntersection
+            originalSubMainToMainIntersection - zoneStats.lateralToSubMainIntersection
         );
 
         zoneStats.total =
@@ -1789,73 +1765,6 @@ export const countConnectionPointsByZone = (
             zoneStats.lateralToSubMainIntersection;
 
         stats.push(zoneStats);
-    }
-
-    const allEndToEndConnections = findEndToEndConnections(
-        projectData.mainPipes,
-        projectData.subMainPipes,
-        projectData.zones || [],
-        irrigationZones,
-        15
-    );
-
-    const allMainToSubMainConnections = findMainToSubMainConnections(
-        projectData.mainPipes,
-        projectData.subMainPipes,
-        projectData.zones || [],
-        irrigationZones,
-        15
-    );
-
-    let totalEndToEndInZones = 0;
-    let totalMainToSubMainInZones = 0;
-
-    for (const connection of allEndToEndConnections) {
-        const mainPipe = projectData.mainPipes.find((mp) => mp.id === connection.mainPipeId);
-        const subMainPipe = projectData.subMainPipes.find(
-            (smp) => smp.id === connection.subMainPipeId
-        );
-
-        if (mainPipe && subMainPipe) {
-            const mainZoneId = findPipeZoneForConnection(
-                mainPipe,
-                projectData.zones || [],
-                irrigationZones
-            );
-            const subMainZoneId = findPipeZoneForConnection(
-                subMainPipe,
-                projectData.zones || [],
-                irrigationZones
-            );
-
-            if (mainZoneId && subMainZoneId && mainZoneId === subMainZoneId) {
-                totalEndToEndInZones++;
-            }
-        }
-    }
-
-    for (const connection of allMainToSubMainConnections) {
-        const mainPipe = projectData.mainPipes.find((mp) => mp.id === connection.mainPipeId);
-        const subMainPipe = projectData.subMainPipes.find(
-            (smp) => smp.id === connection.subMainPipeId
-        );
-
-        if (mainPipe && subMainPipe) {
-            const mainZoneId = findPipeZoneForConnection(
-                mainPipe,
-                projectData.zones || [],
-                irrigationZones
-            );
-            const subMainZoneId = findPipeZoneForConnection(
-                subMainPipe,
-                projectData.zones || [],
-                irrigationZones
-            );
-
-            if (mainZoneId && subMainZoneId && mainZoneId === subMainZoneId) {
-                totalMainToSubMainInZones++;
-            }
-        }
     }
 
     return stats;

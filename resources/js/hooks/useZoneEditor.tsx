@@ -1,5 +1,3 @@
-// useZoneEditor.tsx - Hook สำหรับจัดการการแก้ไขโซนอัตโนมัติ
-
 import { useState, useCallback, useRef } from 'react';
 import { IrrigationZone, PlantLocation, Coordinate } from '../utils/irrigationZoneUtils';
 import {
@@ -86,14 +84,26 @@ export const useZoneEditor = ({
             const bounds = mapBoundsRef.current || calculateMapBounds();
             if (!bounds) return { lat: 0, lng: 0 };
 
-            // สมมติใช้ขนาดแผนที่ 800x600 pixels
-            const mapWidth = 800;
-            const mapHeight = 600;
+            const mapWidth = window.innerWidth || 800;
+            const mapHeight = window.innerHeight || 600;
 
-            const lat = bounds.north - (pixelY / mapHeight) * (bounds.north - bounds.south);
-            const lng = bounds.west + (pixelX / mapWidth) * (bounds.east - bounds.west);
+            const lngRange = bounds.east - bounds.west;
+            const latRange = bounds.north - bounds.south;
 
-            return { lat, lng };
+            if (lngRange === 0 || latRange === 0) {
+                return { 
+                    lat: (bounds.north + bounds.south) / 2, 
+                    lng: (bounds.east + bounds.west) / 2 
+                };
+            }
+
+            const lat = bounds.north - (pixelY / mapHeight) * latRange;
+            const lng = bounds.west + (pixelX / mapWidth) * lngRange;
+
+            return { 
+                lat: Math.max(bounds.south, Math.min(bounds.north, lat)), 
+                lng: Math.max(bounds.west, Math.min(bounds.east, lng)) 
+            };
         },
         [calculateMapBounds]
     );
@@ -161,11 +171,32 @@ export const useZoneEditor = ({
                 return;
             }
 
-            const rect =
-                (event.target as Element)?.getBoundingClientRect?.() ||
-                document.querySelector('.map-container')?.getBoundingClientRect();
-
-            if (!rect) return;
+            let rect: DOMRect | null = null;
+            
+            // ลองหาจาก target element ก่อน
+            if (event.target && (event.target as Element).getBoundingClientRect) {
+                rect = (event.target as Element).getBoundingClientRect();
+            }
+            
+            // ถ้าไม่ได้ ลองหาจาก map container
+            if (!rect) {
+                const mapContainer = document.querySelector('.map-container') || 
+                                   document.querySelector('[data-map-container]') ||
+                                   document.querySelector('.google-map-container');
+                if (mapContainer) {
+                    rect = mapContainer.getBoundingClientRect();
+                }
+            }
+            
+            // ถ้ายังไม่ได้ ใช้ viewport
+            if (!rect) {
+                rect = {
+                    left: 0,
+                    top: 0,
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                } as DOMRect;
+            }
 
             const pixelX = event.clientX - rect.left;
             const pixelY = event.clientY - rect.top;
@@ -195,7 +226,6 @@ export const useZoneEditor = ({
                     editState.controlPoints,
                     updateResult.updatedCoordinates,
                     editState.draggedPointIndex!
-                    // editState.editingZone
                 );
 
                 setEditState((prevState) => ({

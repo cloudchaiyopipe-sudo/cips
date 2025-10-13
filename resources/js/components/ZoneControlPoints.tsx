@@ -29,13 +29,23 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
     const coordinateToPixel = (coord: Coordinate): { x: number; y: number } => {
         if (!mapBounds) return { x: 0, y: 0 };
 
-        const mapWidth = 800;
-        const mapHeight = 600;
+        const mapWidth = window.innerWidth || 800;
+        const mapHeight = window.innerHeight || 600;
 
-        const x = ((coord.lng - mapBounds.west) / (mapBounds.east - mapBounds.west)) * mapWidth;
-        const y = ((mapBounds.north - coord.lat) / (mapBounds.north - mapBounds.south)) * mapHeight;
+        const lngRange = mapBounds.east - mapBounds.west;
+        const latRange = mapBounds.north - mapBounds.south;
 
-        return { x, y };
+        if (lngRange === 0 || latRange === 0) {
+            return { x: mapWidth / 2, y: mapHeight / 2 };
+        }
+
+        const x = ((coord.lng - mapBounds.west) / lngRange) * mapWidth;
+        const y = ((mapBounds.north - coord.lat) / latRange) * mapHeight;
+
+        return { 
+            x: Math.max(0, Math.min(mapWidth, x)), 
+            y: Math.max(0, Math.min(mapHeight, y)) 
+        };
     };
 
     const handleMouseDown = (point: ZoneControlPoint, event: React.MouseEvent) => {

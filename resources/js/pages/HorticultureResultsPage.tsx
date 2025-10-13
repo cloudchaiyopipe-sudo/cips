@@ -203,13 +203,12 @@ const createAreaTextOverlay = (
 const GoogleMapsResultsOverlays: React.FC<{
     map: google.maps.Map | null;
     projectData: EnhancedProjectData;
-    mapRotation: number;
     pipeSize: number;
     iconSize: number;
     irrigationZones: IrrigationZoneExtended[];
     lateralPipes: LocalLateralPipe[];
     t: (key: string) => string;
-}> = ({ map, projectData, mapRotation, pipeSize, iconSize, irrigationZones, lateralPipes, t }) => {
+}> = ({ map, projectData, pipeSize, iconSize, irrigationZones, lateralPipes, t }) => {
     const overlaysRef = useRef<{
         polygons: Map<string, google.maps.Polygon>;
         polylines: Map<string, google.maps.Polyline>;
@@ -234,15 +233,6 @@ const GoogleMapsResultsOverlays: React.FC<{
         overlaysRef.current.overlays.clear();
     }, []);
 
-    useEffect(() => {
-        if (map) {
-            const mapDiv = map.getDiv();
-            if (mapDiv) {
-                mapDiv.style.transform = `rotate(${mapRotation}deg)`;
-                mapDiv.style.transformOrigin = 'center center';
-            }
-        }
-    }, [map, mapRotation]);
 
     useEffect(() => {
         if (!map || !projectData) return;
@@ -317,8 +307,8 @@ const GoogleMapsResultsOverlays: React.FC<{
                 map: map,
                 icon: {
                     url: '/images/water-pump.png',
-                    scaledSize: new google.maps.Size(32, 32), 
-                    anchor: new google.maps.Point(16, 16),
+                    scaledSize: new google.maps.Size(32 * iconSize, 32 * iconSize), 
+                    anchor: new google.maps.Point(16 * iconSize, 16 * iconSize),
                 },
                 title: 'ปั๊มน้ำ',
             });
@@ -509,7 +499,6 @@ const GoogleMapsResultsOverlays: React.FC<{
                 projectData.subMainPipes,
                 projectData.zones,
                 irrigationZones,
-                15
             );
 
             endToEndConnections.forEach((connection, index) => {
@@ -554,7 +543,6 @@ const GoogleMapsResultsOverlays: React.FC<{
                 projectData.subMainPipes,
                 projectData.zones,
                 irrigationZones,
-                15 
             );
 
             mainToSubMainConnections.forEach((connection, index) => {
@@ -757,7 +745,6 @@ const GoogleMapsResultsOverlays: React.FC<{
                 projectData.subMainPipes,
                 projectData.zones,
                 irrigationZones,
-                20 
             );
 
             lateralToSubMainIntersections.forEach((intersection, index) => {
@@ -813,12 +800,12 @@ const GoogleMapsResultsOverlays: React.FC<{
                     url:
                         'data:image/svg+xml;charset=UTF-8,' +
                         encodeURIComponent(`
-                        <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-                            <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="white" font-size="10" font-weight="bold">${plantSymbol}</text>
+                        <svg width="${28 * iconSize}" height="${28 * iconSize}" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+                            <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${10 * iconSize}" font-weight="bold">${plantSymbol}</text>
                         </svg>
                     `),
-                    scaledSize: new google.maps.Size(28, 28), 
-                    anchor: new google.maps.Point(14, 14),
+                    scaledSize: new google.maps.Size(28 * iconSize, 28 * iconSize), 
+                    anchor: new google.maps.Point(14 * iconSize, 14 * iconSize),
                 },
                 zIndex: 500, 
                 title: `${plant.plantData.name} (${plant.id})`,
@@ -928,8 +915,6 @@ function EnhancedHorticultureResultsPageContent() {
     const [mapCenter, setMapCenter] = useState<[number, number]>([13.75, 100.5]);
     const [mapZoom, setMapZoom] = useState<number>(16);
 
-    const [mapRotation, setMapRotation] = useState<number>(0);
-    const [isMapLocked, setIsMapLocked] = useState<boolean>(true);
     const [pipeSize, setPipeSize] = useState<number>(1);
     const [iconSize, setIconSize] = useState<number>(1);
 
@@ -1118,35 +1103,7 @@ function EnhancedHorticultureResultsPageContent() {
         setLoading(false);
     }, []);
 
-    const handleRotationChange = (newRotation: number) => {
-        setMapRotation(newRotation);
-    };
 
-    const resetMapRotation = () => {
-        setMapRotation(0);
-    };
-
-    const toggleMapLock = () => {
-        const newLockState = !isMapLocked;
-        setIsMapLocked(newLockState);
-        if (mapRef.current) {
-            if (newLockState) {
-                mapRef.current.setOptions({
-                    draggable: false,
-                    zoomControl: false,
-                    scrollwheel: false,
-                    disableDoubleClickZoom: true,
-                });
-            } else {
-                mapRef.current.setOptions({
-                    draggable: true,
-                    zoomControl: true,
-                    scrollwheel: true,
-                    disableDoubleClickZoom: false,
-                });
-            }
-        }
-    };
 
     const handlePipeSizeChange = (newSize: number) => {
         setPipeSize(Math.max(0.5, Math.min(3, newSize)));
@@ -1181,16 +1138,14 @@ function EnhancedHorticultureResultsPageContent() {
             mapRef.current = map;
             setMapLoaded(true);
 
-            if (isMapLocked) {
-                map.setOptions({
-                    draggable: false,
-                    zoomControl: false,
-                    scrollwheel: false,
-                    disableDoubleClickZoom: true,
-                });
-            }
+            map.setOptions({
+                draggable: false,
+                zoomControl: false,
+                scrollwheel: false,
+                disableDoubleClickZoom: true,
+            });
         },
-        [isMapLocked]
+        []
     );
 
     const handleSprinklerConfigSave = () => {
@@ -1222,11 +1177,6 @@ function EnhancedHorticultureResultsPageContent() {
         }
         setIsCreatingImage(true);
         try {
-            const currentRotation = mapRotation;
-            if (currentRotation !== 0) {
-                setMapRotation(0);
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
 
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -1309,9 +1259,6 @@ function EnhancedHorticultureResultsPageContent() {
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
-            if (currentRotation !== 0) {
-                setMapRotation(currentRotation);
-            }
 
             if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
                 localStorage.setItem('projectMapImage', dataUrl);
@@ -1676,68 +1623,7 @@ function EnhancedHorticultureResultsPageContent() {
                                 <h3 className="text-xl font-semibold">🗺️ {t('แผนผังโครงการ')}</h3>
                             </div>
 
-                            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                <div className="rounded-lg bg-gray-700 p-4">
-                                    <h4 className="mb-3 text-sm font-semibold text-blue-300">
-                                        🔄 {t('การหมุนแผนที่')}
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <label className="w-16 text-xs text-gray-300">
-                                                {t('หมุน')}:
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="360"
-                                                step="1"
-                                                value={mapRotation}
-                                                onChange={(e) =>
-                                                    handleRotationChange(parseInt(e.target.value))
-                                                }
-                                                className="flex-1 accent-blue-600"
-                                            />
-                                            <span className="w-12 text-xs text-blue-300">
-                                                {mapRotation}°
-                                            </span>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() =>
-                                                    handleRotationChange(mapRotation - 15)
-                                                }
-                                                className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
-                                            >
-                                                ↺ -15°
-                                            </button>
-                                            <button
-                                                onClick={resetMapRotation}
-                                                className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs hover:bg-gray-700"
-                                            >
-                                                🔄 {t('รีเซ็ต')}
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    handleRotationChange(mapRotation + 15)
-                                                }
-                                                className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs hover:bg-blue-700"
-                                            >
-                                                ↻ +15°
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={isMapLocked}
-                                                onChange={toggleMapLock}
-                                                className="accent-purple-600"
-                                            />
-                                            <label className="text-xs text-gray-300">
-                                                🔒 {t('ล็อกการลาก')}
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-1">
 
                                 <div className="rounded-lg bg-gray-700 p-4">
                                     <h4 className="mb-3 text-sm font-semibold text-green-300">
@@ -1816,7 +1702,6 @@ function EnhancedHorticultureResultsPageContent() {
                                         <GoogleMapsResultsOverlays
                                             map={mapRef.current}
                                             projectData={projectData}
-                                            mapRotation={mapRotation}
                                             pipeSize={pipeSize}
                                             iconSize={iconSize}
                                             irrigationZones={irrigationZones}

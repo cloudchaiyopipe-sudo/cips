@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-require-imports */
 import { Coordinate } from './horticultureUtils';
+import { findMainToSubMainConnections, findMidConnections, findSubMainToMainIntersections } from './lateralPipeUtils';
 
 export interface ConnectionPoint {
     id: string;
@@ -50,23 +49,21 @@ export const CONNECTION_POINT_CONFIG: ConnectionPointConfig = {
     },
 };
 
+
 export const createMainToSubMainConnectionPoints = (
     mainPipes: any[],
     subMainPipes: any[],
     zones?: any[],
     irrigationZones?: any[],
-    snapThreshold: number = 15
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
 
-    const { findMainToSubMainConnections } = require('./lateralPipeUtils');
 
     const connections = findMainToSubMainConnections(
         mainPipes,
         subMainPipes,
         zones,
         irrigationZones,
-        snapThreshold
     );
 
     connections.forEach((connection) => {
@@ -94,8 +91,6 @@ export const createSubMainToMainMidConnectionPoints = (
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
 
-    const { findMidConnections } = require('./lateralPipeUtils');
-
     const connections = findMidConnections(
         subMainPipes,
         mainPipes,
@@ -104,7 +99,7 @@ export const createSubMainToMainMidConnectionPoints = (
         irrigationZones
     );
 
-    connections.forEach((connection, index) => {
+    connections.forEach((connection) => {
         connectionPoints.push({
             id: `submain-mainmid-${connection.sourcePipeId}-${connection.targetPipeId}`,
             type: 'submain-to-main-mid',
@@ -128,8 +123,6 @@ export const createSubMainToMainIntersectionPoints = (
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
 
-    const { findSubMainToMainIntersections } = require('./lateralPipeUtils');
-
     const intersections = findSubMainToMainIntersections(
         subMainPipes,
         mainPipes,
@@ -137,7 +130,7 @@ export const createSubMainToMainIntersectionPoints = (
         irrigationZones
     );
 
-    intersections.forEach((intersection, index) => {
+    intersections.forEach((intersection) => {
         connectionPoints.push({
             id: `submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`,
             type: 'submain-to-main-intersection',
@@ -168,7 +161,6 @@ export const createAllConnectionPoints = (
             subMainPipes,
             zones,
             irrigationZones,
-            snapThreshold
         )
     );
 

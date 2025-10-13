@@ -118,6 +118,19 @@ const hasPolygonSelfIntersection = (coordinates: Coordinate[]): boolean => {
     const n = coordinates.length;
     if (n < 4) return false;
 
+    // ตรวจสอบจุดซ้ำกันก่อน
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            const dist = Math.sqrt(
+                Math.pow(coordinates[i].lat - coordinates[j].lat, 2) +
+                Math.pow(coordinates[i].lng - coordinates[j].lng, 2)
+            );
+            if (dist < 1e-8) {
+                return true;
+            }
+        }
+    }
+
     for (let i = 0; i < n; i++) {
         const line1Start = coordinates[i];
         const line1End = coordinates[(i + 1) % n];

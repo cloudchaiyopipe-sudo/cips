@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Coordinate, PlantLocation, IrrigationZone } from './irrigationZoneUtils';
 import { getPolygonCenter } from './horticultureUtils';
 
@@ -23,11 +22,11 @@ class SeededRandom {
 export interface AutoZoneConfig {
     numberOfZones: number;
     balanceWaterNeed: boolean;
-    balancePlantCount: boolean; 
+    balancePlantCount: boolean;
     debugMode: boolean;
     paddingMeters: number;
     useVoronoi: boolean;
-    randomSeed?: number; 
+    randomSeed?: number;
 }
 
 export interface AutoZoneResult {
@@ -49,12 +48,12 @@ export interface AutoZoneDebugInfo {
     actualWaterNeedPerZone: number[];
     waterNeedVariance: number;
     waterNeedStandardDeviation: number;
-    waterBalanceEfficiency: number; 
+    waterBalanceEfficiency: number;
     maxWaterNeedDeviation: number;
     minWaterNeedDeviation: number;
-    waterNeedDeviationPercent: number; 
+    waterNeedDeviationPercent: number;
     convexHullPoints: Coordinate[][];
-    plantAssignments: { [plantId: string]: string }; 
+    plantAssignments: { [plantId: string]: string };
     timeTaken: number;
     waterBalanceDetails: {
         zoneIndex: number;
@@ -91,7 +90,7 @@ export const generateZoneColors = (count: number, randomSeed?: number): string[]
 
     const availableColors = [...colors];
     if (randomSeed !== undefined) {
-        const seededRandom = new SeededRandom(randomSeed + 1000); 
+        const seededRandom = new SeededRandom(randomSeed + 1000);
         availableColors.sort(() => seededRandom.compareFunction());
     }
 
@@ -100,7 +99,7 @@ export const generateZoneColors = (count: number, randomSeed?: number): string[]
         if (i < availableColors.length) {
             result.push(availableColors[i]);
         } else {
-            let hue = (i * 137.508) % 360; 
+            let hue = (i * 137.508) % 360;
             if (randomSeed !== undefined) {
                 const seededRandom = new SeededRandom(randomSeed + 2000 + i);
                 hue = seededRandom.next() * 360;
@@ -209,7 +208,7 @@ export const kMeansCluster = (
                 const minDist = Math.min(
                     ...centroids.map((centroid) => calculateDistance(plant.position, centroid))
                 );
-                return minDist * minDist; 
+                return minDist * minDist;
             });
 
             const totalDistance = distances.reduce((sum, d) => sum + d, 0);
@@ -308,7 +307,7 @@ export const plantCountBalancedCluster = (
 
     const seededRandom = randomSeed !== undefined ? new SeededRandom(randomSeed) : null;
     const targetPlantsPerZone = Math.floor(plants.length / k);
-    const extraPlants = plants.length % k; 
+    const extraPlants = plants.length % k;
 
     const targetSizes: number[] = [];
     for (let i = 0; i < k; i++) {
@@ -467,7 +466,7 @@ const perfectWaterBalanceCluster = (
     randomSeed?: number
 ): PlantLocation[][] => {
     const seededRandom = randomSeed !== undefined ? new SeededRandom(randomSeed) : null;
-    const tolerance = targetWaterNeed * 0.01; 
+    const tolerance = targetWaterNeed * 0.01;
 
     const clusters: PlantLocation[][] = Array(k)
         .fill(null)
@@ -504,7 +503,7 @@ const perfectWaterBalanceCluster = (
             ...clusterWaterNeeds.map((need) => Math.abs(need - targetWaterNeed))
         );
         if (maxDeviation <= tolerance) {
-            break; 
+            break;
         }
 
         for (let i = 0; i < k && !improved; i++) {
@@ -578,7 +577,7 @@ const perfectWaterBalanceCluster = (
 };
 
 export const calculateDistance = (coord1: Coordinate, coord2: Coordinate): number => {
-    const R = 6371000; 
+    const R = 6371000;
     const dLat = ((coord2.lat - coord1.lat) * Math.PI) / 180;
     const dLng = ((coord2.lng - coord1.lng) * Math.PI) / 180;
     const a =
@@ -658,11 +657,11 @@ export const balanceWaterNeeds = (
 export const enhancedBalanceWaterNeeds = (
     clusters: PlantLocation[][],
     targetWaterNeedPerZone: number,
-    tolerance: number = 0.05 
+    tolerance: number = 0.05
 ): PlantLocation[][] => {
     const balancedClusters = clusters.map((cluster) => [...cluster]);
 
-    const adaptiveTolerance = Math.min(0.12, tolerance + (clusters.length - 2) * 0.015); 
+    const adaptiveTolerance = Math.min(0.12, tolerance + (clusters.length - 2) * 0.015);
 
     const getClusterWaterNeed = (cluster: PlantLocation[]): number => {
         return cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
@@ -675,7 +674,7 @@ export const enhancedBalanceWaterNeeds = (
 
     let improved = true;
     let iterations = 0;
-    const maxIterations = Math.min(1500, clusters.length * 250); 
+    const maxIterations = Math.min(1500, clusters.length * 250);
     let currentMaxDeviation = getMaxDeviation(balancedClusters);
     const strictTolerance = targetWaterNeedPerZone * adaptiveTolerance;
 
@@ -702,7 +701,7 @@ export const enhancedBalanceWaterNeeds = (
 
             const waterDiff = Math.abs(mostUnbalanced.waterNeed - candidate.waterNeed);
 
-            const potentialImprovement = waterDiff / 2; 
+            const potentialImprovement = waterDiff / 2;
             const combinedDeviation = mostUnbalanced.deviation + candidate.deviation;
 
             const balanceScore =
@@ -726,11 +725,7 @@ export const enhancedBalanceWaterNeeds = (
         );
 
         if (!improved && iterations % 50 === 0) {
-            improved = tryAggressiveRebalancing(
-                balancedClusters,
-                targetWaterNeedPerZone,
-                strictTolerance
-            );
+            improved = tryAggressiveRebalancing(balancedClusters, targetWaterNeedPerZone);
         }
 
         if (improved) {
@@ -795,9 +790,9 @@ const tryEnhancedPrecisionBalancing = (
             const distanceToSource = calculateDistance(plant.position, sourceCenter);
             const distanceToDestination = calculateDistance(plant.position, destCenter);
 
-            const geographicBonus = Math.max(0, (distanceToSource - distanceToDestination) / 1000); 
+            const geographicBonus = Math.max(0, (distanceToSource - distanceToDestination) / 1000);
 
-            const totalScore = balanceImprovement + geographicBonus * 0.1; 
+            const totalScore = balanceImprovement + geographicBonus * 0.1;
 
             if (totalScore > bestScore) {
                 bestPlant = plant;
@@ -818,11 +813,7 @@ const tryEnhancedPrecisionBalancing = (
     return false;
 };
 
-const tryAggressiveRebalancing = (
-    clusters: PlantLocation[][],
-    targetWater: number,
-    _tolerance: number
-): boolean => {
+const tryAggressiveRebalancing = (clusters: PlantLocation[][], targetWater: number): boolean => {
     const getClusterWaterNeed = (cluster: PlantLocation[]): number => {
         return cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
     };
@@ -880,7 +871,8 @@ export const createVoronoiZones = (
     clusters: PlantLocation[][],
     mainArea: Coordinate[],
     colors: string[],
-    preserveClusterPlants: boolean = false 
+    preserveClusterPlants: boolean = false,
+    _config?: AutoZoneConfig // eslint-disable-line @typescript-eslint/no-unused-vars
 ): IrrigationZone[] => {
     const zones: IrrigationZone[] = [];
 
@@ -913,7 +905,7 @@ export const createVoronoiZones = (
                 const distanceFromCenter = Math.sqrt(
                     direction.lat * direction.lat + direction.lng * direction.lng
                 );
-                const minDistanceFromCenter = 0.0001; 
+                const minDistanceFromCenter = 0.0001;
 
                 if (distanceFromCenter < minDistanceFromCenter && distanceFromCenter > 0) {
                     const scale = minDistanceFromCenter / distanceFromCenter;
@@ -929,6 +921,8 @@ export const createVoronoiZones = (
 
         const voronoiZones = createTrueVoronoiZones(centroids, mainArea);
 
+        const allPlants = clusters.flat();
+        
         clusters.forEach((cluster, index) => {
             if (cluster.length === 0 || index >= voronoiZones.length) return;
 
@@ -939,7 +933,9 @@ export const createVoronoiZones = (
                 const fallbackZone = convexHull(plantPositions);
 
                 if (fallbackZone.length >= 3) {
-                    const totalWaterNeed = cluster.reduce(
+                    // นับต้นไม้จริงๆ ในโซน
+                    const actualPlants = findPlantsInPolygon(allPlants, fallbackZone);
+                    const totalWaterNeed = actualPlants.reduce(
                         (sum, plant) => sum + plant.plantData.waterNeed,
                         0
                     );
@@ -948,7 +944,7 @@ export const createVoronoiZones = (
                         id: `auto-zone-${index + 1}`,
                         name: `โซน ${index + 1}`,
                         coordinates: fallbackZone,
-                        plants: cluster, 
+                        plants: actualPlants,
                         totalWaterNeed,
                         color: colors[index] || '#888888',
                         layoutIndex: index,
@@ -958,7 +954,9 @@ export const createVoronoiZones = (
                 return;
             }
 
-            const totalWaterNeed = cluster.reduce(
+            // นับต้นไม้จริงๆ ในโซน
+            const actualPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
+            const totalWaterNeed = actualPlants.reduce(
                 (sum, plant) => sum + plant.plantData.waterNeed,
                 0
             );
@@ -967,7 +965,7 @@ export const createVoronoiZones = (
                 id: `auto-zone-${index + 1}`,
                 name: `โซน ${index + 1}`,
                 coordinates: zoneCoordinates,
-                plants: cluster, 
+                plants: actualPlants,
                 totalWaterNeed,
                 color: colors[index] || '#888888',
                 layoutIndex: index,
@@ -1018,29 +1016,17 @@ export const createVoronoiZones = (
         const zoneCoordinates = voronoiZones[index];
 
         if (zoneCoordinates.length < 3) {
-           
             const plantPositions = cluster.map((plant) => plant.position);
-            const fallbackZone = createFallbackZone(plantPositions, mainArea, 10); 
+            const fallbackZone = createFallbackZone(plantPositions, mainArea, 10);
 
             if (fallbackZone.length >= 3) {
-                let fallbackPlants: PlantLocation[];
-                let fallbackWaterNeed: number;
-
-                if (preserveClusterPlants) {
-                   
-                    fallbackPlants = cluster;
-                    fallbackWaterNeed = cluster.reduce(
-                        (sum, plant) => sum + plant.plantData.waterNeed,
-                        0
-                    );
-                } else {
-                    const allPlants = clusters.flat();
-                    fallbackPlants = findPlantsInPolygon(allPlants, fallbackZone);
-                    fallbackWaterNeed = fallbackPlants.reduce(
-                        (sum, plant) => sum + plant.plantData.waterNeed,
-                        0
-                    );
-                }
+                // นับต้นไม้จริงๆ ในโซนเสมอ
+                const allPlants = clusters.flat();
+                const fallbackPlants = findPlantsInPolygon(allPlants, fallbackZone);
+                const fallbackWaterNeed = fallbackPlants.reduce(
+                    (sum, plant) => sum + plant.plantData.waterNeed,
+                    0
+                );
 
                 const zone: IrrigationZone = {
                     id: `auto-zone-${index + 1}`,
@@ -1056,17 +1042,10 @@ export const createVoronoiZones = (
             return;
         }
 
-        let finalPlants: PlantLocation[];
-        let totalWaterNeed: number;
-
-        if (preserveClusterPlants) {
-            finalPlants = cluster;
-            totalWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
-        } else {
-            const allPlants = clusters.flat();
-            finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
-            totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
-        }
+        // นับต้นไม้จริงๆ ในโซนเสมอ
+        const allPlants = clusters.flat();
+        const finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
+        const totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
@@ -1094,7 +1073,7 @@ const createTrueVoronoiZones = (
     const zones: Coordinate[][] = [];
 
     centroids.forEach((centroid, index) => {
-        let voronoiCell = [...mainArea]; 
+        let voronoiCell = [...mainArea];
 
         centroids.forEach((otherCentroid, otherIndex) => {
             if (index === otherIndex) return;
@@ -1122,7 +1101,7 @@ const createTrueVoronoiZones = (
                 perpendicular.lng /= length;
             }
 
-            const extent = 0.1; 
+            const extent = 0.1;
             const bisectorLine = [
                 {
                     lat: midpoint.lat - perpendicular.lat * extent,
@@ -1260,10 +1239,11 @@ export const createZonesFromClusters = (
     colors: string[],
     paddingMeters: number = 2,
     useVoronoi: boolean = true,
-    preserveClusterPlants: boolean = false 
+    preserveClusterPlants: boolean = false,
+    config?: AutoZoneConfig
 ): IrrigationZone[] => {
     if (useVoronoi) {
-        return createVoronoiZones(clusters, mainArea, colors, preserveClusterPlants);
+        return createVoronoiZones(clusters, mainArea, colors, preserveClusterPlants, config);
     }
 
     const zones: IrrigationZone[] = [];
@@ -1279,21 +1259,37 @@ export const createZonesFromClusters = (
         zoneCoordinates = addPolygonPadding(zoneCoordinates, paddingMeters, mainArea);
 
         if (zoneCoordinates.length < 3) {
-            console.warn(
-                `⚠️ Zone ${index + 1} has insufficient points after clipping, skipping...`
-            );
+            console.warn(`⚠️ Zone ${index + 1}: Insufficient coordinates after padding (${zoneCoordinates.length})`);
             return;
         }
 
-        let finalPlants: PlantLocation[];
-        let totalWaterNeed: number;
-
-        if (preserveClusterPlants) {
-            finalPlants = cluster;
-            totalWaterNeed = cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
-        } else {
-            finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
-            totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        // นับต้นไม้จริงๆ ในโซนที่สร้างขึ้น ไม่ใช่จาก cluster
+        const finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
+        const totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        
+        // ตรวจสอบความแตกต่างระหว่าง cluster และต้นไม้จริงในโซน
+        if (config?.debugMode) {
+            const clusterCount = cluster.length;
+            const actualCount = finalPlants.length;
+            const difference = Math.abs(clusterCount - actualCount);
+            
+            if (difference > 0) {
+                console.log(`🔍 Zone ${index + 1}: Cluster=${clusterCount}, Actual=${actualCount}, Diff=${difference}`);
+                
+                // หาต้นไม้ที่หายไปหรือเพิ่มขึ้น
+                const clusterPlantIds = new Set(cluster.map(p => p.id));
+                const actualPlantIds = new Set(finalPlants.map(p => p.id));
+                
+                const missingPlants = cluster.filter(p => !actualPlantIds.has(p.id));
+                const extraPlants = finalPlants.filter(p => !clusterPlantIds.has(p.id));
+                
+                if (missingPlants.length > 0) {
+                    console.log(`❌ Missing plants in zone ${index + 1}:`, missingPlants.map(p => p.id));
+                }
+                if (extraPlants.length > 0) {
+                    console.log(`➕ Extra plants in zone ${index + 1}:`, extraPlants.map(p => p.id));
+                }
+            }
         }
 
         const zone: IrrigationZone = {
@@ -1317,32 +1313,42 @@ export const addPolygonPadding = (
     paddingMeters: number,
     mainArea?: Coordinate[]
 ): Coordinate[] => {
-    if (polygon.length < 3 || paddingMeters <= 0) return polygon;
+    if (polygon.length < 3) {
+        console.warn('⚠️ Cannot add padding to polygon with less than 3 points');
+        return polygon;
+    }
+    
+    if (paddingMeters <= 0) return polygon;
 
-    const latMidpoint = polygon.reduce((sum, p) => sum + p.lat, 0) / polygon.length;
-    const metersPerDegLat = 111320; 
-    const metersPerDegLng = 111320 * Math.cos((latMidpoint * Math.PI) / 180); 
+    try {
+        const latMidpoint = polygon.reduce((sum, p) => sum + p.lat, 0) / polygon.length;
+        const metersPerDegLat = 111320;
+        const metersPerDegLng = 111320 * Math.cos((latMidpoint * Math.PI) / 180);
 
-    const paddingDegreesLat = paddingMeters / metersPerDegLat;
-    const paddingDegreesLng = paddingMeters / metersPerDegLng;
+        const paddingDegreesLat = paddingMeters / metersPerDegLat;
+        const paddingDegreesLng = paddingMeters / metersPerDegLng;
 
-    const expandedPolygon = createOffsetPolygon(polygon, paddingDegreesLat, paddingDegreesLng);
+        const expandedPolygon = createOffsetPolygon(polygon, paddingDegreesLat, paddingDegreesLng);
 
-    if (mainArea && mainArea.length >= 3) {
-        const clippedPolygon = clipPolygonToMainArea(expandedPolygon, mainArea);
+        if (mainArea && mainArea.length >= 3) {
+            const clippedPolygon = clipPolygonToMainArea(expandedPolygon, mainArea);
 
-        if (
-            clippedPolygon.length < 3 ||
-            calculatePolygonArea(clippedPolygon) < calculatePolygonArea(polygon) * 0.5
-        ) {
-            console.warn(`⚠️ Padding would exceed main area bounds, using conservative approach`);
-            return createConservativePadding(polygon, mainArea, paddingMeters);
+            if (
+                clippedPolygon.length < 3 ||
+                calculatePolygonArea(clippedPolygon) < calculatePolygonArea(polygon) * 0.5
+            ) {
+                console.warn('⚠️ Clipping resulted in insufficient area, using conservative padding');
+                return createConservativePadding(polygon, mainArea, paddingMeters);
+            }
+
+            return clippedPolygon;
         }
 
-        return clippedPolygon;
+        return expandedPolygon;
+    } catch (error) {
+        console.warn('⚠️ Error adding polygon padding:', error);
+        return polygon;
     }
-
-    return expandedPolygon;
 };
 
 const createOffsetPolygon = (
@@ -1421,13 +1427,13 @@ const createConservativePadding = (
             break;
         }
 
-            currentPadding *= 0.5; 
+        currentPadding *= 0.5;
     }
 
     return result;
 };
 
-const calculatePolygonArea = (polygon: Coordinate[]): number => {
+export const calculatePolygonArea = (polygon: Coordinate[]): number => {
     if (polygon.length < 3) return 0;
 
     let area = 0;
@@ -1440,6 +1446,20 @@ const calculatePolygonArea = (polygon: Coordinate[]): number => {
     }
 
     return Math.abs(area) / 2;
+};
+
+export const calculateOverlapArea = (poly1: Coordinate[], poly2: Coordinate[]): number => {
+    if (poly1.length < 3 || poly2.length < 3) return 0;
+    
+    try {
+        const intersection = findPolygonIntersection(poly1, poly2);
+        if (intersection.length < 3) return 0;
+        
+        return calculatePolygonArea(intersection);
+    } catch (error) {
+        console.warn('Error calculating overlap area:', error);
+        return 0;
+    }
 };
 
 export const clipPolygonToMainArea = (
@@ -1484,10 +1504,6 @@ export const clipPolygonToMainArea = (
     const validatedPolygon = clippedPolygon.filter((point) => isPointInPolygon(point, mainArea));
 
     if (validatedPolygon.length < 3) {
-        console.warn(
-            `⚠️ Clipping resulted in insufficient points (${validatedPolygon.length}), returning empty polygon`
-        );
-
         const intersection = findPolygonIntersection(polygon, mainArea);
         if (intersection.length >= 3) {
             return intersection;
@@ -1564,7 +1580,7 @@ const isPointOnLineSegment = (point: Coordinate, start: Coordinate, end: Coordin
 };
 
 const removeDuplicatePoints = (points: Coordinate[]): Coordinate[] => {
-    const epsilon = 1e-8; 
+    const epsilon = 1e-8;
     const unique: Coordinate[] = [];
 
     points.forEach((point) => {
@@ -1606,7 +1622,7 @@ const getLineIntersection = (
         y4 = p4.lat;
 
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (Math.abs(denom) < 1e-10) return null; 
+    if (Math.abs(denom) < 1e-10) return null;
 
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
 
@@ -1673,41 +1689,39 @@ export const createAutomaticZones = (
 
         const colors = generateZoneColors(config.numberOfZones);
 
-        const preserveClusterPlants = config.balancePlantCount;
         let zones = createZonesFromClusters(
             clusters,
             mainArea,
             colors,
             config.paddingMeters,
             config.useVoronoi,
-            preserveClusterPlants
+            false, // ไม่ใช้ preserveClusterPlants แล้ว เพราะเราต้องการนับต้นไม้จริงๆ
+            config
         );
 
-        if (config.balancePlantCount && config.debugMode) {
-            clusters.forEach((cluster, index) => {
-                const centroid =
-                    cluster.length > 0
-                        ? {
-                              lat:
-                                  cluster.reduce((sum, plant) => sum + plant.position.lat, 0) /
-                                  cluster.length,
-                              lng:
-                                  cluster.reduce((sum, plant) => sum + plant.position.lng, 0) /
-                                  cluster.length,
-                          }
-                        : null;
-            });
-            zones.forEach((zone, index) => {
-            });
-
-            const plantCounts = zones.map((zone) => zone.plants.length);
-            const minCount = Math.min(...plantCounts);
-            const maxCount = Math.max(...plantCounts);
+        if (config.debugMode) {
+            console.log('🔍 Debug: Zone generation completed');
+            console.log('📊 Clusters:', clusters.map((cluster, i) => ({
+                index: i,
+                plantCount: cluster.length,
+                waterNeed: cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0)
+            })));
+            console.log('🗺️ Zones (Actual Plant Count):', zones.map((zone, i) => ({
+                index: i,
+                name: zone.name,
+                actualPlantCount: zone.plants.length,
+                waterNeed: zone.totalWaterNeed,
+                coordinateCount: zone.coordinates.length
+            })));
+            
+            // เปรียบเทียบจำนวนต้นไม้ใน cluster vs โซนจริง
+            const totalClusterPlants = clusters.reduce((sum, cluster) => sum + cluster.length, 0);
+            const totalActualPlants = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
+            console.log(`📈 Plant Count Summary: Clusters=${totalClusterPlants}, Actual in Zones=${totalActualPlants}, Difference=${totalActualPlants - totalClusterPlants}`);
         }
 
         const validZones = zones.filter((zone) => zone.coordinates && zone.coordinates.length >= 3);
         if (validZones.length < zones.length) {
-            console.warn(`⚠️ Filtered out ${zones.length - validZones.length} invalid zones`);
             zones = validZones;
         }
 
@@ -1717,12 +1731,12 @@ export const createAutomaticZones = (
 
         const validation = validateZones(zones, mainArea);
 
-        if (validation.errors.length > 0) {
-            console.warn('⚠️ Zone validation warnings:', validation.errors);
-        }
-        if (validation.warnings.length > 0) {
-            console.warn('⚠️ Zone validation warnings:', validation.warnings);
-        }
+        // if (validation.errors.length > 0) {
+        //     console.warn('⚠️ Zone validation warnings:', validation.errors);
+        // }
+        // if (validation.warnings.length > 0) {
+        //     console.warn('⚠️ Zone validation warnings:', validation.warnings);
+        // }
 
         if (validation.errors.some((error) => error.includes('พื้นที่ทับซ้อนกัน'))) {
             zones = fixZoneOverlaps(zones, mainArea);
@@ -1753,7 +1767,7 @@ export const createAutomaticZones = (
         debugInfo.minWaterNeedDeviation = Math.min(...deviations);
         debugInfo.waterNeedDeviationPercent = (debugInfo.maxWaterNeedDeviation / mean) * 100;
 
-        const maxPossibleDeviation = mean; 
+        const maxPossibleDeviation = mean;
         debugInfo.waterBalanceEfficiency = Math.max(
             0,
             100 * (1 - debugInfo.maxWaterNeedDeviation / maxPossibleDeviation)
@@ -1809,27 +1823,22 @@ export const validateZones = (
         return { isValid: false, errors, warnings };
     }
 
-    
     const waterBalanceValidation = validateWaterBalance(zones);
     errors.push(...waterBalanceValidation.errors);
     warnings.push(...waterBalanceValidation.warnings);
 
-    
     const overlapValidation = validateZoneOverlaps(zones);
     errors.push(...overlapValidation.errors);
     warnings.push(...overlapValidation.warnings);
 
-    
     const boundaryValidation = validateZoneBoundaries(zones, mainArea);
     errors.push(...boundaryValidation.errors);
     warnings.push(...boundaryValidation.warnings);
 
-    
     const geometryValidation = validateZoneGeometry(zones);
     errors.push(...geometryValidation.errors);
     warnings.push(...geometryValidation.warnings);
 
-    
     const plantValidation = validatePlantAssignment(zones);
     errors.push(...plantValidation.errors);
     warnings.push(...plantValidation.warnings);
@@ -1838,7 +1847,6 @@ export const validateZones = (
 
     return { isValid, errors, warnings };
 };
-
 
 const validateWaterBalance = (
     zones: IrrigationZone[]
@@ -1850,7 +1858,7 @@ const validateWaterBalance = (
 
     const waterNeeds = zones.map((zone) => zone.totalWaterNeed);
     const avgWaterNeed = waterNeeds.reduce((sum, need) => sum + need, 0) / zones.length;
-    const tolerance = avgWaterNeed * 0.01; 
+    const tolerance = avgWaterNeed * 0.01;
 
     zones.forEach((zone, index) => {
         const deviation = Math.abs(zone.totalWaterNeed - avgWaterNeed);
@@ -1870,7 +1878,6 @@ const validateWaterBalance = (
     return { errors, warnings };
 };
 
-
 const validateZoneOverlaps = (
     zones: IrrigationZone[]
 ): { errors: string[]; warnings: string[] } => {
@@ -1882,7 +1889,11 @@ const validateZoneOverlaps = (
             const zone1 = zones[i];
             const zone2 = zones[j];
 
-            
+            if (!zone1.coordinates || !zone2.coordinates || 
+                zone1.coordinates.length < 3 || zone2.coordinates.length < 3) {
+                continue;
+            }
+
             const sharedPlants = zone1.plants.filter((plant1) =>
                 zone2.plants.some((plant2) => plant1.id === plant2.id)
             );
@@ -1893,34 +1904,47 @@ const validateZoneOverlaps = (
                 );
             }
 
-            
             const hasPolygonOverlap = checkPolygonIntersection(
                 zone1.coordinates,
                 zone2.coordinates
             );
             if (hasPolygonOverlap) {
-                errors.push(
-                    `โซน ${i + 1} และโซน ${j + 1} มีพื้นที่ทับซ้อนกัน - ต้องแยกจากกันอย่างสมบูรณ์`
-                );
+                const overlapArea = calculateOverlapArea(zone1.coordinates, zone2.coordinates);
+                const zone1Area = calculatePolygonArea(zone1.coordinates);
+                const overlapPercentage = (overlapArea / zone1Area) * 100;
+                
+                if (overlapPercentage > 5) {
+                    errors.push(
+                        `โซน ${i + 1} และโซน ${j + 1} มีพื้นที่ทับซ้อนกัน ${overlapPercentage.toFixed(1)}% - ต้องแยกจากกันอย่างสมบูรณ์`
+                    );
+                } else {
+                    warnings.push(
+                        `โซน ${i + 1} และโซน ${j + 1} มีพื้นที่ทับซ้อนกันเล็กน้อย ${overlapPercentage.toFixed(1)}%`
+                    );
+                }
             }
 
-            
-            const zone1InZone2 = zone1.coordinates.some((coord) =>
+            const zone1InZone2 = zone1.coordinates.filter((coord) =>
                 isPointInPolygon(coord, zone2.coordinates)
             );
-            const zone2InZone1 = zone2.coordinates.some((coord) =>
+            const zone2InZone1 = zone2.coordinates.filter((coord) =>
                 isPointInPolygon(coord, zone1.coordinates)
             );
 
-            if (zone1InZone2 || zone2InZone1) {
-                warnings.push(`โซน ${i + 1} และโซน ${j + 1} มีจุดบางจุดอยู่ในพื้นที่ของกันและกัน`);
+            if (zone1InZone2.length > 0 || zone2InZone1.length > 0) {
+                const totalOverlapPoints = zone1InZone2.length + zone2InZone1.length;
+                const totalPoints = zone1.coordinates.length + zone2.coordinates.length;
+                const overlapPercentage = (totalOverlapPoints / totalPoints) * 100;
+                
+                if (overlapPercentage > 10) {
+                    warnings.push(`โซน ${i + 1} และโซน ${j + 1} มีจุดทับซ้อนกัน ${overlapPercentage.toFixed(1)}%`);
+                }
             }
         }
     }
 
     return { errors, warnings };
 };
-
 
 const validateZoneBoundaries = (
     zones: IrrigationZone[],
@@ -1935,43 +1959,35 @@ const validateZoneBoundaries = (
     }
 
     zones.forEach((zone, index) => {
-        
         if (!zone.coordinates || zone.coordinates.length < 3) {
             errors.push(`โซน ${index + 1} ไม่มีพิกัดที่ถูกต้อง`);
             return;
         }
 
-
         const outsidePoints = zone.coordinates.filter(
             (coord) => !isPointInPolygon(coord, mainArea)
         );
 
-            
         if (outsidePoints.length > 0) {
             const outsidePercentage = (outsidePoints.length / zone.coordinates.length) * 100;
 
             if (outsidePercentage > 50) {
-                    
                 errors.push(
                     `โซน ${index + 1} มี ${outsidePoints.length} จุด (${outsidePercentage.toFixed(1)}%) อยู่นอกพื้นที่หลัก`
                 );
             } else if (outsidePercentage > 10) {
-                    
                 warnings.push(
                     `โซน ${index + 1} มี ${outsidePoints.length} จุด (${outsidePercentage.toFixed(1)}%) อยู่นอกพื้นที่หลัก`
                 );
             }
         }
 
-            
         const zoneArea = calculatePolygonArea(zone.coordinates);
         const mainAreaSize = calculatePolygonArea(mainArea);
 
         if (zoneArea > mainAreaSize * 1.1) {
-                
             errors.push(`โซน ${index + 1} มีพื้นที่เกินขนาดพื้นที่หลักมากเกินไป`);
         } else if (zoneArea > mainAreaSize) {
-                
             warnings.push(`โซน ${index + 1} มีพื้นที่เกินขนาดพื้นที่หลักเล็กน้อย`);
         }
     });
@@ -1979,7 +1995,6 @@ const validateZoneBoundaries = (
     return { errors, warnings };
 };
 
-    
 const validateZoneGeometry = (
     zones: IrrigationZone[]
 ): { errors: string[]; warnings: string[] } => {
@@ -1987,26 +2002,22 @@ const validateZoneGeometry = (
     const warnings: string[] = [];
 
     zones.forEach((zone, index) => {
-            
         if (zone.coordinates.length < 3) {
             errors.push(
                 `โซน ${index + 1} มีจุดไม่เพียงพอสำหรับสร้างรูปหลายเหลี่ยม (${zone.coordinates.length} จุด)`
             );
         }
 
-            
         const uniquePoints = removeDuplicatePoints(zone.coordinates);
         if (uniquePoints.length !== zone.coordinates.length) {
             warnings.push(`โซน ${index + 1} มีจุดซ้ำกัน`);
         }
 
-            
         const area = calculatePolygonArea(zone.coordinates);
         if (area < 1e-10) {
             errors.push(`โซน ${index + 1} มีพื้นที่เกือบเป็นศูนย์`);
         }
 
-            
         if (hasPolygonSelfIntersection(zone.coordinates)) {
             errors.push(`โซน ${index + 1} มีเส้นขอบตัดกันเอง`);
         }
@@ -2015,7 +2026,6 @@ const validateZoneGeometry = (
     return { errors, warnings };
 };
 
-    
 const validatePlantAssignment = (
     zones: IrrigationZone[]
 ): { errors: string[]; warnings: string[] } => {
@@ -2037,18 +2047,29 @@ const validatePlantAssignment = (
             }
         });
 
-        zone.plants.forEach((plant) => {
-            if (!isPointInPolygon(plant.position, zone.coordinates)) {
-                warnings.push(`ต้นไม้ ${plant.id} ในโซน ${index + 1} อยู่นอกขอบเขตโซน`);
-            }
+        // Check if plants are outside zone boundaries with tolerance
+        const plantsOutsideZone = zone.plants.filter((plant) => {
+            return !isPointInPolygon(plant.position, zone.coordinates);
         });
+
+        if (plantsOutsideZone.length > 0) {
+            const outsidePercentage = (plantsOutsideZone.length / zone.plants.length) * 100;
+            
+            if (outsidePercentage > 50) {
+                errors.push(`โซน ${index + 1} มีต้นไม้ ${plantsOutsideZone.length} ต้น (${outsidePercentage.toFixed(1)}%) อยู่นอกขอบเขตโซน`);
+            } else if (outsidePercentage > 20) {
+                warnings.push(`โซน ${index + 1} มีต้นไม้ ${plantsOutsideZone.length} ต้น (${outsidePercentage.toFixed(1)}%) อยู่นอกขอบเขตโซน`);
+            } else {
+                // For small percentages, just log to console without showing warnings
+                console.log(`โซน ${index + 1}: ${plantsOutsideZone.length} ต้นไม้นอกขอบเขต (${outsidePercentage.toFixed(1)}%)`);
+            }
+        }
     });
 
     return { errors, warnings };
 };
 
 export const checkPolygonIntersection = (poly1: Coordinate[], poly2: Coordinate[]): boolean => {
-   
     for (let i = 0; i < poly1.length; i++) {
         const p1Start = poly1[i];
         const p1End = poly1[(i + 1) % poly1.length];
@@ -2066,7 +2087,6 @@ export const checkPolygonIntersection = (poly1: Coordinate[], poly2: Coordinate[
     return false;
 };
 
-
 const doLineSegmentsIntersect = (
     p1: Coordinate,
     q1: Coordinate,
@@ -2075,8 +2095,8 @@ const doLineSegmentsIntersect = (
 ): boolean => {
     const orientation = (p: Coordinate, q: Coordinate, r: Coordinate): number => {
         const val = (q.lng - p.lng) * (r.lat - q.lat) - (q.lat - p.lat) * (r.lng - q.lng);
-        if (Math.abs(val) < 1e-10) return 0; 
-        return val > 0 ? 1 : 2; 
+        if (Math.abs(val) < 1e-10) return 0;
+        return val > 0 ? 1 : 2;
     };
 
     const onSegment = (p: Coordinate, q: Coordinate, r: Coordinate): boolean => {
@@ -2093,10 +2113,8 @@ const doLineSegmentsIntersect = (
     const o3 = orientation(p2, q2, p1);
     const o4 = orientation(p2, q2, q1);
 
-    
     if (o1 !== o2 && o3 !== o4) return true;
 
-    
     if (o1 === 0 && onSegment(p1, p2, q1)) return true;
     if (o2 === 0 && onSegment(p1, q2, q1)) return true;
     if (o3 === 0 && onSegment(p2, p1, q2)) return true;
@@ -2104,7 +2122,6 @@ const doLineSegmentsIntersect = (
 
     return false;
 };
-
 
 const hasPolygonSelfIntersection = (polygon: Coordinate[]): boolean => {
     const n = polygon.length;
@@ -2115,7 +2132,6 @@ const hasPolygonSelfIntersection = (polygon: Coordinate[]): boolean => {
         const line1End = polygon[(i + 1) % n];
 
         for (let j = i + 2; j < n; j++) {
-            
             if (j === (i - 1 + n) % n || j === (i + 1) % n) continue;
 
             const line2Start = polygon[j];
@@ -2130,23 +2146,19 @@ const hasPolygonSelfIntersection = (polygon: Coordinate[]): boolean => {
     return false;
 };
 
-
 const fixZoneOverlaps = (zones: IrrigationZone[], mainArea: Coordinate[]): IrrigationZone[] => {
     const fixedZones = zones.map((zone) => ({ ...zone }));
 
-    
     for (let i = 0; i < fixedZones.length; i++) {
         for (let j = i + 1; j < fixedZones.length; j++) {
             const zone1 = fixedZones[i];
             const zone2 = fixedZones[j];
 
-            
             if (checkPolygonIntersection(zone1.coordinates, zone2.coordinates)) {
-                
-                const bufferDistance = 0.00001; 
-                
+                const bufferDistance = 0.00001;
+
                 fixedZones[i].coordinates = shrinkPolygon(zone1.coordinates, bufferDistance);
-                
+
                 fixedZones[j].coordinates = shrinkPolygon(zone2.coordinates, bufferDistance);
 
                 fixedZones[i].coordinates = clipPolygonToMainArea(
@@ -2158,7 +2170,6 @@ const fixZoneOverlaps = (zones: IrrigationZone[], mainArea: Coordinate[]): Irrig
                     mainArea
                 );
 
-                
                 const allPlants = [...zone1.plants, ...zone2.plants];
                 const zone1Center = getPolygonCenter(fixedZones[i].coordinates);
                 const zone2Center = getPolygonCenter(fixedZones[j].coordinates);
@@ -2177,7 +2188,6 @@ const fixZoneOverlaps = (zones: IrrigationZone[], mainArea: Coordinate[]): Irrig
                     }
                 });
 
-                
                 fixedZones[i].totalWaterNeed = fixedZones[i].plants.reduce(
                     (sum, plant) => sum + plant.plantData.waterNeed,
                     0
@@ -2192,7 +2202,6 @@ const fixZoneOverlaps = (zones: IrrigationZone[], mainArea: Coordinate[]): Irrig
 
     return fixedZones;
 };
-
 
 const shrinkPolygon = (polygon: Coordinate[], distance: number): Coordinate[] => {
     if (polygon.length < 3) return polygon;
