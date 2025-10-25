@@ -38,6 +38,180 @@ Route::middleware(['web', 'auth'])->get('/test-auth', function (Request $request
 });
 
 // ==================================================
+// 📢 ADVERTISEMENT ROUTES
+// ==================================================
+
+// Public advertisements (for free plan homepage)
+Route::get('/advertisements/public', function () {
+    try {
+        $advertisements = \App\Models\Advertisement::where('is_active', true)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'advertisements' => $advertisements->map(function ($ad) {
+                return [
+                    'id' => $ad->id,
+                    'title' => $ad->title,
+                    'description' => $ad->description,
+                    'image_url' => $ad->image_url,
+                    'link_url' => $ad->link_url,
+                    'is_active' => $ad->is_active,
+                    'created_at' => $ad->created_at,
+                ];
+            })
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error loading advertisements: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// User's advertisements (authenticated)
+Route::middleware(['web', 'auth'])->group(function () {
+    // Get user's advertisements
+    Route::get('/advertisements', function () {
+        try {
+            $user = auth()->user();
+            $advertisements = \App\Models\Advertisement::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'advertisements' => $advertisements
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error loading advertisements: ' . $e->getMessage()
+            ], 500);
+        }
+    });
+
+    // Create new advertisement
+    Route::post('/advertisements', function (\Illuminate\Http\Request $request) {
+        try {
+            $user = auth()->user();
+            
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'required|string|max:1000',
+                'link_url' => 'required|url|max:500',
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+            ]);
+
+            // Handle image upload
+            if ($request->hasFile('image')) {
+                $image = $request->file('image');
+                $imageName = time() . '_' . $user->id . '.' . $image->getClientOriginalExtension();
+                $imagePath = $image->storeAs('advertisements', $imageName, 'public');
+                $imageUrl = asset('storage/' . $imagePath);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Image is required'
+                ], 400);
+            }
+
+            $advertisement = \App\Models\Advertisement::create([
+                'user_id' => $user->id,
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'link_url' => $validated['link_url'],
+                'image_url' => $imageUrl,
+                'is_active' => true,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Advertisement created successfully',
+                'advertisement' => $advertisement
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error creating advertisement: ' . $e->getMessage()
+            ], 500);
+        }
+    });
+
+    // Update advertisement
+    Route::put('/advertisements/{id}', function (\Illuminate\Http\Request $request, $id) {
+        try {
+            $user = auth()->user();
+            $advertisement = \App\Models\Advertisement::where('user_id', $user->id)
+                ->findOrFail($id);
+
+            $validated = $request->validate([
+                'title' => 'sometimes|string|max:255',
+                'description' => 'sometimes|string|max:1000',
+                'link_url' => 'sometimes|url|max:500',
+                'is_active' => 'sometimes|boolean',
+                'image' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:5120',
+            ]);
+
+            // Handle image update
+            if ($request->hasFile('image')) {
+                // Delete old image
+                if ($advertisement->image_url) {
+                    $oldImagePath = str_replace(asset('storage/'), '', $advertisement->image_url);
+                    \Storage::disk('public')->delete($oldImagePath);
+                }
+
+                $image = $request->file('image');
+                $imageName = time() . '_' . $user->id . '.' . $image->getClientOriginalExtension();
+                $imagePath = $image->storeAs('advertisements', $imageName, 'public');
+                $validated['image_url'] = asset('storage/' . $imagePath);
+            }
+
+            $advertisement->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Advertisement updated successfully',
+                'advertisement' => $advertisement
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating advertisement: ' . $e->getMessage()
+            ], 500);
+        }
+    });
+
+    // Delete advertisement
+    Route::delete('/advertisements/{id}', function ($id) {
+        try {
+            $user = auth()->user();
+            $advertisement = \App\Models\Advertisement::where('user_id', $user->id)
+                ->findOrFail($id);
+
+            // Delete image file
+            if ($advertisement->image_url) {
+                $imagePath = str_replace(asset('storage/'), '', $advertisement->image_url);
+                \Storage::disk('public')->delete($imagePath);
+            }
+
+            $advertisement->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Advertisement deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting advertisement: ' . $e->getMessage()
+            ], 500);
+        }
+    });
+});
+
+// ==================================================
 // 🤖 CHAIYO AI ROUTES (Enhanced Company Representative)
 // ==================================================
 

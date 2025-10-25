@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Head, usePage, router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
@@ -48,7 +48,6 @@ export default function NewHome() {
         type: 'pro' | 'advanced';
         months: number;
     } | null>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
 
     // Helper function to get tier display information
     const getTierDisplayInfo = (tier: string) => {
@@ -183,42 +182,20 @@ export default function NewHome() {
         router.visit('/fields');
     };
 
+    const handleTryFreePlan = () => {
+        // Navigate to free plan page
+        router.visit('/free-plan');
+    };
+
+    const handleGoToAccount = () => {
+        // Navigate to account page
+        router.visit('/free-plan/account');
+    };
+
     const handleCloseUpgradeModal = () => {
         setShowUpgradeModal(false);
     };
 
-    // Video intersection observer for auto-play/pause
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        // Video is in view - play it
-                        video.play().catch((error) => {
-                            console.log('Video autoplay failed:', error);
-                            // Autoplay might be blocked by browser, that's okay
-                        });
-                    } else {
-                        // Video is out of view - pause it
-                        video.pause();
-                    }
-                });
-            },
-            {
-                threshold: 0.5, // Play when 50% of video is visible
-                rootMargin: '0px 0px -10% 0px', // Start playing slightly before fully in view
-            }
-        );
-
-        observer.observe(video);
-
-        return () => {
-            observer.unobserve(video);
-        };
-    }, []);
 
     // If user is super user, redirect to fields page
     if (user?.is_super_user) {
@@ -258,6 +235,12 @@ export default function NewHome() {
                                     className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-blue-700"
                                 >
                                     Continue to App
+                                </button>
+                                <button
+                                    onClick={handleGoToAccount}
+                                    className="rounded-lg border-2 border-green-400 px-8 py-3 text-lg font-semibold text-green-400 transition-colors hover:bg-green-400/10"
+                                >
+                                    My Account
                                 </button>
                                 <button
                                     onClick={() => setShowUpgradeModal(true)}
@@ -379,10 +362,16 @@ export default function NewHome() {
                             </p>
                             <div className="flex flex-col gap-4 sm:flex-row">
                                 <button
-                                    onClick={handleContinueToApp}
-                                    className="rounded-lg bg-purple-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-purple-700"
+                                    onClick={handleTryFreePlan}
+                                    className="rounded-lg bg-orange-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-orange-700"
                                 >
-                                    Try Advanced For Free
+                                    Try Free Plan
+                                </button>
+                                <button
+                                    onClick={handleGoToAccount}
+                                    className="rounded-lg border-2 border-green-400 px-8 py-3 text-lg font-semibold text-green-400 transition-colors hover:bg-green-400/10"
+                                >
+                                    My Account
                                 </button>
                                 <button
                                     onClick={() => setShowUpgradeModal(true)}
@@ -505,7 +494,7 @@ export default function NewHome() {
                             Choose Your Plan
                         </h2>
                         <p className="text-lg text-gray-300">
-                            Try our Advanced plan for free now! Free and Pro plans coming in 2026.
+                            Try our Free plan now! Pro and Advanced plans coming in 2026.
                         </p>
                     </div>
 
@@ -513,8 +502,8 @@ export default function NewHome() {
                         {/* Free Plan */}
                         <div className="relative flex flex-col rounded-lg border-2 border-gray-600 bg-gray-800 p-8 text-center shadow-lg">
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
-                                <span className="whitespace-nowrap rounded-full bg-orange-500 px-3 py-1 text-xs font-medium text-white">
-                                    Coming Q1 2026
+                                <span className="whitespace-nowrap rounded-full bg-green-500 px-3 py-1 text-xs font-medium text-white">
+                                    Available Now
                                 </span>
                             </div>
 
@@ -599,10 +588,10 @@ export default function NewHome() {
                             </div>
 
                             <button
-                                disabled
-                                className="mt-auto w-full cursor-not-allowed rounded-lg bg-gray-600 px-6 py-3 font-semibold text-gray-400 opacity-50"
+                                onClick={handleTryFreePlan}
+                                className="mt-auto w-full rounded-lg bg-orange-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
                             >
-                                Coming Q1 2026
+                                Try Free Plan
                             </button>
                         </div>
 
@@ -902,29 +891,17 @@ export default function NewHome() {
 
                     <div className="relative">
                         <div className="aspect-video overflow-hidden rounded-2xl shadow-2xl">
-                            <video
-                                ref={videoRef}
-                                className="h-full w-full object-cover"
-                                controls
-                                muted
-                                loop
-                                playsInline
-                                poster="/images/video-poster.jpg"
-                            >
-                                <source src="/videos/platform-demo.mp4" type="video/mp4" />
-                                <source src="/videos/platform-demo.webm" type="video/webm" />
-                                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
-                                    <div className="text-center">
-                                        <div className="mb-4 text-6xl">🎥</div>
-                                        <p className="font-medium text-gray-300">
-                                            Platform Demo Video
-                                        </p>
-                                        <p className="text-sm text-gray-400">
-                                            Your browser doesn't support video playback
-                                        </p>
-                                    </div>
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
+                                <div className="text-center">
+                                    <div className="mb-4 text-6xl">🎥</div>
+                                    <p className="font-medium text-gray-300">
+                                        Platform Demo Video
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        Video coming soon
+                                    </p>
                                 </div>
-                            </video>
+                            </div>
                         </div>
                     </div>
 
