@@ -735,6 +735,45 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/folders', [SuperUserController::class, 'createFolderForUser'])->name('create-folder');
         Route::delete('/folders/{folderId}', [SuperUserController::class, 'deleteFolder'])->name('delete-folder');
     });
+
+    // Free Plan Routes
+    Route::get('/free-plan', function () {
+        return Inertia::render('free-plan/freeHome');
+    })->name('free-plan');
+
+    Route::get('/free-plan/choose-crop', function () {
+        return Inertia::render('free-plan/chooseCrop');
+    })->name('free-plan.choose-crop');
+
+    // Free Plan Map Route
+    Route::get('/free-plan/map', function () {
+        return Inertia::render('free-plan/freeMap');
+    })->name('free-plan.map');
+
+    // Free Plan Summary Route
+    Route::get('/free-plan/summary', function () {
+        return Inertia::render('free-plan/freeSummary');
+    })->name('free-plan.summary');
+
+    // Free Plan Product Route
+    Route::get('/free-plan/product', function () {
+        return Inertia::render('free-plan/freeProduct');
+    })->name('free-plan.product');
+
+    // Free Plan Account/Profile Route
+    Route::get('/free-plan/account', function () {
+        return Inertia::render('free-plan/acCount');
+    })->name('free-plan.account');
+
+    // Free Plan Upgrade Pro Route
+    Route::get('/free-plan/upgradePro', function () {
+        return Inertia::render('free-plan/upgradePro');
+    })->name('free-plan.upgradePro');
+
+    // Free Plan Advertisement Management Route
+    Route::get('/free-plan/ads', function () {
+        return Inertia::render('free-plan/components/ads');
+    })->name('free-plan.ads');
 });
 
 // Include other route files
