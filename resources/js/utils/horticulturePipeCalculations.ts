@@ -87,7 +87,6 @@ export function findPressureLoss(
             },
         };
     } catch (error) {
-        console.error('Error finding pressure loss:', error);
         return null;
     }
 }
@@ -205,7 +204,6 @@ export function calculateNewHeadLoss(
             sizeInfo: pressureLossResult.sizeInfo,
         };
     } catch (error) {
-        console.error('Error calculating head loss:', error);
         return null;
     }
 }
@@ -302,7 +300,6 @@ export function validatePipeSelection(
 
         return { isValid: true };
     } catch (error) {
-        console.error('Error validating pipe selection:', error);
         return {
             isValid: false,
             reason: 'เกิดข้อผิดพลาดในการตรวจสอบ',
@@ -376,7 +373,6 @@ export function selectBestPipe(
 
         return sortedPipes[0];
     } catch (error) {
-        console.error('Error selecting best pipe:', error);
         return null;
     }
 }

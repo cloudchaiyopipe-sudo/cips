@@ -5,7 +5,6 @@ import axios from 'axios';
 
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
 import HorticultureDrawingManager from '../components/horticulture/HorticultureDrawingManager';
-import CurvedPipeEditor from '../components/horticulture/CurvedPipeEditor';
 import EnhancedHorticultureSearchControl from '../components/horticulture/HorticultureSearchControl';
 import PlantRotationControl from '../components/horticulture/PlantRotationControl';
 import LateralPipeInfoPanel from '../components/horticulture/LateralPipeInfoPanel';
@@ -13,6 +12,7 @@ import LateralPipeModeSelector from '../components/horticulture/LateralPipeModeS
 import ContinuousLateralPipePanel from '../components/horticulture/ContinuousLateralPipePanel';
 import DeletePipePanel from '../components/horticulture/DeletePipePanel';
 import AutoLateralPipeModal from '../components/horticulture/AutoLateralPipeModal';
+import ElevationControlPanel from '../components/horticulture/ElevationControlPanel';
 import { loadSprinklerConfig } from '../utils/sprinklerUtils';
 import {
     snapMainPipeEndToSubMainPipe,
@@ -50,6 +50,7 @@ import {
 import {
     generateAutoLateralPipes,
     validateAutoLateralPipes,
+    createAutoLateralConnectionPoints,
 } from '../utils/autoLateralPipeUtils';
 
 import { router } from '@inertiajs/react';
@@ -87,7 +88,7 @@ import {
     FaCut,
     FaArrowsAlt,
     FaRuler,
-    FaBezierCurve,
+    FaMountain,
 } from 'react-icons/fa';
 
 const cleanupLocalStorage = (): boolean => {
@@ -1610,10 +1611,6 @@ interface ProjectState {
         activePipeId: string | null;
         activeAngle: number;
         isAdjusting: boolean;
-    };
-    curvedPipeEditing: {
-        isEnabled: boolean;
-        editingPipes: Set<string>;
     };
     lateralPipeDrawing: {
         isActive: boolean;
@@ -4593,6 +4590,9 @@ export default function EnhancedHorticulturePlannerPage() {
     
     // Separate state for lateral pipes to bypass history management issues
     const [lateralPipesState, setLateralPipesState] = useState<LateralPipe[]>([]);
+    
+    // Elevation control panel state
+    const [showElevationControlPanel, setShowElevationControlPanel] = useState(false);
 
     const hasLargeModalOpen = () => {
         return (
@@ -5175,10 +5175,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 activeAngle: 90,
                 isAdjusting: false,
             },
-            curvedPipeEditing: {
-                isEnabled: false,
-                editingPipes: new Set<string>(),
-            },
             lateralPipeDrawing: {
                 isActive: false,
                 isContinuousMode: false,
@@ -5755,13 +5751,16 @@ export default function EnhancedHorticulturePlannerPage() {
     }, []);
 
     const togglePipeConnectionMode = useCallback(() => {
+        const newActiveState = !history.present.pipeConnection.isActive;
+        
         pushToHistory({
             pipeConnection: {
-                isActive: !history.present.pipeConnection.isActive,
+                isActive: newActiveState,
                 selectedPoints: [],
                 tempConnections: [],
             },
         });
+        
     }, [history.present.pipeConnection.isActive, pushToHistory]);
 
   
@@ -5836,8 +5835,51 @@ export default function EnhancedHorticulturePlannerPage() {
         []
     );
 
+    // Simple test function to create a basic lateral pipe
+    const createSimpleLateralPipe = useCallback((fromPoint: any, toPoint: any) => {
+        const plants: PlantLocation[] = [];
+        if (fromPoint.type === 'plant') {
+            plants.push(fromPoint.data);
+        }
+        if (toPoint.type === 'plant') {
+            plants.push(toPoint.data);
+        }
+        const newLateralPipe = {
+            id: generateLateralPipeId(),
+            coordinates: [fromPoint.position, toPoint.position],
+            length: calculateDistanceBetweenPoints(fromPoint.position, toPoint.position),
+            plants: plants,
+            placementMode: 'over_plants' as 'over_plants' | 'between_plants',
+            totalFlowRate: plants.length * (loadSprinklerConfig()?.flowRatePerMinute || 0),
+            connectionPoint: fromPoint.position,
+            totalWaterNeed: plants.reduce((sum, plant) => sum + (plant.plantData?.waterNeed || 0), 0),
+            plantCount: plants.length,
+            emitterLines: [],
+        };
+        
+        const currentLateralPipes = latestLateralPipesRef.current || [];
+        const updatedLateralPipes = [...currentLateralPipes, newLateralPipe];
+        pushToHistory({
+            lateralPipes: updatedLateralPipes as LateralPipe[],
+            pipeConnection: {
+                ...history.present.pipeConnection,
+                selectedPoints: [],
+            },
+        });
+        
+        latestLateralPipesRef.current = updatedLateralPipes as LateralPipe[];
+        setLateralPipesState(updatedLateralPipes as LateralPipe[]);
+    }, [pushToHistory, history.present.pipeConnection, setLateralPipesState]);
+
     const createConnectionPipe = useCallback(
         (fromPoint: any, toPoint: any) => {
+            try {
+                createSimpleLateralPipe(fromPoint, toPoint);
+                return;
+            } catch (error) {
+                console.error('❌ Simple approach failed:', error);
+            }
+            
             const plants: PlantLocation[] = [];
             if (fromPoint.type === 'plant') {
                 plants.push(fromPoint.data);
@@ -5847,7 +5889,7 @@ export default function EnhancedHorticulturePlannerPage() {
             }
             const pipeLength = calculateDistanceBetweenPoints(fromPoint.position, toPoint.position);
 
-            const currentLateralPipes = latestLateralPipesRef.current;
+            const currentLateralPipes = latestLateralPipesRef.current || [];
 
             let fromLateralPipe =
                 fromPoint.type === 'lateralPipe'
@@ -5858,21 +5900,23 @@ export default function EnhancedHorticulturePlannerPage() {
                     ? currentLateralPipes.find((pipe) => pipe.id === toPoint.id)
                     : null;
 
-            if (fromPoint.type === 'plant' && !fromLateralPipe) {
-                fromLateralPipe = findLateralPipePassingThroughPlant(
-                    fromPoint.data,
-                    currentLateralPipes
-                );
-            }
-            if (toPoint.type === 'plant' && !toLateralPipe) {
-                toLateralPipe = findLateralPipePassingThroughPlant(
-                    toPoint.data,
-                    currentLateralPipes
-                );
+            const shouldFindExistingPipes = false;
+            if (shouldFindExistingPipes) {
+                if (fromPoint.type === 'plant' && !fromLateralPipe) {
+                    fromLateralPipe = findLateralPipePassingThroughPlant(
+                        fromPoint.data,
+                        currentLateralPipes
+                    );
+                }
+                if (toPoint.type === 'plant' && !toLateralPipe) {
+                    toLateralPipe = findLateralPipePassingThroughPlant(
+                        toPoint.data,
+                        currentLateralPipes
+                    );
+                }
             }
 
             if (fromLateralPipe && toLateralPipe) {
-              
                 const mergedPipe = mergeLateralPipes(
                     fromLateralPipe,
                     [fromPoint.position, toPoint.position],
@@ -6094,6 +6138,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     latestLateralPipesRef.current = updatedLateralPipes;
                 }
                 } else {
+                
                 const allPlantsForNewPipe: PlantLocation[] = [...plants]; 
 
                 if (fromPoint.type === 'plant' && fromLateralPipe) {
@@ -6129,7 +6174,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     emitterLines: [],
                 } as any;
 
-                let updatedLateralPipes = latestLateralPipesRef.current;
+                let updatedLateralPipes = latestLateralPipesRef.current || [];
 
                 if (fromLateralPipe) {
                     updatedLateralPipes = updatedLateralPipes.filter(
@@ -6842,66 +6887,8 @@ export default function EnhancedHorticulturePlannerPage() {
         setShowRealTimeBranchModal(false);
     }, [pushToHistory]);
 
-    const toggleCurvedPipeEditMode = useCallback(() => {
-        pushToHistory({
-            curvedPipeEditing: {
-                isEnabled: !history.present.curvedPipeEditing.isEnabled,
-                editingPipes: new Set<string>(),
-            },
-        });
-    }, [history.present.curvedPipeEditing.isEnabled, pushToHistory]);
 
-    const handleCurvedPipeUpdate = useCallback(
-        (pipeId: string, newCoordinates: Coordinate[]) => {
-            const mainPipe = history.present.mainPipes.find((p) => p.id === pipeId);
-            const subMainPipe = history.present.subMainPipes.find((p) => p.id === pipeId);
 
-            if (mainPipe) {
-                const updatedMainPipes = history.present.mainPipes.map((pipe) =>
-                    pipe.id === pipeId
-                        ? {
-                              ...pipe,
-                              coordinates: newCoordinates,
-                              length: calculatePipeLength(newCoordinates),
-                          }
-                        : pipe
-                );
-                pushToHistory({ mainPipes: updatedMainPipes });
-            } else if (subMainPipe) {
-                const updatedSubMainPipes = history.present.subMainPipes.map((pipe) =>
-                    pipe.id === pipeId
-                        ? {
-                              ...pipe,
-                              coordinates: newCoordinates,
-                              length: calculatePipeLength(newCoordinates),
-                          }
-                        : pipe
-                );
-                pushToHistory({ subMainPipes: updatedSubMainPipes });
-            }
-        },
-        [history.present.mainPipes, history.present.subMainPipes, pushToHistory]
-    );
-
-    const handleCurvedPipeEditingChange = useCallback(
-        (pipeId: string, isEditing: boolean) => {
-            const newEditingPipes = new Set(history.present.curvedPipeEditing.editingPipes);
-
-            if (isEditing) {
-                newEditingPipes.add(pipeId);
-            } else {
-                newEditingPipes.delete(pipeId);
-            }
-
-            pushToHistory({
-                curvedPipeEditing: {
-                    ...history.present.curvedPipeEditing,
-                    editingPipes: newEditingPipes,
-                },
-            });
-        },
-        [history.present.curvedPipeEditing, pushToHistory]
-    );
 
     const handlePlantDragStart = useCallback(
         (plantId: string) => {
@@ -9749,10 +9736,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 activeAngle: 90,
                 isAdjusting: false,
             },
-            curvedPipeEditing: {
-                isEnabled: false,
-                editingPipes: new Set<string>(),
-            },
             lateralPipeDrawing: {
                 isActive: false,
                 isContinuousMode: false, 
@@ -10484,19 +10467,20 @@ export default function EnhancedHorticulturePlannerPage() {
             // Update separate lateral pipes state
             setLateralPipesState(newLateralPipesArray);
             
+            const autoConnectionPoints = createAutoLateralConnectionPoints(valid);
             
-            // Force update the ref to prevent future conflicts
+            if (autoConnectionPoints.length > 0) {
+                // You can store these connection points in state if needed for rendering
+                // setAutoLateralConnectionPoints(autoConnectionPoints);
+            }
+            
             prevHistoryRef.current = forceUpdatedState;
             
 
             
-            // Debug: ตรวจสอบ state หลังจากเพิ่มท่อย่อย
             setTimeout(() => {
                 
-                // Force re-render by updating a dummy state
                 if (history.present.lateralPipes.length === 0) {
-                    console.warn('⚠️ Lateral pipes still 0, forcing state refresh');
-                    // Try to trigger a re-render
                     dispatchHistory({
                         type: 'PUSH_STATE',
                         state: {
@@ -10740,7 +10724,6 @@ export default function EnhancedHorticulturePlannerPage() {
                         history.present.lateralPipeDrawing.placementMode,
                         20 
                     );
-
                     selectedPlants = aligned.selectedPlants || [];
                     alignedCurrentPoint = aligned.alignedEnd || effectiveCurrentPoint;
                 }
@@ -11585,25 +11568,18 @@ export default function EnhancedHorticulturePlannerPage() {
                             </button>
 
                             <button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    toggleCurvedPipeEditMode();
-                                }}
-                                className={`flex h-10 w-10 items-center rounded-md px-3 py-2 text-sm font-medium shadow-md transition-all duration-200 hover:shadow-lg ${
-                                    history.present.curvedPipeEditing.isEnabled
-                                        ? 'border-2 border-red-300 bg-red-600 text-white hover:bg-red-700'
-                                        : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                                onClick={() => setShowElevationControlPanel(!showElevationControlPanel)}
+                                className={`h-10 w-10 rounded-lg px-3 py-2 text-center text-sm font-medium transition-colors ${
+                                    showElevationControlPanel
+                                        ? 'bg-blue-600 text-white ring-2 ring-blue-300 hover:bg-blue-700'
+                                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
                                 }`}
+                                title={t('เครื่องมือความสูงต่ำ - แสดงความสูงต่ำด้วยสี, คลิกเพื่อดูความสูง, และโปรไฟล์ความสูง')}
                                 type="button"
-                                title={t('แก้ไขรูปร่างท่อ')}
                             >
-                                {history.present.curvedPipeEditing.isEnabled ? (
-                                    <FaTimes className="h-4 w-4" />
-                                ) : (
-                                    <FaBezierCurve className="h-4 w-4" />
-                                )}
+                                <FaMountain className="h-4 w-4" />
                             </button>
+
 
                             {editMode === 'plant' && (
                                 <div className="flex items-center space-x-2 rounded-lg border border-gray-600 bg-gray-800 px-2 py-1">
@@ -13680,42 +13656,44 @@ export default function EnhancedHorticulturePlannerPage() {
                             )}
                         </div>
                     )}
-                    <button
-                        onClick={() => handleSaveDraft()}
-                        disabled={!canSaveDraft}
-                        className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
-                            canSaveDraft
-                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                                : 'cursor-not-allowed bg-gray-300 text-gray-500'
-                        }`}
-                    >
-                        {!isCompactMode ? (
-                            <div className="flex items-center space-x-2">
+                    <div className="flex w-full space-x-1">
+                        <button
+                            onClick={() => handleSaveDraft()}
+                            disabled={!canSaveDraft}
+                            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
+                                canSaveDraft
+                                    ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                    : 'cursor-not-allowed bg-gray-300 text-gray-500'
+                            }`}
+                        >
+                            {!isCompactMode ? (
+                                <div className="flex items-center space-x-2">
+                                    <FaSave />
+                                    <span>{isEditingExistingField ? t('บันทึกร่าง') : t('บันทึกร่าง')}</span>
+                                </div>
+                            ) : (
                                 <FaSave />
-                                <span>{isEditingExistingField ? t('บันทึกร่าง') : t('บันทึกร่าง')}</span>
-                            </div>
-                        ) : (
-                            <FaSave />
-                        )}
-                    </button>
-                    <button
-                        onClick={handleSaveProject}
-                        disabled={!canSaveProject}
-                        className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
-                            canSaveProject
-                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                : 'cursor-not-allowed bg-gray-300 text-gray-500'
-                        }`}
-                    >
-                        {!isCompactMode ? (
-                            <div className="flex items-center space-x-2">
+                            )}
+                        </button>
+                        <button
+                            onClick={handleSaveProject}
+                            disabled={!canSaveProject}
+                            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
+                                canSaveProject
+                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                    : 'cursor-not-allowed bg-gray-300 text-gray-500'
+                            }`}
+                        >
+                            {!isCompactMode ? (
+                                <div className="flex items-center space-x-2">
+                                    <FaSave />
+                                    <span>{isEditingExistingField ? t('สรุปโครงการ') : t('สรุปโครงการ')}</span>
+                                </div>
+                            ) : (
                                 <FaSave />
-                                <span>{isEditingExistingField ? t('บันทึกโครงการ') : t('บันทึกโครงการ')}</span>
-                            </div>
-                        ) : (
-                            <FaSave />
-                        )}
-                    </button>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="relative flex-1 bg-gray-900">
@@ -13724,6 +13702,44 @@ export default function EnhancedHorticulturePlannerPage() {
                             center={mapCenter}
                             zoom={mapRef.current ? mapRef.current.getZoom() || 16 : 16}
                             onMapLoad={handleMapLoad}
+                            mapOptions={{
+                                mapTypeId: 'hybrid', // ใช้ hybrid view เพื่อแสดงชื่อสถานที่
+                                clickableIcons: true,
+                                mapTypeControl: true,
+                                mapTypeControlOptions: {
+                                    position: 'TOP_CENTER' as any,
+                                    style: 'HORIZONTAL_BAR' as any,
+                                    mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
+                                },
+                                // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่
+                                styles: [
+                                    {
+                                        featureType: 'poi',
+                                        elementType: 'labels',
+                                        stylers: [{ visibility: 'on' }]
+                                    },
+                                    {
+                                        featureType: 'administrative',
+                                        elementType: 'labels',
+                                        stylers: [{ visibility: 'on' }]
+                                    },
+                                    {
+                                        featureType: 'road',
+                                        elementType: 'labels',
+                                        stylers: [{ visibility: 'on' }]
+                                    },
+                                    {
+                                        featureType: 'locality',
+                                        elementType: 'labels',
+                                        stylers: [{ visibility: 'on' }]
+                                    },
+                                    {
+                                        featureType: 'country',
+                                        elementType: 'labels',
+                                        stylers: [{ visibility: 'on' }]
+                                    }
+                                ]
+                            }}
                         >
                             <EnhancedHorticultureSearchControl
                                 onPlaceSelect={handleSearch}
@@ -13774,61 +13790,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                 // onMainPipesUpdate={(updatedMainPipes) => {
                                 //     pushToHistory({ mainPipes: updatedMainPipes as any });
                                 // }}
-                                enableCurvedDrawing={true}
                                 t={t}
                                 onMainPipeClick={handleMainPipeClick}
                                 onLateralPipeClick={handleLateralPipeClick}
                                 onLateralPipeMouseMove={handleLateralPipeMouseMove}
                             />
 
-                            <CurvedPipeEditor
-                                map={mapRef.current || undefined}
-                                pipes={[
-                                    ...history.present.mainPipes.map((pipe) => ({
-                                        id: pipe.id,
-                                        coordinates: pipe.coordinates,
-                                        type: 'mainPipe' as const,
-                                        anchorPoints:
-                                            pipe.coordinates.length >= 3
-                                                ? [
-                                                      pipe.coordinates[0], 
-                                                      pipe.coordinates[
-                                                          Math.floor(pipe.coordinates.length / 2)
-                                                      ], 
-                                                      pipe.coordinates[pipe.coordinates.length - 1], 
-                                                  ]
-                                                : pipe.coordinates,
-                                        isEditing:
-                                            history.present.curvedPipeEditing.editingPipes.has(
-                                                pipe.id
-                                            ),
-                                    })),
-                                    ...history.present.subMainPipes.map((pipe) => ({
-                                        id: pipe.id,
-                                        coordinates: pipe.coordinates,
-                                        type: 'subMainPipe' as const,
-                                        anchorPoints:
-                                            pipe.coordinates.length >= 3
-                                                ? [
-                                                      pipe.coordinates[0], 
-                                                      pipe.coordinates[
-                                                          Math.floor(pipe.coordinates.length / 2)
-                                                      ], 
-                                                      pipe.coordinates[pipe.coordinates.length - 1], 
-                                                  ]
-                                                : pipe.coordinates,
-                                        isEditing:
-                                            history.present.curvedPipeEditing.editingPipes.has(
-                                                pipe.id
-                                            ),
-                                    })),
-                                ]}
-                                onPipeUpdate={handleCurvedPipeUpdate}
-                                onEditingChange={handleCurvedPipeEditingChange}
-                                editMode={history.present.curvedPipeEditing.isEnabled}
-                                strokeColor="#2563eb"
-                                strokeWeight={2}
-                            />
 
                             {(() => {
                                 return null;
@@ -13897,7 +13864,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                 setSelectedPlantsForMove={setSelectedPlantsForMove}
                                 isDeleteMode={isDeleteMode}
                                 handleDeletePipe={handleDeletePipe}
-                                handleCurvedPipeEditingChange={handleCurvedPipeEditingChange}
                                 highlightedPlants={highlightedPlants}
                                 t={t}
                             />
@@ -14044,6 +14010,13 @@ export default function EnhancedHorticulturePlannerPage() {
                             isVisible={isDeleteMode}
                             onCancel={handleCancelDeleteMode}
                             deletedCount={deletedPipeCount}
+                            t={t}
+                        />
+
+                        <ElevationControlPanel
+                            map={mapRef.current}
+                            isVisible={showElevationControlPanel}
+                            onClose={() => setShowElevationControlPanel(false)}
                             t={t}
                         />
 
@@ -14611,7 +14584,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         pipeId: string,
         pipeType: 'mainPipe' | 'subMainPipe' | 'lateralPipe' | 'branchPipe'
     ) => void;
-    handleCurvedPipeEditingChange: (pipeId: string, isEditing: boolean) => void;
     highlightedPlants?: Set<string>;
     showSprinklerRadius?: boolean;
 }> = ({
@@ -14661,7 +14633,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     setSelectedPlantsForMove,
     isDeleteMode,
     handleDeletePipe,
-    handleCurvedPipeEditingChange,
     highlightedPlants = new Set(),
     showSprinklerRadius = false,
 }) => {
@@ -15564,10 +15535,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
                     const domEvent = event.domEvent as MouseEvent;
 
-                    if (data.curvedPipeEditing.isEnabled) {
-                        const isCurrentlyEditing = data.curvedPipeEditing.editingPipes.has(pipe.id);
-                        handleCurvedPipeEditingChange(pipe.id, !isCurrentlyEditing);
-                    } else if (
+                    if (
                         data.isEditModeEnabled &&
                         data.editModeSettings.selectionMode !== 'single' &&
                         domEvent?.ctrlKey
@@ -15805,7 +15773,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
             // Use lateralPipesState if available, otherwise fall back to data.lateralPipes
             const currentLateralPipes = lateralPipesState.length > 0 ? lateralPipesState : data.lateralPipes;
-            
             currentLateralPipes.forEach((lateralPipe) => {
                 if (!data.layerVisibility.lateralPipes) return;
 
@@ -15930,7 +15897,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                             lat: event.latLng.lat(),
                             lng: event.latLng.lng(),
                         });
-                    } else if (onLateralPipeClick && !data.curvedPipeEditing.isEnabled) {
+                    } else if (onLateralPipeClick) {
                         onLateralPipeClick(event, lateralPipe.id);
                     }
 
@@ -16382,10 +16349,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         event.domEvent.preventDefault();
                     }
 
-                    if (data.curvedPipeEditing.isEnabled) {
-                        const isCurrentlyEditing = data.curvedPipeEditing.editingPipes.has(pipe.id);
-                        handleCurvedPipeEditingChange(pipe.id, !isCurrentlyEditing);
-                    } else if (data.pipeConnection.isActive && event.latLng) {
+                    if (data.pipeConnection.isActive && event.latLng) {
                         onPipeClickInConnectionMode(pipe.id, 'subMainPipe', {
                             lat: event.latLng.lat(),
                             lng: event.latLng.lng(),
@@ -16567,11 +16531,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     plantZIndex = 100; 
                     plantClickable = false; 
                     plantDraggable = false; 
-                }
-                else if (data.curvedPipeEditing.isEnabled) {
-                    plantZIndex = 200;
-                    plantClickable = false;
-                    plantDraggable = false;
                 }
                 else if (data.lateralPipeDrawing.isActive) {
                     plantZIndex = isHighlightedForLateralPipe ? 1200 : 300; 
@@ -16901,7 +16860,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         onLateralPipeClick,
         connectionStartPlant?.id,
         editMode,
-        handleCurvedPipeEditingChange,
         handleDeletePipe,
         highlightedPipes,
         isDeleteMode,

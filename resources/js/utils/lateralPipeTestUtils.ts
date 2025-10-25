@@ -73,6 +73,7 @@ export const testPlantGrouping = (): boolean => {
         
         return rows.length > 0 && cols.length > 0;
     } catch (error) {
+        console.error('Error in testPlantGrouping:', error);
         return false;
     }
 };
@@ -104,8 +105,9 @@ export const testLateralPipeAlignment = (): boolean => {
             20
         );
         
-        return result.alignedEnd && result.selectedPlants && result.snappedStart;
+        return Boolean(result.alignedEnd && result.selectedPlants && result.snappedStart);
     } catch (error) {
+        console.error('Error in testLateralPipeAlignment:', error);
         return false;
     }
 };
@@ -150,6 +152,7 @@ export const testPlantRotation = (): boolean => {
                rotationInfo.rotationAngle === 45 &&
                transformed.lat !== testPlants[0].position.lat;
     } catch (error) {
+        console.error('Error in testPlantRotation:', error);
         return false;
     }
 };
@@ -213,6 +216,7 @@ export const testAutoLateralWithRotation = (): boolean => {
         
         return results.length > 0;
     } catch (error) {
+        console.error('Error in testAutoLateralWithRotation:', error);
         return false;
     }
 };

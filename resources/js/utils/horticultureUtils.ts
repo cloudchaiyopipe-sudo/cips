@@ -872,11 +872,7 @@ export const formatAreaInRai = (areaInRai: number): string => {
 
 export const formatDistance = (distance: number): string => {
     if (typeof distance !== 'number' || isNaN(distance) || distance < 0) return '0 ม.';
-    if (distance >= 1000) {
-        return `${(distance / 1000).toFixed(2)} กม.`;
-    } else {
         return `${distance.toFixed(2)} ม.`;
-    }
 };
 
 export const formatWaterVolume = (volume: number): string => {

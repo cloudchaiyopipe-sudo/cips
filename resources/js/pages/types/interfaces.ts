@@ -1,4 +1,3 @@
-// resources\js\pages\types\interfaces.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { PlantData } from '@/utils/horticultureUtils';
 export interface IrrigationInput {
@@ -221,6 +220,7 @@ export interface CalculationResults {
 
     allZoneResults?: ZoneResults[];
     projectSummary?: ProjectSummary;
+    maxPumpHeadForProjectMode?: number;
 }
 
 export interface Zone {

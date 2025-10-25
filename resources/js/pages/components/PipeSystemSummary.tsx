@@ -74,7 +74,6 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             const storedCalcStr = localStorage.getItem(storageKey);
             return storedCalcStr ? JSON.parse(storedCalcStr) : {};
         } catch (error) {
-            console.error('Error reading pipe calculations from localStorage:', error);
             return {};
         }
     }, [projectMode]);
@@ -103,7 +102,28 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             localStorage.setItem('greenhouse_pipe_calculations', JSON.stringify(cleanedData));
         }
 
-        if (!selectedPipes || Object.keys(filteredCalculations).length === 0) {
+        if (!selectedPipes) {
+            return null;
+        }
+
+        if (projectMode === 'greenhouse' && Object.keys(filteredCalculations).length === 0) {
+            const defaultCalculations = {
+                branch: { headLoss: 0, pipeLength: 0, flowRate: 0 },
+                main: { headLoss: 0, pipeLength: 0, flowRate: 0 },
+            };
+            localStorage.setItem('greenhouse_pipe_calculations', JSON.stringify(defaultCalculations));
+            return {
+                branchCalc: defaultCalculations.branch,
+                subMainCalc: null,
+                mainCalc: defaultCalculations.main,
+                emitterCalc: null,
+                branchSubMainCombined: 0,
+                totalHeadLoss: 0,
+                head20Percent: sprinklerPressure.head20PercentM,
+            };
+        }
+
+        if (Object.keys(filteredCalculations).length === 0) {
             return null;
         }
 

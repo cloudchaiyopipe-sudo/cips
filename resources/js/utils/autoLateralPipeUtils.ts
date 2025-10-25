@@ -33,6 +33,7 @@ export interface AutoLateralPipeResult {
         point: Coordinate;
         segmentIndex: number;
     };
+    connectionType?: 'through_submain' | 'from_submain';
 }
 
 export interface AutoLateralPipeConfig {
@@ -273,6 +274,7 @@ export const generateThroughSubMainPipes = (
                                         point: intersection,
                                         segmentIndex: i,
                                     },
+                                    connectionType: 'through_submain',
                                 };
 
                                 results.push(lateralPipe);
@@ -528,6 +530,7 @@ const generateSimpleLateralPipes = (
                                 point: closestPoint,
                                 segmentIndex: 0,
                             },
+                            connectionType: 'from_submain',
                         };
 
                         results.push(lateralPipe);
@@ -548,7 +551,6 @@ export const generateFromSubMainPipes = (
     config: AutoLateralPipeConfig
 ): AutoLateralPipeResult[] => {
     const results: AutoLateralPipeResult[] = [];
-
 
     for (const zone of zones) {
         const plantsInZone = zone.plants;
@@ -599,17 +601,16 @@ export const generateFromSubMainPipes = (
                     const rowStart = row[0].position;
                     const rowEnd = row[row.length - 1].position;
 
+                    // สร้างท่อย่อยทั้งสองฝั่งจากจุดเชื่อมต่อเดียวกัน
                     const distToStart = calculateDistance(closestPoint, rowStart);
                     const distToEnd = calculateDistance(closestPoint, rowEnd);
-                    const farEnd = distToStart > distToEnd ? rowStart : rowEnd;
 
-                    const pipeLength = calculateDistance(closestPoint, farEnd);
-
-                    if (pipeLength >= config.minPipeLength && pipeLength <= config.maxPipeLength) {
-                        const lateralPipe: AutoLateralPipeResult = {
-                            id: `auto-lateral-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                            coordinates: [closestPoint, farEnd],
-                            length: pipeLength,
+                    // ฝั่งซ้าย (ไปทาง rowStart)
+                    if (distToStart >= config.minPipeLength && distToStart <= config.maxPipeLength) {
+                        const leftPipe: AutoLateralPipeResult = {
+                            id: `auto-lateral-left-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            coordinates: [closestPoint, rowStart],
+                            length: distToStart,
                             plants: row,
                             placementMode: 'over_plants',
                             totalFlowRate: row.reduce(
@@ -623,9 +624,33 @@ export const generateFromSubMainPipes = (
                                 point: closestPoint,
                                 segmentIndex: segmentIndex,
                             },
+                            connectionType: 'from_submain',
                         };
+                        results.push(leftPipe);
+                    }
 
-                        results.push(lateralPipe);
+                    // ฝั่งขวา (ไปทาง rowEnd)
+                    if (distToEnd >= config.minPipeLength && distToEnd <= config.maxPipeLength) {
+                        const rightPipe: AutoLateralPipeResult = {
+                            id: `auto-lateral-right-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            coordinates: [closestPoint, rowEnd],
+                            length: distToEnd,
+                            plants: row,
+                            placementMode: 'over_plants',
+                            totalFlowRate: row.reduce(
+                                (sum, plant) => sum + plant.plantData.waterNeed,
+                                0
+                            ),
+                            connectionPoint: closestPoint,
+                            zoneId: zone.id,
+                            intersectionData: {
+                                subMainPipeId: subMainPipe.id,
+                                point: closestPoint,
+                                segmentIndex: segmentIndex,
+                            },
+                            connectionType: 'from_submain',
+                        };
+                        results.push(rightPipe);
                     }
                 }
             }
@@ -653,7 +678,10 @@ export const generateAutoLateralPipes = (
 
     if (mode === 'through_submain') {
         results = generateThroughSubMainPipes(subMainPipes, zones, defaultConfig);
+    } else if (mode === 'from_submain') {
+        results = generateFromSubMainPipes(subMainPipes, zones, defaultConfig);
     } else {
+        // Fallback to simple mode
         results = generateSimpleLateralPipes(subMainPipes, zones, defaultConfig);
     }
 
@@ -710,4 +738,65 @@ export const validateAutoLateralPipes = (
     }
 
     return { valid, invalid };
+};
+
+export interface AutoLateralConnectionPoint {
+    id: string;
+    position: Coordinate;
+    connectedLaterals: string[];
+    subMainPipeId: string;
+    zoneId: string;
+    type: 'through_submain' | 'from_submain';
+    color: string;
+    title: string;
+}
+
+export const createAutoLateralConnectionPoints = (
+    pipes: AutoLateralPipeResult[]
+): AutoLateralConnectionPoint[] => {
+    const connectionPoints: AutoLateralConnectionPoint[] = [];
+    const connectionMap = new Map<string, AutoLateralConnectionPoint>();
+
+    for (const pipe of pipes) {
+        if (!pipe.intersectionData) continue;
+
+        const { point, subMainPipeId } = pipe.intersectionData;
+        const connectionType = pipe.connectionType || 'from_submain';
+        
+        // สร้าง key ที่รวมโซนและโหมดการลากท่อย่อย เพื่อแยกจุดเชื่อมต่อตามโซนและโหมด
+        const pointKey = `${point.lat.toFixed(6)}-${point.lng.toFixed(6)}-${pipe.zoneId}-${connectionType}`;
+
+        if (connectionMap.has(pointKey)) {
+            const existingPoint = connectionMap.get(pointKey)!;
+            existingPoint.connectedLaterals.push(pipe.id);
+            
+            // อัปเดต title ให้แสดงจำนวนท่อที่เชื่อมต่อ
+            if (connectionType === 'through_submain') {
+                existingPoint.title = `จุดข้ามท่อเมนย่อย (ลากผ่าน) - ${existingPoint.connectedLaterals.length} ท่อ`;
+            } else {
+                existingPoint.title = `จุดเชื่อมต่อท่อเมนย่อย (เริ่มจาก) - ${existingPoint.connectedLaterals.length} ท่อ`;
+            }
+        } else {
+            const color = connectionType === 'through_submain' ? '#4CAF50' : '#FFD700'; // เขียว : เหลือง
+            const title = connectionType === 'through_submain' 
+                ? 'จุดข้ามท่อเมนย่อย (ลากผ่าน) - 1 ท่อ' 
+                : 'จุดเชื่อมต่อท่อเมนย่อย (เริ่มจาก) - 1 ท่อ';
+
+            const connectionPoint: AutoLateralConnectionPoint = {
+                id: `auto-connection-${pointKey}`,
+                position: point,
+                connectedLaterals: [pipe.id],
+                subMainPipeId,
+                zoneId: pipe.zoneId,
+                type: connectionType,
+                color,
+                title,
+            };
+
+            connectionMap.set(pointKey, connectionPoint);
+            connectionPoints.push(connectionPoint);
+        }
+    }
+
+    return connectionPoints;
 };

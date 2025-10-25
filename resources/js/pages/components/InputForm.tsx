@@ -7,6 +7,7 @@ import {
     SprinklerSetGroup,
     SprinklerSetItem,
 } from '../types/interfaces';
+import { findMatchingPlotData } from '../../utils/greenhouseZoneMapping';
 import { formatNumber } from '../utils/calculations';
 import { Zone, PlantData } from '../../utils/horticultureUtils';
 import {
@@ -126,24 +127,20 @@ const InputForm: React.FC<InputFormProps> = ({
     const fieldCropSystemDataRef = useRef(fieldCropSystemData);
     fieldCropSystemDataRef.current = fieldCropSystemData;
     
-    // Use refs to avoid infinite loops in useEffect
     const inputRef = useRef(input);
     const onInputChangeRef = useRef(onInputChange);
     const activeZoneRef = useRef(activeZone);
     
-    // Update refs when props change
     useEffect(() => {
         inputRef.current = input;
         onInputChangeRef.current = onInputChange;
         activeZoneRef.current = activeZone;
     });
 
-    // Helper function to check if point is in zone (simplified version)
     const isPointInZone = useCallback((point: any, zone: any): boolean => {
         if (!point.lat || !point.lng || !zone.coordinates) return false;
         
         try {
-            // Simple bounding box check (not as accurate as turf.js but sufficient for this use case)
             const zoneCoords = zone.coordinates;
             if (!Array.isArray(zoneCoords) || zoneCoords.length < 3) return false;
             
@@ -215,16 +212,12 @@ const InputForm: React.FC<InputFormProps> = ({
             const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
             const selections = savedSelections ? JSON.parse(savedSelections) : {};
 
-            // For field-crop mode, we need to check if fieldCropSystemDataRef.current has zones array
-            // or if it's fieldCropData with zones.info structure
             let activeZoneData: any = null;
             if (fieldCropSystemDataRef.current.zones && Array.isArray(fieldCropSystemDataRef.current.zones)) {
-                // This is fieldCropSystemData format
                 activeZoneData = fieldCropSystemDataRef.current.zones.find(
                     (z: any) => z.id === activeZoneId
                 );
             } else if (fieldCropSystemDataRef.current.zones?.info && Array.isArray(fieldCropSystemDataRef.current.zones.info)) {
-                // This is fieldCropData format
                 activeZoneData = fieldCropSystemDataRef.current.zones.info.find(
                     (z: any) => z.id === activeZoneId
                 );
@@ -289,9 +282,9 @@ const InputForm: React.FC<InputFormProps> = ({
 
         const equipments: ConnectionPointEquipment[] = [];
 
-        const filteredStats = activeZoneId
+        const filteredStats = activeZoneId && activeZoneId.trim() !== ''
             ? connectionStats.filter((zoneStats) => zoneStats.zoneId === activeZoneId)
-            : connectionStats;
+            : [];
 
         filteredStats.forEach((zoneStats) => {
             const connectionTypes = [
@@ -538,7 +531,6 @@ const InputForm: React.FC<InputFormProps> = ({
                     setSprinklerGroups([]);
                 }
             } catch (error) {
-                console.error('Error loading sprinkler groups:', error);
                 setSprinklerGroups([]);
             } finally {
                 setLoadingSprinklerGroups(false);
@@ -566,7 +558,6 @@ const InputForm: React.FC<InputFormProps> = ({
                     setCategories([]);
                 }
             } catch (error) {
-                console.error('Error loading categories:', error);
                 setCategories([]);
             }
         };
@@ -581,11 +572,9 @@ const InputForm: React.FC<InputFormProps> = ({
                 const data = await response.json();
                 setEquipments(Array.isArray(data) ? data : []);
             } else {
-                console.error('Failed to fetch equipments, status:', response.status);
                 setEquipments([]);
             }
         } catch (error) {
-            console.error('Error loading equipments:', error);
             setEquipments([]);
         } finally {
             setLoadingEquipments(false);
@@ -627,7 +616,39 @@ const InputForm: React.FC<InputFormProps> = ({
                     }
                 }
             } catch (error) {
-                console.error('Error loading garden zone statistics:', error);
+                console.error('Error calculating garden water requirement:', error);
+            }
+        } else if (projectMode === 'greenhouse' && activeZone) {
+            try {
+                // ดึงข้อมูลจาก localStorage ที่เก็บไว้จาก green-house-summary.tsx
+                const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
+                if (greenhouseSystemDataStr) {
+                    const systemData = JSON.parse(greenhouseSystemDataStr);
+                    const plotPipeData = systemData.plotPipeData || [];
+                    
+                    // หา plot ปัจจุบันจาก plotPipeData
+                    const currentPlotPipeData = plotPipeData.find(
+                        (plot: any) => plot.plotId === activeZone.id
+                    );
+                    
+                    if (currentPlotPipeData && currentPlotPipeData.totalFlowRate) {
+                        const totalFlowRate = currentPlotPipeData.totalFlowRate;
+                        
+                        setGardenWaterRequirement(totalFlowRate);
+
+                        if (
+                            totalFlowRate > 0 &&
+                            Math.abs(totalFlowRate - inputRef.current.waterPerTreeLiters) > 0.01
+                        ) {
+                            onInputChangeRef.current({
+                                ...inputRef.current,
+                                waterPerTreeLiters: totalFlowRate,
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing greenhouse data:', error);
             }
         } else if (projectMode === 'field-crop' && activeZone) {
             try {
@@ -657,7 +678,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         }
                                     }
                                 } catch (error) {
-                                    console.error('Error loading from localStorage:', error);
+                                    console.error('Error parsing fieldCropData:', error);
                                 }
                             }
                             const flowPerUnit = {
@@ -690,7 +711,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     }
                 }
             } catch (error) {
-                console.error('Error loading field crop zone data:', error);
+                console.error('Error calculating field crop water requirement:', error);
             }
         }
     }, [projectMode, activeZone?.id, activeZone, fieldCropSystemData, fieldCropIrrigationSettings, calculateZoneIrrigationCounts]);
@@ -845,7 +866,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 sprinklerName: selectedSprinkler.productCode,
             };
         } catch (error) {
-            console.error('Error calculating sprinkler pressure:', error);
             return null;
         }
     };
@@ -909,7 +929,6 @@ const InputForm: React.FC<InputFormProps> = ({
 
             return zoneStats;
         } catch (error) {
-            console.error('Error calculating branch pipe stats:', error);
             return null;
         }
     };
@@ -976,7 +995,7 @@ const InputForm: React.FC<InputFormProps> = ({
             case 'field-crop':
                 return t('ต้องการน้ำ (ลิตร/นาที)');
             case 'greenhouse':
-                return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
+                return t('ความต้องการน้ำ (ลิตร/นาที)');
             case 'garden':
                 return t('ต้องการน้ำ (ลิตร/นาที)');
             case 'horticulture':
@@ -1217,7 +1236,30 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                value={input.waterPerTreeLiters}
+                                value={(() => {
+                                    if (projectMode === 'greenhouse' && activeZone) {
+                                        try {
+                                            const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
+                                            
+                                            if (greenhouseSystemDataStr) {
+                                                const systemData = JSON.parse(greenhouseSystemDataStr);
+                                                const plotPipeData = systemData.plotPipeData || [];
+                                                // ใช้ utility function ที่ยืดหยุ่น
+                                                const currentPlotPipeData = findMatchingPlotData(activeZone.id, plotPipeData) as any;
+                                                
+                                                
+                                                
+                                                if (currentPlotPipeData && currentPlotPipeData.totalFlowRate) {
+                                                    // ใช้ค่าเดียวกับที่แสดงใน Flow Rate Section ของแต่ละโซน
+                                                    return currentPlotPipeData.totalFlowRate;
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Error getting greenhouse flow rate:', error);
+                                        }
+                                    }
+                                    return input.waterPerTreeLiters;
+                                })()}
                                 onChange={(e) => {
                                     const value = e.target.value;
                                     if (value === '') {
@@ -1448,8 +1490,8 @@ const InputForm: React.FC<InputFormProps> = ({
                     <h3 className="text-lg font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
 
                     <div className="rounded-lg bg-gray-700 p-3">
-                        <h4 className="mb-2 text-sm font-medium text-purple-300">
-                            🔹 {t('ท่อย่อย (Branch Pipe)')}
+                        <h4 className="mb-2 text-sm font-medium text-yellow-300">
+                        🟡 {t('ท่อย่อย (Branch Pipe)')}
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1503,12 +1545,12 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
 
-                    <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestSecondaryPipeM > 0 ? (
+                    <div className="rounded-lg bg-gray-700 p-3">
                             <>
-                                <h4 className="mb-2 text-sm font-medium text-orange-300">
-                                    🔸 {t('ท่อเมนรอง (Secondary)')}
-                                </h4>
+                                    <h4 className="mb-2 text-sm font-medium text-purple-300">
+                                    🟣 {t('ท่อเมนรอง (Sub Main)')}
+                                    </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="mb-1 block text-sm">
@@ -1562,31 +1604,16 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </div>
                                 </div>
                             </>
-                        ) : (
-                            <div className="flex items-center justify-between">
-                                <div className="text-center text-gray-400">
-                                    <div className="mb-1 text-2xl">➖</div>
-                                    <p className="text-sm">{t('ไม่ใช้ท่อเมนรอง')}</p>
-                                </div>
-                                {(projectMode === 'horticulture' ||
-                                    projectMode === 'field-crop' ||
-                                    projectMode === 'greenhouse') && (
-                                    <button
-                                        onClick={() => updateInput('longestSecondaryPipeM', 50)}
-                                        className="text-sm text-blue-400 hover:text-blue-300"
-                                    >
-                                        + {t('เพิ่มท่อเมนรอง')}
-                                    </button>
-                                )}
-                            </div>
-                        )}
                     </div>
 
-                    <div className="rounded-lg bg-gray-700 p-3">
+                        ) : (
+                            null
+                        )}
+
                         {input.longestMainPipeM > 0 ? (
-                            <>
-                                <h4 className="mb-2 text-sm font-medium text-cyan-300">
-                                    🔷 {t('ท่อเมนหลัก')} (Main)
+                            <div className="rounded-lg bg-gray-700 p-3">
+                                <h4 className="mb-2 text-sm font-medium text-red-300">
+                                    🔴 {t('ท่อเมนหลัก (Main)')}
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
@@ -1640,26 +1667,10 @@ const InputForm: React.FC<InputFormProps> = ({
                                         />
                                     </div>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex items-center justify-between">
-                                <div className="text-center text-gray-400">
-                                    <div className="mb-1 text-2xl">➖</div>
-                                    <p className="text-sm">{t('ไม่ใช้ท่อเมนหลัก')}</p>
-                                </div>
-                                {(projectMode === 'horticulture' ||
-                                    projectMode === 'field-crop' ||
-                                    projectMode === 'greenhouse') && (
-                                    <button
-                                        onClick={() => updateInput('longestMainPipeM', 100)}
-                                        className="text-sm text-blue-400 hover:text-blue-300"
-                                    >
-                                        + {t('เพิ่มท่อเมนหลัก')}
-                                    </button>
-                                )}
                             </div>
+                        ) : (
+                            null
                         )}
-                    </div>
 
                     {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 ? (
                         <>
@@ -1930,14 +1941,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-lg bg-gray-700 p-4">
-                        <div className="text-center text-gray-400">
-                            <p className="text-sm">🔗 {t('ไม่มีข้อมูลจุดเชื่อมต่อ')}</p>
-                            <p className="mt-1 text-xs">
-                                {t('กรุณาสร้างโปรเจกต์ที่มีท่อและจุดเชื่อมต่อก่อน')}
-                            </p>
-                        </div>
-                    </div>
+                    null
                 )}
             </div>
 

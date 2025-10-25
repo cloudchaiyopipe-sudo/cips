@@ -348,6 +348,14 @@ Route::get('/fields-api', function () {
                     $realArea = $projectStats['totalAreaInRai'] ?? $projectStats['totalArea'] ?? 0;
                     $realWaterNeed = $projectStats['totalWaterNeedPerSession'] ?? $projectStats['totalWaterNeed'] ?? 0;
                     $realPlants = $projectStats['totalPlants'] ?? 0;
+                    
+                    // Check if data is in results object
+                    if (isset($projectStats['results'])) {
+                        $results = $projectStats['results'];
+                        $realArea = $results['totalArea'] ?? $realArea;
+                        $realWaterNeed = $results['totalWaterRequiredLPM'] ?? $realWaterNeed;
+                        $realPlants = $results['totalSprinklers'] ?? $realPlants;
+                    }
                 } elseif ($projectData) {
                     // Fallback to project_data if project_stats is not available
                     if (isset($projectData['plants']) && is_array($projectData['plants'])) {
@@ -361,6 +369,21 @@ Route::get('/fields-api', function () {
                 // Convert area to ไร่ if it's in square meters
                 if ($realArea > 1000) { // If it's likely in square meters
                     $realArea = $realArea / 1600; // Convert to ไร่ (1 ไร่ = 1600 ตร.ม.)
+                }
+                
+                // Also check if we have total_area from the field itself
+                if ($field->total_area && $field->total_area > 0) {
+                    $realArea = $field->total_area / 1600; // Convert to ไร่
+                }
+                
+                // Also check if we have total_water_need from the field itself
+                if ($field->total_water_need && $field->total_water_need > 0) {
+                    $realWaterNeed = $field->total_water_need;
+                }
+                
+                // Also check if we have total_plants from the field itself
+                if ($field->total_plants && $field->total_plants > 0) {
+                    $realPlants = $field->total_plants;
                 }
                 
                 return [

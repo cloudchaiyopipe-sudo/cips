@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import React, { useEffect, useRef, useState } from 'react';
-import CurvedPipeDrawingManager from './CurvedPipeDrawingManager';
-import CurvedPipeControlPanel from './CurvedPipeControlPanel';
+import React, { useEffect, useRef } from 'react';
 import {
     findClosestPointOnLineSegment as utilsFindClosestPointOnLineSegment,
     calculateDistanceBetweenPoints as utilsCalculateDistanceBetweenPoints,
@@ -32,7 +30,6 @@ interface HorticultureDrawingManagerProps {
     pump?: Coordinate | null;
     mainPipes?: Pipe[];
     subMainPipes?: Pipe[];
-    enableCurvedDrawing?: boolean;
     t?: (key: string) => string;
     onMainPipeClick?: (pipeId: string, clickPosition: Coordinate) => void;
     onLateralPipeClick?: (event: google.maps.MapMouseEvent) => void;
@@ -459,17 +456,11 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     pump = null,
     mainPipes = [],
     subMainPipes = [],
-    enableCurvedDrawing = false,
-    t = (key: string) => key,
     onMainPipeClick,
     onLateralPipeClick,
     onLateralPipeMouseMove,
 }) => {
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
-    const [showCurvedPipePanel, setShowCurvedPipePanel] = useState(false);
-    const [isCurvedDrawingActive, setIsCurvedDrawingActive] = useState(false);
-    const [anchorPointsCount, setAnchorPointsCount] = useState(0);
-    const [showGuides, setShowGuides] = useState(true);
 
     useEffect(() => {
         if (!map || !window.google?.maps?.drawing) {
@@ -766,41 +757,8 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     ]);
 
 
-    const handleFinishCurvedDrawing = () => {
-        setIsCurvedDrawingActive(false);
-        setAnchorPointsCount(0);
-    };
 
 
-    const handleCancelCurvedDrawing = () => {
-        setIsCurvedDrawingActive(false);
-        setAnchorPointsCount(0);
-        setShowCurvedPipePanel(false);
-    };
-
-
-    const handleClearAll = () => {
-        setIsCurvedDrawingActive(false);
-        setAnchorPointsCount(0);
-    };
-
-    const handleCurvedPipeComplete = (coordinates: Coordinate[], pipeType: string) => {
-        onCreated(coordinates, pipeType);
-        setIsCurvedDrawingActive(false);
-        setAnchorPointsCount(0);
-    };
-
-
-    useEffect(() => {
-        if (enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe')) {
-            setShowCurvedPipePanel(true);
-            setIsCurvedDrawingActive(true);
-            setAnchorPointsCount(0);
-        } else {
-            setShowCurvedPipePanel(false);
-            setIsCurvedDrawingActive(false);
-        }
-    }, [enableCurvedDrawing, editMode]);
 
     useEffect(() => {
         return () => {
@@ -819,32 +777,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 
     return (
         <>
-            {enableCurvedDrawing && showCurvedPipePanel && (
-                <CurvedPipeControlPanel
-                    isActive={showCurvedPipePanel}
-                    onFinishDrawing={handleFinishCurvedDrawing}
-                    onCancelDrawing={handleCancelCurvedDrawing}
-                    onClearAll={handleClearAll}
-                    anchorPointsCount={anchorPointsCount}
-                    showGuides={showGuides}
-                    onShowGuidesChange={setShowGuides}
-                    t={t}
-                />
-            )}
-
-            {enableCurvedDrawing && (editMode === 'mainPipe' || editMode === 'subMainPipe') && (
-                <CurvedPipeDrawingManager
-                    map={map}
-                    isActive={isCurvedDrawingActive}
-                    pipeType={editMode as 'mainPipe' | 'subMainPipe'}
-                    onPipeComplete={handleCurvedPipeComplete}
-                    onCancel={handleCancelCurvedDrawing}
-                    strokeColor={strokeColor}
-                    strokeWeight={3}
-                    showGuides={showGuides}
-                    onAnchorPointsChange={setAnchorPointsCount}
-                />
-            )}
         </>
     );
 };

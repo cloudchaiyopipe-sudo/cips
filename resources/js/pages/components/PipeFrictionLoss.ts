@@ -1,6 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Pipe Friction Loss Data (Pressure drop in kgf/cm²/km)
-// Data extracted from pipe friction tables
 
 export interface PipeFlowData {
     flow: number; // Flow rate (liters/minute)
@@ -11,11 +9,9 @@ export interface PipeSizeData {
     [size: string]: PipeFlowData[];
 }
 
-// PE PN 2.5 Data
 export function getPE_PN25_Data(): PipeSizeData {
     return {
         '20mm': [
-            // 0.5 นิ้ว
             { flow: 1, pressureLoss: 0.01 },
             { flow: 2, pressureLoss: 0.02 },
             { flow: 3, pressureLoss: 0.04 },
@@ -43,7 +39,6 @@ export function getPE_PN25_Data(): PipeSizeData {
             { flow: 40, pressureLoss: 4.7 },
         ],
         '25mm': [
-            // 0.75 นิ้ว
             { flow: 3, pressureLoss: 0.01 },
             { flow: 4, pressureLoss: 0.02 },
             { flow: 5, pressureLoss: 0.03 },
@@ -79,7 +74,6 @@ export function getPE_PN25_Data(): PipeSizeData {
             { flow: 75, pressureLoss: 4.97 },
         ],
         '32mm': [
-            // 1 นิ้ว
             { flow: 6, pressureLoss: 0.01 },
             { flow: 7, pressureLoss: 0.02 },
             { flow: 8, pressureLoss: 0.02 },
@@ -121,7 +115,6 @@ export function getPE_PN25_Data(): PipeSizeData {
             { flow: 140, pressureLoss: 4.7 },
         ],
         '40mm': [
-            // 1.25 นิ้ว
             { flow: 10, pressureLoss: 0.01 },
             { flow: 12, pressureLoss: 0.02 },
             { flow: 14, pressureLoss: 0.02 },
@@ -167,7 +160,6 @@ export function getPE_PN25_Data(): PipeSizeData {
             { flow: 240, pressureLoss: 4.45 },
         ],
         '50mm': [
-            // 1.5 นิ้ว
             { flow: 20, pressureLoss: 0.01 },
             { flow: 22, pressureLoss: 0.02 },
             { flow: 24, pressureLoss: 0.02 },
@@ -219,7 +211,6 @@ export function getPE_PN25_Data(): PipeSizeData {
             { flow: 460, pressureLoss: 4.91 },
         ],
         '63mm': [
-            // 2 นิ้ว
             { flow: 36, pressureLoss: 0.01 },
             { flow: 38, pressureLoss: 0.02 },
             { flow: 40, pressureLoss: 0.02 },
@@ -294,7 +285,6 @@ export function getPE_PN4_Data(): PipeSizeData {
             { flow: 20, pressureLoss: 5.09 },
         ],
         '20mm': [
-            // 0.5 นิ้ว
             { flow: 3, pressureLoss: 0.05 },
             { flow: 4, pressureLoss: 0.09 },
             { flow: 5, pressureLoss: 0.13 },
@@ -317,7 +307,6 @@ export function getPE_PN4_Data(): PipeSizeData {
             { flow: 34, pressureLoss: 4.59 },
         ],
         '25mm': [
-            // 0.75 นิ้ว
             { flow: 5, pressureLoss: 0.05 },
             { flow: 6, pressureLoss: 0.06 },
             { flow: 7, pressureLoss: 0.08 },
@@ -348,7 +337,6 @@ export function getPE_PN4_Data(): PipeSizeData {
             { flow: 60, pressureLoss: 4.49 },
         ],
         '32mm': [
-            // 1 นิ้ว
             { flow: 10, pressureLoss: 0.05 },
             { flow: 12, pressureLoss: 0.07 },
             { flow: 14, pressureLoss: 0.09 },
@@ -384,7 +372,6 @@ export function getPE_PN4_Data(): PipeSizeData {
             { flow: 120, pressureLoss: 4.82 },
         ],
         '40mm': [
-            // 1.25 นิ้ว
             { flow: 18, pressureLoss: 0.05 },
             { flow: 20, pressureLoss: 0.06 },
             { flow: 22, pressureLoss: 0.07 },
@@ -425,7 +412,6 @@ export function getPE_PN4_Data(): PipeSizeData {
             { flow: 220, pressureLoss: 5.0 },
         ],
         '50mm': [
-            // 1.5 นิ้ว
             { flow: 32, pressureLoss: 0.05 },
             { flow: 34, pressureLoss: 0.05 },
             { flow: 36, pressureLoss: 0.06 },
@@ -468,7 +454,6 @@ export function getPE_PN4_Data(): PipeSizeData {
             { flow: 400, pressureLoss: 5.05 },
         ],
         '63mm': [
-            // 2 นิ้ว
             { flow: 60, pressureLoss: 0.05 },
             { flow: 65, pressureLoss: 0.06 },
             { flow: 70, pressureLoss: 0.07 },
@@ -528,7 +513,6 @@ export function getPE_PN63_Data(): PipeSizeData {
             { flow: 30, pressureLoss: 12.38 },
         ],
         '20mm': [
-            // 0.5 นิ้ว (เพิ่มเพื่อรองรับ PN16 → PN6.3)
             { flow: 1, pressureLoss: 0.02 },
             { flow: 2, pressureLoss: 0.05 },
             { flow: 3, pressureLoss: 0.1 },
@@ -547,7 +531,6 @@ export function getPE_PN63_Data(): PipeSizeData {
             { flow: 60, pressureLoss: 27.34 },
         ],
         '25mm': [
-            // 0.75 นิ้ว
             { flow: 2, pressureLoss: 0.01 },
             { flow: 3, pressureLoss: 0.02 },
             { flow: 4, pressureLoss: 0.03 },
@@ -582,7 +565,6 @@ export function getPE_PN63_Data(): PipeSizeData {
             { flow: 65, pressureLoss: 4.55 },
         ],
         '32mm': [
-            // 1 นิ้ว
             { flow: 10, pressureLoss: 0.04 },
             { flow: 12, pressureLoss: 0.06 },
             { flow: 14, pressureLoss: 0.08 },
@@ -619,7 +601,6 @@ export function getPE_PN63_Data(): PipeSizeData {
             { flow: 130, pressureLoss: 4.59 },
         ],
         '40mm': [
-            // 1.25 นิ้ว
             { flow: 18, pressureLoss: 0.04 },
             { flow: 20, pressureLoss: 0.05 },
             { flow: 22, pressureLoss: 0.06 },
@@ -661,7 +642,6 @@ export function getPE_PN63_Data(): PipeSizeData {
             { flow: 240, pressureLoss: 4.97 },
         ],
         '50mm': [
-            // 1.5 นิ้ว
             { flow: 36, pressureLoss: 0.05 },
             { flow: 38, pressureLoss: 0.06 },
             { flow: 40, pressureLoss: 0.06 },
@@ -703,7 +683,6 @@ export function getPE_PN63_Data(): PipeSizeData {
             { flow: 420, pressureLoss: 4.73 },
         ],
         '63mm': [
-            // 2 นิ้ว
             { flow: 60, pressureLoss: 0.04 },
             { flow: 65, pressureLoss: 0.05 },
             { flow: 70, pressureLoss: 0.06 },
@@ -811,7 +790,6 @@ export function getPE_PN63_Data(): PipeSizeData {
 export function getPVC_Class5_Data(): PipeSizeData {
     return {
         '35mm': [
-            // 1.25 นิ้ว
             { flow: 10, pressureLoss: 0.01 },
             { flow: 20, pressureLoss: 0.03 },
             { flow: 22, pressureLoss: 0.04 },
@@ -856,7 +834,6 @@ export function getPVC_Class5_Data(): PipeSizeData {
             { flow: 300, pressureLoss: 4.56 },
         ],
         '40mm': [
-            // 1.5 นิ้ว
             { flow: 24, pressureLoss: 0.02 },
             { flow: 26, pressureLoss: 0.02 },
             { flow: 28, pressureLoss: 0.02 },
@@ -906,7 +883,6 @@ export function getPVC_Class5_Data(): PipeSizeData {
             { flow: 460, pressureLoss: 5.02 },
         ],
         '55mm': [
-            // 2 นิ้ว
             { flow: 36, pressureLoss: 0.01 },
             { flow: 38, pressureLoss: 0.02 },
             { flow: 40, pressureLoss: 0.02 },
@@ -1220,7 +1196,6 @@ export function getPVC_Class5_Data(): PipeSizeData {
 export function getPVC_Class85_Data(): PipeSizeData {
     return {
         '18mm': [
-            // 0.5 นิ้ว
             { flow: 1, pressureLoss: 0.01 },
             { flow: 2, pressureLoss: 0.02 },
             { flow: 3, pressureLoss: 0.04 },
@@ -1249,7 +1224,6 @@ export function getPVC_Class85_Data(): PipeSizeData {
             { flow: 42, pressureLoss: 5.14 },
         ],
         '20mm': [
-            // 0.75 นิ้ว
             { flow: 2, pressureLoss: 0.01 },
             { flow: 3, pressureLoss: 0.02 },
             { flow: 4, pressureLoss: 0.04 },
@@ -1280,7 +1254,6 @@ export function getPVC_Class85_Data(): PipeSizeData {
             { flow: 48, pressureLoss: 3.95 },
         ],
         '25mm': [
-            // 1 นิ้ว
             { flow: 8, pressureLoss: 0.01 },
             { flow: 9, pressureLoss: 0.02 },
             { flow: 10, pressureLoss: 0.03 },
@@ -1325,7 +1298,6 @@ export function getPVC_Class85_Data(): PipeSizeData {
             { flow: 190, pressureLoss: 5.12 },
         ],
         '35mm': [
-            // 1.25 นิ้ว
             { flow: 12, pressureLoss: 0.01 },
             { flow: 14, pressureLoss: 0.02 },
             { flow: 16, pressureLoss: 0.02 },
@@ -1373,7 +1345,6 @@ export function getPVC_Class85_Data(): PipeSizeData {
             { flow: 300, pressureLoss: 5.17 },
         ],
         '40mm': [
-            // 1.5 นิ้ว
             { flow: 18, pressureLoss: 0.01 },
             { flow: 20, pressureLoss: 0.02 },
             { flow: 22, pressureLoss: 0.02 },
@@ -1424,7 +1395,6 @@ export function getPVC_Class85_Data(): PipeSizeData {
             { flow: 420, pressureLoss: 5.05 },
         ],
         '55mm': [
-            // 2 นิ้ว
             { flow: 32, pressureLoss: 0.01 },
             { flow: 34, pressureLoss: 0.02 },
             { flow: 36, pressureLoss: 0.02 },

@@ -103,7 +103,6 @@ const calculateSprinklerPressure = (
         const workingPressureBar = avgPressureBar * workingPressureFactor;
         return workingPressureBar * 10.197;
     } catch (error) {
-        console.error('Error calculating pressure from sprinkler:', error);
         return defaultPressure;
     }
 };
@@ -123,11 +122,10 @@ const calculateSprinklerBasedFlow = (
         totalWaterPerMinute = totalSprinklers * flowPerSprinkler;
 
         if (totalSprinklers === 1) {
-            console.warn('⚠️ totalSprinklers is 1, this might be incorrect for field-crop mode');
+            console.error('Error calculating pressure from sprinkler: totalSprinklers is 1');
         }
 
         if (totalWaterPerMinute === 0 || isNaN(totalWaterPerMinute)) {
-            console.warn('⚠️ totalWaterPerMinute is 0 or NaN, using fallback calculation');
             try {
                 const fieldCropSystemDataStr = localStorage.getItem('fieldCropSystemData');
                 if (fieldCropSystemDataStr) {
@@ -659,37 +657,55 @@ const autoSelectBestPump = (
 ): any => {
     if (!analyzedPumps || analyzedPumps.length === 0) return null;
 
-    const adequatePumps = analyzedPumps.filter(
+    const fullyAdequatePumps = analyzedPumps.filter(
         (pump) => pump.isFlowAdequate && pump.isHeadAdequate
     );
 
-    if (adequatePumps.length === 0) {
-        return analyzedPumps.sort((a, b) => {
-            const aDeficit =
-                Math.max(0, requiredFlowLPM - a.maxFlow) +
-                Math.max(0, requiredHeadM - a.maxHead) * 2;
-            const bDeficit =
-                Math.max(0, requiredFlowLPM - b.maxFlow) +
-                Math.max(0, requiredHeadM - b.maxHead) * 2;
-            return aDeficit - bDeficit;
+    if (fullyAdequatePumps.length > 0) {
+        return fullyAdequatePumps.sort((a, b) => {
+            const aFlowEfficiency = a.maxFlow / requiredFlowLPM;
+            const aHeadEfficiency = a.maxHead / requiredHeadM;
+            const aEfficiency = Math.abs(aFlowEfficiency - 1.0) + Math.abs(aHeadEfficiency - 1.0);
+            
+            const bFlowEfficiency = b.maxFlow / requiredFlowLPM;
+            const bHeadEfficiency = b.maxHead / requiredHeadM;
+            const bEfficiency = Math.abs(bFlowEfficiency - 1.0) + Math.abs(bHeadEfficiency - 1.0);
+            
+            if (Math.abs(aEfficiency - bEfficiency) > 0.1) {
+                return aEfficiency - bEfficiency;
+            }
+            return a.price - b.price;
         })[0];
     }
 
-    return adequatePumps.sort((a, b) => {
-       
-        if (Math.abs(a.maxFlow - b.maxFlow) > 10) {
-            
-            return a.maxFlow - b.maxFlow;
-        }
+    const partiallyAdequatePumps = analyzedPumps.filter(
+        (pump) => pump.isFlowAdequate || pump.isHeadAdequate
+    );
 
-        
-        if (Math.abs(a.maxHead - b.maxHead) > 5) {
+    if (partiallyAdequatePumps.length > 0) {
+        return partiallyAdequatePumps.sort((a, b) => {
+            const aScore = (a.isFlowAdequate ? 2 : 0) + (a.isHeadAdequate ? 1 : 0);
+            const bScore = (b.isFlowAdequate ? 2 : 0) + (b.isHeadAdequate ? 1 : 0);
             
-            return a.maxHead - b.maxHead;
-        }
+            if (aScore !== bScore) {
+                return bScore - aScore; // คะแนนสูงสุดก่อน
+            }
+            
+            const aDeficit = Math.max(0, requiredFlowLPM - a.maxFlow) + Math.max(0, requiredHeadM - a.maxHead);
+            const bDeficit = Math.max(0, requiredFlowLPM - b.maxFlow) + Math.max(0, requiredHeadM - b.maxHead);
+            
+            if (Math.abs(aDeficit - bDeficit) > 0.1) {
+                return aDeficit - bDeficit;
+            }
+            
+            return a.price - b.price;
+        })[0];
+    }
 
-        
-        return a.price - b.price;
+    return analyzedPumps.sort((a, b) => {
+        const aDeficit = Math.max(0, requiredFlowLPM - a.maxFlow) + Math.max(0, requiredHeadM - a.maxHead);
+        const bDeficit = Math.max(0, requiredFlowLPM - b.maxFlow) + Math.max(0, requiredHeadM - b.maxHead);
+        return aDeficit - bDeficit;
     })[0];
 };
 
@@ -744,7 +760,6 @@ const getFieldCropCalculationData = (): {
 
         return { fieldCropData, convertedInput };
     } catch (error) {
-        console.error('Error getting field-crop calculation data:', error);
         return { fieldCropData: null, convertedInput: null };
     }
 };
@@ -804,7 +819,6 @@ export const useCalculations = (
 
             return data;
         } catch (error) {
-            console.error(`Error fetching ${categoryName} data:`, error);
             return [];
         }
     };
@@ -939,7 +953,6 @@ export const useCalculations = (
 
                     return transformed;
                 } catch (error) {
-                    console.error(`Error transforming ${categoryType} equipment:`, item.id, error);
                     return null;
                 }
             })
@@ -974,7 +987,6 @@ export const useCalculations = (
                     setError('ไม่พบข้อมูลอุปกรณ์ที่เปิดใช้งานในระบบ');
                 }
             } catch (error) {
-                console.error('Failed to load equipment data:', error);
                 setError(
                     `ไม่สามารถโหลดข้อมูลอุปกรณ์ได้: ${error instanceof Error ? error.message : 'Unknown error'}`
                 );
@@ -993,11 +1005,6 @@ export const useCalculations = (
         if (loading || error) return null;
 
         if (!sprinklerData.length || !pumpData.length || !pipeData.length) {
-            console.warn('❌ Missing equipment data:', {
-                sprinklers: sprinklerData.length,
-                pumps: pumpData.length,
-                pipes: pipeData.length,
-            });
             return null;
         }
         if (!input) return null;
@@ -1458,6 +1465,25 @@ export const useCalculations = (
 
             allZoneResults,
             projectSummary,
+
+            // คำนวณค่า maxPumpHeadForProjectMode สำหรับแต่ละ projectMode
+            maxPumpHeadForProjectMode: (() => {
+                if (allZoneResults && allZoneResults.length > 0) {
+                    // หาค่า Pump Head ที่สูงที่สุดจากทุกโซน
+                    let maxHead = 0;
+                    
+                    allZoneResults.forEach((zoneResult) => {
+                        // ใช้ค่า totalHead จาก zoneResult (รวม pipe head loss + sprinkler head loss)
+                        const totalHead = zoneResult.totalHead || 0;
+                        maxHead = Math.max(maxHead, totalHead);
+                    });
+                    
+                    return maxHead > 0 ? maxHead : pumpHeadRequired;
+                }
+                
+                // สำหรับ projectMode อื่นๆ ใช้ค่า default
+                return pumpHeadRequired;
+            })(),
 
             calculationMetadata: {
                 totalWaterRequiredLPM: flowData.totalFlowLPM,

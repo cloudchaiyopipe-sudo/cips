@@ -1186,7 +1186,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         }
                     }
                 } catch (error) {
-                    console.error('Error parsing fieldCropSystemData in CostSummary:', error);
+                    console.error('Error parsing fieldCropSystemData in getProjectSummary:', error);
                 }
 
                 let totalSprinklers = 0;

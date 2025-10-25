@@ -208,7 +208,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 setEquipmentCategories(categories);
             }
         } catch (error) {
-            console.error('Failed to load equipment categories:', error);
         }
     };
 
@@ -237,7 +236,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 setEquipmentList(equipments);
             }
         } catch (error) {
-            console.error('Failed to load equipment:', error);
         } finally {
             setIsLoadingEquipment(false);
         }
@@ -364,7 +362,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             isGreenhouseMode && greenhouseData.summary?.plotStats?.length > 1;
 
         if (isGreenhouseMultiPlot) {
-            // Handle greenhouse multi-plot mode
             const totalPlantsInAllPlots = greenhouseData.summary.plotStats.reduce(
                 (sum: number, plot: any) => sum + (plot.production?.totalPlants || 0),
                 0

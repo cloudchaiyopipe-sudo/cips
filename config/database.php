@@ -47,7 +47,7 @@ return [
             'driver' => 'mysql',
     'host' => '127.0.0.1', // Hardcoded
     'port' => '3306', // Hardcoded
-    'database' => 'waterapp', // Hardcoded
+    'database' => 'waterapp_local', // Hardcoded
     'username' => 'root', // Hardcoded
     'password' => '', // Hardcoded
             'unix_socket' => env('DB_SOCKET', ''),

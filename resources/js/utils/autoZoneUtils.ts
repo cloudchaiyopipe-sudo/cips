@@ -1699,26 +1699,25 @@ export const createAutomaticZones = (
             config
         );
 
-        if (config.debugMode) {
-            console.log('🔍 Debug: Zone generation completed');
-            console.log('📊 Clusters:', clusters.map((cluster, i) => ({
-                index: i,
-                plantCount: cluster.length,
-                waterNeed: cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0)
-            })));
-            console.log('🗺️ Zones (Actual Plant Count):', zones.map((zone, i) => ({
-                index: i,
-                name: zone.name,
-                actualPlantCount: zone.plants.length,
-                waterNeed: zone.totalWaterNeed,
-                coordinateCount: zone.coordinates.length
-            })));
+        // if (config.debugMode) {
+        //     console.log('📊 Clusters:', clusters.map((cluster, i) => ({
+        //         index: i,
+        //         plantCount: cluster.length,
+        //         waterNeed: cluster.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0)
+        //     })));
+        //     console.log('🗺️ Zones (Actual Plant Count):', zones.map((zone, i) => ({
+        //         index: i,
+        //         name: zone.name,
+        //         actualPlantCount: zone.plants.length,
+        //         waterNeed: zone.totalWaterNeed,
+        //         coordinateCount: zone.coordinates.length
+        //     })));
             
-            // เปรียบเทียบจำนวนต้นไม้ใน cluster vs โซนจริง
-            const totalClusterPlants = clusters.reduce((sum, cluster) => sum + cluster.length, 0);
-            const totalActualPlants = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
-            console.log(`📈 Plant Count Summary: Clusters=${totalClusterPlants}, Actual in Zones=${totalActualPlants}, Difference=${totalActualPlants - totalClusterPlants}`);
-        }
+        //     // เปรียบเทียบจำนวนต้นไม้ใน cluster vs โซนจริง
+        //     const totalClusterPlants = clusters.reduce((sum, cluster) => sum + cluster.length, 0);
+        //     const totalActualPlants = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
+        //     console.log(`📈 Plant Count Summary: Clusters=${totalClusterPlants}, Actual in Zones=${totalActualPlants}, Difference=${totalActualPlants - totalClusterPlants}`);
+        // }
 
         const validZones = zones.filter((zone) => zone.coordinates && zone.coordinates.length >= 3);
         if (validZones.length < zones.length) {

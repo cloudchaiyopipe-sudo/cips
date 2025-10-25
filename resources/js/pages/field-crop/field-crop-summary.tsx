@@ -4160,16 +4160,16 @@ export default function FieldCropSummary() {
     ]);
 
     // Enhanced manual capture function with user feedback
-    const handleManualCapture = async () => {
-        setMapImageCaptured(false); // Reset to allow manual capture
-        await handleCaptureMapImage();
+    // const handleManualCapture = async () => {
+    //     setMapImageCaptured(false); // Reset to allow manual capture
+    //     await handleCaptureMapImage();
 
-        if (captureStatus.includes(t('Success'))) {
-            alert(t('Map image saved successfully! You can view it in the equipment calculation page'));
-        } else if (captureStatus.includes('ข้อผิดพลาด') || captureStatus.includes('ไม่สามารถ')) {
-            alert(t('Error saving map image. Please try again'));
-        }
-    };
+    //     if (captureStatus.includes(t('Success'))) {
+    //         alert(t('Map image saved successfully! You can view it in the equipment calculation page'));
+    //     } else if (captureStatus.includes('ข้อผิดพลาด') || captureStatus.includes('ไม่สามารถ')) {
+    //         alert(t('Error saving map image. Please try again'));
+    //     }
+    // };
 
     // Save Project functionality removed per UI simplification
 
@@ -5284,8 +5284,8 @@ export default function FieldCropSummary() {
 
             {/* Fixed Header Section */}
             <div className="top-16 z-40 border-b border-gray-700 bg-gray-800 print:hidden">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="mx-auto max-w-7xl">
+                <div className="px-4 py-4">
+                    <div className="mx-auto">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <div className="mb-2 flex flex-wrap gap-2">
@@ -5324,7 +5324,7 @@ export default function FieldCropSummary() {
 
                             <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
                                 {/* Enhanced Map capture button */}
-                                <button
+                                {/* <button
                                     onClick={handleManualCapture}
                                     disabled={isCapturingImage}
                                     className={`inline-flex transform items-center rounded-lg px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg ${
@@ -5366,30 +5366,11 @@ export default function FieldCropSummary() {
                                                 : '📷 บันทึกภาพแผนที่'}
                                         </>
                                     )}
-                                </button>
+                                </button> */}
 
                                 {/* Save Project Button (removed by UI simplification request) */}
 
-                                {/* Product Button */}
-                                <button
-                                    onClick={handleExportToProduct}
-                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-green-600 hover:to-emerald-600 hover:shadow-lg"
-                                >
-                                    <svg
-                                        className="mr-2 h-5 w-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                                        />
-                                    </svg>
-                                    🛒 {t('คำนวณอุปกรณ์')}
-                                </button>
+                                
 
                                 {/* New Project Button */}
                                 <Link
@@ -5411,6 +5392,26 @@ export default function FieldCropSummary() {
                                     </svg>
                                     {t('New Project')}
                                 </Link>
+                                {/* Product Button */}
+                                <button
+                                    onClick={handleExportToProduct}
+                                    className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-green-600 hover:to-emerald-600 hover:shadow-lg"
+                                >
+                                    <svg
+                                        className="mr-2 h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                                        />
+                                    </svg>
+                                    {t('คำนวณอุปกรณ์')}
+                                </button>
                             </div>
                         </div>
 
@@ -5452,8 +5453,8 @@ export default function FieldCropSummary() {
 
             {/* Scrollable Main Content */}
             <div className="print:print-layout">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="mx-auto max-w-7xl print:max-w-none">
+                <div className="containe px-4 py-4">
+                    <div className="mx-auto">
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
                             <div className="print:print-summary-section space-y-4">
                                 {/* Enhanced Map Visualization with better capture capabilities */}

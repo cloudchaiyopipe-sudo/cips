@@ -623,9 +623,9 @@ export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHea
         estimatedHP: formatNumber((requiredFlow * requiredHead) / 3500, 3),
         isFlowAdequate: maxFlow >= requiredFlow,
         isHeadAdequate: maxHead >= requiredHead,
-        isRecommended: totalScore >= 80 && maxFlow >= requiredFlow && maxHead >= requiredHead,
-        isGoodChoice: totalScore >= 65 && maxFlow >= requiredFlow && maxHead >= requiredHead,
-        isUsable: totalScore >= 45 && maxFlow >= requiredFlow && maxHead >= requiredHead,
+        isRecommended: maxFlow >= requiredFlow && maxHead >= requiredHead,
+        isGoodChoice: maxFlow >= requiredFlow && maxHead >= requiredHead && totalScore < 80,
+        isUsable: (maxFlow >= requiredFlow || maxHead >= requiredHead) && !(maxFlow >= requiredFlow && maxHead >= requiredHead),
     };
 };
 

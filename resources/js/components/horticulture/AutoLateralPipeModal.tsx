@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaWater, FaTimes, FaRoute, FaPlay } from 'react-icons/fa';
+import { FaWater, FaTimes, FaRoute } from 'react-icons/fa';
 
 interface AutoLateralPipeModalProps {
     isVisible: boolean;
@@ -42,33 +42,6 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                     </button>
                 </div>
 
-                {/* Description */}
-                <div className="mb-6 rounded-lg bg-blue-900 p-4 text-blue-100">
-                    <h4 className="mb-2 font-semibold">📋 {t('คำอธิบาย') || 'คำอธิบาย'}</h4>
-                    <ul className="space-y-1 text-sm">
-                        <li>
-                            •{' '}
-                            {t('ระบบจะลากท่อย่อยตามแนวต้นไม้โดยอัตโนมัติ') ||
-                                'ระบบจะลากท่อย่อยตามแนวต้นไม้โดยอัตโนมัติ'}
-                        </li>
-                        <li>
-                            •{' '}
-                            {t('ลากได้เฉพาะในโซนตัวเองเท่านั้น') ||
-                                'ลากได้เฉพาะในโซนตัวเองเท่านั้น'}
-                        </li>
-                        <li>
-                            •{' '}
-                            {t('รองรับทั้งโหมด "ทับแนวต้นไม้" และ "ระหว่างแนวต้นไม้"') ||
-                                'รองรับทั้งโหมด "ทับแนวต้นไม้" และ "ระหว่างแนวต้นไม้"'}
-                        </li>
-                        <li>
-                            •{' '}
-                            {t('ระบบจะคำนวณและปรับปรุงเส้นทางอัตโนมัติ') ||
-                                'ระบบจะคำนวณและปรับปรุงเส้นทางอัตโนมัติ'}
-                        </li>
-                    </ul>
-                </div>
-
                 {/* Zone Selection */}
                 <div className="mb-6">
                     <h4 className="mb-3 text-lg font-semibold text-white">
@@ -97,90 +70,90 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                         </label>
 
                         {/* Individual Zone Options */}
-                        {zones.map((zone) => (
-                            <label
-                                key={zone.id}
-                                className="flex cursor-pointer items-center rounded-lg border border-gray-600 p-3 hover:bg-gray-700"
-                            >
-                                <input
-                                    type="radio"
-                                    name="zone"
-                                    value={zone.id}
-                                    checked={selectedZone === zone.id}
-                                    onChange={(e) => setSelectedZone(e.target.value)}
-                                    className="mr-3 h-4 w-4 text-blue-600"
-                                />
-                                <div>
-                                    <div className="font-medium text-white">🏷️ {zone.name}</div>
-                                    <div className="text-sm text-gray-400">
-                                        {zone.plants.length} {t('ต้นไม้') || 'ต้นไม้'}
+                        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                            {zones.map((zone) => (
+                                <label
+                                    key={zone.id}
+                                    className="flex cursor-pointer items-center rounded-lg border border-gray-600 p-3 hover:bg-gray-700"
+                                >
+                                    <input
+                                        type="radio"
+                                        name="zone"
+                                        value={zone.id}
+                                        checked={selectedZone === zone.id}
+                                        onChange={(e) => setSelectedZone(e.target.value)}
+                                        className="mr-3 h-4 w-4 text-blue-600"
+                                    />
+                                    <div>
+                                        <div className="font-medium text-white">🏷️ {zone.name}</div>
+                                        <div className="text-sm text-gray-400">
+                                            {zone.plants.length} {t('ต้นไม้') || 'ต้นไม้'}
+                                        </div>
                                     </div>
-                                </div>
-                            </label>
-                        ))}
+                                </label>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
                 {/* Mode Options */}
-                <div className="mb-6 space-y-4">
-                    {/* Mode 1: Through SubMain */}
-                    <button
-                        onClick={() =>
-                            onModeSelect(
-                                'through_submain',
-                                selectedZone === 'all' ? undefined : selectedZone
-                            )
-                        }
-                        className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-blue-300 hover:bg-blue-600"
-                    >
-                        <div className="flex items-center gap-6">
-                            <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 transition-colors group-hover:bg-blue-200">
-                                <FaRoute className="text-blue-600" size={32} />
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="mb-2 text-lg font-semibold text-white">
-                                    🔄 {t('ลากผ่านท่อ Sub Main') || 'ลากผ่านท่อ Sub Main'}
-                                </h4>
-                                <p className="text-sm text-gray-300">
-                                    {t('ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน') ||
-                                        'ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน'}
-                                </p>
-                                <div className="mt-2 flex items-center gap-2 text-xs text-blue-300">
-                                    <span>✅ เหมาะสำหรับแนวต้นไม้ที่ตั้งฉากกับท่อ Sub Main</span>
+                <div className="mb-6">
+                    <div className="flex flex-col gap-4 md:flex-row">
+                        {/* Mode 1: Through SubMain */}
+                        <button
+                            onClick={() =>
+                                onModeSelect(
+                                    'through_submain',
+                                    selectedZone === 'all' ? undefined : selectedZone
+                                )
+                            }
+                            className="group w-full md:w-1/2 rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-blue-300 hover:bg-blue-600"
+                        >
+                            <h3 className="mb-4 text-xl font-semibold text-white text-center">
+                                {t('ลากผ่านท่อ Sub Main') || 'ลากผ่านท่อ Sub Main'}
+                            </h3>
+                            <div className="flex items-center gap-6">
+                                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 transition-colors group-hover:bg-blue-200">
+                                    <FaRoute className="text-green-600" size={32} />
                                 </div>
-                            </div>
-                        </div>
-                    </button>
+                                <div className="flex-1">
 
-                    {/* Mode 2: From SubMain */}
-                    <button
-                        onClick={() =>
-                            onModeSelect(
-                                'from_submain',
-                                selectedZone === 'all' ? undefined : selectedZone
-                            )
-                        }
-                        className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-green-300 hover:bg-green-600"
-                    >
-                        <div className="flex items-center gap-6">
-                            <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 transition-colors group-hover:bg-green-200">
-                                <FaPlay className="text-green-600" size={32} />
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="mb-2 text-lg font-semibold text-white">
-                                    🚀 {t('เริ่มจากท่อ Sub Main') || 'เริ่มจากท่อ Sub Main'}
-                                </h4>
-                                <p className="text-sm text-gray-300">
-                                    {t(
-                                        'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'
-                                    ) || 'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
-                                </p>
-                                <div className="mt-2 flex items-center gap-2 text-xs text-green-300">
-                                    <span>✅ เหมาะสำหรับแนวต้นไม้ที่ขนานกับท่อ Sub Main</span>
+                                    <p className="text-sm text-gray-300">
+                                        {t('ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน') ||
+                                            'ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน'}
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-                    </button>
+                        </button>
+
+                        {/* Mode 2: From SubMain */}
+                        <button
+                            onClick={() =>
+                                onModeSelect(
+                                    'from_submain',
+                                    selectedZone === 'all' ? undefined : selectedZone
+                                )
+                            }
+                            className="group w-full md:w-1/2 rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-green-300 hover:bg-green-600"
+                        >
+                            <h3 className="mb-4 text-xl font-semibold text-white text-center">
+                                {t('เริ่มจากท่อ Sub Main') || 'เริ่มจากท่อ Sub Main'}
+                            </h3>
+                            <div className="flex items-center gap-6">
+                                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 transition-colors group-hover:bg-green-200">
+                                    <FaRoute className="text-yellow-600" size={32} />
+                                </div>
+                                <div className="flex-1">
+
+                                    <p className="text-sm text-gray-300">
+                                        {t(
+                                            'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'
+                                        ) || 'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
+                                    </p>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Cancel Button */}

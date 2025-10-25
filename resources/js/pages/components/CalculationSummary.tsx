@@ -31,7 +31,9 @@ interface CalculationSummaryProps {
     getZoneName?: (zoneId: string) => string;
     fieldCropData?: any;
     greenhouseData?: any;
-    gardenStats?: any; 
+    gardenStats?: any;
+    maxPumpHeadForProjectMode?: number;
+    onPumpHeadCalculated?: (pumpHead: number) => void;
 }
 
 const CalculationSummary: React.FC<CalculationSummaryProps> = ({
@@ -49,6 +51,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     fieldCropData,
     greenhouseData,
     gardenStats,
+    maxPumpHeadForProjectMode,
+    onPumpHeadCalculated,
 }) => {
     const { t } = useLanguage();
     const actualPump = results.autoSelectedPump;
@@ -271,65 +275,31 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const pressureInfo = getSprinklerPressureInfo();
 
     const calculateSprinklerHeadLoss = () => {
-        let sprinklerPressureBar = 0;
+        let sprinklerPressureBar = 2.5; // default fallback
 
         if (projectMode === 'horticulture') {
+            // ลองหาจาก localStorage ก่อน (เหมือนกับ PipeSystemSummary.tsx)
             try {
                 const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
                 if (horticultureSystemDataStr) {
                     const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
                     if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
                         sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
-                    } else {
-                       
-                        if (selectedSprinkler && selectedSprinkler.pressureBar) {
-                            if (Array.isArray(selectedSprinkler.pressureBar)) {
-                                sprinklerPressureBar =
-                                    (selectedSprinkler.pressureBar[0] +
-                                        selectedSprinkler.pressureBar[1]) /
-                                    2;
-                            } else if (
-                                typeof selectedSprinkler.pressureBar === 'string' &&
-                                selectedSprinkler.pressureBar.includes('-')
-                            ) {
-                                const parts = selectedSprinkler.pressureBar.split('-');
-                                sprinklerPressureBar =
-                                    (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
-                            } else {
-                                sprinklerPressureBar = parseFloat(
-                                    String(selectedSprinkler.pressureBar)
-                                );
-                            }
-                        } else {
-                            sprinklerPressureBar = 2.5; 
-                        }
-                    }
-                } else {
-                    if (selectedSprinkler && selectedSprinkler.pressureBar) {
-                        if (Array.isArray(selectedSprinkler.pressureBar)) {
-                            sprinklerPressureBar =
-                                (selectedSprinkler.pressureBar[0] +
-                                    selectedSprinkler.pressureBar[1]) /
-                                2;
-                        } else if (
-                            typeof selectedSprinkler.pressureBar === 'string' &&
-                            selectedSprinkler.pressureBar.includes('-')
-                        ) {
-                            const parts = selectedSprinkler.pressureBar.split('-');
-                            sprinklerPressureBar =
-                                (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
-                        } else {
-                            sprinklerPressureBar = parseFloat(
-                                String(selectedSprinkler.pressureBar)
-                            );
-                        }
-                    } else {
-                        sprinklerPressureBar = 2.5; 
                     }
                 }
             } catch (error) {
                 console.error('Error parsing horticulture system data:', error);
-                sprinklerPressureBar = 2.5; 
+            }
+            
+            if (sprinklerPressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
             }
         } else if (projectMode === 'garden') {
             if (gardenStats && activeZone) {
@@ -337,29 +307,62 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 if (currentZone) {
                     sprinklerPressureBar = currentZone.sprinklerPressure || 2.5;
                 } else {
-                    sprinklerPressureBar = 2.5; 
+                    if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                        if (Array.isArray(selectedSprinkler.pressureBar)) {
+                            sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            const parts = selectedSprinkler.pressureBar.split('-');
+                            sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                        } else {
+                            sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                        }
+                    }
                 }
             } else {
-                sprinklerPressureBar = 2.5; 
+                if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                    if (Array.isArray(selectedSprinkler.pressureBar)) {
+                        sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                    } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                        const parts = selectedSprinkler.pressureBar.split('-');
+                        sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                    } else {
+                        sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                    }
+                }
             }
         } else if (projectMode === 'greenhouse') {
-            if (greenhouseData && activeZone) {
-                const currentPlot = greenhouseData.summary.plotStats.find(
-                    (p: any) => p.plotId === activeZone.id
-                );
-                if (currentPlot) {
-                    sprinklerPressureBar = 2.5; 
-                } else {
-                    sprinklerPressureBar = 2.5; 
+            try {
+                const greenhouseSummaryDataStr = localStorage.getItem('greenhouseSummaryData');
+                if (greenhouseSummaryDataStr) {
+                    const greenhouseSummaryData = JSON.parse(greenhouseSummaryDataStr);
+                    if (greenhouseSummaryData?.sprinklerPressure) {
+                        sprinklerPressureBar = greenhouseSummaryData.sprinklerPressure;
+                    }
                 }
-            } else {
-                sprinklerPressureBar = 2.5; 
+            } catch (error) {
+                console.error('Error parsing greenhouse summary data:', error);
+            }
+            
+            if (sprinklerPressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
             }
         } else {
             if (selectedSprinkler && selectedSprinkler.pressureBar) {
-                sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
-            } else {
-                sprinklerPressureBar = 2.5; 
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
             }
         }
 
@@ -373,11 +376,271 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             const greenhouseTotalHeadLoss =
                 (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
             return greenhouseTotalHeadLoss + sprinklerHeadLoss;
+        } else if (projectMode === 'field-crop') {
+            // สำหรับ field-crop mode ให้ใช้ค่าเดียวกันกับ PipeSystemSummary.tsx
+            let fieldCropSprinklerHeadLoss = 0;
+            
+            if (fieldCropData && fieldCropData.irrigationSettings?.sprinkler_system?.pressure) {
+                fieldCropSprinklerHeadLoss = fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
+            }
+            else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                let pressureBar = 2.5; // default fallback
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
+                fieldCropSprinklerHeadLoss = pressureBar * 10;
+            }
+            else {
+                fieldCropSprinklerHeadLoss = 2.5 * 10;
+            }
+            
+            let fieldCropPipeHeadLoss = 0;
+            try {
+                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                if (fieldCropPipeCalculationsStr) {
+                    const fieldCropPipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
+                    const branchHeadLoss = fieldCropPipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = fieldCropPipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = fieldCropPipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = fieldCropPipeCalculations.emitter?.headLoss || 0;
+                    fieldCropPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                }
+            } catch (error) {
+                console.error('Error parsing field-crop pipe calculations:', error);
+            }
+            
+            if (fieldCropPipeHeadLoss === 0) {
+                fieldCropPipeHeadLoss = actualHeadLoss.total;
+            }
+            
+            const totalPumpHead = fieldCropPipeHeadLoss + fieldCropSprinklerHeadLoss;
+            return totalPumpHead;
+        } else if (projectMode === 'horticulture') {
+            let horticultureSprinklerHeadLoss = 2.5 * 10; // default fallback
+            
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        horticultureSprinklerHeadLoss = horticultureSystemData.sprinklerConfig.pressureBar * 10;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+            }
+            
+            if (horticultureSprinklerHeadLoss === 2.5 * 10 && selectedSprinkler && selectedSprinkler.pressureBar) {
+                let pressureBar = 2.5; // default fallback
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
+                horticultureSprinklerHeadLoss = pressureBar * 10;
+            }
+            
+            let horticulturePipeHeadLoss = 0;
+            try {
+                const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                if (horticulturePipeCalculationsStr) {
+                    const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                    const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
+                    horticulturePipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture pipe calculations:', error);
+            }
+            
+            if (horticulturePipeHeadLoss === 0) {
+                horticulturePipeHeadLoss = actualHeadLoss.total;
+            }
+            
+            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss;
+            
+            
+            return totalPumpHead;
         }
         return actualHeadLoss.total + sprinklerHeadLoss;
     };
 
     const actualPumpHead = calculatePumpHead();
+
+    useEffect(() => {
+        if (onPumpHeadCalculated && actualPumpHead > 0) {
+            const pumpHeadWithSafety = actualPumpHead + (actualPumpHead * 0.1);
+            onPumpHeadCalculated(pumpHeadWithSafety);
+        }
+    }, [actualPumpHead, onPumpHeadCalculated, projectMode, activeZone, selectedZones]);
+
+    const getMaxPumpHeadForProjectMode = () => {
+        if (maxPumpHeadForProjectMode !== undefined && maxPumpHeadForProjectMode > 0) {
+            return maxPumpHeadForProjectMode;
+        }
+        
+        if (projectMode === 'greenhouse') {
+            const greenhouseTotalHeadLoss =
+                (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
+            return greenhouseTotalHeadLoss + sprinklerHeadLoss;
+        } else if (projectMode === 'field-crop') {
+            let fieldCropSprinklerHeadLoss = 0;
+            
+            if (fieldCropData && fieldCropData.irrigationSettings?.sprinkler_system?.pressure) {
+                fieldCropSprinklerHeadLoss = fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
+            }
+            else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                let pressureBar = 2.5; // default fallback
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
+                fieldCropSprinklerHeadLoss = pressureBar * 10;
+            }
+            else {
+                fieldCropSprinklerHeadLoss = 2.5 * 10;
+            }
+            
+            let fieldCropPipeHeadLoss = 0;
+            try {
+                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                if (fieldCropPipeCalculationsStr) {
+                    const fieldCropPipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
+                    const branchHeadLoss = fieldCropPipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = fieldCropPipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = fieldCropPipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = fieldCropPipeCalculations.emitter?.headLoss || 0;
+                    fieldCropPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                }
+            } catch (error) {
+                console.error('Error parsing field-crop pipe calculations:', error);
+            }
+            
+            if (fieldCropPipeHeadLoss === 0) {
+                fieldCropPipeHeadLoss = actualHeadLoss.total;
+            }
+            
+            return fieldCropPipeHeadLoss + fieldCropSprinklerHeadLoss;
+        } else if (projectMode === 'horticulture') {
+            let horticultureSprinklerHeadLoss = 2.5 * 10; // default fallback
+            
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        horticultureSprinklerHeadLoss = horticultureSystemData.sprinklerConfig.pressureBar * 10;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+            }
+            
+            if (horticultureSprinklerHeadLoss === 2.5 * 10 && selectedSprinkler && selectedSprinkler.pressureBar) {
+                let pressureBar = 2.5; // default fallback
+                if (Array.isArray(selectedSprinkler.pressureBar)) {
+                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    const parts = selectedSprinkler.pressureBar.split('-');
+                    pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                } else {
+                    pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                }
+                horticultureSprinklerHeadLoss = pressureBar * 10;
+            }
+            
+            let horticulturePipeHeadLoss = 0;
+            try {
+                const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                if (horticulturePipeCalculationsStr) {
+                    const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                    const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
+                    horticulturePipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture pipe calculations:', error);
+            }
+            
+            if (horticulturePipeHeadLoss === 0) {
+                horticulturePipeHeadLoss = actualHeadLoss.total;
+            }
+            
+            return horticulturePipeHeadLoss + horticultureSprinklerHeadLoss;
+        } else if (projectMode === 'garden') {
+            let gardenSprinklerHeadLoss = 2.5 * 10; // default fallback
+            
+            if (gardenStats && activeZone) {
+                const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                if (currentZone) {
+                    gardenSprinklerHeadLoss = (currentZone.sprinklerPressure || 2.5) * 10;
+                } else {
+                    if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                        if (Array.isArray(selectedSprinkler.pressureBar)) {
+                            gardenSprinklerHeadLoss = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2 * 10;
+                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            const parts = selectedSprinkler.pressureBar.split('-');
+                            gardenSprinklerHeadLoss = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2 * 10;
+                        } else {
+                            gardenSprinklerHeadLoss = parseFloat(String(selectedSprinkler.pressureBar)) * 10;
+                        }
+                    }
+                }
+            } else {
+                if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                    if (Array.isArray(selectedSprinkler.pressureBar)) {
+                        gardenSprinklerHeadLoss = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2 * 10;
+                    } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                        const parts = selectedSprinkler.pressureBar.split('-');
+                        gardenSprinklerHeadLoss = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2 * 10;
+                    } else {
+                        gardenSprinklerHeadLoss = parseFloat(String(selectedSprinkler.pressureBar)) * 10;
+                    }
+                }
+            }
+            
+            let gardenPipeHeadLoss = 0;
+            try {
+                const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                if (gardenPipeCalculationsStr) {
+                    const gardenPipeCalculations = JSON.parse(gardenPipeCalculationsStr);
+                    const branchHeadLoss = gardenPipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = gardenPipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = gardenPipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = gardenPipeCalculations.emitter?.headLoss || 0;
+                    gardenPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                }
+            } catch (error) {
+                console.error('Error parsing garden pipe calculations:', error);
+            }
+            
+            if (gardenPipeHeadLoss === 0) {
+                gardenPipeHeadLoss = actualHeadLoss.total;
+            }
+            
+            return gardenPipeHeadLoss + gardenSprinklerHeadLoss;
+        }
+        
+        return actualHeadLoss.total + sprinklerHeadLoss;
+    };
+
 
     const isMultiZone =
         selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
@@ -647,7 +910,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-blue-200">{t('ความต้องการน้ำ')}</p>
                         <p className="text-xl font-bold">
                             {(() => {
-                                // ใช้ค่าเดียวกันกับ input.waterPerTreeLiters ใน InputForm.tsx
                                 if (projectMode === 'garden') {
                                     return input.waterPerTreeLiters.toFixed(1);
                                 } else if (projectMode === 'greenhouse') {
@@ -673,18 +935,32 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                         >
                             {(() => {   
-                                // ใช้ค่าจาก PipeSystemSummary.tsx - รวม head loss ของแต่ละท่อ
                                 if (projectMode === 'greenhouse') {
                                     const greenhouseTotalHeadLoss =
                                         (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
                                     return greenhouseTotalHeadLoss.toFixed(1);
                                 } else if (projectMode === 'field-crop') {
-                                    // สำหรับ field-crop ใช้ค่าจาก PipeSystemSummary.tsx - รวม head loss ของแต่ละท่อ
                                     const totalHeadLoss = (actualHeadLoss.main || 0) + 
                                                          (actualHeadLoss.secondary || 0) + 
                                                          (actualHeadLoss.branch || 0) + 
                                                          (actualHeadLoss.emitter || 0);
                                     return totalHeadLoss.toFixed(1);
+                                } else if (projectMode === 'horticulture') {
+                                    try {
+                                        const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                                        if (horticulturePipeCalculationsStr) {
+                                            const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                                            const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
+                                            const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
+                                            const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
+                                            const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
+                                            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                                            return totalHeadLoss.toFixed(1);
+                                        }
+                                    } catch (error) {
+                                        console.error('Error parsing horticulture pipe calculations:', error);
+                                    }
+                                    return actualHeadLoss.total.toFixed(1);
                                 }
                                 return actualHeadLoss.total.toFixed(1);
                             })()}{' '}
@@ -704,9 +980,50 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-yellow-200">{t('Head Loss หัวฉีด')}</p>
                         <p className="text-xl font-bold text-yellow-400">
                             {(() => {
-                                // ใช้ค่าจาก PipeSystemSummary.tsx - แรงดัน(บาร์) × 10
                                 if (projectMode === 'field-crop' && fieldCropData) {
-                                    const pressureBar = (fieldCropData as any)?.irrigationSettings?.sprinkler_system?.pressure || 2.7;
+                                    let pressureBar = 2.5; // default fallback - ใช้ค่าเริ่มต้นที่เหมาะสม
+                                    
+                                    if ((fieldCropData as any)?.irrigationSettings?.sprinkler_system?.pressure) {
+                                        pressureBar = (fieldCropData as any).irrigationSettings.sprinkler_system.pressure;
+                                    }
+                                    else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                                        if (Array.isArray(selectedSprinkler.pressureBar)) {
+                                            pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                            const parts = selectedSprinkler.pressureBar.split('-');
+                                            pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                                        } else {
+                                            pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                                        }
+                                    }
+                                    
+                                    return (pressureBar * 10).toFixed(1);
+                                } else if (projectMode === 'horticulture') {
+                                    let pressureBar = 2.5; // default fallback
+                                    
+                                    try {
+                                        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                                        if (horticultureSystemDataStr) {
+                                            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                                            if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                                                pressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('Error parsing horticulture system data:', error);
+                                    }
+                                    
+                                    if (pressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+                                        if (Array.isArray(selectedSprinkler.pressureBar)) {
+                                            pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                            const parts = selectedSprinkler.pressureBar.split('-');
+                                            pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                                        } else {
+                                            pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                                        }
+                                    }
+                                    
                                     return (pressureBar * 10).toFixed(1);
                                 }
                                 return sprinklerHeadLoss.toFixed(1);
@@ -719,30 +1036,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             <p className="text-purple-200">{t('Pump Head')}</p>
                             <p className="text-xl font-bold text-orange-300">
                                 {(() => {
-                                    // Pump Head = Head Loss ท่อ + Head Loss หัวฉีด
-                                    if (projectMode === 'field-crop') {
-                                        // คำนวณ Head Loss ท่อ
-                                        const pipeHeadLoss = (actualHeadLoss.main || 0) + 
-                                                           (actualHeadLoss.secondary || 0) + 
-                                                           (actualHeadLoss.branch || 0) + 
-                                                           (actualHeadLoss.emitter || 0);
-                                        
-                                        // คำนวณ Head Loss หัวฉีด
-                                        const sprinklerHeadLossValue = fieldCropData ? 
-                                            ((fieldCropData as any)?.irrigationSettings?.sprinkler_system?.pressure || 2.7) * 10 : 
-                                            sprinklerHeadLoss;
-                                        
-                                        return (pipeHeadLoss + sprinklerHeadLossValue).toFixed(1);
-                                    }
-                                    return actualPumpHead.toFixed(1);
+                                    return (actualPumpHead + (actualPumpHead * 0.1)).toFixed(1);
                                 })()} m
                             </p>
-                            {isMultiZone && results.projectSummary && (
-                                <p className="text-xs text-purple-100">
-                                    ({t('ตาม')}
-                                    {getOperationModeLabel(results.projectSummary.operationMode)})
-                                </p>
-                            )}
+                            (+ 10%)
                         </div>
                     )}
                     <div className="text-center">
@@ -762,468 +1059,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 </div>
             </div>
 
-            {/* <div className="rounded-lg bg-gray-700 p-6">
-                <h2 className="mb-4 text-xl font-semibold text-yellow-400">
-                    📊 {t('สรุปการคำนวณรายละเอียด')}
-                    {currentZoneData && (
-                        <span className="ml-2 text-lg font-normal text-red-400">
-                            - {currentZoneData.name.split(' (')[0]}
-                        </span>
-                    )}
-                    {isMultiZone && (
-                        <span className="ml-2 text-sm font-normal text-green-400">
-                            ({t('โซนปัจจุบันที่กำลังตั้งค่า')})
-                        </span>
-                    )}
-                </h2>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-blue-300">
-                            💧 {t('ความต้องการน้ำทั้งโซน')}
-                        </h3>
-                        <p className="text-lg font-bold">
-                            {input.waterPerTreeLiters.toLocaleString(undefined, {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                            })}{' '}
-                            {t('ลิตร/นาที')}
-                        </p>
-                        <div className="mt-1 space-y-1 text-sm text-gray-300">
-                            <p>{t('ความต้องการน้ำทั้งโซน:')}</p>
-                            <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')}{' '}
-                                {input.waterPerTreeLiters.toLocaleString(undefined, {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 2,
-                                })}{' '}
-                                {t('ลิตร/นาที')}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-purple-300">
-                            💦 {t('น้ำต่อหัว')}
-                            {getEquipmentName()}
-                        </h3>
-                        <p className="text-lg font-bold">
-                            {(() => {
-                                if (projectMode === 'garden' && gardenStats && activeZone) {
-                                    const currentZone = gardenStats.zones.find(
-                                        (z: any) => z.zoneId === activeZone.id
-                                    );
-                                    if (currentZone) {
-                                        return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                } else if (
-                                    projectMode === 'greenhouse' &&
-                                    greenhouseData &&
-                                    activeZone
-                                ) {
-                                    const currentPlot = greenhouseData.summary.plotStats.find(
-                                        (p: any) => p.plotId === activeZone.id
-                                    );
-                                    if (currentPlot && currentPlot.production?.waterCalculation) {
-                                        const waterCalc = currentPlot.production.waterCalculation;
-                                        const flowRate =
-                                            waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
-                                        return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                } else if (projectMode === 'field-crop' && fieldCropData && activeZone) {
-                                    const currentZone = fieldCropData.zones.info.find((z: any) => z.id === activeZone.id);
-                                    if (currentZone) {
-                                        // ใช้ข้อมูลจาก field-crop-summary.tsx
-                                        const sprinklerFlow = fieldCropData.irrigationSettings?.sprinkler_system?.flow || 30;
-                                        return `${sprinklerFlow.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                }
-                                return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                            })()}
-                        </p>
-                        <div className="mt-2 space-y-1 text-sm text-gray-300">
-                            <p className="text-xs text-blue-300">
-                                {projectMode === 'garden' && gardenStats && activeZone
-                                    ? (() => {
-                                          const currentZone = gardenStats.zones.find(
-                                              (z: any) => z.zoneId === activeZone.id
-                                          );
-                                          return currentZone
-                                              ? `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`
-                                              : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                      })()
-                                    : projectMode === 'greenhouse' && greenhouseData && activeZone
-                                      ? (() => {
-                                            const currentPlot =
-                                                greenhouseData.summary.plotStats.find(
-                                                    (p: any) => p.plotId === activeZone.id
-                                                );
-                                            if (
-                                                currentPlot &&
-                                                currentPlot.production?.waterCalculation
-                                            ) {
-                                                const waterCalc =
-                                                    currentPlot.production.waterCalculation;
-                                                const flowRate =
-                                                    waterCalc?.waterPerPlant?.litersPerMinute ||
-                                                    6.0;
-                                                return `${t('ค่าจาก greenhouse plot:')} ${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                            }
-                                            return `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                        })()
-                                      : projectMode === 'field-crop' && fieldCropData && activeZone
-                                        ? (() => {
-                                              const currentZone = fieldCropData.zones.info.find((z: any) => z.id === activeZone.id);
-                                              if (currentZone) {
-                                                  const sprinklerFlow = fieldCropData.irrigationSettings?.sprinkler_system?.flow || 30;
-                                                  return `${t('ค่าจาก field-crop irrigation settings:')} ${sprinklerFlow.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                              }
-                                              return `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                          })()
-                                        : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
-                            </p>
-                        </div>
-                        {selectedSprinkler && (
-                            <div className="mt-2 border-t border-purple-700 pt-2">
-                                <p className="text-xs text-purple-200">{selectedSprinkler.name}</p>
-                                {selectedSprinkler.pressureBar && (
-                                    <p className="text-xs text-gray-400">
-                                        {t('แรงดัน:')}{' '}
-                                        {Array.isArray(selectedSprinkler.pressureBar)
-                                            ? `${selectedSprinkler.pressureBar[0]}-${selectedSprinkler.pressureBar[1]}`
-                                            : selectedSprinkler.pressureBar}{' '}
-                                        {t('บาร์')}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                        <p className="mt-1 text-xs text-gray-400">
-                            {t('สำหรับ')} {input.irrigationTimeMinutes} {t('นาที/ครั้ง')}
-                        </p>
-                    </div>
-
-                    <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-yellow-300">
-                            ⚡ {t('อัตราการไหลแต่ละท่อ')}
-                        </h3>
-                        <div className="text-sm">
-                            <p>
-                                {t('ท่อย่อย:')}{' '}
-                                <span className="font-bold text-purple-300">
-                                    {results.flows.branch.toLocaleString(undefined, {
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 2,
-                                    })}{' '}
-                                    {t('LPM')}
-                                </span>
-                            </p>
-                            {results.hasValidSecondaryPipe && (
-                                <p>
-                                    {t('ท่อรอง:')}{' '}
-                                    <span className="font-bold text-orange-300">
-                                        {results.flows.secondary.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}{' '}
-                                        {t('LPM')}
-                                    </span>
-                                </p>
-                            )}
-                            {results.hasValidMainPipe && (
-                                <p>
-                                    {t('ท่อหลัก:')}{' '}
-                                    <span className="font-bold text-cyan-300">
-                                        {results.flows.main.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}{' '}
-                                        {t('LPM')}
-                                    </span>
-                                </p>
-                            )}
-                        </div>
-                        <p className="mt-1 text-xs text-gray-400">{t('ตามการออกแบบระบบ')}</p>
-                    </div>
-
-                    <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-red-300">
-                            📉 {t('Head Loss รายละเอียด')}
-                        </h3>
-                        <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                                <span>{t('หัวฉีด:')}</span>
-                                <span className="font-bold text-gray-50">
-                                    {(() => {
-                                        if (projectMode === 'field-crop' && fieldCropData) {
-                                            const pressureBar = (fieldCropData as any)?.irrigationSettings?.sprinkler_system?.pressure || 2.7;
-                                            return (pressureBar * 10).toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 3,
-                                            });
-                                        }
-                                        return sprinklerHeadLoss.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 3,
-                                        });
-                                    })()}{' '}
-                                    m
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>{t('ท่อย่อย:')}</span>
-                                <span className="font-bold text-gray-50">
-                                    {actualHeadLoss.branch.toLocaleString(undefined, {
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 3,
-                                    })}{' '}
-                                    m
-                                </span>
-                            </div>
-
-                            {((results.hasValidSecondaryPipe && actualHeadLoss.secondary > 0) ||
-                                (projectMode === 'field-crop' && actualHeadLoss.secondary > 0)) &&
-                                projectMode !== 'greenhouse' && (
-                                    <div className="flex justify-between">
-                                        <span>{t('ท่อรอง:')}</span>
-                                        <span className="font-bold text-gray-50">
-                                            {actualHeadLoss.secondary.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 3,
-                                            })}{' '}
-                                            m
-                                        </span>
-                                    </div>
-                                )}
-                            {((results.hasValidMainPipe && actualHeadLoss.main > 0) ||
-                                (projectMode === 'greenhouse' && actualHeadLoss.main > 0) ||
-                                (projectMode === 'field-crop' && actualHeadLoss.main > 0)) && (
-                                <div className="flex justify-between">
-                                    <span>{t('ท่อหลัก:')}</span>
-                                    <span className="font-bold text-gray-50">
-                                        {actualHeadLoss.main.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 3,
-                                        })}{' '}
-                                        m
-                                    </span>
-                                </div>
-                            )}
-                            {((results.hasValidEmitterPipe && actualHeadLoss.emitter > 0) ||
-                                (projectMode === 'field-crop' && actualHeadLoss.emitter > 0)) &&
-                                projectMode !== 'greenhouse' && (
-                                    <div className="flex justify-between">
-                                        <span>{t('ท่อย่อยแยก:')}</span>
-                                        <span className="font-bold text-gray-50">
-                                            {actualHeadLoss.emitter.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 3,
-                                            })}{' '}
-                                            m
-                                        </span>
-                                    </div>
-                                )}
-                            <div className="mt-1 border-t border-gray-500 pt-1">
-                                <div className="flex justify-between">
-                                    <span className="font-medium">{t('รวม:')}</span>
-                                    <span
-                                        className={`font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
-                                    >
-                                        {(() => {
-                                            if (projectMode === 'greenhouse') {
-                                                const greenhouseTotalHeadLoss =
-                                                    (actualHeadLoss.main || 0) +
-                                                    (actualHeadLoss.branch || 0);
-                                                return (
-                                                    greenhouseTotalHeadLoss + sprinklerHeadLoss
-                                                ).toLocaleString(undefined, {
-                                                    minimumFractionDigits: 0,
-                                                    maximumFractionDigits: 2,
-                                                });
-                                            } else if (projectMode === 'field-crop') {
-                                                // สำหรับ field-crop ใช้ค่าจาก field_crop_pipe_calculations
-                                                const fieldCropTotalHeadLoss = (actualHeadLoss.main || 0) + 
-                                                                             (actualHeadLoss.secondary || 0) + 
-                                                                             (actualHeadLoss.branch || 0) + 
-                                                                             (actualHeadLoss.emitter || 0);
-                                                const fieldCropSprinklerHeadLoss = fieldCropData ? 
-                                                    ((fieldCropData as any)?.irrigationSettings?.sprinkler_system?.pressure || 2.7) * 10 : 
-                                                    sprinklerHeadLoss;
-                                                return (
-                                                    fieldCropTotalHeadLoss + fieldCropSprinklerHeadLoss
-                                                ).toLocaleString(undefined, {
-                                                    minimumFractionDigits: 0,
-                                                    maximumFractionDigits: 2,
-                                                });
-                                            }
-                                            return (
-                                                actualHeadLoss.total + sprinklerHeadLoss
-                                            ).toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 2,
-                                            });
-                                        })()}{' '}
-                                        m
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <hr className="mt-1 border-gray-500" />
-                    </div>
-
-                    <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-cyan-300">
-                            🌊 {t('ความเร็วน้ำ')} ({t('m/s')})
-                        </h3>
-                        <div className="space-y-1 text-sm">
-                            <div className="flex items-center justify-between">
-                                <span>{t('ย่อย:')}</span>
-                                <div className="flex items-center gap-2">
-                                    <span
-                                        className={`font-bold ${
-                                            results.velocity.branch > 2.5
-                                                ? 'text-red-400'
-                                                : results.velocity.branch < 0.3
-                                                  ? 'text-blue-400'
-                                                  : results.velocity.branch > 0.8 &&
-                                                      results.velocity.branch <= 2.0
-                                                    ? 'text-green-400'
-                                                    : 'text-yellow-400'
-                                        }`}
-                                    >
-                                        {results.velocity.branch.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                    <span className="text-xs">
-                                        (
-                                        {results.flows.branch.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 0,
-                                        })}{' '}
-                                        LPM)
-                                    </span>
-                                </div>
-                            </div>
-                            {results.hasValidSecondaryPipe && (
-                                <div className="flex items-center justify-between">
-                                    <span>{t('รอง:')}</span>
-                                    <div className="flex items-center gap-2">
-                                        <span
-                                            className={`font-bold ${
-                                                results.velocity.secondary > 2.5
-                                                    ? 'text-red-400'
-                                                    : results.velocity.secondary < 0.3
-                                                      ? 'text-blue-400'
-                                                      : results.velocity.secondary > 0.8 &&
-                                                          results.velocity.secondary <= 2.0
-                                                        ? 'text-green-400'
-                                                        : 'text-yellow-400'
-                                            }`}
-                                        >
-                                            {results.velocity.secondary.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 2,
-                                            })}
-                                        </span>
-                                        <span className="text-xs">
-                                            (
-                                            {results.flows.secondary.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 0,
-                                            })}{' '}
-                                            LPM)
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                            {results.hasValidMainPipe && (
-                                <div className="flex items-center justify-between">
-                                    <span>{t('หลัก:')}</span>
-                                    <div className="flex items-center gap-2">
-                                        <span
-                                            className={`font-bold ${
-                                                results.velocity.main > 2.5
-                                                    ? 'text-red-400'
-                                                    : results.velocity.main < 0.3
-                                                      ? 'text-blue-400'
-                                                      : results.velocity.main > 0.8 &&
-                                                          results.velocity.main <= 2.0
-                                                        ? 'text-green-400'
-                                                        : 'text-yellow-400'
-                                            }`}
-                                        >
-                                            {results.velocity.main.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 2,
-                                            })}
-                                        </span>
-                                        <span className="text-xs">
-                                            (
-                                            {results.flows.main.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 0,
-                                            })}{' '}
-                                            LPM)
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                            {results.hasValidEmitterPipe && (
-                                <div className="flex items-center justify-between">
-                                    <span>{t('ย่อยแยก:')}</span>
-                                    <div className="flex items-center gap-2">
-                                        <span
-                                            className={`font-bold ${
-                                                (results.velocity.emitter || 0) > 2.5
-                                                    ? 'text-red-400'
-                                                    : (results.velocity.emitter || 0) < 0.3
-                                                      ? 'text-blue-400'
-                                                      : (results.velocity.emitter || 0) > 0.8 &&
-                                                          (results.velocity.emitter || 0) <= 2.0
-                                                        ? 'text-green-400'
-                                                        : 'text-yellow-400'
-                                            }`}
-                                        >
-                                            {results.velocity.emitter?.toLocaleString(undefined, {
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 2,
-                                            }) || '0.00'}
-                                        </span>
-                                        <span className="text-xs">
-                                            (
-                                            {(results.flows.emitter || 0).toLocaleString(
-                                                undefined,
-                                                {
-                                                    minimumFractionDigits: 0,
-                                                    maximumFractionDigits: 0,
-                                                }
-                                            )}{' '}
-                                            LPM)
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="mt-2 border-t border-gray-500 pt-2">
-                            <p className="text-xs text-gray-400">
-                                {t('แนะนำ:')} 0.8-2.0 {t('m/s')}
-                            </p>
-                            <p className="flex items-center gap-1 text-xs text-cyan-200">
-                                <span>{t('สถานะ:')}</span>
-                                <span>{getStatusIcon(systemPerformance.velocityStatus)}</span>
-                                <span>
-                                    {systemPerformance.velocityStatus === 'good'
-                                        ? t('เหมาะสม')
-                                        : systemPerformance.velocityStatus === 'warning'
-                                          ? t('ควรปรับ')
-                                          : t('ต้องปรับ')}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div> */}
         </div>
     );
 };

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 
 interface HorticultureMapComponentProps {
@@ -15,9 +15,9 @@ const getGoogleMapsConfig = () => {
 
     return {
         apiKey,
-        libraries: ['drawing', 'geometry', 'places'],
+        libraries: ['drawing', 'geometry', 'places', 'marker', 'elevation'],
         defaultMapOptions: {
-            mapTypeId: 'satellite',
+            mapTypeId: 'hybrid', // เปลี่ยนจาก 'satellite' เป็น 'hybrid' เพื่อแสดงชื่อสถานที่
             disableDefaultUI: false,
             zoomControl: true,
             streetViewControl: true,
@@ -32,6 +32,34 @@ const getGoogleMapsConfig = () => {
             clickableIcons: true,
             scrollwheel: true,
             disableDoubleClickZoom: true,
+            // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่
+            styles: [
+                {
+                    featureType: 'poi',
+                    elementType: 'labels',
+                    stylers: [{ visibility: 'on' }]
+                },
+                {
+                    featureType: 'administrative',
+                    elementType: 'labels',
+                    stylers: [{ visibility: 'on' }]
+                },
+                {
+                    featureType: 'road',
+                    elementType: 'labels',
+                    stylers: [{ visibility: 'on' }]
+                },
+                {
+                    featureType: 'transit',
+                    elementType: 'labels',
+                    stylers: [{ visibility: 'on' }]
+                },
+                {
+                    featureType: 'water',
+                    elementType: 'labels',
+                    stylers: [{ visibility: 'on' }]
+                }
+            ]
         },
     };
 };
@@ -78,7 +106,7 @@ const MapComponent: React.FC<{
     children?: React.ReactNode;
     mapOptions?: Partial<google.maps.MapOptions>;
 }> = ({ center, zoom, onLoad, children, mapOptions }) => {
-    const validCenter =
+    const validCenter = useMemo(() => 
         center &&
         typeof center.lat === 'number' &&
         typeof center.lng === 'number' &&
@@ -87,9 +115,14 @@ const MapComponent: React.FC<{
         isFinite(center.lat) &&
         isFinite(center.lng)
             ? center
-            : { lat: 13.7563, lng: 100.5018 };
+            : { lat: 13.7563, lng: 100.5018 },
+        [center]
+    );
 
-    const validZoom = typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16;
+    const validZoom = useMemo(() => 
+        typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16,
+        [zoom]
+    );
     const ref = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map>();
     const [isMapInitialized, setIsMapInitialized] = useState(false);
@@ -116,6 +149,47 @@ const MapComponent: React.FC<{
                     zoomControl: true,
                     scrollwheel: true,
                     gestureHandling: 'greedy',
+                    // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่
+                    clickableIcons: true,
+                    mapTypeControl: true,
+                    mapTypeControlOptions: {
+                        position: google.maps.ControlPosition.TOP_CENTER,
+                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                        mapTypeIds: [
+                            google.maps.MapTypeId.ROADMAP,
+                            google.maps.MapTypeId.SATELLITE,
+                            google.maps.MapTypeId.HYBRID,
+                            google.maps.MapTypeId.TERRAIN
+                        ]
+                    },
+                    // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่
+                    styles: [
+                        {
+                            featureType: 'poi',
+                            elementType: 'labels',
+                            stylers: [{ visibility: 'on' }]
+                        },
+                        {
+                            featureType: 'administrative',
+                            elementType: 'labels',
+                            stylers: [{ visibility: 'on' }]
+                        },
+                        {
+                            featureType: 'road',
+                            elementType: 'labels',
+                            stylers: [{ visibility: 'on' }]
+                        },
+                        {
+                            featureType: 'transit',
+                            elementType: 'labels',
+                            stylers: [{ visibility: 'on' }]
+                        },
+                        {
+                            featureType: 'water',
+                            elementType: 'labels',
+                            stylers: [{ visibility: 'on' }]
+                        }
+                    ]
                 });
 
                 let isZooming = false;
@@ -162,6 +236,23 @@ const MapComponent: React.FC<{
                             maxZoom: null,
                         });
                     }
+                    
+                    // ตั้งค่าให้แสดงชื่อสถานที่เมื่อ zoom เปลี่ยน
+                    if (currentZoom && currentZoom >= 10) {
+                        newMap.setOptions({
+                            clickableIcons: true,
+                            mapTypeControl: true,
+                        });
+                    }
+                });
+
+                // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่เมื่อโหลดแผนที่เสร็จ
+                newMap.addListener('idle', () => {
+                    // ตั้งค่าให้แสดงชื่อสถานที่ต่างๆ
+                    newMap.setOptions({
+                        clickableIcons: true,
+                        mapTypeControl: true
+                    });
                 });
 
                 setMap(newMap);
@@ -171,7 +262,7 @@ const MapComponent: React.FC<{
                 console.error('Error creating Google Map:', error);
             }
         }
-    }, [ref, map, center, zoom, onLoad, mapOptions]);
+    }, [ref, map, validCenter, validZoom, onLoad, mapOptions]);
 
     useEffect(() => {
         if (map && !isMapInitialized) {
