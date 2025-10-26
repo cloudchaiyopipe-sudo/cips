@@ -93,7 +93,7 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
     if (!isActive) return null;
 
     return (
-        <div className="fixed top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm">
+        <div className="fixed top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <FaMountain className="text-green-600" size={16} />

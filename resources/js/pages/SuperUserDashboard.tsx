@@ -106,6 +106,8 @@ export default function SuperUserDashboard() {
     const [showPaymentEditModal, setShowPaymentEditModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+    const [userViewMode, setUserViewMode] = useState<'grid' | 'table'>('grid');
+    const [userSearchTerm, setUserSearchTerm] = useState('');
 
     useEffect(() => {
         loadDashboardData();
@@ -346,6 +348,25 @@ export default function SuperUserDashboard() {
             alert(errorMessage);
         }
     };
+
+    // Filter and sort users
+    const filteredAndSortedUsers = users
+        .filter((user) => {
+            if (!userSearchTerm) return true;
+            const searchLower = userSearchTerm.toLowerCase();
+            return (
+                user.name.toLowerCase().includes(searchLower) ||
+                user.email.toLowerCase().includes(searchLower) ||
+                (user.phone && user.phone.includes(searchLower))
+            );
+        })
+        .sort((a, b) => {
+            // Super users first
+            if (a.is_super_user && !b.is_super_user) return -1;
+            if (!a.is_super_user && b.is_super_user) return 1;
+            // Then sort by name
+            return a.name.localeCompare(b.name);
+        });
 
     if (loading) {
         return (
@@ -848,8 +869,71 @@ export default function SuperUserDashboard() {
                                         {t('create_user')}
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                                    {users.map((user) => (
+
+                                {/* Search and View Controls */}
+                                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex-1 max-w-md">
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder={t('search_users') || 'Search by name, email, or phone...'}
+                                                value={userSearchTerm}
+                                                onChange={(e) => setUserSearchTerm(e.target.value)}
+                                                className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 pl-10 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                                            />
+                                            <svg
+                                                className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                                />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-400">
+                                            {t('view_mode') || 'View:'}
+                                        </span>
+                                        <div className="flex rounded-lg border border-gray-600 bg-gray-700 p-1">
+                                            <button
+                                                onClick={() => setUserViewMode('grid')}
+                                                className={`flex items-center gap-2 rounded px-3 py-1 text-sm transition-colors ${
+                                                    userViewMode === 'grid'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-gray-400 hover:text-white'
+                                                }`}
+                                            >
+                                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                                </svg>
+                                                {t('grid') || 'Grid'}
+                                            </button>
+                                            <button
+                                                onClick={() => setUserViewMode('table')}
+                                                className={`flex items-center gap-2 rounded px-3 py-1 text-sm transition-colors ${
+                                                    userViewMode === 'table'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-gray-400 hover:text-white'
+                                                }`}
+                                            >
+                                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                                </svg>
+                                                {t('table') || 'Table'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* User Display */}
+                                {userViewMode === 'grid' ? (
+                                    <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                                        {filteredAndSortedUsers.map((user) => (
                                         <div
                                             key={user.id}
                                             className={`relative flex flex-col overflow-hidden rounded-3xl border border-blue-700 bg-gradient-to-br from-blue-900 via-gray-900 to-blue-800 shadow-2xl transition-transform hover:-translate-y-2 hover:scale-105 hover:shadow-blue-500/30 duration-300 min-h-[420px] ${user.is_super_user ? 'border-yellow-700 bg-gradient-to-br from-yellow-900 via-gray-900 to-yellow-800' : ''}`}
@@ -943,8 +1027,145 @@ export default function SuperUserDashboard() {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* Table View */
+                                    <div className="overflow-hidden rounded-lg border border-gray-700 bg-gray-800">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead className="bg-gray-700">
+                                                    <tr>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('user') || 'User'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('email') || 'Email'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('phone') || 'Phone'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('fields') || 'Fields'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('folders') || 'Folders'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('joined') || 'Joined'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('status') || 'Status'}
+                                                        </th>
+                                                        <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-300">
+                                                            {t('actions') || 'Actions'}
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-700">
+                                                    {filteredAndSortedUsers.map((user) => (
+                                                        <tr key={user.id} className="hover:bg-gray-700/50 transition-colors">
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="flex items-center">
+                                                                    <div className="flex-shrink-0 h-10 w-10">
+                                                                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                                                            user.is_super_user 
+                                                                                ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' 
+                                                                                : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                                                                        }`}>
+                                                                            <FaUsers className="h-5 w-5 text-white" />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="ml-4">
+                                                                        <div className="text-sm font-medium text-white">
+                                                                            {user.name}
+                                                                        </div>
+                                                                        {user.is_super_user && (
+                                                                            <div className="text-xs text-yellow-400 font-semibold">
+                                                                                {t('super_user') || 'Super User'}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm text-gray-300 font-mono">
+                                                                    {user.email}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm text-gray-300">
+                                                                    {user.phone || '-'}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm text-white font-semibold">
+                                                                    {user.fields_count ?? '-'}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm text-white font-semibold">
+                                                                    {user.folders_count ?? '-'}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm text-gray-300">
+                                                                    {new Date(user.created_at).toLocaleDateString()}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                                    user.is_super_user
+                                                                        ? 'bg-yellow-100 text-yellow-800'
+                                                                        : 'bg-green-100 text-green-800'
+                                                                }`}>
+                                                                    {user.is_super_user ? (t('super_user') || 'Super User') : (t('regular_user') || 'Regular User')}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSelectedUser(user);
+                                                                            setShowEditUserModal(true);
+                                                                        }}
+                                                                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                                                                        title={t('edit') || 'Edit'}
+                                                                    >
+                                                                        <FaEdit className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteUser(user.id)}
+                                                                        className="text-red-400 hover:text-red-300 transition-colors"
+                                                                        title={t('delete') || 'Delete'}
+                                                                    >
+                                                                        <FaTrash className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {filteredAndSortedUsers.length === 0 && (
+                                            <div className="py-12 text-center">
+                                                <FaUsers className="mx-auto h-12 w-12 text-gray-400" />
+                                                <p className="mt-2 text-gray-400">
+                                                    {userSearchTerm ? (t('no_users_found') || 'No users found matching your search') : (t('no_users') || 'No users found')}
+                                                </p>
+                                                {userSearchTerm && (
+                                                    <button
+                                                        onClick={() => setUserSearchTerm('')}
+                                                        className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
+                                                    >
+                                                        {t('clear_search') || 'Clear search'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 
