@@ -88,7 +88,7 @@ const DrawingDistanceOverlay: React.FC<DrawingDistanceOverlayProps> = ({
 
     // Show/hide overlay based on active state and edit mode
     useEffect(() => {
-        const shouldShow = isActive && editMode && (isPolygonMode(editMode) || isPolylineMode(editMode));
+        const shouldShow = Boolean(isActive && editMode && (isPolygonMode(editMode) || isPolylineMode(editMode)));
         setIsVisible(shouldShow);
     }, [isActive, editMode]);
 
