@@ -82,9 +82,9 @@ class SummaryErrorBoundary extends React.Component<
 
 const CanvasRenderer: React.FC<{
     gardenData: GardenPlannerData;
-    canvasRef?: React.RefObject<HTMLCanvasElement>;
+    canvasRef?: React.RefObject<HTMLCanvasElement | null>;
 }> = ({ gardenData, canvasRef }) => {
-    const internalCanvasRef = useRef<HTMLCanvasElement>(null);
+    const internalCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const activeCanvasRef = canvasRef || internalCanvasRef;
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -829,7 +829,7 @@ const CanvasRenderer: React.FC<{
                 </div>
             </div>
             <canvas
-                ref={activeCanvasRef}
+                ref={activeCanvasRef as React.RefObject<HTMLCanvasElement>}
                 width={canvasSize.width}
                 height={canvasSize.height}
                 className="rounded-lg border border-gray-600 bg-gray-900 shadow-xl"

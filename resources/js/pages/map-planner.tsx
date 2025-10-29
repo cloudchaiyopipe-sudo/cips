@@ -120,7 +120,7 @@ const SearchControl: React.FC<{ onSearch: (lat: number, lng: number) => void }> 
     const [error, setError] = useState<string | null>(null);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const searchTimeoutRef = useRef<NodeJS.Timeout>();
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleClear = () => {
         setSearchQuery('');

@@ -358,7 +358,7 @@ const DrawingManager: React.FC<{
     onZoneCreated: (coordinates: Coordinate[]) => void;
     onMapClick: (e: unknown) => void;
 }> = ({ map, editMode, selectedZoneType, onZoneCreated, onMapClick }) => {
-    const drawingManagerRef = useRef<google.maps.drawing.DrawingManager>();
+    const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
 
     useEffect(() => {
         if (!map || !window.google?.maps?.drawing) return;
