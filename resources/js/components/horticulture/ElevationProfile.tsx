@@ -705,14 +705,14 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                                         </label>
                                         <input
                                             type="number"
-                                            value={yAxisMin || ''}
+                                            value={yAxisMin?.toFixed(1) || ''}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value);
                                                 if (!isNaN(value)) {
                                                     handleCustomRangeChange(value, yAxisMax || profileData.maxElevation);
                                                 }
                                             }}
-                                            className="w-full px-2 py-1 text-xs border rounded"
+                                            className="w-full px-2 py-1 text-xs border rounded text-black"
                                             placeholder={profileData.minElevation.toFixed(1)}
                                         />
                                     </div>
@@ -722,14 +722,14 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                                         </label>
                                         <input
                                             type="number"
-                                            value={yAxisMax || ''}
+                                            value={yAxisMax?.toFixed(1) || ''}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value);
                                                 if (!isNaN(value)) {
                                                     handleCustomRangeChange(yAxisMin || profileData.minElevation, value);
                                                 }
                                             }}
-                                            className="w-full px-2 py-1 text-xs border rounded"
+                                            className="w-full px-2 py-1 text-xs border rounded text-black"
                                             placeholder={profileData.maxElevation.toFixed(1)}
                                         />
                                     </div>
