@@ -182,6 +182,21 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('yield_optimization'),
         ],
     },
+    {
+        id: 'khok-nong-na',
+        name: 'โคกหนองนา',
+        description: 'ระบบวางระบบน้ำสำหรับโคกหนองนา ตามแนวคิดเศรษฐกิจพอเพียง',
+        icon: '🏞️',
+        color: 'from-emerald-600 to-teal-800',
+        route: '/khok-nong-na',
+        features: [
+            'การวิเคราะห์พื้นที่โคกหนองนา',
+            'การวางแผนระบบน้ำอัตโนมัติ',
+            'การคำนวณต้นทุนโครงการ',
+            'การจัดการน้ำตามหลักเศรษฐกิจพอเพียง',
+            'การติดตามและรายงานผล',
+        ],
+    },
 ];
 
 // Components
@@ -226,6 +241,7 @@ const FieldCard = ({
             'home-garden': '🏡',
             greenhouse: '🌱',
             'field-crop': '🌾',
+            'khok-nong-na': '🏞️',
         };
         return categoryMap[category] || '📁';
     };
@@ -1307,6 +1323,7 @@ export default function Home() {
                     'home-garden': '?mode=garden',
                     'field-crop': '?mode=field-crop',
                     greenhouse: '?mode=greenhouse',
+                    'khok-nong-na': '?mode=khok-nong-na',
                 };
                 const modeParam = productModeMap[field.category || 'horticulture'] || '';
                 navigateToRoute(`/product${modeParam}`);
@@ -1323,6 +1340,10 @@ export default function Home() {
 
                 case 'field-crop':
                     navigateToRoute('/field-crop');
+                    break;
+
+                case 'khok-nong-na':
+                    navigateToRoute('/khok-nong-na');
                     break;
 
                 case 'greenhouse': {

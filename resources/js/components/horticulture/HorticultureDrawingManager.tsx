@@ -463,7 +463,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
 
     useEffect(() => {
-        if (!map || !window.google?.maps?.drawing) {
+        if (!map || !window.google?.maps?.drawing || !window.google?.maps) {
             if (drawingManagerRef.current) {
                 drawingManagerRef.current.setMap(null);
                 drawingManagerRef.current = null;
@@ -492,6 +492,12 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 
         try {
             const defaultDrawingMode = getDrawingMode(editMode);
+
+            // Check if Google Maps is fully loaded
+            if (!window.google?.maps?.drawing?.DrawingManager) {
+                console.warn('Google Maps Drawing Manager not available');
+                return;
+            }
 
             const drawingManager = new google.maps.drawing.DrawingManager({
                 drawingMode: defaultDrawingMode,
@@ -525,14 +531,16 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 
 
 
-            drawingManager.addListener('mousemove', (event) => {
-                if (editMode === 'lateralPipe' && onLateralPipeMouseMove) {
+            // Handle lateral pipe mouse movement separately
+            if (editMode === 'lateralPipe' && onLateralPipeMouseMove) {
+                drawingManager.addListener('mousemove', (event) => {
                     onLateralPipeMouseMove(event);
-                }
-            });
+                });
+            }
 
 
             const listeners: google.maps.MapsEventListener[] = [];
+
 
             listeners.push(
                 drawingManager.addListener('polygoncomplete', (polygon: google.maps.Polygon) => {
@@ -563,6 +571,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             onCreated(coordinates, 'rectangle');
                         }
                         rectangle.setMap(null);
+                        
                     }
                 )
             );
@@ -579,6 +588,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         onCreated(coordinates, 'circle');
                     }
                     circle.setMap(null);
+                    
                 })
             );
 
@@ -601,6 +611,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         onCreated(coordinates, 'polyline');
                     }
                     polyline.setMap(null);
+                    
                 })
             );
 
@@ -739,6 +750,11 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             };
         } catch (error) {
             console.error('Error creating DrawingManager:', error);
+            // Reset drawing manager on error
+            if (drawingManagerRef.current) {
+                drawingManagerRef.current.setMap(null);
+                drawingManagerRef.current = null;
+            }
         }
     }, [
         map,
@@ -764,9 +780,12 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         return () => {
             if (drawingManagerRef.current) {
                 try {
-                    drawingManagerRef.current.setDrawingMode(null);
-                    drawingManagerRef.current.setOptions({ drawingControl: false });
-                    drawingManagerRef.current.setMap(null);
+                    // Check if Google Maps is still available before cleanup
+                    if (window.google?.maps?.drawing) {
+                        drawingManagerRef.current.setDrawingMode(null);
+                        drawingManagerRef.current.setOptions({ drawingControl: false });
+                        drawingManagerRef.current.setMap(null);
+                    }
                 } catch (e) {
                     console.error('Error cleaning up DrawingManager:', e);
                 }

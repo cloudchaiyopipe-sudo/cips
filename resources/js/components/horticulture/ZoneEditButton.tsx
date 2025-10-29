@@ -1,5 +1,5 @@
 import React from 'react';
-import { IrrigationZone } from '../utils/irrigationZoneUtils';
+import { IrrigationZone } from '../../utils/irrigationZoneUtils';
 
 interface ZoneEditButtonProps {
     zones: IrrigationZone[];

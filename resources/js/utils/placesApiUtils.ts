@@ -472,22 +472,22 @@ export const createSearchDebouncer = (
 };
 
 // ฟังก์ชันสำหรับ log การใช้งาน Places API
-export const logPlacesAPIUsage = (
-    operation: string,
-    query?: string,
-    resultsCount?: number,
-    error?: string
-): void => {
-    if (import.meta.env.DEV) {
-        console.log('🔍 Places API Usage:', {
-            operation,
-            query,
-            resultsCount,
-            error,
-            timestamp: new Date().toISOString(),
-        });
-    }
-};
+// export const logPlacesAPIUsage = (
+//     operation: string,
+//     query?: string,
+//     resultsCount?: number,
+//     error?: string
+// ): void => {
+//     if (import.meta.env.DEV) {
+//         console.log('🔍 Places API Usage:', {
+//             operation,
+//             query,
+//             resultsCount,
+//             error,
+//             timestamp: new Date().toISOString(),
+//         });
+//     }
+// };
 
 // ======= COORDINATE SEARCH FUNCTIONS =======
 
@@ -719,17 +719,10 @@ export const universalSearch = async (
 
     // ตรวจสอบว่าเป็นพิกัดหรือไม่
     if (detectCoordinatePattern(trimmedQuery)) {
-        logPlacesAPIUsage('coordinate_search', trimmedQuery);
 
         const coordinates = parseCoordinatesFromText(trimmedQuery);
         if (coordinates) {
             const reverseResult = await reverseGeocode(coordinates.lat, coordinates.lng);
-            logPlacesAPIUsage(
-                'reverse_geocoding',
-                trimmedQuery,
-                reverseResult.results.length,
-                reverseResult.error?.message
-            );
 
             return {
                 ...reverseResult,
@@ -754,15 +747,8 @@ export const universalSearch = async (
     }
 
     // ถึงจุดนี้แสดงว่าเป็นการค้นหาด้วยข้อความ
-    logPlacesAPIUsage('text_search', trimmedQuery);
 
     const textResult = await searchPlacesWithText(trimmedQuery, options);
-    logPlacesAPIUsage(
-        'places_text_search',
-        trimmedQuery,
-        textResult.results.length,
-        textResult.error?.message
-    );
 
     // กรองผลลัพธ์ถ้าต้องการ
     const filteredResults =

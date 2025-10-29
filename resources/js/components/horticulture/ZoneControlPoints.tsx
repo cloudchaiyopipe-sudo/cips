@@ -1,6 +1,6 @@
 import React from 'react';
-import { ZoneControlPoint } from '../utils/zoneEditUtils';
-import { Coordinate } from '../utils/irrigationZoneUtils';
+import { ZoneControlPoint } from '../../utils/zoneEditUtils';
+import { Coordinate } from '../../utils/irrigationZoneUtils';
 
 interface ZoneControlPointsProps {
     controlPoints: ZoneControlPoint[];

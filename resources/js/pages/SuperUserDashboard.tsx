@@ -30,6 +30,7 @@ type User = {
     phone: string;
     additional_details: string;
     is_super_user: boolean;
+    role: 'user' | 'sales' | 'super_user';
     created_at: string;
     fields_count?: number;
     folders_count?: number;
@@ -108,6 +109,9 @@ export default function SuperUserDashboard() {
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
     const [userViewMode, setUserViewMode] = useState<'grid' | 'table'>('grid');
     const [userSearchTerm, setUserSearchTerm] = useState('');
+    const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'super_user' | 'sales' | 'user'>('all');
+    const [currentUserPage, setCurrentUserPage] = useState(1);
+    const usersPerPage = 12;
 
     useEffect(() => {
         loadDashboardData();
@@ -352,21 +356,51 @@ export default function SuperUserDashboard() {
     // Filter and sort users
     const filteredAndSortedUsers = users
         .filter((user) => {
-            if (!userSearchTerm) return true;
-            const searchLower = userSearchTerm.toLowerCase();
-            return (
-                user.name.toLowerCase().includes(searchLower) ||
-                user.email.toLowerCase().includes(searchLower) ||
-                (user.phone && user.phone.includes(searchLower))
-            );
+            // Search filter
+            if (userSearchTerm) {
+                const searchLower = userSearchTerm.toLowerCase();
+                const matchesSearch = (
+                    user.name.toLowerCase().includes(searchLower) ||
+                    user.email.toLowerCase().includes(searchLower) ||
+                    (user.phone && user.phone.includes(searchLower))
+                );
+                if (!matchesSearch) return false;
+            }
+            
+            // Role filter
+            if (userRoleFilter !== 'all') {
+                if (userRoleFilter === 'super_user' && user.role !== 'super_user') return false;
+                if (userRoleFilter === 'sales' && user.role !== 'sales') return false;
+                if (userRoleFilter === 'user' && user.role !== 'user') return false;
+            }
+            
+            return true;
         })
         .sort((a, b) => {
-            // Super users first
-            if (a.is_super_user && !b.is_super_user) return -1;
-            if (!a.is_super_user && b.is_super_user) return 1;
+            // Sort by role priority: super_user -> sales -> user
+            const rolePriority = { 'super_user': 0, 'sales': 1, 'user': 2 };
+            const aPriority = rolePriority[a.role as keyof typeof rolePriority] ?? 3;
+            const bPriority = rolePriority[b.role as keyof typeof rolePriority] ?? 3;
+            
+            if (aPriority !== bPriority) {
+                return aPriority - bPriority;
+            }
+            
             // Then sort by name
             return a.name.localeCompare(b.name);
         });
+
+    // Pagination logic
+    const totalUsers = filteredAndSortedUsers.length;
+    const totalPages = Math.ceil(totalUsers / usersPerPage);
+    const startIndex = (currentUserPage - 1) * usersPerPage;
+    const endIndex = startIndex + usersPerPage;
+    const paginatedUsers = filteredAndSortedUsers.slice(startIndex, endIndex);
+
+    // Reset to first page when search term or role filter changes
+    useEffect(() => {
+        setCurrentUserPage(1);
+    }, [userSearchTerm, userRoleFilter]);
 
     if (loading) {
         return (
@@ -872,28 +906,42 @@ export default function SuperUserDashboard() {
 
                                 {/* Search and View Controls */}
                                 <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex-1 max-w-md">
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder={t('search_users') || 'Search by name, email, or phone...'}
-                                                value={userSearchTerm}
-                                                onChange={(e) => setUserSearchTerm(e.target.value)}
-                                                className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 pl-10 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
-                                            />
-                                            <svg
-                                                className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                    <div className="flex flex-1 gap-4 max-w-2xl">
+                                        <div className="flex-1 max-w-md">
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    placeholder={t('search_users') || 'Search by name, email, or phone...'}
+                                                    value={userSearchTerm}
+                                                    onChange={(e) => setUserSearchTerm(e.target.value)}
+                                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 pl-10 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
                                                 />
-                                            </svg>
+                                                <svg
+                                                    className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                                    />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div className="min-w-40">
+                                            <select
+                                                value={userRoleFilter}
+                                                onChange={(e) => setUserRoleFilter(e.target.value as 'all' | 'super_user' | 'sales' | 'user')}
+                                                className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                            >
+                                                <option value="all">{t('ทั้งหมด') || 'All Roles'}</option>
+                                                <option value="super_user">{t('Admin') || 'Admin'}</option>
+                                                <option value="sales">{t('Sales') || 'Sales'}</option>
+                                                <option value="user">{t('User') || 'User'}</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -933,23 +981,48 @@ export default function SuperUserDashboard() {
                                 {/* User Display */}
                                 {userViewMode === 'grid' ? (
                                     <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                                        {filteredAndSortedUsers.map((user) => (
+                                        {paginatedUsers.map((user) => (
                                         <div
                                             key={user.id}
-                                            className={`relative flex flex-col overflow-hidden rounded-3xl border border-blue-700 bg-gradient-to-br from-blue-900 via-gray-900 to-blue-800 shadow-2xl transition-transform hover:-translate-y-2 hover:scale-105 hover:shadow-blue-500/30 duration-300 min-h-[420px] ${user.is_super_user ? 'border-yellow-700 bg-gradient-to-br from-yellow-900 via-gray-900 to-yellow-800' : ''}`}
+                                            className={`relative flex flex-col overflow-hidden rounded-3xl border shadow-2xl transition-transform hover:-translate-y-2 hover:scale-105 duration-300 min-h-[420px] ${
+                                                user.role === 'super_user' 
+                                                    ? 'border-yellow-700 bg-gradient-to-br from-yellow-900 via-gray-900 to-yellow-800 hover:shadow-yellow-500/30' 
+                                                    : user.role === 'sales'
+                                                    ? 'border-purple-700 bg-gradient-to-br from-purple-900 via-gray-900 to-purple-800 hover:shadow-purple-500/30'
+                                                    : 'border-blue-700 bg-gradient-to-br from-blue-900 via-gray-900 to-blue-800 hover:shadow-blue-500/30'
+                                            }`}
                                         >
                                             {/* User Banner */}
-                                            <div className={`h-24 w-full ${user.is_super_user ? 'bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-400' : 'bg-gradient-to-r from-blue-800 via-blue-600 to-blue-400'}`}></div>
+                                            <div className={`h-24 w-full ${
+                                                user.role === 'super_user' 
+                                                    ? 'bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-400' 
+                                                    : user.role === 'sales'
+                                                    ? 'bg-gradient-to-r from-purple-800 via-purple-600 to-purple-400'
+                                                    : 'bg-gradient-to-r from-blue-800 via-blue-600 to-blue-400'
+                                            }`}></div>
                                             {/* Avatar */}
                                             <div className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-                                                <div className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-blue-700 via-blue-500 to-blue-400 shadow-lg ring-4 ring-blue-300/30">
+                                                <div className={`flex h-24 w-24 items-center justify-center rounded-full border-4 border-white shadow-lg ring-4 ${
+                                                    user.role === 'super_user' 
+                                                        ? 'bg-gradient-to-br from-yellow-700 via-yellow-500 to-yellow-400 ring-yellow-300/30' 
+                                                        : user.role === 'sales'
+                                                        ? 'bg-gradient-to-br from-purple-700 via-purple-500 to-purple-400 ring-purple-300/30'
+                                                        : 'bg-gradient-to-br from-blue-700 via-blue-500 to-blue-400 ring-blue-300/30'
+                                                }`}>
                                                     <FaUsers className="h-12 w-12 text-white drop-shadow" />
                                                 </div>
-                                                {/* {user.is_super_user && (
-                                                    <span className="mt-2 rounded-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 px-4 py-1 text-xs font-bold text-white shadow-lg border border-yellow-300">
-                                                        {t('super_user')}
-                                                    </span>
-                                                )} */}
+                                                {/* Role Badge */}
+                                                <span className={`mt-2 rounded-full px-4 py-1 text-xs font-bold text-white shadow-lg border ${
+                                                    user.role === 'super_user' 
+                                                        ? 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 border-yellow-300' 
+                                                        : user.role === 'sales'
+                                                        ? 'bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 border-purple-300'
+                                                        : 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600 border-blue-300'
+                                                }`}>
+                                                    {user.role === 'super_user' ? (t('Admin') || 'Admin') : 
+                                                     user.role === 'sales' ? (t('Sales') || 'Sales') : 
+                                                     (t('User') || 'User')}
+                                                </span>
                                             </div>
                                             {/* User Info */}
                                             <div className="flex-1 flex flex-col items-center pt-20 pb-4 px-8">
@@ -992,7 +1065,13 @@ export default function SuperUserDashboard() {
                                                 </div>
                                             </div>
                                             {/* User Stats */}
-                                            <div className="flex justify-around border-t border-blue-800 bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 py-4 text-xs text-blue-200">
+                                            <div className={`flex justify-around border-t py-4 text-xs ${
+                                                user.role === 'super_user' 
+                                                    ? 'border-yellow-800 bg-gradient-to-r from-yellow-950 via-yellow-900 to-yellow-950 text-yellow-200' 
+                                                    : user.role === 'sales'
+                                                    ? 'border-purple-800 bg-gradient-to-r from-purple-950 via-purple-900 to-purple-950 text-purple-200'
+                                                    : 'border-blue-800 bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 text-blue-200'
+                                            }`}>
                                                 <div className="flex flex-col items-center">
                                                     <span className="font-bold text-white text-lg drop-shadow">{user.fields_count ?? '-'}</span>
                                                     <span className="tracking-wide">{t('fields')}</span>
@@ -1013,7 +1092,13 @@ export default function SuperUserDashboard() {
                                                         setSelectedUser(user);
                                                         setShowEditUserModal(true);
                                                     }}
-                                                    className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-md transition-all hover:from-blue-700 hover:to-blue-600 flex items-center justify-center gap-1 ring-1 ring-blue-400/30"
+                                                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md transition-all flex items-center justify-center gap-1 ${
+                                                        user.role === 'super_user' 
+                                                            ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 ring-1 ring-yellow-400/30' 
+                                                            : user.role === 'sales'
+                                                            ? 'bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 ring-1 ring-purple-400/30'
+                                                            : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 ring-1 ring-blue-400/30'
+                                                    }`}
                                                 >
                                                     <FaEdit className="h-4 w-4" />
                                                     {t('edit')}
@@ -1063,14 +1148,16 @@ export default function SuperUserDashboard() {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-700">
-                                                    {filteredAndSortedUsers.map((user) => (
+                                                    {paginatedUsers.map((user) => (
                                                         <tr key={user.id} className="hover:bg-gray-700/50 transition-colors">
                                                             <td className="px-6 py-4 whitespace-nowrap">
                                                                 <div className="flex items-center">
                                                                     <div className="flex-shrink-0 h-10 w-10">
                                                                         <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                                                            user.is_super_user 
+                                                                            user.role === 'super_user' 
                                                                                 ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' 
+                                                                                : user.role === 'sales'
+                                                                                ? 'bg-gradient-to-br from-purple-500 to-purple-600'
                                                                                 : 'bg-gradient-to-br from-blue-500 to-blue-600'
                                                                         }`}>
                                                                             <FaUsers className="h-5 w-5 text-white" />
@@ -1080,11 +1167,17 @@ export default function SuperUserDashboard() {
                                                                         <div className="text-sm font-medium text-white">
                                                                             {user.name}
                                                                         </div>
-                                                                        {user.is_super_user && (
-                                                                            <div className="text-xs text-yellow-400 font-semibold">
-                                                                                {t('super_user') || 'Super User'}
-                                                                            </div>
-                                                                        )}
+                                                                        <div className={`text-xs font-semibold ${
+                                                                            user.role === 'super_user' 
+                                                                                ? 'text-yellow-400' 
+                                                                                : user.role === 'sales'
+                                                                                ? 'text-purple-400'
+                                                                                : 'text-blue-400'
+                                                                        }`}>
+                                                                            {user.role === 'super_user' ? (t('super_user') || 'Super User') : 
+                                                                             user.role === 'sales' ? (t('sales_user') || 'Sales User') : 
+                                                                             (t('regular_user') || 'Regular User')}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -1115,11 +1208,15 @@ export default function SuperUserDashboard() {
                                                             </td>
                                                             <td className="px-6 py-4 whitespace-nowrap">
                                                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                                    user.is_super_user
+                                                                    user.role === 'super_user'
                                                                         ? 'bg-yellow-100 text-yellow-800'
+                                                                        : user.role === 'sales'
+                                                                        ? 'bg-purple-100 text-purple-800'
                                                                         : 'bg-green-100 text-green-800'
                                                                 }`}>
-                                                                    {user.is_super_user ? (t('super_user') || 'Super User') : (t('regular_user') || 'Regular User')}
+                                                                    {user.role === 'super_user' ? (t('Admin') || 'Admin') : 
+                                                                     user.role === 'sales' ? (t('Sales') || 'Sales') : 
+                                                                     (t('User') || 'User')}
                                                                 </span>
                                                             </td>
                                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1148,7 +1245,7 @@ export default function SuperUserDashboard() {
                                                 </tbody>
                                             </table>
                                         </div>
-                                        {filteredAndSortedUsers.length === 0 && (
+                                        {paginatedUsers.length === 0 && (
                                             <div className="py-12 text-center">
                                                 <FaUsers className="mx-auto h-12 w-12 text-gray-400" />
                                                 <p className="mt-2 text-gray-400">
@@ -1164,6 +1261,114 @@ export default function SuperUserDashboard() {
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="mt-6 flex items-center justify-between">
+                                        <div className="text-sm text-gray-400">
+                                            {t('showing') || 'Showing'} {startIndex + 1} {t('to') || 'to'} {Math.min(endIndex, totalUsers)} {t('of') || 'of'} {totalUsers} {t('users') || 'users'}
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            {/* Previous Button */}
+                                            <button
+                                                onClick={() => setCurrentUserPage(Math.max(1, currentUserPage - 1))}
+                                                disabled={currentUserPage === 1}
+                                                className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                                </svg>
+                                                {t('previous') || 'Previous'}
+                                            </button>
+
+                                            {/* Page Numbers */}
+                                            <div className="flex items-center space-x-1">
+                                                {(() => {
+                                                    const pages: React.ReactNode[] = [];
+                                                    const maxVisiblePages = 5;
+                                                    let startPage = Math.max(1, currentUserPage - Math.floor(maxVisiblePages / 2));
+                                                    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                                                    // Adjust start page if we're near the end
+                                                    if (endPage - startPage + 1 < maxVisiblePages) {
+                                                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                                                    }
+
+                                                    // First page and ellipsis
+                                                    if (startPage > 1) {
+                                                        pages.push(
+                                                            <button
+                                                                key={1}
+                                                                onClick={() => setCurrentUserPage(1)}
+                                                                className="px-3 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 hover:text-white transition-colors"
+                                                            >
+                                                                1
+                                                            </button>
+                                                        );
+                                                        if (startPage > 2) {
+                                                            pages.push(
+                                                                <span key="ellipsis1" className="px-2 text-gray-500">
+                                                                    ...
+                                                                </span>
+                                                            );
+                                                        }
+                                                    }
+
+                                                    // Page numbers
+                                                    for (let i = startPage; i <= endPage; i++) {
+                                                        pages.push(
+                                                            <button
+                                                                key={i}
+                                                                onClick={() => setCurrentUserPage(i)}
+                                                                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                                                    i === currentUserPage
+                                                                        ? 'bg-blue-600 text-white border border-blue-500'
+                                                                        : 'text-gray-300 bg-gray-700 border border-gray-600 hover:bg-gray-600 hover:text-white'
+                                                                }`}
+                                                            >
+                                                                {i}
+                                                            </button>
+                                                        );
+                                                    }
+
+                                                    // Last page and ellipsis
+                                                    if (endPage < totalPages) {
+                                                        if (endPage < totalPages - 1) {
+                                                            pages.push(
+                                                                <span key="ellipsis2" className="px-2 text-gray-500">
+                                                                    ...
+                                                                </span>
+                                                            );
+                                                        }
+                                                        pages.push(
+                                                            <button
+                                                                key={totalPages}
+                                                                onClick={() => setCurrentUserPage(totalPages)}
+                                                                className="px-3 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 hover:text-white transition-colors"
+                                                            >
+                                                                {totalPages}
+                                                            </button>
+                                                        );
+                                                    }
+
+                                                    return pages;
+                                                })()}
+                                            </div>
+
+                                            {/* Next Button */}
+                                            <button
+                                                onClick={() => setCurrentUserPage(Math.min(totalPages, currentUserPage + 1))}
+                                                disabled={currentUserPage === totalPages}
+                                                className="flex items-center px-3 py-2 text-sm font-medium text-gray-300 bg-gray-700 border border-gray-600 rounded-lg hover:bg-gray-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                {t('next') || 'Next'}
+                                                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -1686,6 +1891,7 @@ const CreateUserModal = ({
     const [userEmail, setUserEmail] = useState('');
     const [userPassword, setUserPassword] = useState('');
     const [isSuperUser, setIsSuperUser] = useState(false);
+    const [userRole, setUserRole] = useState<'user' | 'sales' | 'super_user'>('user');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -1695,7 +1901,8 @@ const CreateUserModal = ({
             name: userName.trim(),
             email: userEmail.trim(),
             password: userPassword,
-            is_super_user: isSuperUser,
+            is_super_user: isSuperUser || userRole === 'super_user',
+            role: userRole,
             phone: '',
             additional_details: ''
         });
@@ -1704,6 +1911,7 @@ const CreateUserModal = ({
         setUserEmail('');
         setUserPassword('');
         setIsSuperUser(false);
+        setUserRole('user');
         onClose();
     };
 
@@ -1772,6 +1980,21 @@ const CreateUserModal = ({
                             minLength={8}
                         />
                     </div>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('user_role') || 'User Role'}
+                        </label>
+                        <select
+                            value={userRole}
+                            onChange={(e) => setUserRole(e.target.value as 'user' | 'sales' | 'super_user')}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            required
+                        >
+                            <option value="user">{t('regular_user') || 'Regular User'}</option>
+                            <option value="sales">{t('sales_user') || 'Sales User'}</option>
+                            <option value="super_user">{t('super_user') || 'Super User'}</option>
+                        </select>
+                    </div>
                     <div className="mb-6">
                         <label className="flex items-center">
                             <input
@@ -1823,6 +2046,7 @@ const EditUserModal = ({
     const [userEmail, setUserEmail] = useState(user.email);
     const [userPassword, setUserPassword] = useState('');
     const [isSuperUser, setIsSuperUser] = useState(user.is_super_user);
+    const [userRole, setUserRole] = useState<'user' | 'sales' | 'super_user'>(user.role || 'user');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -1831,7 +2055,8 @@ const EditUserModal = ({
         const updateData: Partial<User> = {
             name: userName.trim(),
             email: userEmail.trim(),
-            is_super_user: isSuperUser,
+            is_super_user: isSuperUser || userRole === 'super_user',
+            role: userRole,
         };
 
         // Only include password if it's provided
@@ -1908,6 +2133,21 @@ const EditUserModal = ({
                         <p className="mt-1 text-xs text-gray-400">
                             {t('leave_blank_to_keep_current_password')}
                         </p>
+                    </div>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('user_role') || 'User Role'}
+                        </label>
+                        <select
+                            value={userRole}
+                            onChange={(e) => setUserRole(e.target.value as 'user' | 'sales' | 'super_user')}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            required
+                        >
+                            <option value="user">{t('regular_user') || 'Regular User'}</option>
+                            <option value="sales">{t('sales_user') || 'Sales User'}</option>
+                            <option value="super_user">{t('super_user') || 'Super User'}</option>
+                        </select>
                     </div>
                     <div className="mb-6">
                         <label className="flex items-center">

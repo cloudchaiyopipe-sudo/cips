@@ -1,6 +1,6 @@
 import React from 'react';
-import { IrrigationZone, PlantLocation, Coordinate } from '../utils/irrigationZoneUtils';
-import { useZoneEditor } from '../hooks/useZoneEditor';
+import { IrrigationZone, PlantLocation, Coordinate } from '../../utils/irrigationZoneUtils';
+import { useZoneEditor } from '../../hooks/useZoneEditor';
 import ZoneEditButton from './ZoneEditButton';
 import ZoneControlPoints from './ZoneControlPoints';
 

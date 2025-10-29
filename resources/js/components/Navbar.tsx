@@ -221,6 +221,17 @@ const Navbar: React.FC = () => {
                                 </Link>
                             )}
 
+                            {/* Sales User - Only show equipment management */}
+                            {auth?.user?.role === 'sales' && (
+                                <Link
+                                    href="/equipment-crud"
+                                    className="flex items-center rounded-lg bg-blue-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                                >
+                                    <span className="text-lg">⚙️</span>
+                                    {t('จัดการอุปกรณ์')}
+                                </Link>
+                            )}
+
                             <div className="flex items-center gap-3">
                                 <FloatingAiChat
                                     isOpen={showFloatingAiChat}
@@ -244,8 +255,8 @@ const Navbar: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Token Display for Non-Admin Users */}
-                            {auth?.user && !auth.user.is_super_user && (
+                            {/* Token Display for Non-Admin and Non-Sales Users */}
+                            {auth?.user && !auth.user.is_super_user && auth.user.role !== 'sales' && (
                                 <div className="flex items-center gap-2">
                                     {loadingTokens ? (
                                         <div className="flex items-center gap-2 rounded-lg bg-gray-700 px-3 py-1 text-sm text-white">

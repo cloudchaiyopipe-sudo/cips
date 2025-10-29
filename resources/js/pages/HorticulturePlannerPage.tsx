@@ -13,6 +13,8 @@ import ContinuousLateralPipePanel from '../components/horticulture/ContinuousLat
 import DeletePipePanel from '../components/horticulture/DeletePipePanel';
 import AutoLateralPipeModal from '../components/horticulture/AutoLateralPipeModal';
 import ElevationControlPanel from '../components/horticulture/ElevationControlPanel';
+// import DrawingDistanceOverlay from '../components/horticulture/DrawingDistanceOverlay'; // REMOVED - using DistanceMeasurementOverlay instead
+import DistanceMeasurementOverlay from '../components/horticulture/DistanceMeasurementOverlay';
 import { loadSprinklerConfig } from '../utils/sprinklerUtils';
 import {
     snapMainPipeEndToSubMainPipe,
@@ -5073,6 +5075,8 @@ export default function EnhancedHorticulturePlannerPage() {
     const [isApplyingRotation, setIsApplyingRotation] = useState(false);
     const [tempRotationAngle, setTempRotationAngle] = useState(0);
 
+    // Drawing distance overlay states - REMOVED (using DistanceMeasurementOverlay instead)
+
     const mapRef = useRef<google.maps.Map | null>(null);
     const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
     const polygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
@@ -5648,6 +5652,10 @@ export default function EnhancedHorticulturePlannerPage() {
         },
         [isRulerMode, rulerStartPoint]
     );
+
+    // handleCloseDrawingDistanceOverlay - REMOVED (using DistanceMeasurementOverlay instead)
+
+    // Distance measurement is now handled by DistanceMeasurementOverlay component
 
     const prevDimensionStateRef = useRef({
         dimensionLineAngleOffset,
@@ -7546,6 +7554,8 @@ export default function EnhancedHorticulturePlannerPage() {
             if (!isValidForPolyline && !isValidForPolygon) {
                 return;
             }
+
+            // Drawing distance overlay is now handled by DistanceMeasurementOverlay component
 
             if (history.present.mainArea.length === 0) {
                 const center = coordinates.reduce(
@@ -13796,6 +13806,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                 onLateralPipeMouseMove={handleLateralPipeMouseMove}
                             />
 
+                            {/* Distance Measurement Overlay */}
+                            <DistanceMeasurementOverlay
+                                map={mapRef.current}
+                                isActive={true}
+                                editMode={editMode}
+                            />
 
                             {(() => {
                                 return null;

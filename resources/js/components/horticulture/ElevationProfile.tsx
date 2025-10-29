@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { FaTimes, FaRoute, FaDownload } from 'react-icons/fa';
 
 interface ElevationProfileProps {
@@ -22,6 +22,8 @@ interface ProfileData {
     maxElevation: number;
     elevationGain: number;
     elevationLoss: number;
+    startPoint: google.maps.LatLng;
+    endPoint: google.maps.LatLng;
 }
 
 const ElevationProfile: React.FC<ElevationProfileProps> = ({
@@ -35,8 +37,12 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [startPoint, setStartPoint] = useState<google.maps.LatLng | null>(null);
-    const [endPoint, setEndPoint] = useState<google.maps.LatLng | null>(null);
+    const [, setEndPoint] = useState<google.maps.LatLng | null>(null);
     const [, setCurrentPoint] = useState<google.maps.LatLng | null>(null);
+    const [yAxisStepSize] = useState<number>(2); // Fixed step size for Y-axis
+    const [yAxisMin, setYAxisMin] = useState<number | null>(null); // Custom Y-axis minimum
+    const [yAxisMax, setYAxisMax] = useState<number | null>(null); // Custom Y-axis maximum
+    const [useCustomRange, setUseCustomRange] = useState<boolean>(false); // Whether to use custom range
     
     // Use refs to track current state
     const startPointRef = useRef<google.maps.LatLng | null>(null);
@@ -56,23 +62,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
         }
     }, [map]);
 
-    // Setup drawing mode
-    useEffect(() => {
-        if (!map || !isActive) {
-            cleanup();
-            return;
-        }
-
-        if (isDrawing) {
-            setupDrawingMode();
-        } else {
-            cleanup();
-        }
-
-        return cleanup;
-    }, [map, isActive, isDrawing]);
-
-    const cleanup = () => {
+    const cleanup = (removeLine: boolean = true) => {
         if (clickListenerRef.current) {
             google.maps.event.removeListener(clickListenerRef.current);
             clickListenerRef.current = null;
@@ -81,75 +71,35 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
             google.maps.event.removeListener(mouseMoveListenerRef.current);
             mouseMoveListenerRef.current = null;
         }
+        if (removeLine && polylineRef.current) {
+            polylineRef.current.setMap(null);
+            polylineRef.current = null;
+        }
+        if (removeLine) {
+        markersRef.current.forEach(marker => marker.setMap(null));
+        markersRef.current = [];
+        }
+        
+        // Only reset points when removing line (full cleanup)
+        if (removeLine) {
+        setStartPoint(null);
+        setEndPoint(null);
+        setCurrentPoint(null);
+        startPointRef.current = null;
+        endPointRef.current = null;
+        }
+    };
+
+    const removeLineAndMarkers = () => {
         if (polylineRef.current) {
             polylineRef.current.setMap(null);
             polylineRef.current = null;
         }
         markersRef.current.forEach(marker => marker.setMap(null));
         markersRef.current = [];
-        setStartPoint(null);
-        setEndPoint(null);
-        setCurrentPoint(null);
-        startPointRef.current = null;
-        endPointRef.current = null;
     };
 
-    const setupDrawingMode = () => {
-        if (!map) return;
-
-        const handleMapClick = (event: google.maps.MapMouseEvent) => {
-            if (!event.latLng) return;
-
-            if (!startPointRef.current) {
-                // First click - set start point
-                startPointRef.current = event.latLng;
-                setStartPoint(event.latLng);
-                createMarker(event.latLng, 'start');
-            } else if (!endPointRef.current) {
-                // Second click - set end point and create profile
-                endPointRef.current = event.latLng;
-                setEndPoint(event.latLng);
-                createMarker(event.latLng, 'end');
-                
-                // Create line between start and end points
-                createLineBetweenPoints(startPointRef.current, event.latLng);
-                
-                // Store the points for later use
-                const startPointForProfile = startPointRef.current;
-                const endPointForProfile = event.latLng;
-                
-                // Create elevation profile after a short delay to ensure line is visible
-                setTimeout(() => {
-                    if (startPointForProfile && endPointForProfile) {
-                        createElevationProfile(startPointForProfile, endPointForProfile);
-                    }
-                }, 100);
-                
-                setIsDrawing(false);
-            }
-        };
-
-        const handleMouseMove = (event: google.maps.MapMouseEvent) => {
-            if (event.latLng && startPoint && !endPoint) {
-                setCurrentPoint(event.latLng);
-                // Don't update polyline during mouse move to preserve the permanent line
-                // updatePolyline(startPoint, event.latLng);
-            }
-        };
-
-        // Remove existing listeners first
-        if (clickListenerRef.current) {
-            google.maps.event.removeListener(clickListenerRef.current);
-        }
-        if (mouseMoveListenerRef.current) {
-            google.maps.event.removeListener(mouseMoveListenerRef.current);
-        }
-
-        clickListenerRef.current = map.addListener('click', handleMapClick);
-        mouseMoveListenerRef.current = map.addListener('mousemove', handleMouseMove);
-    };
-
-    const createMarker = (position: google.maps.LatLng, type: 'start' | 'end') => {
+    const createMarker = useCallback((position: google.maps.LatLng, type: 'start' | 'end') => {
         if (!map) return;
 
         const marker = new google.maps.Marker({
@@ -167,9 +117,9 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
         });
 
         markersRef.current.push(marker);
-    };
+    }, [map, t]);
 
-    const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.LatLng) => {
+    const createLineBetweenPoints = useCallback((start: google.maps.LatLng, end: google.maps.LatLng) => {
         if (!map) return;
 
         // Remove existing line if any
@@ -187,9 +137,160 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
             strokeWeight: 4,
             map: map
         });
-    };
+    }, [map]);
 
-    const createElevationProfile = async (start: google.maps.LatLng, end: google.maps.LatLng) => {
+    const drawProfileChart = useCallback((points: ElevationPoint[], customStepSize?: number) => {
+        const canvas = canvasRef.current;
+        if (!canvas || !points.length) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Ensure the orange line is still visible when redrawing chart
+        // Use profileData points if available, otherwise use refs
+        const startPoint = profileData?.startPoint || startPointRef.current;
+        const endPoint = profileData?.endPoint || endPointRef.current;
+        
+        if (startPoint && endPoint && !polylineRef.current) {
+            createLineBetweenPoints(startPoint, endPoint);
+        }
+
+        // Use custom step size if provided, otherwise use current state
+        const currentStepSize = customStepSize ?? yAxisStepSize;
+
+        // Set canvas size
+        canvas.width = 600;
+        canvas.height = 300;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Set up drawing parameters
+        const padding = 40;
+        const chartWidth = canvas.width - 2 * padding;
+        const chartHeight = canvas.height - 2 * padding;
+
+        // Find min/max elevation
+        const elevations = points.map(p => p.elevation);
+        const minElevation = Math.min(...elevations);
+        const maxElevation = Math.max(...elevations);
+        
+        // Create Y-axis scale with padding for better visualization
+        let finalYAxisMin, finalYAxisMax;
+        
+        if (useCustomRange && yAxisMin !== null && yAxisMax !== null) {
+            // Use custom range
+            finalYAxisMin = yAxisMin;
+            finalYAxisMax = yAxisMax;
+        } else {
+            // Use auto range with padding
+            const elevationRange = maxElevation - minElevation;
+            const paddingFactor = 0.1; // 10% padding above and below
+            const elevationPadding = elevationRange * paddingFactor;
+            
+            finalYAxisMin = Math.floor((minElevation - elevationPadding) / currentStepSize) * currentStepSize;
+            finalYAxisMax = Math.ceil((maxElevation + elevationPadding) / currentStepSize) * currentStepSize;
+        }
+        
+        const yAxisRange = finalYAxisMax - finalYAxisMin;
+        
+        // Use the current step size
+        const stepSize = currentStepSize;
+        const numSteps = Math.ceil(yAxisRange / stepSize);
+
+        // Draw background
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw grid lines
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+        
+        // Vertical grid lines
+        for (let i = 0; i <= 10; i++) {
+            const x = padding + (i / 10) * chartWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, padding);
+            ctx.lineTo(x, padding + chartHeight);
+            ctx.stroke();
+        }
+
+        // Horizontal grid lines - Match Y-axis scale
+        for (let i = 0; i <= numSteps; i++) {
+            const elevation = finalYAxisMin + i * stepSize;
+            if (elevation <= finalYAxisMax) {
+                const y = padding + chartHeight - ((elevation - finalYAxisMin) / yAxisRange) * chartHeight;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(padding + chartWidth, y);
+                ctx.stroke();
+            }
+        }
+
+        // Draw elevation profile
+        ctx.strokeStyle = '#2196F3';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+
+        points.forEach((point, index) => {
+            const x = padding + (index / (points.length - 1)) * chartWidth;
+            const y = padding + chartHeight - ((point.elevation - finalYAxisMin) / yAxisRange) * chartHeight;
+            
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+
+        ctx.stroke();
+
+        // Fill area under curve
+        ctx.fillStyle = 'rgba(33, 150, 243, 0.2)';
+        ctx.beginPath();
+        ctx.moveTo(padding, padding + chartHeight);
+        
+        points.forEach((point, index) => {
+            const x = padding + (index / (points.length - 1)) * chartWidth;
+            const y = padding + chartHeight - ((point.elevation - finalYAxisMin) / yAxisRange) * chartHeight;
+            ctx.lineTo(x, y);
+        });
+        
+        ctx.lineTo(padding + chartWidth, padding + chartHeight);
+        ctx.closePath();
+        ctx.fill();
+
+        // Draw axes labels
+        ctx.fillStyle = '#666';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        
+        // X-axis labels (distance)
+        for (let i = 0; i <= 10; i++) {
+            const x = padding + (i / 10) * chartWidth;
+            const distance = (i / 10) * points[points.length - 1].distance;
+            ctx.fillText(`${(distance / 1000).toFixed(1)} km`, x, padding + chartHeight + 20);
+        }
+
+        // Y-axis labels (elevation) - Create nice scale with whole numbers
+        ctx.textAlign = 'right';
+        
+        for (let i = 0; i <= numSteps; i++) {
+            const elevation = finalYAxisMin + i * stepSize;
+            if (elevation <= finalYAxisMax) {
+                const y = padding + chartHeight - ((elevation - finalYAxisMin) / yAxisRange) * chartHeight;
+                ctx.fillText(`${elevation} m`, padding - 10, y + 4);
+            }
+        }
+
+        // Draw title
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(t('กราฟแสดงความสูง') || 'กราฟแสดงความสูง', canvas.width / 2, 20);
+    }, [yAxisStepSize, useCustomRange, yAxisMin, yAxisMax, createLineBetweenPoints, profileData, t]);
+
+    const createElevationProfile = useCallback(async (start: google.maps.LatLng, end: google.maps.LatLng) => {
         if (!elevationServiceRef.current) {
             setError(t('Elevation service ไม่พร้อมใช้งาน') || 'Elevation service ไม่พร้อมใช้งาน');
             return;
@@ -245,7 +346,9 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                         minElevation,
                         maxElevation,
                         elevationGain,
-                        elevationLoss
+                        elevationLoss,
+                        startPoint: start,
+                        endPoint: end
                     };
 
                     setProfileData(newProfileData);
@@ -268,7 +371,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
             setError(t('เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ') + (err as Error).message || 'เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ' + (err as Error).message);
             setIsLoading(false);
         }
-    };
+    }, [t, createLineBetweenPoints, drawProfileChart]);
 
     const createDetailedPath = (start: google.maps.LatLng, end: google.maps.LatLng, samples: number): google.maps.LatLng[] => {
         if (!start || !end) {
@@ -294,130 +397,116 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
         return google.maps.geometry.spherical.computeDistanceBetween(start, end);
     };
 
-    const drawProfileChart = (points: ElevationPoint[]) => {
-        const canvas = canvasRef.current;
-        if (!canvas || !points.length) return;
+    const setupDrawingMode = useCallback(() => {
+        if (!map) return;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        const handleMapClick = (event: google.maps.MapMouseEvent) => {
+            if (!event.latLng) return;
 
-        // Set canvas size
-        canvas.width = 600;
-        canvas.height = 300;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Set up drawing parameters
-        const padding = 40;
-        const chartWidth = canvas.width - 2 * padding;
-        const chartHeight = canvas.height - 2 * padding;
-
-        // Find min/max elevation
-        const elevations = points.map(p => p.elevation);
-        // const minElevation = Math.min(...elevations);
-        const maxElevation = Math.max(...elevations);
-        
-        // Create nice Y-axis scale starting from 0
-        const yAxisMin = 0;
-        const yAxisMax = Math.ceil(maxElevation / 10) * 10; // Round up to nearest 10
-        const yAxisRange = yAxisMax - yAxisMin;
-        
-        // Calculate step size for Y-axis (used in multiple places)
-        const stepSize = Math.max(1, Math.ceil(yAxisRange / 8)); // At least 1m steps
-        const numSteps = Math.ceil(yAxisRange / stepSize);
-
-        // Draw background
-        ctx.fillStyle = '#f8f9fa';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw grid lines
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        
-        // Vertical grid lines
-        for (let i = 0; i <= 10; i++) {
-            const x = padding + (i / 10) * chartWidth;
-            ctx.beginPath();
-            ctx.moveTo(x, padding);
-            ctx.lineTo(x, padding + chartHeight);
-            ctx.stroke();
-        }
-
-        // Horizontal grid lines - Match Y-axis scale
-        for (let i = 0; i <= numSteps; i++) {
-            const elevation = yAxisMin + i * stepSize;
-            if (elevation <= yAxisMax) {
-                const y = padding + chartHeight - ((elevation - yAxisMin) / yAxisRange) * chartHeight;
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(padding + chartWidth, y);
-                ctx.stroke();
+            if (!startPointRef.current) {
+                // First click - set start point
+                startPointRef.current = event.latLng;
+                setStartPoint(event.latLng);
+                createMarker(event.latLng, 'start');
+            } else if (!endPointRef.current) {
+                // Second click - set end point and create profile
+                endPointRef.current = event.latLng;
+                setEndPoint(event.latLng);
+                createMarker(event.latLng, 'end');
+                
+                // Store the points for later use
+                const startPointForProfile = startPointRef.current;
+                const endPointForProfile = event.latLng;
+                
+                // Create line between start and end points
+                createLineBetweenPoints(startPointForProfile, endPointForProfile);
+                
+                // Create elevation profile after a short delay to ensure line is visible
+                setTimeout(() => {
+                    if (startPointForProfile && endPointForProfile) {
+                        createElevationProfile(startPointForProfile, endPointForProfile);
+                    }
+                }, 100);
+                
+                setIsDrawing(false);
+                // Don't remove the line and markers when profile is created
+                // Only clean up listeners, not the line and markers
+                if (clickListenerRef.current) {
+                    google.maps.event.removeListener(clickListenerRef.current);
+                    clickListenerRef.current = null;
+                }
+                if (mouseMoveListenerRef.current) {
+                    google.maps.event.removeListener(mouseMoveListenerRef.current);
+                    mouseMoveListenerRef.current = null;
+                }
             }
+        };
+
+        const handleMouseMove = (event: google.maps.MapMouseEvent) => {
+            if (event.latLng && startPointRef.current && !endPointRef.current) {
+                setCurrentPoint(event.latLng);
+                // Don't update polyline during mouse move to preserve the permanent line
+                // updatePolyline(startPoint, event.latLng);
+            }
+        };
+
+        // Remove existing listeners first
+        if (clickListenerRef.current) {
+            google.maps.event.removeListener(clickListenerRef.current);
+        }
+        if (mouseMoveListenerRef.current) {
+            google.maps.event.removeListener(mouseMoveListenerRef.current);
         }
 
-        // Draw elevation profile
-        ctx.strokeStyle = '#2196F3';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
+        clickListenerRef.current = map.addListener('click', handleMapClick);
+        mouseMoveListenerRef.current = map.addListener('mousemove', handleMouseMove);
+    }, [map, createMarker, createLineBetweenPoints, createElevationProfile]);
 
-        points.forEach((point, index) => {
-            const x = padding + (index / (points.length - 1)) * chartWidth;
-            const y = padding + chartHeight - ((point.elevation - yAxisMin) / yAxisRange) * chartHeight;
-            
-            if (index === 0) {
-                ctx.moveTo(x, y);
+    // Setup drawing mode
+    useEffect(() => {
+        if (!map || !isActive) {
+            cleanup(true);
+            return;
+        }
+
+        if (isDrawing) {
+            setupDrawingMode();
+        } else {
+            // Only clean up listeners when not drawing, but keep the line and points if we have profile data
+            if (profileData) {
+                // Keep the line and points, only clean up listeners
+                cleanup(false);
             } else {
-                ctx.lineTo(x, y);
-            }
-        });
-
-        ctx.stroke();
-
-        // Fill area under curve
-        ctx.fillStyle = 'rgba(33, 150, 243, 0.2)';
-        ctx.beginPath();
-        ctx.moveTo(padding, padding + chartHeight);
-        
-        points.forEach((point, index) => {
-            const x = padding + (index / (points.length - 1)) * chartWidth;
-            const y = padding + chartHeight - ((point.elevation - yAxisMin) / yAxisRange) * chartHeight;
-            ctx.lineTo(x, y);
-        });
-        
-        ctx.lineTo(padding + chartWidth, padding + chartHeight);
-        ctx.closePath();
-        ctx.fill();
-
-        // Draw axes labels
-        ctx.fillStyle = '#666';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        
-        // X-axis labels (distance)
-        for (let i = 0; i <= 10; i++) {
-            const x = padding + (i / 10) * chartWidth;
-            const distance = (i / 10) * points[points.length - 1].distance;
-            ctx.fillText(`${(distance / 1000).toFixed(1)} km`, x, padding + chartHeight + 20);
-        }
-
-        // Y-axis labels (elevation) - Create nice scale with whole numbers
-        ctx.textAlign = 'right';
-        
-        for (let i = 0; i <= numSteps; i++) {
-            const elevation = yAxisMin + i * stepSize;
-            if (elevation <= yAxisMax) {
-                const y = padding + chartHeight - ((elevation - yAxisMin) / yAxisRange) * chartHeight;
-                ctx.fillText(`${elevation} m`, padding - 10, y + 4);
+                // No profile data, clean up everything
+                cleanup(true);
             }
         }
 
-        // Draw title
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(t('กราฟแสดงความสูง') || 'กราฟแสดงความสูง', canvas.width / 2, 20);
-    };
+        return () => cleanup(true);
+    }, [map, isActive, isDrawing, setupDrawingMode, profileData]);
+
+    // Redraw chart when yAxisStepSize changes
+    useEffect(() => {
+        if (profileData && profileData.points.length > 0) {
+            drawProfileChart(profileData.points);
+        }
+    }, [yAxisStepSize, profileData, drawProfileChart]);
+
+    // Redraw chart when custom range changes and ensure line is visible
+    useEffect(() => {
+        if (profileData && profileData.points.length > 0) {
+            // Ensure the orange line is still visible when redrawing chart
+            // Use profileData points if available, otherwise use refs
+            const startPoint = profileData.startPoint || startPointRef.current;
+            const endPoint = profileData.endPoint || endPointRef.current;
+            
+            if (startPoint && endPoint && !polylineRef.current) {
+                createLineBetweenPoints(startPoint, endPoint);
+            }
+            
+            drawProfileChart(profileData.points);
+        }
+    }, [useCustomRange, yAxisMin, yAxisMax, profileData, drawProfileChart, createLineBetweenPoints]);
 
     const downloadProfile = () => {
         if (!profileData) return;
@@ -437,10 +526,45 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
         setEndPoint(null);
         setCurrentPoint(null);
         setIsDrawing(false);
+        setYAxisMin(null);
+        setYAxisMax(null);
+        setUseCustomRange(false);
         startPointRef.current = null;
         endPointRef.current = null;
-        cleanup();
+        removeLineAndMarkers();
+        cleanup(true);
     };
+
+
+    const handleCustomRangeChange = useCallback((min: number, max: number) => {
+        setYAxisMin(min);
+        setYAxisMax(max);
+        setUseCustomRange(true);
+        
+        // Ensure the orange line remains visible when changing range
+        // Use profileData points if available, otherwise use refs
+        const startPoint = profileData?.startPoint || startPointRef.current;
+        const endPoint = profileData?.endPoint || endPointRef.current;
+        
+        if (startPoint && endPoint && !polylineRef.current) {
+            createLineBetweenPoints(startPoint, endPoint);
+        }
+    }, [createLineBetweenPoints, profileData]);
+
+    const resetToAutoRange = useCallback(() => {
+        setUseCustomRange(false);
+        setYAxisMin(null);
+        setYAxisMax(null);
+        
+        // Ensure the orange line remains visible when resetting to auto range
+        // Use profileData points if available, otherwise use refs
+        const startPoint = profileData?.startPoint || startPointRef.current;
+        const endPoint = profileData?.endPoint || endPointRef.current;
+        
+        if (startPoint && endPoint && !polylineRef.current) {
+            createLineBetweenPoints(startPoint, endPoint);
+        }
+    }, [createLineBetweenPoints, profileData]);
 
     if (!isActive) return null;
 
@@ -455,7 +579,10 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                         </h3>
                     </div>
                     <button
-                        onClick={onToggle}
+                        onClick={() => {
+                            removeLineAndMarkers();
+                            onToggle();
+                        }}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
                     >
                         <FaTimes size={14} />
@@ -475,9 +602,13 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                                 setEndPoint(null);
                                 setCurrentPoint(null);
                                 setProfileData(null);
+                                setYAxisMin(null);
+                                setYAxisMax(null);
+                                setUseCustomRange(false);
                                 startPointRef.current = null;
                                 endPointRef.current = null;
-                                cleanup();
+                                removeLineAndMarkers();
+                                cleanup(true);
                                 setIsDrawing(true);
                             }}
                             className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -502,7 +633,13 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                         <button
                             onClick={() => {
                                 setIsDrawing(false);
-                                cleanup();
+                                setStartPoint(null);
+                                setEndPoint(null);
+                                setCurrentPoint(null);
+                                startPointRef.current = null;
+                                endPointRef.current = null;
+                                removeLineAndMarkers();
+                                cleanup(true);
                             }}
                             className="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
                         >
@@ -526,6 +663,140 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
 
                 {profileData && (
                     <div className="space-y-4">
+
+                        {/* Custom Y-Axis Range Control */}
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                    {t('ช่วงความสูงของกราฟ') || 'ช่วงความสูงของกราฟ'}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-xs px-2 py-1 rounded ${
+                                        useCustomRange 
+                                            ? 'bg-blue-500 text-white' 
+                                            : 'bg-gray-200 text-gray-600'
+                                    }`}>
+                                        {useCustomRange ? t('กำหนดเอง') || 'กำหนดเอง' : t('อัตโนมัติ') || 'อัตโนมัติ'}
+                                    </span>
+                                    {useCustomRange && (
+                                        <button
+                                            onClick={resetToAutoRange}
+                                            className="text-xs text-blue-600 hover:text-blue-800"
+                                        >
+                                            {t('รีเซ็ต') || 'รีเซ็ต'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {/* Current data range display */}
+                                <div className="text-xs text-gray-600 bg-white p-2 rounded border">
+                                    <div className="font-medium mb-1">{t('ข้อมูลจริง:') || 'ข้อมูลจริง:'}</div>
+                                    <div>ต่ำสุด: {profileData.minElevation.toFixed(1)} m</div>
+                                    <div>สูงสุด: {profileData.maxElevation.toFixed(1)} m</div>
+                                </div>
+                                
+                                {/* Custom range inputs */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-xs text-gray-600 block mb-1">
+                                            {t('ต่ำสุด (m):') || 'ต่ำสุด (m):'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={yAxisMin || ''}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    handleCustomRangeChange(value, yAxisMax || profileData.maxElevation);
+                                                }
+                                            }}
+                                            className="w-full px-2 py-1 text-xs border rounded"
+                                            placeholder={profileData.minElevation.toFixed(1)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-600 block mb-1">
+                                            {t('สูงสุด (m):') || 'สูงสุด (m):'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={yAxisMax || ''}
+                                            onChange={(e) => {
+                                                const value = parseFloat(e.target.value);
+                                                if (!isNaN(value)) {
+                                                    handleCustomRangeChange(yAxisMin || profileData.minElevation, value);
+                                                }
+                                            }}
+                                            className="w-full px-2 py-1 text-xs border rounded"
+                                            placeholder={profileData.maxElevation.toFixed(1)}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {/* Quick range buttons */}
+                                <div className="space-y-2">
+                                    <div className="text-xs text-gray-600 font-medium">
+                                        {t('ช่วงแนะนำ:') || 'ช่วงแนะนำ:'}
+                                    </div>
+                                    <div className="flex gap-1 flex-wrap">
+                                        <button
+                                            onClick={() => {
+                                                const range = profileData.maxElevation - profileData.minElevation;
+                                                const padding = range * 0.2; // 20% padding
+                                                const newMin = Math.floor(profileData.minElevation - padding);
+                                                const newMax = Math.ceil(profileData.maxElevation + padding);
+                                                handleCustomRangeChange(newMin, newMax);
+                                            }}
+                                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                                        >
+                                            {t('+20%') || '+20%'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const range = profileData.maxElevation - profileData.minElevation;
+                                                const padding = range * 0.5; // 50% padding
+                                                handleCustomRangeChange(
+                                                    Math.floor(profileData.minElevation - padding),
+                                                    Math.ceil(profileData.maxElevation + padding)
+                                                );
+                                            }}
+                                            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                        >
+                                            {t('+50%') || '+50%'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const range = profileData.maxElevation - profileData.minElevation;
+                                                const padding = range * 1.0; // 100% padding
+                                                handleCustomRangeChange(
+                                                    Math.floor(profileData.minElevation - padding),
+                                                    Math.ceil(profileData.maxElevation + padding)
+                                                );
+                                            }}
+                                            className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                                        >
+                                            {t('+100%') || '+100%'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const range = profileData.maxElevation - profileData.minElevation;
+                                                const padding = range * 2.0; // 200% padding
+                                                handleCustomRangeChange(
+                                                    Math.floor(profileData.minElevation - padding),
+                                                    Math.ceil(profileData.maxElevation + padding)
+                                                );
+                                            }}
+                                            className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+                                        >
+                                            {t('+200%') || '+200%'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Profile Chart */}
                         <div className="border border-gray-200 rounded-lg p-2">
                             <canvas ref={canvasRef} className="w-full h-auto" />
