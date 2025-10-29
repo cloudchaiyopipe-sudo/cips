@@ -206,7 +206,7 @@ const Navbar: React.FC = () => {
                                     </p>
                                 </div>
                                 <div className="block sm:hidden">
-                                    <h1 className="text-sm font-bold">
+                                    <h1 className="text-xl font-bold">
                                         {t('CIPS')}
                                     </h1>
                                 </div>
