@@ -8,7 +8,6 @@ export interface LanguageTranslations {
   upgradeToPro: string;
   sponsoredContent: string;
   clickAdToVisit: string;
-  previous: string;
   next: string;
   
   // UpgradePro page
@@ -69,7 +68,6 @@ export interface LanguageTranslations {
   rootCrops: string;
   gourds: string;
   back: string;
-  nextButton: string;
   noPlantsFound: string;
   tryAdjustingSearch: string;
   
@@ -119,6 +117,122 @@ export interface LanguageTranslations {
   chaiyoPhone: string;
   chaiyoEmail: string;
   loadingMap: string;
+  
+  // FreeMap page
+  irrigationSystemDesign: string;
+  loadingGoogleMaps: string;
+  plant: string;
+  labelNameOfProject: string;
+  drawingModeActive: string;
+  useDrawingTools: string;
+  availablePolygonRectangleCircle: string;
+  placingWaterSource: string;
+  clickAnywhereInDrawnArea: string;
+  waterSourceWillSupplyWater: string;
+  placingWaterPump: string;
+  clickOnlyOnRedOrangePoints: string;
+  redCirclesCornerPoints: string;
+  orangeCirclesMidpointPoints: string;
+  cannotPlacePumpsAnywhereElse: string;
+  pumpWillDistributeWater: string;
+  readyToDivideZones: string;
+  clickToDivideZonesButton: string;
+  willHelpOptimizeWaterDistribution: string;
+  areaDrawn: string;
+  shapes: string;
+  plantPoints: string;
+  waterSources: string;
+  dragWaterSourceToReposition: string;
+  pumps: string;
+  zones: string;
+  finalAreaCannotBeEdited: string;
+  readyToStartDrawing: string;
+  reset: string;
+  clickToDivideZones: string;
+  generatePipeSystem: string;
+  saveProject: string;
+  loadProject: string;
+  exportImage: string;
+  zoneCenter: string;
+  cornerPoints: string;
+  midpointPoints: string;
+  
+  // Step button labels
+  drawArea: string;
+  drawAreaCompleted: string;
+  drawing: string;
+  water: string;
+  waterCompleted: string;
+  placingWater: string;
+  placePump: string;
+  placePumpCompleted: string;
+  
+  // Search and input placeholders
+  searchLocation: string;
+  enterNumberOfZones: string;
+  noPlantSelected: string;
+  
+  // FreeSummary page
+  irrigationSummary: string;
+  save: string;
+  edit: string;
+  area: string;
+  zone: string;
+  plants: string;
+  flow: string;
+  flowRateSummary: string;
+  totalFlowRate: string;
+  waterPressure: string;
+  sprinklerRadius: string;
+  pipeSystemSummary: string;
+  mainPipe: string;
+  subMainPipe: string;
+  lateralPipe: string;
+  length: string;
+  outlets: string;
+  flowRate: string;
+  mainPipeLabel: string;
+  subMainPipeLabel: string;
+  lateralPipeLabel: string;
+  noZoneDataAvailable: string;
+  flowRateConfig: string;
+  flowRateSetting: string;
+  determineFlowRateProperties: string;
+  flowRatePerMin: string;
+  realTimeStatistics: string;
+  totalPlants: string;
+  lpmPerPlant: string;
+  lpmTotal: string;
+  lphrTotal: string;
+  cancel: string;
+  applySetting: string;
+  longest: string;
+  waterNeedPerSession: string;
+  pipeInformation: string;
+  
+  // FreeProduct page
+  irrigationProducts: string;
+  selectZone: string;
+  sprinklerSelector: string;
+  mainPipeSelection: string;
+  subMainPipeSelection: string;
+  lateralPipeSelection: string;
+  pumpSelection: string;
+  recommendedSize: string;
+  totalPrice: string;
+  checkout: string;
+  loadingSprinklerSpecs: string;
+  loadingPipeRecommendations: string;
+  loadingPumpRecommendations: string;
+  flowRateProduct: string;
+  pressureProduct: string;
+  radiusProduct: string;
+  totalFlowRateProduct: string;
+  averageFlowRatePerZone: string;
+  flowRatePerSprinkler: string;
+  waterPressureProduct: string;
+  powerProduct: string;
+  headProduct: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -131,8 +245,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     upgradeToPro: "Upgrade to Pro",
     sponsoredContent: "Sponsored Content",
     clickAdToVisit: "Click the ad to visit the link",
-    previous: "← Previous",
-    next: "Next →",
+    next: "Next",
     
     // UpgradePro page
     cipsPro: "CIPS Pro",
@@ -192,7 +305,6 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     rootCrops: "Root Crops",
     gourds: "Gourds",
     back: "Back",
-    nextButton: "Next",
     noPlantsFound: "No plants found",
     tryAdjustingSearch: "Try adjusting your search or category filter",
     
@@ -241,7 +353,123 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     chaiyoAddress: "71/6 Moo 1, Khok Krabue Subdistrict, Mueang Samut Sakhon District, Samut Sakhon Province 74000",
     chaiyoPhone: "034-441-841",
     chaiyoEmail: "info@chaiyopipe.com",
-    loadingMap: "Loading map..."
+    loadingMap: "Loading map...",
+    
+    // FreeMap page
+    irrigationSystemDesign: "Irrigation System Design",
+    loadingGoogleMaps: "Loading Google Maps...",
+    plant: "Plant",
+    labelNameOfProject: "Label: (Name of project)",
+    drawingModeActive: "🎨 Drawing Mode Active",
+    useDrawingTools: "Use the drawing tools on the map to draw your irrigation area",
+    availablePolygonRectangleCircle: "Available: Polygon, Rectangle, Circle",
+    placingWaterSource: "💧 Placing Water Source",
+    clickAnywhereInDrawnArea: "Click anywhere in the drawn area to place a water source",
+    waterSourceWillSupplyWater: "The water source will be used to supply water to your irrigation system",
+    placingWaterPump: "🔧 Placing Water Pump",
+    clickOnlyOnRedOrangePoints: "Click ONLY on the red/orange placement points around the water source",
+    redCirclesCornerPoints: "Red circles = corner points, Orange circles = midpoint points",
+    orangeCirclesMidpointPoints: "Orange circles = midpoint points",
+    cannotPlacePumpsAnywhereElse: "⚠️ You cannot place pumps anywhere else in the area",
+    pumpWillDistributeWater: "The pump will distribute water from the water source to the zones",
+    readyToDivideZones: "🗺️ Ready to Divide Zones",
+    clickToDivideZonesButton: "Click the \"Click to Divide Zones\" button to automatically divide your area into irrigation zones",
+    willHelpOptimizeWaterDistribution: "This will help optimize water distribution",
+    areaDrawn: "✅ Area Drawn",
+    shapes: "Shapes:",
+    plantPoints: "Plant Points:",
+    waterSources: "Water Sources:",
+    dragWaterSourceToReposition: "💡 Drag water source to reposition",
+    pumps: "Pumps:",
+    zones: "Zones:",
+    finalAreaCannotBeEdited: "Final area - cannot be edited",
+    readyToStartDrawing: "Ready to start drawing your irrigation area",
+    reset: "Reset",
+    clickToDivideZones: "Click to Divide Zones",
+    generatePipeSystem: "Generate Pipe System",
+    saveProject: "Save Project",
+    loadProject: "Load Project",
+    exportImage: "Export Image",
+    zoneCenter: "จุดกึ่งกลางโซน",
+    cornerPoints: "Corner Points",
+    midpointPoints: "Midpoint Points",
+    
+    // Step button labels
+    drawArea: "Draw Area",
+    drawAreaCompleted: "Draw Area ✓",
+    drawing: "Drawing...",
+    water: "Water",
+    waterCompleted: "Water ✓",
+    placingWater: "Placing Water...",
+    placePump: "Place Pump",
+    placePumpCompleted: "Place Pump ✓",
+    
+    // Search and input placeholders
+    searchLocation: "Search location...",
+    enterNumberOfZones: "Enter number of zones",
+    noPlantSelected: "No plant selected",
+    
+    // FreeSummary page
+    irrigationSummary: "Irrigation Summary",
+    save: "Save",
+    edit: "Edit",
+    area: "Area",
+    zone: "Zone",
+    plants: "Plants",
+    flow: "Flow",
+    flowRateSummary: "Flow Rate Summary",
+    totalFlowRate: "Total Flow Rate",
+    waterPressure: "Water Pressure",
+    sprinklerRadius: "Sprinkler Radius",
+    pipeSystemSummary: "Pipe System Summary",
+    mainPipe: "Main Pipe",
+    subMainPipe: "Sub Main Pipe",
+    lateralPipe: "Lateral Pipe",
+    length: "Length",
+    outlets: "Outlets",
+    flowRate: "Flow Rate",
+    mainPipeLabel: "Main Pipe",
+    subMainPipeLabel: "Sub Main Pipe",
+    lateralPipeLabel: "Lateral Pipe",
+    noZoneDataAvailable: "No zone data available",
+    flowRateConfig: "Flow Rate Config",
+    flowRateSetting: "Flow Rate Setting",
+    determineFlowRateProperties: "determine flow rate properties for plant",
+    flowRatePerMin: "Flow Rate per min",
+    realTimeStatistics: "Real-time Statistics",
+    totalPlants: "Total plants",
+    lpmPerPlant: "LPM/plant",
+    lpmTotal: "LPM Total",
+    lphrTotal: "LPHr Total",
+    cancel: "cancel",
+    applySetting: "apply setting",
+    longest: "Longest",
+    waterNeedPerSession: "Water Need per Session",
+    pipeInformation: "Pipe Information",
+    
+    // FreeProduct page
+    irrigationProducts: "Irrigation Products",
+    selectZone: "Select Zone",
+    sprinklerSelector: "Sprinkler Selector",
+    mainPipeSelection: "Main Pipe Selection",
+    subMainPipeSelection: "Sub Main Pipe Selection",
+    lateralPipeSelection: "Lateral Pipe Selection",
+    pumpSelection: "Pump Selection",
+    recommendedSize: "Recommended Size",
+    totalPrice: "Total Price",
+    checkout: "Checkout",
+    loadingSprinklerSpecs: "Loading sprinkler specifications...",
+    loadingPipeRecommendations: "Loading pipe recommendations...",
+    loadingPumpRecommendations: "Loading pump recommendations...",
+    flowRateProduct: "Flow Rate",
+    pressureProduct: "Pressure",
+    radiusProduct: "Radius",
+    totalFlowRateProduct: "Total Flow Rate",
+    averageFlowRatePerZone: "Average Flow Rate per Zone",
+    flowRatePerSprinkler: "Flow Rate per Sprinkler",
+    waterPressureProduct: "Water Pressure",
+    powerProduct: "Power",
+    headProduct: "Head"
   },
   TH: {
     // FreeHome page
@@ -252,8 +480,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     upgradeToPro: "อัปเกรดเป็น Pro",
     sponsoredContent: "เนื้อหาโฆษณา",
     clickAdToVisit: "คลิกโฆษณาเพื่อไปที่ลิงก์",
-    previous: "← ก่อนหน้า",
-    next: "ถัดไป →",
+    next: "ถัดไป",
     
     // UpgradePro page
     cipsPro: "CIPS Pro",
@@ -313,7 +540,6 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     rootCrops: "พืชหัว",
     gourds: "พืชตระกูลแตง",
     back: "กลับ",
-    nextButton: "ถัดไป",
     noPlantsFound: "ไม่พบพืช",
     tryAdjustingSearch: "ลองปรับการค้นหาหรือตัวกรองหมวดหมู่",
     
@@ -362,7 +588,123 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     chaiyoAddress: "71/6 หมู่ 1 ตำบลโคกกระเบื้อง อำเภอเมืองสมุทรสาคร จังหวัดสมุทรสาคร 74000",
     chaiyoPhone: "034-441-841",
     chaiyoEmail: "info@chaiyopipe.com",
-    loadingMap: "กำลังโหลดแผนที่..."
+    loadingMap: "กำลังโหลดแผนที่...",
+    
+    // FreeMap page
+    irrigationSystemDesign: "การออกแบบระบบชลประทาน",
+    loadingGoogleMaps: "กำลังโหลด Google Maps...",
+    plant: "พืช",
+    labelNameOfProject: "ป้ายกำกับ: (ชื่อโครงการ)",
+    drawingModeActive: "🎨 โหมดวาดภาพเปิดใช้งาน",
+    useDrawingTools: "ใช้เครื่องมือวาดบนแผนที่เพื่อวาดพื้นที่ชลประทานของคุณ",
+    availablePolygonRectangleCircle: "มีให้ใช้: รูปหลายเหลี่ยม, สี่เหลี่ยม, วงกลม",
+    placingWaterSource: "💧 วางแหล่งน้ำ",
+    clickAnywhereInDrawnArea: "คลิกที่ใดก็ได้ในพื้นที่ที่วาดแล้วเพื่อวางแหล่งน้ำ",
+    waterSourceWillSupplyWater: "แหล่งน้ำจะใช้เพื่อจ่ายน้ำให้กับระบบชลประทานของคุณ",
+    placingWaterPump: "🔧 วางปั๊มน้ำ",
+    clickOnlyOnRedOrangePoints: "คลิกเฉพาะจุดสีแดง/ส้มรอบแหล่งน้ำเท่านั้น",
+    redCirclesCornerPoints: "วงกลมสีแดง = จุดมุม, วงกลมสีส้ม = จุดกลาง",
+    orangeCirclesMidpointPoints: "วงกลมสีส้ม = จุดกลาง",
+    cannotPlacePumpsAnywhereElse: "⚠️ คุณไม่สามารถวางปั๊มที่อื่นในพื้นที่ได้",
+    pumpWillDistributeWater: "ปั๊มจะกระจายน้ำจากแหล่งน้ำไปยังโซนต่างๆ",
+    readyToDivideZones: "🗺️ พร้อมแบ่งโซน",
+    clickToDivideZonesButton: "คลิกปุ่ม \"คลิกเพื่อแบ่งโซน\" เพื่อแบ่งพื้นที่ของคุณเป็นโซนชลประทานโดยอัตโนมัติ",
+    willHelpOptimizeWaterDistribution: "สิ่งนี้จะช่วยเพิ่มประสิทธิภาพการกระจายน้ำ",
+    areaDrawn: "✅ วาดพื้นที่แล้ว",
+    shapes: "รูปทรง:",
+    plantPoints: "จุดปลูกพืช:",
+    waterSources: "แหล่งน้ำ:",
+    dragWaterSourceToReposition: "💡 ลากแหล่งน้ำเพื่อเปลี่ยนตำแหน่ง",
+    pumps: "ปั๊ม:",
+    zones: "โซน:",
+    finalAreaCannotBeEdited: "พื้นที่สุดท้าย - ไม่สามารถแก้ไขได้",
+    readyToStartDrawing: "พร้อมเริ่มวาดพื้นที่ชลประทานของคุณ",
+    reset: "รีเซ็ต",
+    clickToDivideZones: "คลิกเพื่อแบ่งโซน",
+    generatePipeSystem: "สร้างระบบท่อ",
+    saveProject: "บันทึกโครงการ",
+    loadProject: "โหลดโครงการ",
+    exportImage: "ส่งออกรูปภาพ",
+    zoneCenter: "จุดกึ่งกลางโซน",
+    cornerPoints: "จุดมุม",
+    midpointPoints: "จุดกลาง",
+    
+    // Step button labels
+    drawArea: "วาดพื้นที่",
+    drawAreaCompleted: "วาดพื้นที่ ✓",
+    drawing: "กำลังวาด...",
+    water: "แหล่งน้ำ",
+    waterCompleted: "แหล่งน้ำ ✓",
+    placingWater: "กำลังวางน้ำ...",
+    placePump: "วางปั๊ม",
+    placePumpCompleted: "วางปั๊ม ✓",
+    
+    // Search and input placeholders
+    searchLocation: "ค้นหาสถานที่...",
+    enterNumberOfZones: "ใส่จำนวนโซน",
+    noPlantSelected: "ยังไม่ได้เลือกพืช",
+    
+    // FreeSummary page
+    irrigationSummary: "สรุประบบชลประทาน",
+    save: "บันทึก",
+    edit: "แก้ไข",
+    area: "พื้นที่",
+    zone: "โซน",
+    plants: "พืช",
+    flow: "การไหล",
+    flowRateSummary: "สรุปอัตราการไหล",
+    totalFlowRate: "อัตราการไหลรวม",
+    waterPressure: "ความดันน้ำ",
+    sprinklerRadius: "รัศมีสปริงเกลอร์",
+    pipeSystemSummary: "สรุประบบท่อ",
+    mainPipe: "ท่อหลัก",
+    subMainPipe: "ท่อรอง",
+    lateralPipe: "ท่อแขนง",
+    length: "ความยาว",
+    outlets: "จุดจ่าย",
+    flowRate: "อัตราการไหล",
+    mainPipeLabel: "ท่อหลัก",
+    subMainPipeLabel: "ท่อรอง",
+    lateralPipeLabel: "ท่อแขนง",
+    noZoneDataAvailable: "ไม่มีข้อมูลโซน",
+    flowRateConfig: "การตั้งค่าอัตราการไหล",
+    flowRateSetting: "การตั้งค่าอัตราการไหล",
+    determineFlowRateProperties: "กำหนดคุณสมบัติอัตราการไหลสำหรับพืช",
+    flowRatePerMin: "อัตราการไหลต่อนาที",
+    realTimeStatistics: "สถิติแบบเรียลไทม์",
+    totalPlants: "พืชทั้งหมด",
+    lpmPerPlant: "ลิตร/นาที/พืช",
+    lpmTotal: "ลิตร/นาทีรวม",
+    lphrTotal: "ลิตร/ชั่วโมงรวม",
+    cancel: "ยกเลิก",
+    applySetting: "ใช้การตั้งค่า",
+    longest: "ยาวที่สุด",
+    waterNeedPerSession: "ความต้องการน้ำต่อรอบ",
+    pipeInformation: "ข้อมูลท่อ",
+    
+    // FreeProduct page
+    irrigationProducts: "ผลิตภัณฑ์ระบบชลประทาน",
+    selectZone: "เลือกโซน",
+    sprinklerSelector: "ตัวเลือกสปริงเกลอร์",
+    mainPipeSelection: "การเลือกท่อหลัก",
+    subMainPipeSelection: "การเลือกท่อรอง",
+    lateralPipeSelection: "การเลือกท่อแขนง",
+    pumpSelection: "การเลือกปั๊ม",
+    recommendedSize: "ขนาดที่แนะนำ",
+    totalPrice: "ราคารวม",
+    checkout: "ชำระเงิน",
+    loadingSprinklerSpecs: "กำลังโหลดข้อมูลสปริงเกลอร์...",
+    loadingPipeRecommendations: "กำลังโหลดคำแนะนำท่อ...",
+    loadingPumpRecommendations: "กำลังโหลดคำแนะนำปั๊ม...",
+    flowRateProduct: "อัตราการไหล",
+    pressureProduct: "ความดัน",
+    radiusProduct: "รัศมี",
+    totalFlowRateProduct: "อัตราการไหลรวม",
+    averageFlowRatePerZone: "อัตราการไหลเฉลี่ยต่อโซน",
+    flowRatePerSprinkler: "อัตราการไหลต่อสปริงเกลอร์",
+    waterPressureProduct: "ความดันน้ำ",
+    powerProduct: "กำลัง",
+    headProduct: "หัว"
   }
 };
 

@@ -1,10 +1,10 @@
 // FreeNav Component
 import { router } from '@inertiajs/react';
-import React from 'react';
+import { useState } from 'react';
 
 function FreeNav() {
     // State for language switching with localStorage persistence
-    const [language, setLanguage] = React.useState<'EN' | 'TH'>(() => {
+    const [language, setLanguage] = useState<'EN' | 'TH'>(() => {
         // Initialize from localStorage or default to 'EN'
         if (typeof window !== 'undefined') {
             const savedLanguage = localStorage.getItem('cips-language') as 'EN' | 'TH';

@@ -1,10 +1,11 @@
 // 1. Import
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
-import { GardenPlant } from './utils/freeCrop';
+import { GardenPlant, getTranslatedPlantName } from './utils/freeCrop';
 // import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
+import { getTranslations } from './utils/language';
 // use dynamic import of html2canvas in handler for better compatibility
 
 // Google Maps TypeScript declarations
@@ -35,19 +36,19 @@ interface MapOptions {
 // 2. Component
 function FreeMap() {
     // State
-    const [searchValue, setSearchValue] = React.useState('');
-    const [searchResults, setSearchResults] = React.useState<google.maps.places.AutocompletePrediction[]>([]);
-    const [showSearchResults, setShowSearchResults] = React.useState(false);
-    const [autocompleteService, setAutocompleteService] = React.useState<google.maps.places.AutocompleteService | null>(null);
-    const [placesService, setPlacesService] = React.useState<google.maps.places.PlacesService | null>(null);
-    const [projectName, setProjectName] = React.useState('');
-    const [mapLoaded, setMapLoaded] = React.useState(false);
-    const [apiLoading, setApiLoading] = React.useState(true);
-    const [selectedPlant, setSelectedPlant] = React.useState<GardenPlant | null>(null);
-    const [currentStep, setCurrentStep] = React.useState(0); // 0: draw area, 1: water, 2: place pump, 3: zones, 4: generate pipe system
-    const [completedSteps, setCompletedSteps] = React.useState<number[]>([]);
-    const [isDrawingMode, setIsDrawingMode] = React.useState(false);
-    const [drawnShapes, setDrawnShapes] = React.useState<Array<{ 
+    const [searchValue, setSearchValue] = useState('');
+    const [searchResults, setSearchResults] = useState<google.maps.places.AutocompletePrediction[]>([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [autocompleteService, setAutocompleteService] = useState<google.maps.places.AutocompleteService | null>(null);
+    const [placesService, setPlacesService] = useState<google.maps.places.PlacesService | null>(null);
+    const [projectName, setProjectName] = useState('');
+    const [mapLoaded, setMapLoaded] = useState(false);
+    const [apiLoading, setApiLoading] = useState(true);
+    const [selectedPlant, setSelectedPlant] = useState<GardenPlant | null>(null);
+    const [currentStep, setCurrentStep] = useState(0); // 0: draw area, 1: water, 2: place pump, 3: zones, 4: generate pipe system
+    const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+    const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [drawnShapes, setDrawnShapes] = useState<Array<{ 
         overlay: unknown; 
         type: string; 
         id: number;
@@ -58,42 +59,42 @@ function FreeMap() {
             path?: Array<{ lat: number; lng: number }>;
         };
     }>>([]);
-    const [waterSources, setWaterSources] = React.useState<Array<{
+    const [waterSources, setWaterSources] = useState<Array<{
         id: number;
         position: { lat: number; lng: number };
         marker: unknown;
     }>>([]);
-    const [pumps, setPumps] = React.useState<Array<{
+    const [pumps, setPumps] = useState<Array<{
         id: number;
         position: { lat: number; lng: number };
         marker: unknown;
     }>>([]);
-    const [pumpPlacementPoints, setPumpPlacementPoints] = React.useState<Array<{
+    const [pumpPlacementPoints, setPumpPlacementPoints] = useState<Array<{
         id: number;
         position: { lat: number; lng: number };
         marker: unknown;
         type: 'corner' | 'midpoint';
     }>>([]);
-    const [mainPipes, setMainPipes] = React.useState<Array<{
+    const [mainPipes, setMainPipes] = useState<Array<{
         id: number;
         fromPump: { lat: number; lng: number };
         toZoneCenter: { lat: number; lng: number };
         overlay: unknown;
         zoneId: number;
     }>>([]);
-    const [subMainPipes, setSubMainPipes] = React.useState<Array<{
+    const [subMainPipes, setSubMainPipes] = useState<Array<{
         id: number;
         path: Array<{ lat: number; lng: number }>;
         overlay: unknown;
         zoneId: number;
     }>>([]);
-    const [lateralPipes, setLateralPipes] = React.useState<Array<{
+    const [lateralPipes, setLateralPipes] = useState<Array<{
         id: number;
         path: Array<{ lat: number; lng: number }>;
         overlay: unknown;
         zoneId: number;
     }>>([]);
-    const [zones, setZones] = React.useState<Array<{
+    const [zones, setZones] = useState<Array<{
         id: number;
         name: string;
         color: string;
@@ -103,19 +104,22 @@ function FreeMap() {
         center: { lat: number; lng: number };
         centerMarker: unknown;
     }>>([]);
-    const [showZoneModal, setShowZoneModal] = React.useState(false);
-    const [zoneCount, setZoneCount] = React.useState(2);
-    const [plantPoints, setPlantPoints] = React.useState<Array<{
+    const [showZoneModal, setShowZoneModal] = useState(false);
+    const [zoneCount, setZoneCount] = useState(2);
+    
+    // State for language
+    const [translations, setTranslations] = useState(getTranslations());
+    const [plantPoints, setPlantPoints] = useState<Array<{
         id: number;
         position: { lat: number; lng: number };
         marker: unknown;
     }>>([]);
-    const mapRef = React.useRef<HTMLDivElement>(null);
-    const drawingManagerRef = React.useRef<unknown>(null);
-    const mapInstanceRef = React.useRef<unknown>(null);
-    const [mapInitialized, setMapInitialized] = React.useState(false);
+    const mapRef = useRef<HTMLDivElement>(null);
+    const drawingManagerRef = useRef<unknown>(null);
+    const mapInstanceRef = useRef<unknown>(null);
+    const [mapInitialized, setMapInitialized] = useState(false);
     // Remove plant points that overlap a given position within a small radius
-    const removeOverlappedPlantPoints = React.useCallback((position: { lat: number; lng: number }, radiusMeters: number = 5) => {
+    const removeOverlappedPlantPoints = useCallback((position: { lat: number; lng: number }, radiusMeters: number = 5) => {
         console.log(`🔍 Removing overlapped plant points within ${radiusMeters}m of position:`, position);
         const geometry = window.google?.maps?.geometry;
         
@@ -160,7 +164,7 @@ function FreeMap() {
 
     // 3. Hooks
     // Handle incoming data from chooseCrop page
-    React.useEffect(() => {
+    useEffect(() => {
         // Get data from Inertia page props or localStorage
         const pageData = (window as unknown as { page?: { props?: { data?: { selectedPlant?: GardenPlant } } } }).page?.props?.data;
         const localData = localStorage.getItem('selectedPlantData');
@@ -331,9 +335,30 @@ function FreeMap() {
         
     }, []);
 
+    // Listen for language changes from localStorage
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        // Listen for storage changes (when language is changed in other components)
+        window.addEventListener('storage', handleLanguageChange);
+        
+        // Listen for custom language change event
+        window.addEventListener('languageChanged', handleLanguageChange);
+        
+        // Also check on focus (when user comes back to tab)
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // Function to create plant points based on spacing
-    const createPlantPoints = React.useCallback((map: google.maps.Map, shapeData: { bounds?: { north: number; south: number; east: number; west: number }; center?: { lat: number; lng: number }; radius?: number; path?: Array<{ lat: number; lng: number }> }, shapeType: string) => {
+    const createPlantPoints = useCallback((map: google.maps.Map, shapeData: { bounds?: { north: number; south: number; east: number; west: number }; center?: { lat: number; lng: number }; radius?: number; path?: Array<{ lat: number; lng: number }> }, shapeType: string) => {
         
         // Get plant data from localStorage
         const savedPlantData = localStorage.getItem('selectedPlantData');
@@ -444,7 +469,7 @@ function FreeMap() {
                     const marker = new window.google.maps.Marker({
                         position: position,
                         map: map,
-                        title: `${plantData.name} Plant`,
+                        title: `${getTranslatedPlantName(plantData.name, translations)} Plant`,
                         icon: {
                             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                                 <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
@@ -482,7 +507,7 @@ function FreeMap() {
         
         
         return plantPoints;
-    }, []);
+    }, [translations]);
 
     // Helper function to check if point is inside polygon
     const isPointInPolygon = (point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) => {
@@ -510,7 +535,7 @@ function FreeMap() {
         return R * c;
     };
 
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
 
         // Only initialize map once
@@ -772,7 +797,7 @@ function FreeMap() {
                         const marker = new window.google.maps.Marker({
                             position: point.position,
                             map: map,
-                            title: plantData ? `${plantData.name} Plant` : 'Plant',
+                            title: plantData ? `${getTranslatedPlantName(plantData.name, translations)} Plant` : 'Plant',
                             icon: {
                                 url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                                     <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
@@ -1069,6 +1094,7 @@ function FreeMap() {
             window.google.maps.event.addListener(drawingManagerRef.current, 'overlaycomplete', (event: { overlay: unknown; type: string }) => {
                 const overlay = event.overlay;
                 const type = event.type;
+                console.log('🔍 Google Maps API sent type:', type, 'typeof:', typeof type);
                 
                 // Extract data from overlay for storage
                 let overlayData: {
@@ -1284,8 +1310,44 @@ function FreeMap() {
 
     // 4. Handlers
 
+    // Function to create center marker for a zone
+    const createZoneCenterMarker = useCallback((map: google.maps.Map, center: { lat: number; lng: number }, zoneName: string, zoneColor: string) => {
+        const marker = new window.google.maps.Marker({
+            position: center,
+            map: map,
+            title: `Center of ${zoneName}`,
+            icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: zoneColor,
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2
+            },
+            zIndex: 1500 // Higher than zones to appear on top
+        });
+
+        // Add info window for center marker
+        const infoWindow = new window.google.maps.InfoWindow({
+            content: `<div class="text-center">
+                <div class="font-semibold text-gray-800">${zoneName}</div>
+                <div class="text-sm text-gray-600">${translations.zoneCenter}</div>
+                <div class="text-xs text-gray-500 mt-1">
+                    Lat: ${center.lat.toFixed(6)}<br>
+                    Lng: ${center.lng.toFixed(6)}
+                </div>
+            </div>`
+        });
+
+        marker.addListener('click', () => {
+            infoWindow.open(map, marker);
+        });
+
+        return marker;
+    }, [translations]);
+
     // Ensure overlays are recreated after state is restored (when navigating back)
-    React.useEffect(() => {
+    useEffect(() => {
         if (!mapInitialized || !mapInstanceRef.current) return;
 
         const map = mapInstanceRef.current as google.maps.Map;
@@ -1351,7 +1413,7 @@ function FreeMap() {
                     const marker = new window.google.maps.Marker({
                         position: point.position,
                         map: map,
-                        title: plantData ? `${plantData.name} Plant` : 'Plant',
+                        title: plantData ? `${getTranslatedPlantName(plantData.name, translations)} Plant` : 'Plant',
                         icon: {
                             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                                 <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
@@ -1473,7 +1535,7 @@ function FreeMap() {
                 }
             });
         }
-    }, [mapInitialized, zones, plantPoints, mainPipes, subMainPipes, lateralPipes, drawnShapes]);
+    }, [mapInitialized, zones, plantPoints, mainPipes, subMainPipes, lateralPipes, drawnShapes, translations, createZoneCenterMarker]);
     const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setProjectName(e.target.value);
     };
@@ -1722,13 +1784,13 @@ function FreeMap() {
     };
 
     const getStepName = (stepIndex: number): string => {
-        const stepNames = ['Draw Area', 'Water', 'Place Pump', 'Zones', 'Generate Pipe System'];
+        const stepNames = [translations.drawingModeActive, translations.placingWaterSource, translations.placingWaterPump, translations.zones, translations.generatePipeSystem];
         return stepNames[stepIndex] || '';
     };
 
 
     // Function to handle pump placement click
-    const handlePumpPlacementClick = React.useCallback((position: { lat: number; lng: number }, map: google.maps.Map) => {
+    const handlePumpPlacementClick = useCallback((position: { lat: number; lng: number }, map: google.maps.Map) => {
         
         // Create pump marker
         const pumpMarker = createPumpMarker(position, map);
@@ -1794,7 +1856,7 @@ function FreeMap() {
     }, [pumps, pumpPlacementPoints, setPumps, setPumpPlacementPoints, setCompletedSteps, setCurrentStep, removeOverlappedPlantPoints]);
 
     // Function to create pump placement points around water source
-    const createPumpPlacementPoints = React.useCallback((waterSourcePosition: { lat: number; lng: number }, map: google.maps.Map) => {
+    const createPumpPlacementPoints = useCallback((waterSourcePosition: { lat: number; lng: number }, map: google.maps.Map) => {
         
         // Define offset distances (in degrees, roughly 10 meters - further from water source icon)
         const offset = 0.00004; // Approximately 10 meters - further away from the water source icon
@@ -1935,7 +1997,7 @@ function FreeMap() {
     };
 
     // Function to create water source marker (with drag functionality)
-    const createWaterSourceMarker = React.useCallback((position: { lat: number; lng: number }, map: google.maps.Map) => {
+    const createWaterSourceMarker = useCallback((position: { lat: number; lng: number }, map: google.maps.Map) => {
         console.log('🔧 Creating water source marker at:', position);
         console.log('🔧 Map instance:', map);
         
@@ -1974,7 +2036,7 @@ function FreeMap() {
     }, [removeOverlappedPlantPoints]);
 
     // Recreate markers from saved data when map is initialized
-    React.useEffect(() => {
+    useEffect(() => {
         if (!mapInitialized || !mapInstanceRef.current) return;
 
         const map = mapInstanceRef.current as google.maps.Map;
@@ -2005,7 +2067,7 @@ function FreeMap() {
     }, [mapInitialized, waterSources, pumps, createWaterSourceMarker, setWaterSources, setPumps]);
 
     // Auto-activate steps based on current step and completion status
-    React.useEffect(() => {
+    useEffect(() => {
         if (!mapInitialized || !drawingManagerRef.current) return;
 
         console.log('=== Auto-activate Step ===');
@@ -2146,43 +2208,75 @@ function FreeMap() {
     };
     */
 
-    // Function to create center marker for a zone
-    const createZoneCenterMarker = (map: google.maps.Map, center: { lat: number; lng: number }, zoneName: string, zoneColor: string) => {
-        const marker = new window.google.maps.Marker({
-            position: center,
-            map: map,
-            title: `Center of ${zoneName}`,
-            icon: {
-                path: window.google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: zoneColor,
-                fillOpacity: 1,
-                strokeColor: '#ffffff',
-                strokeWeight: 2
-            },
-            zIndex: 1500 // Higher than zones to appear on top
-        });
 
-        // Add info window for center marker
-        const infoWindow = new window.google.maps.InfoWindow({
-            content: `<div class="text-center">
-                <div class="font-semibold text-gray-800">${zoneName}</div>
-                <div class="text-sm text-gray-600">จุดกึ่งกลางโซน</div>
-                <div class="text-xs text-gray-500 mt-1">
-                    Lat: ${center.lat.toFixed(6)}<br>
-                    Lng: ${center.lng.toFixed(6)}
-                </div>
-            </div>`
-        });
-
-        marker.addListener('click', () => {
-            infoWindow.open(map, marker);
-        });
-
-        return marker;
+    // Function to create Voronoi cell boundary
+    const createVoronoiCell = (plantsInZone: Array<{ position: { lat: number; lng: number } }>, zoneCenter: { lat: number; lng: number }) => {
+        // Create a convex hull around the plants in this zone
+        const points = plantsInZone.map(plant => ({ lat: plant.position.lat, lng: plant.position.lng }));
+        
+        // Add zone center to points for better boundary
+        points.push({ lat: zoneCenter.lat, lng: zoneCenter.lng });
+        
+        // Create convex hull
+        const hull = createConvexHull(points);
+        
+        // If hull is too small, create a buffer around the plants
+        if (hull.length < 3) {
+            const buffer = 0.0001; // Small buffer in degrees
+            return [
+                { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng + buffer },
+                { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng - buffer },
+                { lat: zoneCenter.lat - buffer, lng: zoneCenter.lng - buffer },
+                { lat: zoneCenter.lat - buffer, lng: zoneCenter.lng + buffer }
+            ];
+        }
+        
+        return hull;
     };
 
-    // Function to create vertical column-based zones (straight divisions following plant columns)
+    // Function to create convex hull from points
+    const createConvexHull = (points: Array<{ lat: number; lng: number }>) => {
+        if (points.length < 3) return points;
+        
+        // Sort points by latitude, then longitude
+        const sortedPoints = [...points].sort((a, b) => {
+            if (a.lat !== b.lat) return a.lat - b.lat;
+            return a.lng - b.lng;
+        });
+        
+        // Graham scan algorithm
+        const hull: Array<{ lat: number; lng: number }> = [];
+        
+        // Lower hull
+        for (const point of sortedPoints) {
+            while (hull.length >= 2 && crossProduct(hull[hull.length - 2], hull[hull.length - 1], point) <= 0) {
+                hull.pop();
+            }
+            hull.push(point);
+        }
+        
+        // Upper hull
+        const upperHull: Array<{ lat: number; lng: number }> = [];
+        for (let i = sortedPoints.length - 1; i >= 0; i--) {
+            const point = sortedPoints[i];
+            while (upperHull.length >= 2 && crossProduct(upperHull[upperHull.length - 2], upperHull[upperHull.length - 1], point) <= 0) {
+                upperHull.pop();
+            }
+            upperHull.push(point);
+        }
+        
+        // Combine lower and upper hull
+        hull.pop();
+        upperHull.pop();
+        return [...hull, ...upperHull];
+    };
+
+    // Function to calculate cross product for convex hull
+    const crossProduct = (O: { lat: number; lng: number }, A: { lat: number; lng: number }, B: { lat: number; lng: number }) => {
+        return (A.lat - O.lat) * (B.lng - O.lng) - (A.lng - O.lng) * (B.lat - O.lat);
+    };
+
+    // Function to create Voronoi-based zones using plant positions
     const createVoronoiZones = (map: google.maps.Map, numberOfZones: number = 2) => {
         if (drawnShapes.length === 0) {
             console.error('❌ No drawn area to divide');
@@ -2200,69 +2294,40 @@ function FreeMap() {
             return;
         }
 
-        // Get area bounds
-        let areaBounds: { north: number; south: number; east: number; west: number };
+        // Note: Area bounds not needed for Voronoi tessellation as it's based on plant positions
+
+        console.log(`🎯 Creating ${numberOfZones} Voronoi zones based on plant positions`);
+
+        // Use K-means clustering to find optimal zone centers based on plant positions
+        const plantPositions = plantPoints.map(p => ({ lat: p.position.lat, lng: p.position.lng }));
         
-        if (shape.type === window.google.maps.drawing.OverlayType.RECTANGLE && shape.data.bounds) {
-            areaBounds = shape.data.bounds;
-        } else if (shape.type === window.google.maps.drawing.OverlayType.CIRCLE && shape.data.center && shape.data.radius) {
-            const center = shape.data.center;
-            const radius = shape.data.radius / 111000;
-            areaBounds = {
-                north: center.lat + radius,
-                south: center.lat - radius,
-                east: center.lng + radius,
-                west: center.lng - radius
-            };
-        } else if (shape.type === window.google.maps.drawing.OverlayType.POLYGON && shape.data.path) {
-            const lats = shape.data.path.map((p: { lat: number }) => p.lat);
-            const lngs = shape.data.path.map((p: { lng: number }) => p.lng);
-            areaBounds = {
-                north: Math.max(...lats),
-                south: Math.min(...lats),
-                east: Math.max(...lngs),
-                west: Math.min(...lngs)
-            };
-        } else {
-            console.error('❌ Unsupported shape type for zone division');
+        if (plantPositions.length === 0) {
+            console.error('❌ No plant positions available for Voronoi generation');
             return;
         }
 
-        console.log(`🎯 Creating ${numberOfZones} vertical zones based on plant columns`);
+        console.log(`📊 Found ${plantPositions.length} plant positions for Voronoi tessellation`);
 
-        // Group plants by longitude (columns)
-        const tolerance = 0.00001;
-        const columnMap = new Map<number, typeof plantPoints>();
-        
-        plantPoints.forEach(plant => {
-            const colKey = Math.round(plant.position.lng / tolerance);
-            if (!columnMap.has(colKey)) {
-                columnMap.set(colKey, []);
+        // Perform K-means clustering to find zone centers
+        const plantLocations = plantPoints.map(p => ({
+            id: p.id.toString(),
+            position: p.position,
+            plantData: {
+                id: 1,
+                name: 'Plant',
+                plantSpacing: 30,
+                rowSpacing: 30,
+                waterNeed: 1
             }
-            columnMap.get(colKey)!.push(plant);
-        });
-
-        // Sort columns by longitude
-        const columns = Array.from(columnMap.entries())
-            .map(([, plants]) => ({
-                lng: plants[0].position.lng,
-                plants,
-                count: plants.length
-            }))
-            .sort((a, b) => a.lng - b.lng);
-
-        console.log(`📊 Found ${columns.length} plant columns`);
-
-        // Distribute columns evenly across zones using balanced approach
-        const targetColumnsPerZone = Math.floor(columns.length / numberOfZones);
-        const remainder = columns.length % numberOfZones;
+        }));
+        const zoneCenters = performKMeansClustering(plantLocations, numberOfZones);
         
-        console.log(`📊 Target: ${targetColumnsPerZone} columns per zone (${remainder} zones get +1)`);
+        console.log(`📊 Generated ${zoneCenters.length} zone centers using K-means clustering`);
 
         // Generate zone colors
         const zoneColors = generateZoneColors(numberOfZones);
 
-        // Create zones with vertical boundaries
+        // Create Voronoi zones based on zone centers
         const newZones: Array<{
             id: number;
             name: string;
@@ -2274,66 +2339,45 @@ function FreeMap() {
             centerMarker: google.maps.Marker;
         }> = [];
 
-        let columnIndex = 0;
-        let previousEastLng: number | null = null;
-        
+        // Create Voronoi cells for each zone center
         for (let zoneIdx = 0; zoneIdx < numberOfZones; zoneIdx++) {
-            const columnsInThisZone = targetColumnsPerZone + (zoneIdx < remainder ? 1 : 0);
-            const zoneColumns = columns.slice(columnIndex, columnIndex + columnsInThisZone);
+            const zoneCenter = zoneCenters[zoneIdx][0]; // Get first plant in cluster as center
             
-            if (zoneColumns.length === 0) continue;
+            // Find all plants closest to this zone center
+            const plantsInZone = plantPoints.filter(plant => {
+                const distances = zoneCenters.map(cluster => {
+                    const clusterCenter = cluster[0];
+                    return Math.sqrt(
+                        Math.pow(plant.position.lat - clusterCenter.position.lat, 2) + 
+                        Math.pow(plant.position.lng - clusterCenter.position.lng, 2)
+                    );
+                });
+                const minDistance = Math.min(...distances);
+                const distanceToThisCenter = Math.sqrt(
+                    Math.pow(plant.position.lat - zoneCenter.position.lat, 2) + 
+                    Math.pow(plant.position.lng - zoneCenter.position.lng, 2)
+                );
+                return Math.abs(distanceToThisCenter - minDistance) < 0.000001;
+            });
 
-            // Calculate zone boundaries
-            let westLng: number;
-            let eastLng: number;
+            if (plantsInZone.length === 0) continue;
 
-            if (zoneIdx === 0) {
-                // First zone: start from area west boundary
-                westLng = areaBounds.west;
-            } else if (previousEastLng !== null) {
-                // Subsequent zones: start exactly where previous zone ended
-                westLng = previousEastLng;
-            } else {
-                // Fallback
-                westLng = zoneColumns[0].lng - 0.00005;
-            }
+            // Create Voronoi cell boundary using convex hull of plants in this zone
+            const zoneCoordinates = createVoronoiCell(plantsInZone, { lat: zoneCenter.position.lat, lng: zoneCenter.position.lng });
 
-            if (zoneIdx === numberOfZones - 1) {
-                // Last zone: extend to area east boundary
-                eastLng = areaBounds.east;
-            } else {
-                // Calculate midpoint between last column of this zone and first column of next zone
-                const nextZoneStartIdx = columnIndex + columnsInThisZone;
-                if (nextZoneStartIdx < columns.length) {
-                    const thisZoneLastLng = zoneColumns[zoneColumns.length - 1].lng;
-                    const nextZoneFirstLng = columns[nextZoneStartIdx].lng;
-                    eastLng = (thisZoneLastLng + nextZoneFirstLng) / 2;
-                } else {
-                    eastLng = zoneColumns[zoneColumns.length - 1].lng + 0.00005;
-                }
-            }
-
-            // Store for next iteration
-            previousEastLng = eastLng;
-
-            // Create rectangular zone with vertical boundaries
-            const zoneCoordinates = [
-                { lat: areaBounds.north, lng: westLng },
-                { lat: areaBounds.north, lng: eastLng },
-                { lat: areaBounds.south, lng: eastLng },
-                { lat: areaBounds.south, lng: westLng }
-            ];
-
+            // Calculate bounds from coordinates
+            const lats = zoneCoordinates.map(coord => coord.lat);
+            const lngs = zoneCoordinates.map(coord => coord.lng);
             const zoneBounds = {
-                north: areaBounds.north,
-                south: areaBounds.south,
-                east: eastLng,
-                west: westLng
+                north: Math.max(...lats),
+                south: Math.min(...lats),
+                east: Math.max(...lngs),
+                west: Math.min(...lngs)
             };
 
             const center = {
-                lat: (areaBounds.north + areaBounds.south) / 2,
-                lng: (westLng + eastLng) / 2
+                lat: zoneCenter.position.lat,
+                lng: zoneCenter.position.lng
             };
 
             // Create polygon overlay
@@ -2354,8 +2398,7 @@ function FreeMap() {
             const zoneName = `Zone ${zoneIdx + 1}`;
             const centerMarker = createZoneCenterMarker(map, center, zoneName, zoneColors[zoneIdx]);
 
-            const plantsInZone = zoneColumns.reduce((sum, col) => sum + col.count, 0);
-            console.log(`✅ ${zoneName}: ${zoneColumns.length} columns, ${plantsInZone} plants`);
+            console.log(`✅ ${zoneName}: ${plantsInZone.length} plants`);
 
             newZones.push({
                 id: Date.now() + zoneIdx,
@@ -2368,7 +2411,6 @@ function FreeMap() {
                 centerMarker
             });
 
-            columnIndex += columnsInThisZone;
         }
 
         // Update zones state
@@ -2385,7 +2427,7 @@ function FreeMap() {
         }));
         localStorage.setItem('zones', JSON.stringify(zonesForStorage));
 
-        console.log('✅ Vertical zones created successfully:', newZones.length);
+        console.log('✅ Voronoi zones created successfully:', newZones.length);
         return newZones;
     };
 
@@ -3094,6 +3136,17 @@ function FreeMap() {
                     };
                 });
 
+                // Get selected plant data from localStorage
+                let selectedPlantData = null;
+                try {
+                    const savedPlantData = localStorage.getItem('selectedPlantData');
+                    if (savedPlantData) {
+                        selectedPlantData = JSON.parse(savedPlantData);
+                    }
+                } catch (error) {
+                    console.error('Error parsing selected plant data:', error);
+                }
+
                 const summary = {
                     area: { totalSqm: totalAreaSqm, totalRai: totalAreaSqm / 1600, byZone: zoneAreas },
                     plants: { total: totalPlants, byZone: zonePlantCounts },
@@ -3106,6 +3159,7 @@ function FreeMap() {
                         lateralOutlets: totalLateralOutlets,
                         byZone: zonePipeLengths,
                     },
+                    selectedPlant: selectedPlantData,
                     savedAt: new Date().toISOString(),
                 };
                 localStorage.setItem('freePlanSummary', JSON.stringify(summary));
@@ -3507,7 +3561,7 @@ function FreeMap() {
     // 4. Render
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title="Irrigation System Design" />
+            <Head title={translations.irrigationSystemDesign} />
 
             {/* Navbar */}
             <FreeNav />
@@ -3517,7 +3571,7 @@ function FreeMap() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-800/80 backdrop-blur-sm">
                     <div className="flex flex-col items-center space-y-4">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                        <p className="text-white text-lg">Loading Google Maps...</p>
+                        <p className="text-white text-lg">{translations.loadingGoogleMaps}</p>
                     </div>
                 </div>
             )}
@@ -3526,7 +3580,7 @@ function FreeMap() {
             <div className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6">
                 {/* Header Bar (title and quick chips) */}
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white md:text-xl">Irrigation System Design</h2>
+                    <h2 className="text-lg font-bold text-white md:text-xl">{translations.irrigationSystemDesign}</h2>
                 </div>
 
                 {/* Plant and Project Name Inputs */}
@@ -3536,10 +3590,10 @@ function FreeMap() {
                         <div className="relative">
                             <input
                                 type="text"
-                                value={selectedPlant ? selectedPlant.name : ''}
+                                value={selectedPlant ? getTranslatedPlantName(selectedPlant.name, translations) : ''}
                                 readOnly
-                                placeholder="Plant"
-                                title={selectedPlant ? `Water need: ${selectedPlant.waterNeed}L/day, Spacing: ${selectedPlant.plantSpacing}cm` : 'No plant selected'}
+                                placeholder={translations.plant}
+                                title={selectedPlant ? `Water need: ${selectedPlant.waterNeed}L/day, Spacing: ${selectedPlant.plantSpacing}cm` : translations.noPlantSelected}
                                 className="w-full rounded-lg border border-slate-500 bg-slate-100 px-4 py-2 text-gray-900 placeholder-gray-500 cursor-not-allowed"
                             />
                         </div>
@@ -3552,7 +3606,7 @@ function FreeMap() {
                                 type="text"
                                 value={projectName}
                                 onChange={handleProjectNameChange}
-                                placeholder="Label: (Name of project)"
+                                placeholder={translations.labelNameOfProject}
                                 className="w-full rounded-lg border border-slate-500 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                             />
                         </div>
@@ -3570,7 +3624,7 @@ function FreeMap() {
                                 onChange={handleSearchInputChange}
                                 onFocus={handleSearchInputFocus}
                                 onBlur={handleSearchInputBlur}
-                                placeholder="ค้นหาสถานที่..."
+                                placeholder={translations.searchLocation}
                                 className="w-full rounded-lg border border-slate-500 bg-white px-3 py-2 pr-8 text-sm md:px-4 md:py-2 md:pr-10 md:text-base text-gray-900 placeholder-gray-500 shadow-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 md:right-3">
@@ -3645,10 +3699,10 @@ function FreeMap() {
                             }`}
                         >
                             {getButtonState(0) === 'completed' 
-                                ? 'Draw Area ✓' 
+                                ? translations.drawAreaCompleted
                                 : isDrawingMode 
-                                    ? 'Drawing...' 
-                                    : 'Draw Area'}
+                                    ? translations.drawing
+                                    : translations.drawArea}
                         </button>
 
                         {/* Step 2: Water */}
@@ -3664,13 +3718,13 @@ function FreeMap() {
                                         : 'bg-blue-600 hover:bg-blue-700'
                                     : 'bg-slate-400 cursor-not-allowed'
                             }`}
-                            title={currentStep === 1 && waterSources.length === 0 ? 'คลิกในพื้นที่เพื่อวางแหล่งน้ำ' : ''}
+                            title={currentStep === 1 && waterSources.length === 0 ? translations.clickAnywhereInDrawnArea : ''}
                         >
                             {getButtonState(1) === 'completed' 
-                                ? 'Water ✓' 
+                                ? translations.waterCompleted
                                 : currentStep === 1 && waterSources.length === 0
-                                    ? 'Placing Water...'
-                                    : 'Water'}
+                                    ? translations.placingWater
+                                    : translations.water}
                         </button>
 
                         {/* Step 3: Place Pump */}
@@ -3686,13 +3740,13 @@ function FreeMap() {
                                         : 'bg-blue-600 hover:bg-blue-700'
                                     : 'bg-slate-400 cursor-not-allowed'
                             }`}
-                            title={currentStep === 2 && pumps.length === 0 ? 'คลิกในพื้นที่เพื่อวางปั๊ม' : ''}
+                            title={currentStep === 2 && pumps.length === 0 ? translations.clickOnlyOnRedOrangePoints : ''}
                         >
                             {getButtonState(2) === 'completed' 
-                                ? 'Place Pump ✓' 
+                                ? translations.placePumpCompleted
                                 : currentStep === 2 && pumps.length === 0
-                                    ? 'Placing Pump...'
-                                    : 'Place Pump'}
+                                    ? translations.placingWaterPump
+                                    : translations.placePump}
                         </button>
 
                         {/* Step 4: Zones */}
@@ -3708,13 +3762,13 @@ function FreeMap() {
                                         : 'bg-blue-600 hover:bg-blue-700'
                                     : 'bg-slate-400 cursor-not-allowed'
                             }`}
-                            title={currentStep === 3 && zones.length === 0 ? 'คลิกเพื่อแบ่งโซน' : ''}
+                            title={currentStep === 3 && zones.length === 0 ? translations.clickToDivideZones : ''}
                         >
                             {getButtonState(3) === 'completed' 
-                                ? 'Zones ✓' 
+                                ? `${translations.zones} ✓` 
                                 : currentStep === 3 && zones.length === 0
-                                    ? 'Click to Divide Zones'
-                                    : 'Zones'}
+                                    ? translations.clickToDivideZones
+                                    : translations.zones}
                         </button>
                     </div>
 
@@ -3723,54 +3777,54 @@ function FreeMap() {
                         <div className="flex-1 rounded-lg border border-slate-600 bg-slate-700/40 p-3 text-white">
                             {currentStep === 0 && isDrawingMode ? (
                                 <div className="text-center">
-                                    <p className="text-sm font-medium text-blue-300 mb-2">🎨 Drawing Mode Active</p>
-                                    <p className="text-xs text-slate-300">Use the drawing tools on the map to draw your irrigation area</p>
-                                    <p className="text-xs text-slate-400 mt-1">Available: Polygon, Rectangle, Circle</p>
+                                    <p className="text-sm font-medium text-blue-300 mb-2">{translations.drawingModeActive}</p>
+                                    <p className="text-xs text-slate-300">{translations.useDrawingTools}</p>
+                                    <p className="text-xs text-slate-400 mt-1">{translations.availablePolygonRectangleCircle}</p>
                                 </div>
                             ) : currentStep === 1 && waterSources.length === 0 ? (
                                 <div className="text-center">
-                                    <p className="text-sm font-medium text-blue-300 mb-2">💧 Placing Water Source</p>
-                                    <p className="text-xs text-slate-300">Click anywhere in the drawn area to place a water source</p>
-                                    <p className="text-xs text-slate-400 mt-1">The water source will be used to supply water to your irrigation system</p>
+                                    <p className="text-sm font-medium text-blue-300 mb-2">{translations.placingWaterSource}</p>
+                                    <p className="text-xs text-slate-300">{translations.clickAnywhereInDrawnArea}</p>
+                                    <p className="text-xs text-slate-400 mt-1">{translations.waterSourceWillSupplyWater}</p>
                                 </div>
                             ) : currentStep === 2 && pumps.length === 0 ? (
                                 <div className="text-center">
-                                    <p className="text-sm font-medium text-blue-300 mb-2">🔧 Placing Water Pump</p>
-                                    <p className="text-xs text-slate-300">Click ONLY on the red/orange placement points around the water source</p>
-                                    <p className="text-xs text-slate-400 mt-1">Red circles = corner points, Orange circles = midpoint points</p>
-                                    <p className="text-xs text-amber-300 mt-1">⚠️ You cannot place pumps anywhere else in the area</p>
-                                    <p className="text-xs text-slate-400">The pump will distribute water from the water source to the zones</p>
+                                    <p className="text-sm font-medium text-blue-300 mb-2">{translations.placingWaterPump}</p>
+                                    <p className="text-xs text-slate-300">{translations.clickOnlyOnRedOrangePoints}</p>
+                                    <p className="text-xs text-slate-400 mt-1">{translations.redCirclesCornerPoints}</p>
+                                    <p className="text-xs text-amber-300 mt-1">{translations.cannotPlacePumpsAnywhereElse}</p>
+                                    <p className="text-xs text-slate-400">{translations.pumpWillDistributeWater}</p>
                                 </div>
                             ) : currentStep === 3 && zones.length === 0 ? (
                                 <div className="text-center">
-                                    <p className="text-sm font-medium text-blue-300 mb-2">🗺️ Ready to Divide Zones</p>
-                                    <p className="text-xs text-slate-300">Click the "Click to Divide Zones" button to automatically divide your area into irrigation zones</p>
-                                    <p className="text-xs text-slate-400 mt-1">This will help optimize water distribution</p>
+                                    <p className="text-sm font-medium text-blue-300 mb-2">{translations.readyToDivideZones}</p>
+                                    <p className="text-xs text-slate-300">{translations.clickToDivideZonesButton}</p>
+                                    <p className="text-xs text-slate-400 mt-1">{translations.willHelpOptimizeWaterDistribution}</p>
                                 </div>
                             ) : drawnShapes.length > 0 ? (
                                 <div>
-                                    <p className="text-sm font-medium text-green-300 mb-2">✅ Area Drawn</p>
-                                    <p className="text-xs text-slate-300">Shapes: {drawnShapes.length}</p>
+                                    <p className="text-sm font-medium text-green-300 mb-2">{translations.areaDrawn}</p>
+                                    <p className="text-xs text-slate-300">{translations.shapes} {drawnShapes.length}</p>
                                     {plantPoints.length > 0 ? (
-                                        <p className="text-xs text-green-300">Plant Points: {plantPoints.length}</p>
+                                        <p className="text-xs text-green-300">{translations.plantPoints} {plantPoints.length}</p>
                                     ) : null}
                                     {waterSources.length > 0 ? (
                                         <div>
-                                        <p className="text-xs text-blue-300">Water Sources: {waterSources.length}</p>
-                                            <p className="text-xs text-green-300">💡 Drag water source to reposition</p>
+                                        <p className="text-xs text-blue-300">{translations.waterSources} {waterSources.length}</p>
+                                            <p className="text-xs text-green-300">{translations.dragWaterSourceToReposition}</p>
                                         </div>
                                     ) : null}
                                     {pumps.length > 0 ? (
-                                        <p className="text-xs text-red-300">Pumps: {pumps.length}</p>
+                                        <p className="text-xs text-red-300">{translations.pumps} {pumps.length}</p>
                                     ) : null}
                                     {zones.length > 0 ? (
-                                        <p className="text-xs text-purple-300">Zones: {zones.length}</p>
+                                        <p className="text-xs text-purple-300">{translations.zones} {zones.length}</p>
                                     ) : null}
-                                    <p className="text-xs text-slate-400">Final area - cannot be edited</p>
+                                    <p className="text-xs text-slate-400">{translations.finalAreaCannotBeEdited}</p>
                                 </div>
                             ) : (
                                 <div className="text-center">
-                                    <p className="text-sm text-slate-300">Ready to start drawing your irrigation area</p>
+                                    <p className="text-sm text-slate-300">{translations.readyToStartDrawing}</p>
                                 </div>
                             )}
                         </div>
@@ -3787,7 +3841,7 @@ function FreeMap() {
                                         : 'bg-slate-400 cursor-not-allowed'
                                 }`}
                             >
-                                Generate Pipe System
+                                {translations.generatePipeSystem}
                             </button>
                         </div>
                     </div>
@@ -3795,9 +3849,9 @@ function FreeMap() {
 
                 {/* Bottom Nav */}
                 <div className="mt-6 flex gap-3">
-                    <button onClick={handleBack} className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white hover:bg-slate-500">Back</button>
-                    <button onClick={handleReset} className="flex-1 rounded-lg bg-amber-600 px-4 py-3 text-white hover:bg-amber-700">Reset</button>
-                    <button onClick={handleNext} className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700">Next</button>
+                    <button onClick={handleBack} className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white hover:bg-slate-500">{translations.back}</button>
+                    <button onClick={handleReset} className="flex-1 rounded-lg bg-amber-600 px-4 py-3 text-white hover:bg-amber-700">{translations.reset}</button>
+                    <button onClick={handleNext} className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700">{translations.next}</button>
                 </div>
             </div>
 
@@ -3821,7 +3875,7 @@ function FreeMap() {
                                     value={zoneCount}
                                     onChange={(e) => setZoneCount(Math.max(1, Math.min(15, parseInt(e.target.value) || 1)))}
                                     className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    placeholder="Enter number of zones"
+                                    placeholder={translations.enterNumberOfZones}
                                 />
                             </div>
                             

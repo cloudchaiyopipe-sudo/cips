@@ -1,5 +1,5 @@
 // 1. Import
-import React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getTranslations } from '../utils/language';
 
 // Google Maps TypeScript declarations
@@ -28,15 +28,15 @@ interface MarkerOptions {
 // 2. FreeFooter Component
 function FreeFooter() {
     // State
-    const [mapLoaded, setMapLoaded] = React.useState(false);
-    const mapRef = React.useRef<HTMLDivElement>(null);
+    const [mapLoaded, setMapLoaded] = useState(false);
+    const mapRef = useRef<HTMLDivElement>(null);
     
     // State for translations
-    const [translations, setTranslations] = React.useState(getTranslations());
+    const [translations, setTranslations] = useState(getTranslations());
 
     // 3. Hooks
     // Listen for language changes
-    React.useEffect(() => {
+    useEffect(() => {
         const handleLanguageChange = () => {
             setTranslations(getTranslations());
         };
@@ -57,7 +57,7 @@ function FreeFooter() {
         };
     }, []);
 
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
 
         // Load Google Maps script
