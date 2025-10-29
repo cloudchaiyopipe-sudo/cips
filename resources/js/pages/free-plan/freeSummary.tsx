@@ -1,14 +1,15 @@
 // 1. Import
-import React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
+import { getTranslations } from './utils/language';
 
 // 2. Component
 function FreeSummary() {
-    const [imageUrl, setImageUrl] = React.useState<string | null>(null);
-    const mapRef = React.useRef<HTMLDivElement>(null);
-    const mapInstanceRef = React.useRef<unknown>(null);
-    const [summaryData, setSummaryData] = React.useState<{
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstanceRef = useRef<unknown>(null);
+    const [summaryData, setSummaryData] = useState<{
         area: { totalRai: number; byZone: Array<{ zoneId: number; name: string; areaRai: number }> };
         plants: { total: number; byZone: Array<{ zoneId: number; name: string; plants: number }> };
         pipes: {
@@ -27,6 +28,9 @@ function FreeSummary() {
                 mainOutlets?: number;
                 subMainOutlets?: number;
                 lateralOutlets?: number;
+                longestMainMeters?: number;
+                longestSubMainMeters?: number;
+                longestLateralMeters?: number;
             }>;
         };
         flowRate: {
@@ -41,15 +45,45 @@ function FreeSummary() {
                 lpm: number;
             }>;
         };
+        selectedPlant?: {
+            name: string;
+            waterNeed: number;
+            plantSpacing: number;
+            rowSpacing: number;
+            icon: string;
+        };
         zones: number;
     } | null>(null);
-    const [expandedZones, setExpandedZones] = React.useState<Set<number>>(new Set());
-    const [showFlowRateModal, setShowFlowRateModal] = React.useState(false);
-    const [flowRateConfig, setFlowRateConfig] = React.useState({
+    const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
+    const [showFlowRateModal, setShowFlowRateModal] = useState(false);
+    const [flowRateConfig, setFlowRateConfig] = useState({
         flowRatePerMin: 2.5,
         waterPressure: 2.0,
         radius: 4.0
     });
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes from localStorage
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        // Listen for storage changes (when language is changed in other components)
+        window.addEventListener('storage', handleLanguageChange);
+        
+        // Listen for custom language change event
+        window.addEventListener('languageChanged', handleLanguageChange);
+        
+        // Also check on focus (when user comes back to tab)
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // Toggle zone expansion
     const toggleZone = (zoneId: number) => {
@@ -64,8 +98,95 @@ function FreeSummary() {
         });
     };
 
+    // Function to calculate distance between two points
+    const calculateDistance = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }) => {
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = point1.lat * Math.PI / 180;
+        const φ2 = point2.lat * Math.PI / 180;
+        const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
+        const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c; // Distance in meters
+    };
+
+    // Function to calculate longest pipe lengths for each zone
+    const calculateLongestPipes = () => {
+        if (!summaryData) return {};
+
+        const longestPipes: { [zoneId: number]: { longestMain: number; longestSubMain: number; longestLateral: number } } = {};
+
+        // Get pipe data from localStorage
+        const mainPipes = localStorage.getItem('mainPipes');
+        const subMainPipes = localStorage.getItem('subMainPipes');
+        const lateralPipes = localStorage.getItem('lateralPipes');
+
+        if (mainPipes) {
+            try {
+                const mainPipesData = JSON.parse(mainPipes);
+                mainPipesData.forEach((pipe: { zoneId: number; fromPump: { lat: number; lng: number }; toZoneCenter: { lat: number; lng: number } }) => {
+                    if (!longestPipes[pipe.zoneId]) {
+                        longestPipes[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                    }
+                    const length = calculateDistance(pipe.fromPump, pipe.toZoneCenter);
+                    if (length > longestPipes[pipe.zoneId].longestMain) {
+                        longestPipes[pipe.zoneId].longestMain = length;
+                    }
+                });
+            } catch (error) {
+                console.error('Error parsing main pipes:', error);
+            }
+        }
+
+        if (subMainPipes) {
+            try {
+                const subMainPipesData = JSON.parse(subMainPipes);
+                subMainPipesData.forEach((pipe: { zoneId: number; path: Array<{ lat: number; lng: number }> }) => {
+                    if (!longestPipes[pipe.zoneId]) {
+                        longestPipes[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                    }
+                    let totalLength = 0;
+                    for (let i = 0; i < pipe.path.length - 1; i++) {
+                        totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
+                    }
+                    if (totalLength > longestPipes[pipe.zoneId].longestSubMain) {
+                        longestPipes[pipe.zoneId].longestSubMain = totalLength;
+                    }
+                });
+            } catch (error) {
+                console.error('Error parsing sub-main pipes:', error);
+            }
+        }
+
+        if (lateralPipes) {
+            try {
+                const lateralPipesData = JSON.parse(lateralPipes);
+                lateralPipesData.forEach((pipe: { zoneId: number; path: Array<{ lat: number; lng: number }> }) => {
+                    if (!longestPipes[pipe.zoneId]) {
+                        longestPipes[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                    }
+                    let totalLength = 0;
+                    for (let i = 0; i < pipe.path.length - 1; i++) {
+                        totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
+                    }
+                    if (totalLength > longestPipes[pipe.zoneId].longestLateral) {
+                        longestPipes[pipe.zoneId].longestLateral = totalLength;
+                    }
+                });
+            } catch (error) {
+                console.error('Error parsing lateral pipes:', error);
+            }
+        }
+
+        return longestPipes;
+    };
+
     // Load summary data from localStorage
-    React.useEffect(() => {
+    useEffect(() => {
         const savedSummary = localStorage.getItem('freePlanSummary');
         const savedZones = localStorage.getItem('zones');
         const savedFlowRateConfig = localStorage.getItem('flowRateConfig');
@@ -99,6 +220,7 @@ function FreeSummary() {
                         radius: flowRateConfig.radius,
                         byZone: flowRateByZone
                     },
+                    selectedPlant: summary.selectedPlant || undefined,
                     zones: zones.length || 0
                 });
             } catch (error) {
@@ -118,7 +240,7 @@ function FreeSummary() {
     }, [flowRateConfig.flowRatePerMin, flowRateConfig.waterPressure, flowRateConfig.radius]);
 
     // Load Google Maps and render an interactive, read-only map like freeMap
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
 
         const initializeMap = () => {
@@ -365,6 +487,77 @@ function FreeSummary() {
                     }
                 }
 
+                // Drawn shapes (area) - พื้นที่หลักที่วาดด้วยสีเขียว
+                const savedDrawnShapes = localStorage.getItem('drawnShapes');
+                if (savedDrawnShapes) {
+                    try {
+                        const drawnShapes = JSON.parse(savedDrawnShapes) as Array<{
+                            type: string;
+                            data: {
+                                path?: Array<{ lat: number; lng: number }>;
+                                bounds?: { north: number; south: number; east: number; west: number };
+                                center?: { lat: number; lng: number };
+                                radius?: number;
+                            };
+                        }>;
+                        drawnShapes.forEach((shape) => {
+                            console.log('🔍 Reading shape from localStorage:', shape.type, 'typeof:', typeof shape.type);
+                            if (shape.data) {
+                                let overlay: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | undefined;
+                                
+                                if (shape.type === 'polygon' && shape.data.path) {
+                                    overlay = new window.google.maps.Polygon({
+                                        paths: shape.data.path,
+                                        fillColor: '#10b981',
+                                        fillOpacity: 0.2,
+                                        strokeColor: '#10b981',
+                                        strokeOpacity: 0.6,
+                                        strokeWeight: 2,
+                                        clickable: false,
+                                        zIndex: 100
+                                    });
+                                    shape.data.path.forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                                } else if (shape.type === 'rectangle' && shape.data.bounds) {
+                                    overlay = new window.google.maps.Rectangle({
+                                        bounds: new window.google.maps.LatLngBounds(
+                                            { lat: shape.data.bounds.south, lng: shape.data.bounds.west },
+                                            { lat: shape.data.bounds.north, lng: shape.data.bounds.east }
+                                        ),
+                                        fillColor: '#10b981',
+                                        fillOpacity: 0.2,
+                                        strokeColor: '#10b981',
+                                        strokeOpacity: 0.6,
+                                        strokeWeight: 2,
+                                        clickable: false,
+                                        zIndex: 100
+                                    });
+                                    bounds.extend(new window.google.maps.LatLng(shape.data.bounds.north, shape.data.bounds.east));
+                                    bounds.extend(new window.google.maps.LatLng(shape.data.bounds.south, shape.data.bounds.west));
+                                } else if (shape.type === 'circle' && shape.data.center && shape.data.radius) {
+                                    overlay = new window.google.maps.Circle({
+                                        center: { lat: shape.data.center.lat, lng: shape.data.center.lng },
+                                        radius: shape.data.radius,
+                                        fillColor: '#10b981',
+                                        fillOpacity: 0.2,
+                                        strokeColor: '#10b981',
+                                        strokeOpacity: 0.6,
+                                        strokeWeight: 2,
+                                        clickable: false,
+                                        zIndex: 100
+                                    });
+                                    bounds.extend(new window.google.maps.LatLng(shape.data.center.lat, shape.data.center.lng));
+                                }
+                                
+                                if (overlay) {
+                                    overlay.setMap(map);
+                                }
+                            }
+                        });
+                    } catch {
+                        // ignore parse error
+                    }
+                }
+
                 // Fit to content if we have bounds
                 try {
                     if (!bounds.isEmpty()) {
@@ -481,7 +674,7 @@ function FreeSummary() {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title="Irrigation System Summary" />
+            <Head title={translations.irrigationSummary} />
 
             {/* Navbar */}
             <FreeNav />
@@ -489,15 +682,15 @@ function FreeSummary() {
             {/* Header */}
             <div className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white md:text-xl">Irrigation Summary</h2>
+                    <h2 className="text-lg font-bold text-white md:text-xl">{translations.irrigationSummary}</h2>
                     <div className="flex items-center gap-2 text-xs text-emerald-300">
-                        <button onClick={handleSave} className="rounded-lg bg-green-600 px-6 py-2 font-medium text-white hover:bg-green-700">Save</button>
-                        <button onClick={handleEdit} className="rounded-lg bg-amber-600 px-6 py-2 font-medium text-white hover:bg-amber-700">Edit</button>
+                        <button onClick={handleSave} className="rounded-lg bg-green-600 px-6 py-2 font-medium text-white hover:bg-green-700">{translations.save}</button>
+                        <button onClick={handleEdit} className="rounded-lg bg-amber-600 px-6 py-2 font-medium text-white hover:bg-amber-700">{translations.edit}</button>
                     </div>
                 </div>
 
                 {/* Interactive Google Map (read-only). Fallback to image if map can't load */}
-                <div className="mb-6 h-[360px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40">
+                <div className="mb-6 h-[500px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40">
                     <div ref={mapRef} className="h-full w-full" />
                     {!window.google && imageUrl && (
                         <img src={imageUrl} alt="Map snapshot" className="h-full w-full object-cover" />
@@ -508,21 +701,21 @@ function FreeSummary() {
                 <div className="rounded-lg bg-slate-800/50 p-4">
                     <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                         <div className="rounded-lg bg-slate-700/40 p-3 text-center text-white">
-                            <div className="text-sm">Area</div>
+                            <div className="text-sm">{translations.area}</div>
                             <div className="text-lg font-semibold">
                                 {summaryData ? summaryData.area.totalRai.toFixed(2) : '0.00'} Rai
                             </div>
                         </div>
                         <div className="rounded-lg bg-slate-700/40 p-3 text-center text-white">
-                            <div className="text-sm">Zone</div>
+                            <div className="text-sm">{translations.zone}</div>
                             <div className="text-lg font-semibold">{summaryData?.zones || 0}</div>
                         </div>
                         <div className="rounded-lg bg-slate-700/40 p-3 text-center text-white">
-                            <div className="text-sm">Plants</div>
+                            <div className="text-sm">{translations.plants}</div>
                             <div className="text-lg font-semibold">{summaryData?.plants.total || 0}</div>
                         </div>
                         <div className="rounded-lg bg-slate-700/40 p-3 text-center text-white">
-                            <div className="text-sm">Flow</div>
+                            <div className="text-sm">{translations.flow}</div>
                             <div className="text-lg font-semibold text-blue-400">
                                 {summaryData?.flowRate?.totalLPM ? Math.round(summaryData.flowRate.totalLPM) : 0} LPM
                             </div>
@@ -530,15 +723,46 @@ function FreeSummary() {
                         </div>
                     </div>
 
+                    {/* Selected Plant Information */}
+                    {summaryData?.selectedPlant && (
+                        <div className="mb-3 text-white">
+                            <h3 className="mb-2 text-base font-semibold">Selected Plant Information</h3>
+                            <div className="rounded-lg bg-slate-700/40 p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-2xl">{summaryData.selectedPlant.icon}</span>
+                                    <span className="text-lg font-semibold">{summaryData.selectedPlant.name}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-300">Water Need:</span>
+                                        <span className="text-blue-400 font-semibold">{summaryData.selectedPlant.waterNeed} L/day/plant</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-300">Plant Spacing:</span>
+                                        <span className="text-green-400 font-semibold">{summaryData.selectedPlant.plantSpacing} cm</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-300">Row Spacing:</span>
+                                        <span className="text-green-400 font-semibold">{summaryData.selectedPlant.rowSpacing} cm</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-300">Total Water Need:</span>
+                                        <span className="text-cyan-400 font-semibold">{Math.round(summaryData.selectedPlant.waterNeed * (summaryData?.plants?.total || 0))} L/day</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Flow Rate Summary */}
                     <div className="mb-3 text-white">
-                        <h3 className="mb-2 text-base font-semibold">Flow Rate Summary</h3>
+                        <h3 className="mb-2 text-base font-semibold">{translations.flowRateSummary}</h3>
                         <div className="space-y-2 text-sm">
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-3 rounded-full bg-blue-500"></span> 
-                                        Total Flow Rate
+                                        {translations.totalFlowRate}
                                     </div>
                                     <div className="text-right">
                                         <div className="text-blue-400 font-semibold text-lg">
@@ -554,7 +778,7 @@ function FreeSummary() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-3 rounded-full bg-yellow-500"></span> 
-                                        Water Pressure
+                                        {translations.waterPressure}
                                     </div>
                                     <div className="text-right">
                                         <div className="text-yellow-400 font-semibold text-lg">
@@ -567,7 +791,7 @@ function FreeSummary() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-3 rounded-full bg-gray-500"></span> 
-                                        Sprinkler Radius
+                                        {translations.sprinklerRadius}
                                     </div>
                                     <div className="text-right">
                                         <div className="text-gray-400 font-semibold text-lg">
@@ -581,18 +805,18 @@ function FreeSummary() {
 
                     {/* Pipe System Summary */}
                     <div className="mb-3 text-white">
-                        <h3 className="mb-2 text-base font-semibold">Pipe System Summary</h3>
+                        <h3 className="mb-2 text-base font-semibold">{translations.pipeSystemSummary}</h3>
                         <div className="space-y-2 text-sm">
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-3 rounded-full bg-red-500"></span> 
-                                        Main Pipe ({summaryData?.zones || 0})
+                                        {translations.mainPipe} ({summaryData?.zones || 0})
                                     </div>
                                     <div className="text-right">
-                                        <div>Length: <span className="text-red-400 font-semibold text-lg">{summaryData ? summaryData.pipes.mainMeters.toFixed(1) : '0.0'} m</span></div>
+                                        <div>{translations.length}: <span className="text-red-400 font-semibold text-lg">{summaryData ? summaryData.pipes.mainMeters.toFixed(1) : '0.0'} m</span></div>
                                         {summaryData?.pipes.mainOutlets !== undefined && (
-                                            <div className="text-xs text-slate-400">Outlets: {summaryData.pipes.mainOutlets} sub-main pipes</div>
+                                            <div className="text-xs text-slate-400">{translations.outlets}: {summaryData.pipes.mainOutlets} {translations.subMainPipe.toLowerCase()}</div>
                                         )}
                                     </div>
                                 </div>
@@ -601,12 +825,12 @@ function FreeSummary() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-3 rounded-full bg-purple-500"></span> 
-                                        Sub Main Pipe ({summaryData?.zones || 0})
+                                        {translations.subMainPipe} ({summaryData?.zones || 0})
                                     </div>
                                     <div className="text-right">
-                                        <div>Length: <span className="text-purple-400 font-semibold text-lg">{summaryData ? summaryData.pipes.subMainMeters.toFixed(1) : '0.0'} m</span></div>
+                                        <div>{translations.length}: <span className="text-purple-400 font-semibold text-lg">{summaryData ? summaryData.pipes.subMainMeters.toFixed(1) : '0.0'} m</span></div>
                                         {summaryData?.pipes.subMainOutlets !== undefined && (
-                                            <div className="text-xs text-slate-400">Outlets: {summaryData.pipes.subMainOutlets} lateral pipes</div>
+                                            <div className="text-xs text-slate-400">{translations.outlets}: {summaryData.pipes.subMainOutlets} {translations.lateralPipe.toLowerCase()}</div>
                                         )}
                                     </div>
                                 </div>
@@ -615,12 +839,12 @@ function FreeSummary() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="h-3 w-3 rounded-full bg-yellow-500"></span> 
-                                        Lateral Pipe ({summaryData?.pipes.subMainOutlets || 0})
+                                        {translations.lateralPipe} ({summaryData?.pipes.subMainOutlets || 0})
                                     </div>
                                     <div className="text-right">
-                                        <div>Length: <span className="text-yellow-400 font-semibold text-lg">{summaryData ? summaryData.pipes.lateralMeters.toFixed(1) : '0.0'} m</span></div>
+                                        <div>{translations.length}: <span className="text-yellow-400 font-semibold text-lg">{summaryData ? summaryData.pipes.lateralMeters.toFixed(1) : '0.0'} m</span></div>
                                         {summaryData?.pipes.lateralOutlets !== undefined && (
-                                            <div className="text-xs text-slate-400">Outlets: {summaryData.pipes.lateralOutlets} plants</div>
+                                            <div className="text-xs text-slate-400">{translations.outlets}: {summaryData.pipes.lateralOutlets} {translations.plants.toLowerCase()}</div>
                                         )}
                                     </div>
                                 </div>
@@ -674,40 +898,105 @@ function FreeSummary() {
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                                                        Main Pipe
+                                                {/* Water Need per Session for this zone */}
+                                                {summaryData?.selectedPlant && (
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="h-2 w-2 rounded-full bg-cyan-500"></span>
+                                                            {translations.waterNeedPerSession}
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="font-semibold text-cyan-400 text-lg">
+                                                                {Math.round((zonePlants?.plants || 0) * summaryData.selectedPlant.waterNeed)} L/session
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400">
+                                                                {zonePlants?.plants || 0} plants × {summaryData.selectedPlant.waterNeed} L/day/plant
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div><span className="text-red-400 font-semibold text-lg">{zone.mainMeters.toFixed(1)} m</span></div>
-                                                        {zone.mainOutlets !== undefined && (
-                                                            <div className="text-[10px] text-slate-400">{zone.mainOutlets} outlets</div>
-                                                        )}
+                                                )}
+                                                
+                                                {/* Pipe Information */}
+                                                <div className="space-y-2">
+                                                    {/* Main Pipe */}
+                                                    <div className="rounded-lg bg-slate-600/30 p-2">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                                                                <span className="font-medium">{translations.mainPipe}</span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div>
+                                                                    <span className="text-red-400 font-semibold text-lg">{zone.mainMeters.toFixed(1)} m</span>
+                                                                    {(() => {
+                                                                        const longestPipes = calculateLongestPipes();
+                                                                        const longestMain = longestPipes[zone.zoneId]?.longestMain || 0;
+                                                                        return longestMain > 0 && (
+                                                                            <span className="text-red-300 text-sm ml-2">
+                                                                                ({translations.longest}: {longestMain.toFixed(1)} m)
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                                {zone.mainOutlets !== undefined && (
+                                                                    <div className="text-[10px] text-slate-400">{zone.mainOutlets} outlets</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="h-2 w-2 rounded-full bg-purple-500"></span>
-                                                        Sub Main Pipe
+
+                                                    {/* Sub Main Pipe */}
+                                                    <div className="rounded-lg bg-slate-600/30 p-2">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="h-2 w-2 rounded-full bg-purple-500"></span>
+                                                                <span className="font-medium">{translations.subMainPipe}</span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div>
+                                                                    <span className="text-purple-400 font-semibold text-lg">{zone.subMainMeters.toFixed(1)} m</span>
+                                                                    {(() => {
+                                                                        const longestPipes = calculateLongestPipes();
+                                                                        const longestSubMain = longestPipes[zone.zoneId]?.longestSubMain || 0;
+                                                                        return longestSubMain > 0 && (
+                                                                            <span className="text-purple-300 text-sm ml-2">
+                                                                                ({translations.longest}: {longestSubMain.toFixed(1)} m)
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                                {zone.subMainOutlets !== undefined && (
+                                                                    <div className="text-[10px] text-slate-400">{zone.subMainOutlets} outlets</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div><span className="text-purple-400 font-semibold text-lg">{zone.subMainMeters.toFixed(1)} m</span></div>
-                                                        {zone.subMainOutlets !== undefined && (
-                                                            <div className="text-[10px] text-slate-400">{zone.subMainOutlets} outlets</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="h-2 w-2 rounded-full bg-yellow-500"></span>
-                                                        Lateral Pipe
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div><span className="text-yellow-400 font-semibold text-lg">{zone.lateralMeters.toFixed(1)} m</span></div>
-                                                        {zone.lateralOutlets !== undefined && (
-                                                            <div className="text-[10px] text-slate-400">{zone.lateralOutlets} outlets</div>
-                                                        )}
+
+                                                    {/* Lateral Pipe */}
+                                                    <div className="rounded-lg bg-slate-600/30 p-2">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="h-2 w-2 rounded-full bg-yellow-500"></span>
+                                                                <span className="font-medium">{translations.lateralPipe}</span>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div>
+                                                                    <span className="text-yellow-400 font-semibold text-lg">{zone.lateralMeters.toFixed(1)} m</span>
+                                                                    {(() => {
+                                                                        const longestPipes = calculateLongestPipes();
+                                                                        const longestLateral = longestPipes[zone.zoneId]?.longestLateral || 0;
+                                                                        return longestLateral > 0 && (
+                                                                            <span className="text-yellow-300 text-sm ml-2">
+                                                                                ({translations.longest}: {longestLateral.toFixed(1)} m)
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                                {zone.lateralOutlets !== undefined && (
+                                                                    <div className="text-[10px] text-slate-400">{zone.lateralOutlets} outlets</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -717,16 +1006,16 @@ function FreeSummary() {
                             })
                         ) : (
                             <div className="rounded-lg bg-slate-700/40 p-3 text-center text-slate-400">
-                                No zone data available
+                                {translations.noZoneDataAvailable}
                             </div>
                         )}
                     </div>
 
                     {/* Equipment Calculation button */}
                     <div className="mt-4 flex items-center justify-between">
-                        <button onClick={() => router.visit('/free-plan/map')} className="rounded-lg bg-slate-600 px-6 py-2 font-medium text-white hover:bg-slate-500">Back</button>
+                        <button onClick={() => router.visit('/free-plan/map')} className="rounded-lg bg-slate-600 px-6 py-2 font-medium text-white hover:bg-slate-500">{translations.back}</button>
                         <div className="text-center">
-                            <button onClick={() => router.visit('/free-plan/product')} className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white hover:bg-blue-700">Next</button>
+                            <button onClick={() => router.visit('/free-plan/product')} className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white hover:bg-blue-700">{translations.next}</button>
                         </div>
                     </div>
                 </div>
@@ -738,14 +1027,14 @@ function FreeSummary() {
                     <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-slate-800 p-4 text-white sm:p-6">
                         {/* Header */}
                         <div className="mb-6">
-                            <h3 className="text-xl font-bold">Flow Rate Config</h3>
+                            <h3 className="text-xl font-bold">{translations.flowRateConfig}</h3>
                         </div>
 
                         {/* Flow Rate Setting Section */}
                         <div className="mb-6">
-                            <h4 className="mb-2 text-lg font-semibold">Flow Rate Setting</h4>
+                            <h4 className="mb-2 text-lg font-semibold">{translations.flowRateSetting}</h4>
                             <p className="mb-4 text-sm text-slate-300">
-                                determine flow rate properties for plant ({summaryData?.plants.total || 0} plants)
+                                {translations.determineFlowRateProperties} ({summaryData?.plants.total || 0} {translations.plants.toLowerCase()})
                             </p>
                             
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -755,7 +1044,7 @@ function FreeSummary() {
                                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 sm:h-8 sm:w-8">
                                             <span className="text-xs sm:text-sm">💧</span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">Flow Rate per min</span>
+                                        <span className="text-xs font-medium sm:text-sm">{translations.flowRatePerMin}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
@@ -775,7 +1064,7 @@ function FreeSummary() {
                                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 sm:h-8 sm:w-8">
                                             <span className="text-xs sm:text-sm">⚡</span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">Water Pressure</span>
+                                        <span className="text-xs font-medium sm:text-sm">{translations.waterPressure}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
@@ -795,7 +1084,7 @@ function FreeSummary() {
                                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-500 sm:h-8 sm:w-8">
                                             <span className="text-xs sm:text-sm">📏</span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">Radius</span>
+                                        <span className="text-xs font-medium sm:text-sm">{translations.sprinklerRadius}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
@@ -817,7 +1106,7 @@ function FreeSummary() {
                                 <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 sm:h-6 sm:w-6">
                                     <span className="text-xs">📊</span>
                                 </div>
-                                <h4 className="text-base font-semibold sm:text-lg">Real-time Statistics</h4>
+                                <h4 className="text-base font-semibold sm:text-lg">{translations.realTimeStatistics}</h4>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
@@ -827,7 +1116,7 @@ function FreeSummary() {
                                         <span className="text-sm sm:text-lg">🌱</span>
                                     </div>
                                     <div className="text-sm font-bold sm:text-lg">{summaryData?.plants.total || 0}</div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">Total plants</div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.totalPlants}</div>
                                 </div>
 
                                 {/* LPM/plant */}
@@ -836,7 +1125,7 @@ function FreeSummary() {
                                         <span className="text-sm sm:text-lg">💧</span>
                                     </div>
                                     <div className="text-sm font-bold sm:text-lg">{flowRateConfig.flowRatePerMin}</div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">LPM/plant</div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.lpmPerPlant}</div>
                                 </div>
 
                                 {/* LPM Total */}
@@ -847,7 +1136,7 @@ function FreeSummary() {
                                     <div className="text-sm font-bold sm:text-lg">
                                         {((summaryData?.plants.total || 0) * flowRateConfig.flowRatePerMin).toFixed(0)}
                                     </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">LPM Total</div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.lpmTotal}</div>
                                 </div>
 
                                 {/* LPHr Total */}
@@ -858,7 +1147,7 @@ function FreeSummary() {
                                     <div className="text-sm font-bold sm:text-lg">
                                         {(((summaryData?.plants.total || 0) * flowRateConfig.flowRatePerMin) * 60).toFixed(0)}
                                     </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">LPHr Total</div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.lphrTotal}</div>
                                 </div>
                             </div>
                         </div>
@@ -869,13 +1158,13 @@ function FreeSummary() {
                                 onClick={handleFlowRateCancel}
                                 className="rounded-lg border border-slate-500 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 sm:px-6"
                             >
-                                cancel
+                                {translations.cancel}
                             </button>
                             <button
                                 onClick={handleFlowRateApply}
                                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 sm:px-6"
                             >
-                                apply setting
+                                {translations.applySetting}
                             </button>
                         </div>
                     </div>

@@ -1,5 +1,5 @@
 // 1. Import
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { gardenPlants, searchGardenPlants, getGardenPlantsByCategory, getGardenPlantByName, getTranslatedPlantName } from './utils/freeCrop';
@@ -8,16 +8,16 @@ import { getTranslations } from './utils/language';
 // 2. State & Hooks Component
 function ChooseCrop() {
     // State
-    const [searchValue, setSearchValue] = React.useState('');
-    const [selectedCrops, setSelectedCrops] = React.useState<string[]>([]);
-    const [selectedCategory, setSelectedCategory] = React.useState<'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds'>('all');
+    const [searchValue, setSearchValue] = useState('');
+    const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState<'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds'>('all');
 
     // State for translations
-    const [translations, setTranslations] = React.useState(getTranslations());
+    const [translations, setTranslations] = useState(getTranslations());
 
     // 3. Hooks (currently none)
     // Listen for language changes
-    React.useEffect(() => {
+    useEffect(() => {
         const handleLanguageChange = () => {
             setTranslations(getTranslations());
         };
@@ -251,7 +251,7 @@ function ChooseCrop() {
                                     : 'bg-blue-600 hover:bg-blue-700'
                             }`}
                         >
-                            {translations.nextButton}
+                            {translations.next}
                         </button>
                     </div>
                 </div>
