@@ -1,16 +1,17 @@
 // 1. Import
-import React from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { calculatePipeRecommendations, PipeRecommendations } from './utils/pipeSelection';
 import { calculatePumpRequirements, PumpRecommendation } from './utils/pumpSelection';
+import { getTranslations } from './utils/language';
 
 // 2. Component
 function FreeProduct() {
-    const [imageUrl, setImageUrl] = React.useState<string | null>(null);
-    const mapRef = React.useRef<HTMLDivElement>(null);
-    const mapInstanceRef = React.useRef<unknown>(null);
-    const [zones, setZones] = React.useState<Array<{
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstanceRef = useRef<unknown>(null);
+    const [zones, setZones] = useState<Array<{
         id: number;
         name: string;
         color: string;
@@ -24,22 +25,259 @@ function FreeProduct() {
         lateralOutlets?: number;
         lpm?: number;
     }>>([]);
-    const [selectedZoneId, setSelectedZoneId] = React.useState<number | null>(null);
-    const [showZoneDropdown, setShowZoneDropdown] = React.useState(false);
-    const [sprinklerSpecs, setSprinklerSpecs] = React.useState<{
+    const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
+    const [showZoneDropdown, setShowZoneDropdown] = useState(false);
+    const [selectedPipeZoneId, setSelectedPipeZoneId] = useState<number | null>(null);
+    const [showPipeZoneDropdown, setShowPipeZoneDropdown] = useState(false);
+    const [selectedPumpZoneId, setSelectedPumpZoneId] = useState<'all' | 'single' | null>(null);
+    const [showPumpZoneDropdown, setShowPumpZoneDropdown] = useState(false);
+    const [showCalculationDetails, setShowCalculationDetails] = useState(false);
+    const [sprinklerSpecs, setSprinklerSpecs] = useState<{
         flowRatePerMin: number;
         waterPressure: number;
         radius: number;
         totalLPM: number;
     } | null>(null);
-    const [pipeRecommendations, setPipeRecommendations] = React.useState<PipeRecommendations | null>(null);
-    const [pumpRecommendations, setPumpRecommendations] = React.useState<PumpRecommendation | null>(null);
+    const [sprinklerMode, setSprinklerMode] = useState<'preset' | 'calculated'>('preset');
+    const [calculatedSprinklerSpecs, setCalculatedSprinklerSpecs] = useState<{
+        flowRatePerMin: number;
+        waterPressure: number;
+        radius: number;
+        totalLPM: number;
+        calculationDetails?: {
+            step1: {
+                irrigationTimeMinutes: number;
+                totalWaterVolumeLiters: number;
+                areaSquareMeters: number;
+                waterDepthMm: number;
+            };
+            step2: {
+                irrigationRateMmPerHour: number;
+            };
+            step3: {
+                plantDensity: number;
+                optimalRadius: number;
+                sprinklerSpacing: number;
+                totalSprinklers: number;
+            };
+            step4: {
+                sprinklerCoverageArea: number;
+                sprinklerFlowRateLPH: number;
+                sprinklerFlowRateLPM: number;
+            };
+            step5: {
+                requiredPressure: number;
+                pressureCategory: string;
+            };
+            zoneInfo: {
+                zoneName: string;
+                zoneArea: number;
+                zonePlants: number;
+                zoneLPM: number;
+            };
+        };
+    } | null>(null);
+    const [pipeRecommendations, setPipeRecommendations] = useState<PipeRecommendations | null>(null);
+    const [pumpRecommendations, setPumpRecommendations] = useState<PumpRecommendation | null>(null);
+    const [summaryData, setSummaryData] = useState<{
+        area?: { totalRai?: number; byZone?: Array<{ zoneId: number; areaRai: number }> };
+        plants?: { total?: number; byZone?: Array<{ zoneId: number; plants: number }> };
+        pipes?: { byZone?: Array<{ 
+            zoneId: number; 
+            mainMeters: number; 
+            subMainMeters: number; 
+            lateralMeters: number;
+            mainOutlets?: number;
+            subMainOutlets?: number;
+            lateralOutlets?: number;
+        }> };
+        flowRate?: { 
+            totalLPM?: number;
+            flowRatePerMin?: number;
+            waterPressure?: number;
+            radius?: number;
+            byZone?: Array<{ zoneId: number; lpm: number }> 
+        };
+        selectedPlant?: {
+            name: string;
+            waterNeed: number;
+            plantSpacing: number;
+            rowSpacing: number;
+            icon: string;
+        };
+    } | null>(null);
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes from localStorage
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        // Listen for storage changes (when language is changed in other components)
+        window.addEventListener('storage', handleLanguageChange);
+        
+        // Listen for custom language change event
+        window.addEventListener('languageChanged', handleLanguageChange);
+        
+        // Also check on focus (when user comes back to tab)
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     const handleBack = () => router.visit('/free-plan/summary');
     const handleCheckout = () => alert('Use price data from database (demo)');
 
+    // Function to find zone with highest flow rate
+    const findHighestFlowRateZone = (zones: Array<{ 
+        id: number; 
+        name: string; 
+        lpm?: number; 
+        area?: number; 
+        plants?: number; 
+    }>) => {
+        if (zones.length === 0) return null;
+        
+        return zones.reduce((highest, current) => {
+            const currentLpm = current.lpm || 0;
+            const highestLpm = highest.lpm || 0;
+            return currentLpm > highestLpm ? current : highest;
+        });
+    };
+
+    // Function to calculate sprinkler specifications using 5-step calculation method
+    const calculateSprinklerSpecsFromWaterVolume = (zones: Array<{ area?: number; plants?: number; lpm?: number; name?: string }>) => {
+        if (zones.length === 0) return null;
+
+        // Find zone with highest water consumption (LPM)
+        const highestFlowZone = zones.reduce((highest, current) => {
+            const currentLpm = current.lpm || 0;
+            const highestLpm = highest.lpm || 0;
+            return currentLpm > highestLpm ? current : highest;
+        });
+
+        if (!highestFlowZone || !highestFlowZone.area || highestFlowZone.area <= 0) {
+            return null;
+        }
+
+        // Step 1: Convert water volume to depth (mm)
+        // Assume irrigation time of 30 minutes per session
+        const irrigationTimeMinutes = 30;
+        const totalWaterVolumeLiters = (highestFlowZone.lpm || 0) * irrigationTimeMinutes;
+        const areaSquareMeters = highestFlowZone.area * 1600; // Convert rai to sqm
+        const waterDepthMm = (totalWaterVolumeLiters / areaSquareMeters) * 1000; // Convert to mm
+
+        // Step 2: Calculate required irrigation rate (mm/hour)
+        const irrigationRateMmPerHour = waterDepthMm / (irrigationTimeMinutes / 60);
+
+        // Step 3: Design sprinkler layout
+        // Calculate optimal radius based on plant density and zone shape
+        const plantDensity = (highestFlowZone.plants || 0) / highestFlowZone.area; // plants per rai
+        let optimalRadius = 4.0; // Default radius in meters
+        
+        if (plantDensity > 100) {
+            optimalRadius = 3.0; // High density - smaller radius for precise watering
+        } else if (plantDensity > 50) {
+            optimalRadius = 4.0; // Medium density - standard radius
+        } else {
+            optimalRadius = 5.0; // Low density - larger radius for coverage
+        }
+
+        // Calculate sprinkler spacing (typically equal to radius for optimal coverage)
+        const sprinklerSpacing = optimalRadius;
+
+        // Step 4: Calculate flow rate per sprinkler
+        const sprinklerCoverageArea = Math.PI * Math.pow(optimalRadius, 2); // m²
+        const sprinklerFlowRateLPH = (irrigationRateMmPerHour * sprinklerCoverageArea) / 1000; // LPH
+        const sprinklerFlowRateLPM = sprinklerFlowRateLPH / 60; // LPM
+
+        // Step 5: Determine pressure from catalog specifications
+        // Based on radius and flow rate, determine required pressure
+        let requiredPressure = 2.0; // Default pressure in Bar
+        
+        if (optimalRadius >= 5.0 && sprinklerFlowRateLPM >= 2.0) {
+            requiredPressure = 2.5; // High pressure for large radius and high flow
+        } else if (optimalRadius >= 4.0 && sprinklerFlowRateLPM >= 1.5) {
+            requiredPressure = 2.2; // Medium-high pressure
+        } else if (optimalRadius >= 3.0 && sprinklerFlowRateLPM >= 1.0) {
+            requiredPressure = 1.8; // Medium pressure
+        } else {
+            requiredPressure = 1.5; // Low pressure for small radius and low flow
+        }
+
+        // Calculate total system flow rate
+        const totalSprinklers = Math.ceil(areaSquareMeters / sprinklerCoverageArea);
+        const totalLPM = totalSprinklers * sprinklerFlowRateLPM;
+
+        return {
+            // Basic specs
+            flowRatePerMin: sprinklerFlowRateLPM,
+            waterPressure: requiredPressure,
+            radius: optimalRadius,
+            totalLPM: totalLPM,
+            
+            // Detailed calculation results
+            calculationDetails: {
+                // Step 1: Water depth calculation
+                step1: {
+                    irrigationTimeMinutes,
+                    totalWaterVolumeLiters,
+                    areaSquareMeters,
+                    waterDepthMm: Math.round(waterDepthMm * 10) / 10
+                },
+                
+                // Step 2: Irrigation rate
+                step2: {
+                    irrigationRateMmPerHour: Math.round(irrigationRateMmPerHour * 10) / 10
+                },
+                
+                // Step 3: Sprinkler layout
+                step3: {
+                    plantDensity: Math.round(plantDensity * 10) / 10,
+                    optimalRadius,
+                    sprinklerSpacing,
+                    totalSprinklers
+                },
+                
+                // Step 4: Flow rate per sprinkler
+                step4: {
+                    sprinklerCoverageArea: Math.round(sprinklerCoverageArea * 10) / 10,
+                    sprinklerFlowRateLPH: Math.round(sprinklerFlowRateLPH * 10) / 10,
+                    sprinklerFlowRateLPM: Math.round(sprinklerFlowRateLPM * 100) / 100
+                },
+                
+                // Step 5: Pressure requirements
+                step5: {
+                    requiredPressure,
+                    pressureCategory: requiredPressure >= 2.5 ? 'High' : 
+                                    requiredPressure >= 2.0 ? 'Medium-High' : 
+                                    requiredPressure >= 1.5 ? 'Medium' : 'Low'
+                },
+                
+                // Zone information
+                zoneInfo: {
+                    zoneName: highestFlowZone.name || 'Highest Flow Zone',
+                    zoneArea: highestFlowZone.area,
+                    zonePlants: highestFlowZone.plants || 0,
+                    zoneLPM: highestFlowZone.lpm || 0
+                }
+            }
+        };
+    };
+
+    // Legacy function for backward compatibility
+    const calculateOptimalSprinklerSpecs = useCallback((zones: Array<{ area?: number; plants?: number; lpm?: number; name?: string }>) => {
+        return calculateSprinklerSpecsFromWaterVolume(zones);
+    }, []);
+
+
     // Load zone data from localStorage
-    React.useEffect(() => {
+    useEffect(() => {
         const savedZones = localStorage.getItem('zones');
         const savedSummary = localStorage.getItem('freePlanSummary');
         
@@ -75,6 +313,7 @@ function FreeProduct() {
                 if (savedSummary) {
                     try {
                         summaryData = JSON.parse(savedSummary);
+                        setSummaryData(summaryData);
                     } catch {
                         // ignore parse error
                     }
@@ -82,11 +321,19 @@ function FreeProduct() {
                 
                 // Get flow rate config for calculation
                 const savedFlowRateConfig = localStorage.getItem('flowRateConfig');
-                let flowRatePerMin = 2.5; // default value
+                let flowRateConfig = {
+                    flowRatePerMin: 2.5,
+                    waterPressure: 2.0,
+                    radius: 4.0
+                };
                 if (savedFlowRateConfig) {
                     try {
                         const config = JSON.parse(savedFlowRateConfig);
-                        flowRatePerMin = config.flowRatePerMin || 2.5;
+                        flowRateConfig = {
+                            flowRatePerMin: config.flowRatePerMin || 2.5,
+                            waterPressure: config.waterPressure || 2.0,
+                            radius: config.radius || 4.0
+                        };
                     } catch {
                         // use default
                     }
@@ -99,7 +346,7 @@ function FreeProduct() {
                     const flowData = summaryData?.flowRate?.byZone?.find((z) => z.zoneId === zone.id);
                     
                     // Calculate LPM if not available in flowData
-                    const calculatedLpm = flowData?.lpm || (plantData?.plants || 0) * flowRatePerMin;
+                    const calculatedLpm = flowData?.lpm || (plantData?.plants || 0) * flowRateConfig.flowRatePerMin;
                     
                     return {
                         ...zone,
@@ -116,36 +363,42 @@ function FreeProduct() {
                 });
                 
                 console.log('Zones with data:', zonesWithData);
-                console.log('Flow rate config:', flowRatePerMin);
+                console.log('Flow rate config:', flowRateConfig);
                 console.log('Summary data:', summaryData);
                 
                 // Display sprinkler specifications
                 console.log('=== SPRINKLER SPECIFICATIONS ===');
-                console.log('Flow Rate per Plant:', flowRatePerMin, 'LPM');
-                console.log('Water Pressure:', summaryData?.flowRate?.waterPressure || 'Not set', 'Bar');
-                console.log('Sprinkler Radius:', summaryData?.flowRate?.radius || 'Not set', 'm');
+                console.log('Flow Rate per Plant:', flowRateConfig.flowRatePerMin, 'LPM');
+                console.log('Water Pressure:', flowRateConfig.waterPressure, 'Bar');
+                console.log('Sprinkler Radius:', flowRateConfig.radius, 'm');
                 console.log('Total Plants:', summaryData?.plants?.total || 0);
-                console.log('Total Flow Rate:', (summaryData?.plants?.total || 0) * flowRatePerMin, 'LPM');
+                console.log('Total Flow Rate:', (summaryData?.plants?.total || 0) * flowRateConfig.flowRatePerMin, 'LPM');
                 console.log('===============================');
                 
                 setZones(zonesWithData);
                 if (zonesWithData.length > 0) {
                     setSelectedZoneId(zonesWithData[0].id);
+                    setSelectedPipeZoneId(zonesWithData[0].id);
+                    setSelectedPumpZoneId('all'); // Default to show all zones
                 }
                 
-                // Set sprinkler specifications
+                // Set sprinkler specifications - prioritize flowRateConfig over summary data
                 setSprinklerSpecs({
-                    flowRatePerMin: flowRatePerMin,
-                    waterPressure: summaryData?.flowRate?.waterPressure || 0,
-                    radius: summaryData?.flowRate?.radius || 0,
-                    totalLPM: summaryData?.flowRate?.totalLPM || 0
+                    flowRatePerMin: flowRateConfig.flowRatePerMin,
+                    waterPressure: flowRateConfig.waterPressure,
+                    radius: flowRateConfig.radius,
+                    totalLPM: (summaryData?.plants?.total || 0) * flowRateConfig.flowRatePerMin
                 });
 
-                // Calculate pipe recommendations
-                const totalFlowRate = summaryData?.flowRate?.totalLPM || 0;
+                // Calculate optimal sprinkler specifications
+                const calculatedSpecs = calculateOptimalSprinklerSpecs(zonesWithData);
+                setCalculatedSprinklerSpecs(calculatedSpecs);
+
+                // Calculate pipe and pump recommendations
+                const totalFlowRate = (summaryData?.plants?.total || 0) * flowRateConfig.flowRatePerMin;
                 const avgZoneFlowRate = zonesWithData.length > 0 ? 
                     zonesWithData.reduce((sum, zone) => sum + (zone.lpm || 0), 0) / zonesWithData.length : 0;
-                const avgSprinklerFlowRate = sprinklerSpecs?.flowRatePerMin || 2.5;
+                const avgSprinklerFlowRate = flowRateConfig.flowRatePerMin;
 
                 const pipeRecs = calculatePipeRecommendations(
                     totalFlowRate,
@@ -154,20 +407,50 @@ function FreeProduct() {
                 );
                 setPipeRecommendations(pipeRecs);
 
-                // Calculate pump recommendations
                 const pumpRecs = calculatePumpRequirements(
                     totalFlowRate,
-                    sprinklerSpecs?.waterPressure || 2.0
+                    flowRateConfig.waterPressure
                 );
                 setPumpRecommendations(pumpRecs);
             } catch (error) {
                 console.error('Error loading zones:', error);
             }
         }
-    }, [sprinklerSpecs?.flowRatePerMin, sprinklerSpecs?.waterPressure]);
+    }, [calculateOptimalSprinklerSpecs]);
+
+    // Update recommendations when sprinkler mode changes
+    useEffect(() => {
+        const currentSpecs = sprinklerMode === 'preset' ? sprinklerSpecs : calculatedSprinklerSpecs;
+        if (!currentSpecs) return;
+
+        const totalFlowRate = currentSpecs.totalLPM;
+        const avgZoneFlowRate = zones.length > 0 ? 
+            zones.reduce((sum, zone) => sum + (zone.lpm || 0), 0) / zones.length : 0;
+        const avgSprinklerFlowRate = currentSpecs.flowRatePerMin;
+
+        const pipeRecs = calculatePipeRecommendations(
+            totalFlowRate,
+            avgZoneFlowRate,
+            avgSprinklerFlowRate
+        );
+        setPipeRecommendations(pipeRecs);
+
+        // Calculate pump requirements based on selected mode
+        let pumpFlowRate = totalFlowRate;
+        if (selectedPumpZoneId === 'single') {
+            const highestFlowZone = findHighestFlowRateZone(zones);
+            pumpFlowRate = highestFlowZone ? (highestFlowZone.lpm || 0) : totalFlowRate;
+        }
+
+        const pumpRecs = calculatePumpRequirements(
+            pumpFlowRate,
+            currentSpecs.waterPressure
+        );
+        setPumpRecommendations(pumpRecs);
+    }, [sprinklerMode, sprinklerSpecs, calculatedSprinklerSpecs, zones, selectedPumpZoneId, calculateOptimalSprinklerSpecs]);
 
     // Load Google Maps and render an interactive, read-only map like freeMap
-    React.useEffect(() => {
+    useEffect(() => {
         let isMounted = true;
 
         const initializeMap = () => {
@@ -414,6 +697,77 @@ function FreeProduct() {
                     }
                 }
 
+                // Drawn shapes (area) - พื้นที่หลักที่วาดด้วยสีเขียว
+                const savedDrawnShapes = localStorage.getItem('drawnShapes');
+                if (savedDrawnShapes) {
+                    try {
+                        const drawnShapes = JSON.parse(savedDrawnShapes) as Array<{
+                            type: string;
+                            data: {
+                                path?: Array<{ lat: number; lng: number }>;
+                                bounds?: { north: number; south: number; east: number; west: number };
+                                center?: { lat: number; lng: number };
+                                radius?: number;
+                            };
+                        }>;
+                        drawnShapes.forEach((shape) => {
+                            console.log('🔍 Reading shape from localStorage in product page:', shape.type, 'typeof:', typeof shape.type);
+                            if (shape.data) {
+                                let overlay: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | undefined;
+                                
+                                if (shape.type === 'polygon' && shape.data.path) {
+                                    overlay = new window.google.maps.Polygon({
+                                        paths: shape.data.path,
+                                        fillColor: '#10b981',
+                                        fillOpacity: 0.2,
+                                        strokeColor: '#10b981',
+                                        strokeOpacity: 0.6,
+                                        strokeWeight: 2,
+                                        clickable: false,
+                                        zIndex: 100
+                                    });
+                                    shape.data.path.forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                                } else if (shape.type === 'rectangle' && shape.data.bounds) {
+                                    overlay = new window.google.maps.Rectangle({
+                                        bounds: new window.google.maps.LatLngBounds(
+                                            { lat: shape.data.bounds.south, lng: shape.data.bounds.west },
+                                            { lat: shape.data.bounds.north, lng: shape.data.bounds.east }
+                                        ),
+                                        fillColor: '#10b981',
+                                        fillOpacity: 0.2,
+                                        strokeColor: '#10b981',
+                                        strokeOpacity: 0.6,
+                                        strokeWeight: 2,
+                                        clickable: false,
+                                        zIndex: 100
+                                    });
+                                    bounds.extend(new window.google.maps.LatLng(shape.data.bounds.north, shape.data.bounds.east));
+                                    bounds.extend(new window.google.maps.LatLng(shape.data.bounds.south, shape.data.bounds.west));
+                                } else if (shape.type === 'circle' && shape.data.center && shape.data.radius) {
+                                    overlay = new window.google.maps.Circle({
+                                        center: { lat: shape.data.center.lat, lng: shape.data.center.lng },
+                                        radius: shape.data.radius,
+                                        fillColor: '#10b981',
+                                        fillOpacity: 0.2,
+                                        strokeColor: '#10b981',
+                                        strokeOpacity: 0.6,
+                                        strokeWeight: 2,
+                                        clickable: false,
+                                        zIndex: 100
+                                    });
+                                    bounds.extend(new window.google.maps.LatLng(shape.data.center.lat, shape.data.center.lng));
+                                }
+                                
+                                if (overlay) {
+                                    overlay.setMap(map);
+                                }
+                            }
+                        });
+                    } catch {
+                        // ignore parse error
+                    }
+                }
+
                 // Fit to content if we have bounds
                 try {
                     if (!bounds.isEmpty()) {
@@ -450,7 +804,7 @@ function FreeProduct() {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title="Irrigation Products" />
+            <Head title={translations.irrigationProducts} />
 
             {/* Navbar */}
             <FreeNav />
@@ -461,7 +815,7 @@ function FreeProduct() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                     {/* Map preview */}
                     <div className="md:col-span-3 rounded-lg border border-slate-600 bg-slate-600/30 p-4">
-                        <div className="h-[300px] overflow-hidden rounded bg-slate-700/40">
+                        <div className="h-[380px] overflow-hidden rounded bg-slate-700/40">
                             <div ref={mapRef} className="h-full w-full" />
                             {!window.google && imageUrl && (
                                 <img src={imageUrl} alt="Map snapshot" className="h-full w-full object-cover" />
@@ -473,7 +827,7 @@ function FreeProduct() {
                     <div className="md:col-span-2 rounded-lg border border-slate-600 bg-slate-600/30 p-4 text-white">
                         <div className="mb-2 flex items-center justify-between">
                             <h2 className="text-lg font-bold">
-                                {selectedZoneId ? zones.find(z => z.id === selectedZoneId)?.name || 'Select Zone' : 'Select Zone'}
+                                {selectedZoneId ? zones.find(z => z.id === selectedZoneId)?.name || translations.selectZone : translations.selectZone}
                             </h2>
                             <div className="relative">
                                 <button 
@@ -481,7 +835,7 @@ function FreeProduct() {
                                     className="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600 flex items-center gap-1"
                                 >
                                     <span className="text-xs">
-                                        {selectedZoneId ? zones.find(z => z.id === selectedZoneId)?.name || 'Select Zone' : 'Select Zone'}
+                                        {selectedZoneId ? zones.find(z => z.id === selectedZoneId)?.name || translations.selectZone : translations.selectZone}
                                     </span>
                                     <span>{showZoneDropdown ? '▴' : '▾'}</span>
                                 </button>
@@ -518,19 +872,28 @@ function FreeProduct() {
                             return (
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
-                                        <span>Area</span>
+                                        <span>{translations.area}</span>
                                         <span className="text-green-400 font-semibold">{selectedZone.area?.toFixed(2) || '0.00'} Rai</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Plants</span>
+                                        <span>{translations.plants}</span>
                                         <span className="text-emerald-400 font-semibold">{selectedZone.plants || 0}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Flow Rate</span>
+                                        <span>{translations.flowRate}</span>
                                         <span className="text-blue-400 font-semibold">{Math.round(selectedZone.lpm || 0)} LPM</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Main</span>
+                                        <span>Water Need per Session:</span>
+                                        <span className="text-cyan-400 font-semibold">
+                                            {summaryData?.selectedPlant 
+                                                ? Math.round((selectedZone.plants || 0) * summaryData.selectedPlant.waterNeed)
+                                                : Math.round((selectedZone.lpm || 0) * 30)
+                                            } L/session
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{translations.mainPipe}</span>
                                         <div className="text-right">
                                             <div className="text-red-400 font-semibold">{selectedZone.mainMeters?.toFixed(1) || '0.0'} m</div>
                                             {selectedZone.mainOutlets !== undefined && selectedZone.mainOutlets > 0 && (
@@ -539,7 +902,7 @@ function FreeProduct() {
                                         </div>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Sub Main</span>
+                                        <span>{translations.subMainPipe}</span>
                                         <div className="text-right">
                                             <div className="text-purple-400 font-semibold">{selectedZone.subMainMeters?.toFixed(1) || '0.0'} m</div>
                                             {selectedZone.subMainOutlets !== undefined && selectedZone.subMainOutlets > 0 && (
@@ -548,7 +911,7 @@ function FreeProduct() {
                                         </div>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Lateral</span>
+                                        <span>{translations.lateralPipe}</span>
                                         <div className="text-right">
                                             <div className="text-yellow-400 font-semibold">{selectedZone.lateralMeters?.toFixed(1) || '0.0'} m</div>
                                             {selectedZone.lateralOutlets !== undefined && selectedZone.lateralOutlets > 0 && (
@@ -565,151 +928,750 @@ function FreeProduct() {
                 {/* Selectors */}
                 <div className="mt-4 space-y-3">
                     <div className="rounded-lg bg-emerald-900/30 p-3">
-                        <div className="mb-2 font-semibold text-white">Sprinkler Selector</div>
-                        {sprinklerSpecs ? (
-                            <div className="rounded bg-emerald-900/40 p-3 text-slate-200 text-sm space-y-2">
+                        <div className="mb-3 flex items-center justify-between">
+                            <div className="font-semibold text-white">{translations.sprinklerSelector}</div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setSprinklerMode('preset')}
+                                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                        sprinklerMode === 'preset' 
+                                            ? 'bg-emerald-600 text-white' 
+                                            : 'bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50'
+                                    }`}
+                                >
+                                    Preset
+                                </button>
+                                <button
+                                    onClick={() => setSprinklerMode('calculated')}
+                                    className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                        sprinklerMode === 'calculated' 
+                                            ? 'bg-emerald-600 text-white' 
+                                            : 'bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50'
+                                    }`}
+                                >
+                                    Calculated
+                                </button>
+                            </div>
+                        </div>
+                        {sprinklerMode === 'preset' ? (
+                            sprinklerSpecs ? (
+                            <div className="rounded bg-emerald-900/40 p-3 text-slate-200 text-sm space-y-3">
+                                {/* Mode Indicator */}
+                                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                                    <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Using settings from Summary page</span>
+                                </div>
+                                
+                                {/* Basic Specifications */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-emerald-300">Flow Rate:</span>
+                                        <span className="text-emerald-300">{translations.flowRateProduct}:</span>
                                         <span className="font-semibold text-emerald-400">{sprinklerSpecs.flowRatePerMin} LPM/plant</span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-emerald-300">Pressure:</span>
+                                        <span className="text-emerald-300">{translations.pressureProduct}:</span>
                                         <span className="font-semibold text-emerald-400">{sprinklerSpecs.waterPressure} Bar</span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-emerald-300">Radius:</span>
+                                        <span className="text-emerald-300">{translations.radiusProduct}:</span>
                                         <span className="font-semibold text-emerald-400">{sprinklerSpecs.radius} m</span>
                                     </div>
                                 </div>
+                                
+                                {/* System Overview */}
+                                <div className="pt-2 border-t border-emerald-800/50">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-emerald-300">Total Plants:</span>
+                                            <span className="font-semibold text-emerald-400">{summaryData?.plants?.total || 0}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-emerald-300">Total Zones:</span>
+                                            <span className="font-semibold text-emerald-400">{zones.length}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Flow Rate Summary */}
                                 <div className="pt-2 border-t border-emerald-800/50">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-emerald-300">Total Flow Rate:</span>
+                                        <span className="text-emerald-300">{translations.totalFlowRateProduct}:</span>
                                         <span className="font-bold text-emerald-400 text-lg">{Math.round(sprinklerSpecs.totalLPM)} LPM</span>
+                                    </div>
+                                    <div className="text-xs text-emerald-400 mt-1">
+                                        {summaryData?.plants?.total || 0} plants × {sprinklerSpecs.flowRatePerMin} LPM/plant
+                                    </div>
+                                </div>
+                                
+                                {/* Additional Info */}
+                                <div className="pt-2 border-t border-emerald-800/50">
+                                    <div className="text-xs text-emerald-300">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span>Flow Rate per Hour:</span>
+                                            <span className="font-semibold">{Math.round(sprinklerSpecs.totalLPM * 60)} LPH</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span>Coverage per Sprinkler:</span>
+                                            <span className="font-semibold">{(Math.PI * Math.pow(sprinklerSpecs.radius, 2)).toFixed(1)} m²</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                            ) : (
+                                <div className="rounded bg-emerald-900/40 p-3 text-slate-200 text-sm">{translations.loadingSprinklerSpecs}</div>
+                            )
                         ) : (
-                            <div className="rounded bg-emerald-900/40 p-3 text-slate-200 text-sm">Loading sprinkler specifications...</div>
+                            calculatedSprinklerSpecs ? (
+                                <div className="rounded bg-emerald-900/40 p-3 text-slate-200 text-sm space-y-4">
+                                    {/* Mode Indicator */}
+                                    <div className="flex items-center gap-2 text-xs text-emerald-400">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                        <span>Calculated using 5-step method from water volume</span>
+                                    </div>
+                                    
+                                    {/* Zone Information */}
+                                    {calculatedSprinklerSpecs.calculationDetails?.zoneInfo && (
+                                        <div className="rounded bg-emerald-800/30 p-3">
+                                            <div className="text-xs text-emerald-300 mb-2 font-medium">Based on Zone: {calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneName}</div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="flex justify-between">
+                                                    <span>Area:</span>
+                                                    <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneArea.toFixed(2)} Rai</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>Plants:</span>
+                                                    <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.zoneInfo.zonePlants}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>Flow Rate:</span>
+                                                    <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneLPM} LPM</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>Water Need per Session:</span>
+                                                    <span className="text-cyan-400 font-semibold">
+                                                        {summaryData?.selectedPlant 
+                                                            ? Math.round(calculatedSprinklerSpecs.calculationDetails.zoneInfo.zonePlants * summaryData.selectedPlant.waterNeed)
+                                                            : Math.round(calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneLPM * 30)
+                                                        } L/session
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>Plant Density:</span>
+                                                    <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.step3.plantDensity} plants/rai</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Calculation Details Toggle */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm font-medium text-emerald-300">5-Step Calculation Process</div>
+                                        <button
+                                            onClick={() => setShowCalculationDetails(!showCalculationDetails)}
+                                            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50 transition-colors text-xs"
+                                        >
+                                            <span>{showCalculationDetails ? 'Hide Details' : 'Show Details'}</span>
+                                            <span className={`transition-transform duration-200 ${showCalculationDetails ? 'rotate-180' : ''}`}>▼</span>
+                                        </button>
+                                    </div>
+
+                                    {/* 5-Step Calculation Process - Collapsible */}
+                                    {showCalculationDetails && (
+                                        <div className="space-y-4">
+                                        
+                                        {/* Step 1: Water Depth */}
+                                        {calculatedSprinklerSpecs.calculationDetails?.step1 && (
+                                            <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">1</div>
+                                                    <div className="text-sm font-medium text-emerald-400">Convert Water Volume to Depth</div>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                            <div className="text-xs text-emerald-300 mb-1">Irrigation Time</div>
+                                                            <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.irrigationTimeMinutes} min</div>
+                                                        </div>
+                                                        <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                            <div className="text-xs text-emerald-300 mb-1">Area</div>
+                                                            <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(1)} m²</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="bg-cyan-900/30 rounded-lg p-3 border border-cyan-700/30">
+                                                            <div className="text-xs text-cyan-300 mb-1">Water Need per Session</div>
+                                                            <div className="text-sm font-bold text-cyan-400">
+                                                                {summaryData?.selectedPlant 
+                                                                    ? Math.round(calculatedSprinklerSpecs.calculationDetails.zoneInfo.zonePlants * summaryData.selectedPlant.waterNeed)
+                                                                    : calculatedSprinklerSpecs.calculationDetails.step1.totalWaterVolumeLiters
+                                                                } L/session
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                            <div className="text-xs text-emerald-300 mb-1">Total Water Volume</div>
+                                                            <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.totalWaterVolumeLiters} L</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
+                                                        <div className="text-xs text-emerald-300 mb-1">Water Depth (Result)</div>
+                                                        <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.waterDepthMm} mm</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Step 2: Irrigation Rate */}
+                                        {calculatedSprinklerSpecs.calculationDetails?.step2 && (
+                                            <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">2</div>
+                                                    <div className="text-sm font-medium text-emerald-400">Calculate Irrigation Rate</div>
+                                                </div>
+                                                <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
+                                                    <div className="text-xs text-emerald-300 mb-1">Required Irrigation Rate</div>
+                                                    <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step2.irrigationRateMmPerHour} mm/hour</div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Step 3: Sprinkler Layout */}
+                                        {calculatedSprinklerSpecs.calculationDetails?.step3 && (
+                                            <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">3</div>
+                                                    <div className="text-sm font-medium text-emerald-400">Design Sprinkler Layout</div>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                        <div className="text-xs text-emerald-300 mb-1">Optimal Radius</div>
+                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.optimalRadius} m</div>
+                                                    </div>
+                                                    <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                        <div className="text-xs text-emerald-300 mb-1">Sprinkler Spacing</div>
+                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.sprinklerSpacing} m</div>
+                                                    </div>
+                                                    <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
+                                                        <div className="text-xs text-emerald-300 mb-1">Total Sprinklers (Calculated)</div>
+                                                        <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.totalSprinklers}</div>
+                                                        <div className="text-xs text-emerald-500 mt-1">
+                                                            Area ÷ Coverage = {calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(0)} ÷ {calculatedSprinklerSpecs.calculationDetails.step4.sprinklerCoverageArea} = {calculatedSprinklerSpecs.calculationDetails.step3.totalSprinklers}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                        <div className="text-xs text-emerald-300 mb-1">Plant Density</div>
+                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.plantDensity} plants/rai</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Step 4: Flow Rate per Sprinkler */}
+                                        {calculatedSprinklerSpecs.calculationDetails?.step4 && (
+                                            <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">4</div>
+                                                    <div className="text-sm font-medium text-emerald-400">Calculate Flow Rate per Sprinkler</div>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                    <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
+                                                        <div className="text-xs text-emerald-300 mb-1">Coverage Area per Sprinkler</div>
+                                                        <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step4.sprinklerCoverageArea} m²</div>
+                                                        <div className="text-xs text-emerald-500 mt-1">
+                                                            π × r² = π × {calculatedSprinklerSpecs.calculationDetails.step3.optimalRadius}²
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                        <div className="text-xs text-emerald-300 mb-1">Flow Rate (LPH)</div>
+                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step4.sprinklerFlowRateLPH} LPH</div>
+                                                    </div>
+                                                    <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
+                                                        <div className="text-xs text-emerald-300 mb-1">Flow Rate (LPM) - Result</div>
+                                                        <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step4.sprinklerFlowRateLPM} LPM</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Step 5: Pressure Requirements */}
+                                        {calculatedSprinklerSpecs.calculationDetails?.step5 && (
+                                            <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">5</div>
+                                                    <div className="text-sm font-medium text-emerald-400">Select Pressure from Catalog</div>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
+                                                        <div className="text-xs text-emerald-300 mb-1">Required Pressure</div>
+                                                        <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step5.requiredPressure} Bar</div>
+                                                    </div>
+                                                    <div className="bg-emerald-900/30 rounded-lg p-3">
+                                                        <div className="text-xs text-emerald-300 mb-1">Pressure Category</div>
+                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step5.pressureCategory}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        </div>
+                                    )}
+
+                                    {/* Final Specifications */}
+                                    <div className="pt-4 border-t border-emerald-800/50">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                                            <div className="text-lg font-semibold text-emerald-300">Final Sprinkler Specifications</div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                            <div className="bg-emerald-600/20 rounded-lg p-4 border border-emerald-500/30">
+                                                <div className="text-xs text-emerald-300 mb-1">{translations.flowRateProduct}</div>
+                                                <div className="text-xl font-bold text-emerald-400">{calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} LPM</div>
+                                            </div>
+                                            <div className="bg-emerald-600/20 rounded-lg p-4 border border-emerald-500/30">
+                                                <div className="text-xs text-emerald-300 mb-1">{translations.pressureProduct}</div>
+                                                <div className="text-xl font-bold text-emerald-400">{calculatedSprinklerSpecs.waterPressure} Bar</div>
+                                            </div>
+                                            <div className="bg-emerald-600/20 rounded-lg p-4 border border-emerald-500/30">
+                                                <div className="text-xs text-emerald-300 mb-1">{translations.radiusProduct}</div>
+                                                <div className="text-xl font-bold text-emerald-400">{calculatedSprinklerSpecs.radius} m</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-emerald-800/30 rounded-lg p-4 border border-emerald-600/30">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="text-sm font-medium text-emerald-300">{translations.totalFlowRateProduct}</div>
+                                                <div className="text-2xl font-bold text-emerald-400">{Math.round(calculatedSprinklerSpecs.totalLPM)} LPM</div>
+                                            </div>
+                                            <div className="text-xs text-emerald-400">
+                                                {calculatedSprinklerSpecs.calculationDetails?.step3.totalSprinklers || 0} sprinklers × {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} LPM/sprinkler
+                                                <div className="text-xs text-emerald-500 mt-1">
+                                                    Coverage: {(calculatedSprinklerSpecs.calculationDetails?.step3.totalSprinklers || 0) * (calculatedSprinklerSpecs.calculationDetails?.step4.sprinklerCoverageArea || 0)} m²
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded bg-emerald-900/40 p-3 text-slate-200 text-sm">{translations.loadingSprinklerSpecs}</div>
+                            )
                         )}
                     </div>
 
                     <div className="rounded-lg bg-rose-900/30 p-3">
-                        <div className="mb-2 font-semibold text-white">Main Pipe Selection</div>
-                        {pipeRecommendations ? (
-                            <div className="rounded bg-rose-900/40 p-3 text-slate-200 text-sm space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-rose-300">Recommended Size:</span>
-                                    <span className="font-semibold text-rose-400">
-                                        {pipeRecommendations.main.sizeMM}mm ({pipeRecommendations.main.sizeInch})
+                        <div className="mb-3 flex items-center justify-between">
+                            <div className="font-semibold text-white">{translations.mainPipeSelection}</div>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowPipeZoneDropdown(!showPipeZoneDropdown)}
+                                    className="rounded bg-rose-800 px-2 py-1 hover:bg-rose-700 flex items-center gap-1"
+                                >
+                                    <span className="text-xs">
+                                        {selectedPipeZoneId ? zones.find(z => z.id === selectedPipeZoneId)?.name || 'Select Zone' : 'Select Zone'}
                                     </span>
-                                </div>
-                                <div className="text-xs text-rose-300">
-                                    {pipeRecommendations.main.reason}
-                                </div>
-                                <div className="text-xs text-slate-400">
-                                    Total Flow Rate: {Math.round(sprinklerSpecs?.totalLPM || 0)} LPM
-                                </div>
+                                    <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
+                                </button>
+                                {showPipeZoneDropdown && (
+                                    <div className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-rose-600 bg-rose-800 shadow-lg">
+                                        {zones.map((zone) => (
+                                            <button
+                                                key={zone.id}
+                                                onClick={() => {
+                                                    setSelectedPipeZoneId(zone.id);
+                                                    setShowPipeZoneDropdown(false);
+                                                }}
+                                                className={`w-full px-3 py-2 text-left text-sm hover:bg-rose-700 ${
+                                                    selectedPipeZoneId === zone.id ? 'bg-rose-700' : ''
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div 
+                                                        className="h-3 w-3 rounded-full" 
+                                                        style={{ backgroundColor: zone.color }}
+                                                    ></div>
+                                                    {zone.name}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div className="rounded bg-rose-900/40 p-3 text-slate-200 text-sm">Loading pipe recommendations...</div>
+                        </div>
+                        {selectedPipeZoneId && (() => {
+                            const selectedZone = zones.find(z => z.id === selectedPipeZoneId);
+                            if (!selectedZone) return null;
+                            
+                            return (
+                                <div className="rounded bg-rose-900/40 p-3 text-slate-200 text-sm space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-rose-300">{translations.recommendedSize}:</span>
+                                        <span className="font-semibold text-rose-400">
+                                            {pipeRecommendations?.main.sizeMM}mm ({pipeRecommendations?.main.sizeInch})
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-rose-300">
+                                        {pipeRecommendations?.main.reason}
+                                    </div>
+                                    <div className="pt-2 border-t border-rose-800/50">
+                                        <div className="text-xs text-rose-300 mb-2">Zone Details:</div>
+                                        <div className="space-y-1 text-xs text-slate-300">
+                                            <div className="flex justify-between">
+                                                <span>Zone Flow Rate:</span>
+                                                <span className="text-rose-400 font-semibold">{Math.round(selectedZone.lpm || 0)} LPM</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Pipe Length:</span>
+                                                <span className="text-rose-400 font-semibold">{selectedZone.mainMeters?.toFixed(1) || '0.0'} m</span>
+                                            </div>
+                                            {selectedZone.mainOutlets !== undefined && selectedZone.mainOutlets > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>Outlets:</span>
+                                                    <span className="text-rose-400 font-semibold">{selectedZone.mainOutlets}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        {!selectedPipeZoneId && (
+                            <div className="rounded bg-rose-900/40 p-3 text-slate-200 text-sm">{translations.loadingPipeRecommendations}</div>
                         )}
                     </div>
 
                     <div className="rounded-lg bg-violet-900/30 p-3">
-                        <div className="mb-2 font-semibold text-white">Sub Main Pipe Selection</div>
-                        {pipeRecommendations ? (
-                            <div className="rounded bg-violet-900/40 p-3 text-slate-200 text-sm space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-violet-300">Recommended Size:</span>
-                                    <span className="font-semibold text-violet-400">
-                                        {pipeRecommendations.subMain.sizeMM}mm ({pipeRecommendations.subMain.sizeInch})
+                        <div className="mb-3 flex items-center justify-between">
+                            <div className="font-semibold text-white">{translations.subMainPipeSelection}</div>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowPipeZoneDropdown(!showPipeZoneDropdown)}
+                                    className="rounded bg-violet-800 px-2 py-1 hover:bg-violet-700 flex items-center gap-1"
+                                >
+                                    <span className="text-xs">
+                                        {selectedPipeZoneId ? zones.find(z => z.id === selectedPipeZoneId)?.name || 'Select Zone' : 'Select Zone'}
                                     </span>
-                                </div>
-                                <div className="text-xs text-violet-300">
-                                    {pipeRecommendations.subMain.reason}
-                                </div>
-                                <div className="text-xs text-slate-400">
-                                    Average Flow Rate per Zone: {Math.round((sprinklerSpecs?.totalLPM || 0) / Math.max(zones.length, 1))} LPM
-                                </div>
+                                    <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
+                                </button>
+                                {showPipeZoneDropdown && (
+                                    <div className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-violet-600 bg-violet-800 shadow-lg">
+                                        {zones.map((zone) => (
+                                            <button
+                                                key={zone.id}
+                                                onClick={() => {
+                                                    setSelectedPipeZoneId(zone.id);
+                                                    setShowPipeZoneDropdown(false);
+                                                }}
+                                                className={`w-full px-3 py-2 text-left text-sm hover:bg-violet-700 ${
+                                                    selectedPipeZoneId === zone.id ? 'bg-violet-700' : ''
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div 
+                                                        className="h-3 w-3 rounded-full" 
+                                                        style={{ backgroundColor: zone.color }}
+                                                    ></div>
+                                                    {zone.name}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div className="rounded bg-violet-900/40 p-3 text-slate-200 text-sm">Loading pipe recommendations...</div>
+                        </div>
+                        {selectedPipeZoneId && (() => {
+                            const selectedZone = zones.find(z => z.id === selectedPipeZoneId);
+                            if (!selectedZone) return null;
+                            
+                            return (
+                                <div className="rounded bg-violet-900/40 p-3 text-slate-200 text-sm space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-violet-300">{translations.recommendedSize}:</span>
+                                        <span className="font-semibold text-violet-400">
+                                            {pipeRecommendations?.subMain.sizeMM}mm ({pipeRecommendations?.subMain.sizeInch})
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-violet-300">
+                                        {pipeRecommendations?.subMain.reason}
+                                    </div>
+                                    <div className="pt-2 border-t border-violet-800/50">
+                                        <div className="text-xs text-violet-300 mb-2">Zone Details:</div>
+                                        <div className="space-y-1 text-xs text-slate-300">
+                                            <div className="flex justify-between">
+                                                <span>Zone Flow Rate:</span>
+                                                <span className="text-violet-400 font-semibold">{Math.round(selectedZone.lpm || 0)} LPM</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Pipe Length:</span>
+                                                <span className="text-violet-400 font-semibold">{selectedZone.subMainMeters?.toFixed(1) || '0.0'} m</span>
+                                            </div>
+                                            {selectedZone.subMainOutlets !== undefined && selectedZone.subMainOutlets > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>Outlets:</span>
+                                                    <span className="text-violet-400 font-semibold">{selectedZone.subMainOutlets}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        {!selectedPipeZoneId && (
+                            <div className="rounded bg-violet-900/40 p-3 text-slate-200 text-sm">{translations.loadingPipeRecommendations}</div>
                         )}
                     </div>
 
                     <div className="rounded-lg bg-amber-900/30 p-3">
-                        <div className="mb-2 font-semibold text-white">Lateral Pipe Selection</div>
-                        {pipeRecommendations ? (
-                            <div className="rounded bg-amber-900/40 p-3 text-slate-200 text-sm space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-amber-300">Recommended Size:</span>
-                                    <span className="font-semibold text-amber-400">
-                                        {pipeRecommendations.lateral.sizeMM}mm ({pipeRecommendations.lateral.sizeInch})
+                        <div className="mb-3 flex items-center justify-between">
+                            <div className="font-semibold text-white">{translations.lateralPipeSelection}</div>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowPipeZoneDropdown(!showPipeZoneDropdown)}
+                                    className="rounded bg-amber-800 px-2 py-1 hover:bg-amber-700 flex items-center gap-1"
+                                >
+                                    <span className="text-xs">
+                                        {selectedPipeZoneId ? zones.find(z => z.id === selectedPipeZoneId)?.name || 'Select Zone' : 'Select Zone'}
                                     </span>
-                                </div>
-                                <div className="text-xs text-amber-300">
-                                    {pipeRecommendations.lateral.reason}
-                                </div>
-                                <div className="text-xs text-slate-400">
-                                    Flow Rate per Sprinkler: {sprinklerSpecs?.flowRatePerMin || 0} LPM
-                                </div>
+                                    <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
+                                </button>
+                                {showPipeZoneDropdown && (
+                                    <div className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-amber-600 bg-amber-800 shadow-lg">
+                                        {zones.map((zone) => (
+                                            <button
+                                                key={zone.id}
+                                                onClick={() => {
+                                                    setSelectedPipeZoneId(zone.id);
+                                                    setShowPipeZoneDropdown(false);
+                                                }}
+                                                className={`w-full px-3 py-2 text-left text-sm hover:bg-amber-700 ${
+                                                    selectedPipeZoneId === zone.id ? 'bg-amber-700' : ''
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div 
+                                                        className="h-3 w-3 rounded-full" 
+                                                        style={{ backgroundColor: zone.color }}
+                                                    ></div>
+                                                    {zone.name}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div className="rounded bg-amber-900/40 p-3 text-slate-200 text-sm">Loading pipe recommendations...</div>
+                        </div>
+                        {selectedPipeZoneId && (() => {
+                            const selectedZone = zones.find(z => z.id === selectedPipeZoneId);
+                            if (!selectedZone) return null;
+                            
+                            return (
+                                <div className="rounded bg-amber-900/40 p-3 text-slate-200 text-sm space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-amber-300">{translations.recommendedSize}:</span>
+                                        <span className="font-semibold text-amber-400">
+                                            {pipeRecommendations?.lateral.sizeMM}mm ({pipeRecommendations?.lateral.sizeInch})
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-amber-300">
+                                        {pipeRecommendations?.lateral.reason}
+                                    </div>
+                                    <div className="pt-2 border-t border-amber-800/50">
+                                        <div className="text-xs text-amber-300 mb-2">Zone Details:</div>
+                                        <div className="space-y-1 text-xs text-slate-300">
+                                            <div className="flex justify-between">
+                                                <span>Zone Flow Rate:</span>
+                                                <span className="text-amber-400 font-semibold">{Math.round(selectedZone.lpm || 0)} LPM</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Pipe Length:</span>
+                                                <span className="text-amber-400 font-semibold">{selectedZone.lateralMeters?.toFixed(1) || '0.0'} m</span>
+                                            </div>
+                                            {selectedZone.lateralOutlets !== undefined && selectedZone.lateralOutlets > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>Outlets:</span>
+                                                    <span className="text-amber-400 font-semibold">{selectedZone.lateralOutlets}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between">
+                                                <span>Flow per Sprinkler:</span>
+                                                <span className="text-amber-400 font-semibold">{(sprinklerMode === 'preset' ? sprinklerSpecs?.flowRatePerMin : calculatedSprinklerSpecs?.flowRatePerMin) || 0} LPM</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        {!selectedPipeZoneId && (
+                            <div className="rounded bg-amber-900/40 p-3 text-slate-200 text-sm">{translations.loadingPipeRecommendations}</div>
                         )}
                     </div>
 
                     <div className="rounded-lg bg-sky-900/30 p-3">
-                        <div className="mb-2 font-semibold text-white">Pump Selection</div>
-                        {pumpRecommendations ? (
-                            <div className="rounded bg-sky-900/40 p-3 text-slate-200 text-sm space-y-2">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sky-300">Flow Rate:</span>
-                                        <span className="font-semibold text-sky-400">{pumpRecommendations.flowRate} LPM</span>
+                        <div className="mb-3 flex items-center justify-between">
+                            <div className="font-semibold text-white">{translations.pumpSelection}</div>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowPumpZoneDropdown(!showPumpZoneDropdown)}
+                                    className="rounded bg-sky-800 px-2 py-1 hover:bg-sky-700 flex items-center gap-1"
+                                >
+                                    <span className="text-xs">
+                                        {selectedPumpZoneId === 'all' ? 'All Zones' : 
+                                         selectedPumpZoneId === 'single' ? 'Single Zone (Highest Flow)' : 'Select Mode'}
+                                    </span>
+                                    <span>{showPumpZoneDropdown ? '▴' : '▾'}</span>
+                                </button>
+                                {showPumpZoneDropdown && (
+                                    <div className="absolute right-0 top-8 z-10 w-56 rounded-lg border border-sky-600 bg-sky-800 shadow-lg">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedPumpZoneId('all');
+                                                setShowPumpZoneDropdown(false);
+                                            }}
+                                            className={`w-full px-3 py-2 text-left text-sm hover:bg-sky-700 ${
+                                                selectedPumpZoneId === 'all' ? 'bg-sky-700' : ''
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-3 w-3 rounded-full bg-sky-400"></div>
+                                                All Zones
+                                            </div>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedPumpZoneId('single');
+                                                setShowPumpZoneDropdown(false);
+                                            }}
+                                            className={`w-full px-3 py-2 text-left text-sm hover:bg-sky-700 ${
+                                                selectedPumpZoneId === 'single' ? 'bg-sky-700' : ''
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-3 w-3 rounded-full bg-orange-400"></div>
+                                                Single Zone (Highest Flow)
+                                            </div>
+                                        </button>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sky-300">Head:</span>
-                                        <span className="font-semibold text-sky-400">{pumpRecommendations.head} m</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sky-300">Power:</span>
-                                        <span className="font-semibold text-sky-400">{pumpRecommendations.power} HP</span>
-                                    </div>
-                                </div>
-                                <div className="pt-2 border-t border-sky-800/50">
-                                    <div className="text-xs text-sky-300 mb-1">
-                                        {pumpRecommendations.reason}
-                                    </div>
-                                    <div className="text-xs text-sky-400">
-                                        {pumpRecommendations.specifications}
-                                    </div>
-                                </div>
-                                <div className="pt-2 border-t border-sky-800/50">
-                                    <div className="text-xs text-slate-400">
-                                        Water Pressure: {sprinklerSpecs?.waterPressure || 0} Bar
-                                    </div>
-                                </div>
+                                )}
                             </div>
-                        ) : (
-                            <div className="rounded bg-sky-900/40 p-3 text-slate-200 text-sm">Loading pump recommendations...</div>
+                        </div>
+                        {selectedPumpZoneId && (() => {
+                            const isAllZones = selectedPumpZoneId === 'all';
+                            const selectedZone = isAllZones ? null : findHighestFlowRateZone(zones);
+                            
+                            return (
+                                <div className="rounded bg-sky-900/40 p-3 text-slate-200 text-sm space-y-2">
+                                    {isAllZones ? (
+                                        // All Zones View
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sky-300">{translations.flowRateProduct}:</span>
+                                                    <span className="font-semibold text-sky-400">{pumpRecommendations?.flowRate} LPM</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sky-300">{translations.headProduct}:</span>
+                                                    <span className="font-semibold text-sky-400">{pumpRecommendations?.head} m</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sky-300">{translations.powerProduct}:</span>
+                                                    <span className="font-semibold text-sky-400">{pumpRecommendations?.power} HP</span>
+                                                </div>
+                                            </div>
+                                            <div className="pt-2 border-t border-sky-800/50">
+                                                <div className="text-xs text-sky-300 mb-1">
+                                                    {pumpRecommendations?.reason}
+                                                </div>
+                                                <div className="text-xs text-sky-400">
+                                                    {pumpRecommendations?.specifications}
+                                                </div>
+                                            </div>
+                                            <div className="pt-2 border-t border-sky-800/50">
+                                                <div className="text-xs text-sky-300 mb-2">System Overview:</div>
+                                                <div className="space-y-1 text-xs text-slate-300">
+                                                    <div className="flex justify-between">
+                                                        <span>Total Zones:</span>
+                                                        <span className="text-sky-400 font-semibold">{zones.length}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Total Flow Rate:</span>
+                                                        <span className="text-sky-400 font-semibold">{Math.round((sprinklerMode === 'preset' ? sprinklerSpecs?.totalLPM : calculatedSprinklerSpecs?.totalLPM) || 0)} LPM</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Water Pressure:</span>
+                                                        <span className="text-sky-400 font-semibold">{(sprinklerMode === 'preset' ? sprinklerSpecs?.waterPressure : calculatedSprinklerSpecs?.waterPressure) || 0} Bar</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : selectedZone ? (
+                                        // Single Zone View (Highest Flow Rate Zone)
+                                        <>
+                                            <div className="flex items-center gap-2 text-xs text-orange-400 mb-2">
+                                                <span className="h-2 w-2 rounded-full bg-orange-400"></span>
+                                                <span>Calculated based on highest flow rate zone: <strong>{selectedZone.name}</strong></span>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sky-300">{translations.flowRateProduct}:</span>
+                                                    <span className="font-semibold text-sky-400">{Math.round(selectedZone.lpm || 0)} LPM</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sky-300">{translations.headProduct}:</span>
+                                                    <span className="font-semibold text-sky-400">{pumpRecommendations?.head} m</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sky-300">{translations.powerProduct}:</span>
+                                                    <span className="font-semibold text-sky-400">{pumpRecommendations?.power} HP</span>
+                                                </div>
+                                            </div>
+                                            <div className="pt-2 border-t border-sky-800/50">
+                                                <div className="text-xs text-sky-300 mb-1">
+                                                    {pumpRecommendations?.reason}
+                                                </div>
+                                                <div className="text-xs text-sky-400">
+                                                    {pumpRecommendations?.specifications}
+                                                </div>
+                                            </div>
+                                            <div className="pt-2 border-t border-sky-800/50">
+                                                <div className="text-xs text-sky-300 mb-2">Highest Flow Zone Details:</div>
+                                                <div className="space-y-1 text-xs text-slate-300">
+                                                    <div className="flex justify-between">
+                                                        <span>Zone Name:</span>
+                                                        <span className="text-sky-400 font-semibold">{selectedZone.name}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Zone Flow Rate:</span>
+                                                        <span className="text-sky-400 font-semibold">{Math.round(selectedZone.lpm || 0)} LPM</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Zone Area:</span>
+                                                        <span className="text-sky-400 font-semibold">{selectedZone.area?.toFixed(2) || '0.00'} Rai</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Plants in Zone:</span>
+                                                        <span className="text-sky-400 font-semibold">{selectedZone.plants || 0}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Water Pressure:</span>
+                                                        <span className="text-sky-400 font-semibold">{(sprinklerMode === 'preset' ? sprinklerSpecs?.waterPressure : calculatedSprinklerSpecs?.waterPressure) || 0} Bar</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : null}
+                                </div>
+                            );
+                        })()}
+                        {!selectedPumpZoneId && (
+                            <div className="rounded bg-sky-900/40 p-3 text-slate-200 text-sm">{translations.loadingPumpRecommendations}</div>
                         )}
                     </div>
                 </div>
 
                 {/* Footer actions */}
                 <div className="mt-4 flex items-center gap-3">
-                    <button onClick={handleBack} className="rounded-lg bg-slate-600 px-6 py-3 font-medium text-white hover:bg-slate-500">Back</button>
-                    <div className="ml-auto flex items-center gap-3">
-                        <div className="rounded-lg bg-emerald-700 px-4 py-3 text-right text-white">
-                            <div className="text-xs">Total Price</div>
-                            <div className="text-lg font-bold">12,115 Bath</div>
-                        </div>
-                        <button onClick={handleCheckout} className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700">Checkout</button>
+                    <button onClick={handleBack} className="rounded-lg bg-slate-600 px-6 py-3 font-medium text-white hover:bg-slate-500">{translations.back}</button>
+                    <div className="ml-auto">
+                        <button onClick={handleCheckout} className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700">{translations.checkout}</button>
                     </div>
                 </div>
-                <div className="mt-1 text-[10px] text-sky-300">// use price data from database</div>
             </div>
         </div>
     );
