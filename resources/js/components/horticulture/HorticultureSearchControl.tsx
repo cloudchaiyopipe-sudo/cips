@@ -608,7 +608,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
     if (!isGoogleMapsReady) {
         return (
-            <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
+            <div className="enhanced-search-container absolute left-4 top-4 z-[0] w-[420px] max-w-[calc(100vw-2rem)]">
                 <div className="rounded-lg border border-gray-600 bg-gray-900/95 p-3 text-sm text-white shadow-xl backdrop-blur">
                     <div className="flex items-center gap-2">
                         <FaSpinner className="h-4 w-4 animate-spin text-gray-400" />
@@ -620,7 +620,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     }
 
     return (
-        <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
+        <div className="enhanced-search-container absolute left-4 top-4 z-[0] w-[350px] max-w-[calc(100vw-2rem)]">
             <div className="relative">
                 <div className="relative">
                     <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400" />

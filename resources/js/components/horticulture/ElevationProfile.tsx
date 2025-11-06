@@ -690,13 +690,6 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({
                             </div>
                             
                             <div className="space-y-3">
-                                {/* Current data range display */}
-                                <div className="text-xs text-gray-600 bg-white p-2 rounded border">
-                                    <div className="font-medium mb-1">{t('ข้อมูลจริง:') || 'ข้อมูลจริง:'}</div>
-                                    <div>ต่ำสุด: {profileData.minElevation.toFixed(1)} m</div>
-                                    <div>สูงสุด: {profileData.maxElevation.toFixed(1)} m</div>
-                                </div>
-                                
                                 {/* Custom range inputs */}
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>

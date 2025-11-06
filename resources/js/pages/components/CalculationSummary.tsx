@@ -468,7 +468,21 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 horticulturePipeHeadLoss = actualHeadLoss.total;
             }
             
-            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss;
+            // เพิ่ม static head (ความสูงจากปั๊มไปจุดสูงสุด) จาก localStorage
+            let staticHeadM = input.staticHeadM || 0;
+            try {
+                const stored = localStorage.getItem('horticulture_elevation_diff_m');
+                if (stored !== null) {
+                    const value = parseFloat(stored);
+                    if (isFinite(value)) {
+                        staticHeadM = value;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error reading elevation difference from localStorage:', error);
+            }
+            
+            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
             
             
             return totalPumpHead;
@@ -583,7 +597,21 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 horticulturePipeHeadLoss = actualHeadLoss.total;
             }
             
-            return horticulturePipeHeadLoss + horticultureSprinklerHeadLoss;
+            // เพิ่ม static head (ความสูงจากปั๊มไปจุดสูงสุด) จาก localStorage
+            let staticHeadM = input.staticHeadM || 0;
+            try {
+                const stored = localStorage.getItem('horticulture_elevation_diff_m');
+                if (stored !== null) {
+                    const value = parseFloat(stored);
+                    if (isFinite(value)) {
+                        staticHeadM = value;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error reading elevation difference from localStorage:', error);
+            }
+            
+            return horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
         } else if (projectMode === 'garden') {
             let gardenSprinklerHeadLoss = 2.5 * 10; // default fallback
             
@@ -1033,13 +1061,13 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
                     {showPump && (
                         <div className="text-center">
-                            <p className="text-purple-200">{t('Pump Head')}</p>
+                            <p className="text-purple-50">{t('Pump Head')}</p>
                             <p className="text-xl font-bold text-orange-300">
                                 {(() => {
                                     return (actualPumpHead + (actualPumpHead * 0.1)).toFixed(1);
                                 })()} m
                             </p>
-                            (+ 10%)
+                            <p className="text-xs text-purple-100">(+ 10% + ความสูงจากปั๊มไปจุดสูงสุด)</p>
                         </div>
                     )}
                     <div className="text-center">

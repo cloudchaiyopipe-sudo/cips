@@ -438,23 +438,21 @@ export function validatePipeSizeHierarchy(
 
     switch (pipeType) {
         case 'main': {
-            return currentSizeMM > Math.max(secondarySize, branchSize, emitterSize);
+            return currentSizeMM >= Math.max(secondarySize, branchSize, emitterSize);
         }
 
         case 'secondary': {
-            const isSmaller = mainSize === 0 || currentSizeMM < mainSize;
-            const isLarger = currentSizeMM > Math.max(branchSize, emitterSize);
+            const isSmaller = mainSize === 0 || currentSizeMM <= mainSize;
+            const isLarger = currentSizeMM >= Math.max(branchSize, emitterSize);
             return isSmaller && isLarger;
         }
 
         case 'branch':
         case 'emitter': {   
-            const maxAllowed = 32;
-            const isBelowLimit = currentSizeMM <= maxAllowed;
             const hasLargerPipes = mainSize > 0 || secondarySize > 0;
             const isSmallerThanLargerPipes = !hasLargerPipes || 
-                currentSizeMM < Math.max(mainSize || 0, secondarySize || 0);
-            return isBelowLimit && isSmallerThanLargerPipes;
+                currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
+            return isSmallerThanLargerPipes;
         }
 
         default:
@@ -490,21 +488,8 @@ export function selectBestPipeByHeadLoss(
     });
 
     if (!validPipes.length) {
-        const fallbackPipes = availablePipes.filter((pipe) => {
-            if (pipeType === 'branch') {
-                return pipe.sizeMM <= 50;
-            }
-            if (pipeType === 'emitter') {
-                return pipe.sizeMM <= 32;
-            }
-            return true;
-        });
-
-        return fallbackPipes.length > 0
-            ? fallbackPipes.reduce((smallest, current) =>
-                  current.sizeMM < smallest.sizeMM ? current : smallest
-              )
-            : null;
+        // ถ้าไม่มีท่อที่ผ่าน hierarchy validation ให้ return null
+        return null;
     }
 
     let targetHeadLossValue: number;
@@ -513,20 +498,20 @@ export function selectBestPipeByHeadLoss(
     switch (pipeType) {
         case 'main':
             targetHeadLossValue = head20Percent;
-            isMaxLimitMode = true; 
+            isMaxLimitMode = true; // ห้ามเกิน head20Percent และให้เลือกตัวที่ใกล้เคียงที่สุด
             break;
         case 'secondary':
-            targetHeadLossValue = head20Percent * 0.6; 
-            isMaxLimitMode = false; 
+            targetHeadLossValue = head20Percent * 0.6; // ใกล้เคียง 60% ของ head20Percent
+            isMaxLimitMode = true; // ห้ามเกิน head20Percent
             break;
         case 'branch':
         case 'emitter':
-            targetHeadLossValue = head20Percent * 0.4; 
-            isMaxLimitMode = false; 
+            targetHeadLossValue = head20Percent * 0.4; // ใกล้เคียง 40% ของ head20Percent
+            isMaxLimitMode = true; // ห้ามเกิน head20Percent
             break;
         default:
             targetHeadLossValue = head20Percent * 0.4;
-            isMaxLimitMode = false;
+            isMaxLimitMode = true;
     }
 
     const candidates: Array<{ pipe: any; headLoss: number; calculation: any }> = [];
@@ -557,16 +542,25 @@ export function selectBestPipeByHeadLoss(
     let bestCandidates: Array<{ pipe: any; headLoss: number; calculation: any }>;
 
     if (isMaxLimitMode) {
-        const validCandidates = candidates.filter((c) => c.headLoss <= targetHeadLossValue);
+        // ห้ามเกิน head20Percent สำหรับทุกประเภท
+        const maxAllowed = pipeType === 'main' ? head20Percent : head20Percent;
+        const validCandidates = candidates.filter((c) => c.headLoss <= maxAllowed);
 
         if (validCandidates.length > 0) {
-            bestCandidates = validCandidates;
-        } else {
+            // เลือกที่ใกล้เคียง targetHeadLossValue มากที่สุด
             const minDiff = Math.min(
-                ...candidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
+                ...validCandidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
+            );
+            bestCandidates = validCandidates.filter(
+                (c) => Math.abs(c.headLoss - targetHeadLossValue) === minDiff
+            );
+        } else {
+            // ถ้าไม่มีท่อที่ผ่านเกณฑ์ maxAllowed ให้เลือกที่ใกล้เคียง head20Percent มากที่สุด
+            const minDiff = Math.min(
+                ...candidates.map((c) => Math.abs(c.headLoss - head20Percent))
             );
             bestCandidates = candidates.filter(
-                (c) => Math.abs(c.headLoss - targetHeadLossValue) === minDiff
+                (c) => Math.abs(c.headLoss - head20Percent) === minDiff
             );
         }
     } else {

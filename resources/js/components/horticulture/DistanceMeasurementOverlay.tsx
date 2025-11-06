@@ -184,7 +184,7 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         const ne = bounds.getNorthEast();
                         const sw = bounds.getSouthWest();
                         
-                        // Calculate lat/lng from screen coordinates
+                        // Calculate lat/lng from screen coordinates (corrected)
                         const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / clickRect.height);
                         const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / clickRect.width);
                         
@@ -338,7 +338,7 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         const ne = bounds.getNorthEast();
                         const sw = bounds.getSouthWest();
                         
-                        // Calculate lat/lng from screen coordinates with proper bounds
+                        // Calculate lat/lng from screen coordinates with proper bounds (corrected)
                         const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / moveRect.height);
                         const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / moveRect.width);
                         

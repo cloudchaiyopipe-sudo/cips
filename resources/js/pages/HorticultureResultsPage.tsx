@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 interface LocalCoordinate {
     lat: number;
@@ -96,15 +96,15 @@ const calculateDistance = (
     coord1: { lat: number; lng: number },
     coord2: { lat: number; lng: number }
 ): number => {
-    const R = 6371000; 
+    const R = 6371000;
     const dLat = ((coord2.lat - coord1.lat) * Math.PI) / 180;
     const dLng = ((coord2.lng - coord1.lng) * Math.PI) / 180;
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos((coord1.lat * Math.PI) / 180) *
-            Math.cos((coord2.lat * Math.PI) / 180) *
-            Math.sin(dLng / 2) *
-            Math.sin(dLng / 2);
+        Math.cos((coord2.lat * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 };
@@ -244,7 +244,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                 fillColor: '#22C55E',
                 fillOpacity: 0.1,
                 strokeColor: '#22C55E',
-                strokeWeight: 3, 
+                strokeWeight: 3,
                 clickable: true,
             });
             mainAreaPolygon.setMap(map);
@@ -260,7 +260,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                 fillColor: exclusionColor,
                 fillOpacity: 0.4,
                 strokeColor: exclusionColor,
-                strokeWeight: 2, 
+                strokeWeight: 2,
                 clickable: true,
             });
             exclusionPolygon.setMap(map);
@@ -282,9 +282,9 @@ const GoogleMapsResultsOverlays: React.FC<{
                 fillColor: zoneColor,
                 fillOpacity: 0.3,
                 strokeColor: zoneColor,
-                strokeWeight: 2, 
+                strokeWeight: 2,
                 clickable: true,
-                zIndex: 50, 
+                zIndex: 50,
             });
             zonePolygon.setMap(map);
             overlaysRef.current.polygons.set(zone.id, zonePolygon);
@@ -307,7 +307,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                 map: map,
                 icon: {
                     url: '/images/water-pump.png',
-                    scaledSize: new google.maps.Size(32 * iconSize, 32 * iconSize), 
+                    scaledSize: new google.maps.Size(32 * iconSize, 32 * iconSize),
                     anchor: new google.maps.Point(16 * iconSize, 16 * iconSize),
                 },
                 title: 'ปั๊มน้ำ',
@@ -319,7 +319,7 @@ const GoogleMapsResultsOverlays: React.FC<{
             const mainPipePolyline = new google.maps.Polyline({
                 path: pipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                 strokeColor: '#FF0000',
-                strokeWeight: 5 * pipeSize, 
+                strokeWeight: 5 * pipeSize,
                 strokeOpacity: 0.9,
             });
             mainPipePolyline.setMap(map);
@@ -330,7 +330,7 @@ const GoogleMapsResultsOverlays: React.FC<{
             const subMainPolyline = new google.maps.Polyline({
                 path: subMainPipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                 strokeColor: '#8B5CF6',
-                strokeWeight: 2 * pipeSize, 
+                strokeWeight: 2 * pipeSize,
                 strokeOpacity: 0.9,
             });
             subMainPolyline.setMap(map);
@@ -355,11 +355,11 @@ const GoogleMapsResultsOverlays: React.FC<{
             const irrigationZonePolygon = new google.maps.Polygon({
                 paths: zone.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                 fillColor: zone.color,
-                fillOpacity: 0.3, 
+                fillOpacity: 0.3,
                 strokeColor: zone.color,
-                strokeWeight: 2, 
+                strokeWeight: 2,
                 clickable: true,
-                zIndex: 50, 
+                zIndex: 50,
             });
             irrigationZonePolygon.setMap(map);
             overlaysRef.current.polygons.set(`irrigation-zone-${zone.id}`, irrigationZonePolygon);
@@ -379,7 +379,7 @@ const GoogleMapsResultsOverlays: React.FC<{
         lateralPipes?.forEach((lateralPipe) => {
             const lateralPolyline = new google.maps.Polyline({
                 path: lateralPipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                strokeColor: '#FFD700', 
+                strokeColor: '#FFD700',
                 strokeWeight: 2 * pipeSize,
                 strokeOpacity: 0.9,
             });
@@ -398,10 +398,10 @@ const GoogleMapsResultsOverlays: React.FC<{
                 );
                 const subMainZone = connectedSubMain
                     ? findPipeZoneImproved(
-                          connectedSubMain,
-                          projectData.zones || [],
-                          irrigationZones
-                      )
+                        connectedSubMain,
+                        projectData.zones || [],
+                        irrigationZones
+                    )
                     : null;
 
                 if (
@@ -418,11 +418,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 3, 
+                            scale: 3,
                             fillColor: '#FF6B6B',
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
-                            strokeWeight: 2, 
+                            strokeWeight: 2,
                         },
                         zIndex: 2000,
                         title: `จุดเชื่อมต่อท่อย่อย: ${lateralPipe.id}`,
@@ -461,9 +461,9 @@ const GoogleMapsResultsOverlays: React.FC<{
                             lat: coord.lat,
                             lng: coord.lng,
                         })),
-                        strokeColor: '#FFB347', 
-                        strokeWeight: 2 * pipeSize, 
-                        strokeOpacity: 0.8, 
+                        strokeColor: '#FFB347',
+                        strokeWeight: 2 * pipeSize,
+                        strokeOpacity: 0.8,
                     });
                     emitterPolyline.setMap(map);
                     overlaysRef.current.polylines.set(`emitter-${emitterLine.id}`, emitterPolyline);
@@ -476,7 +476,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                             map: map,
                             icon: {
                                 path: google.maps.SymbolPath.CIRCLE,
-                                scale: 3, 
+                                scale: 3,
                                 fillColor: '#FFB347',
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
@@ -510,11 +510,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4, 
-                        fillColor: '#DC2626', 
+                        scale: 4,
+                        fillColor: '#DC2626',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2, 
+                        strokeWeight: 2,
                     },
                     zIndex: 2001,
                     title: `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`,
@@ -554,11 +554,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4, 
-                        fillColor: '#3B82F6', 
+                        scale: 4,
+                        fillColor: '#3B82F6',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2, 
+                        strokeWeight: 2,
                     },
                     zIndex: 2001,
                     title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`,
@@ -591,7 +591,7 @@ const GoogleMapsResultsOverlays: React.FC<{
             const midConnections = findMidConnections(
                 projectData.subMainPipes,
                 projectData.mainPipes,
-                20, 
+                20,
                 projectData.zones,
                 irrigationZones
             );
@@ -605,11 +605,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4, 
-                        fillColor: '#8B5CF6', 
+                        scale: 4,
+                        fillColor: '#8B5CF6',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2, 
+                        strokeWeight: 2,
                     },
                     zIndex: 2004,
                     title: `จุดเชื่อมท่อเมนรอง → กลางท่อเมน`,
@@ -644,7 +644,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                 lateralPipes,
                 projectData.zones,
                 irrigationZones,
-                20 
+                20
             );
 
             subMainToLateralConnections.forEach((connection, index) => {
@@ -656,11 +656,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3, 
-                        fillColor: '#F59E0B', 
+                        scale: 3,
+                        fillColor: '#F59E0B',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 1.5, 
+                        strokeWeight: 1.5,
                     },
                     zIndex: 2002,
                     title: `จุดเชื่อมต่อท่อเมนรอง → ท่อย่อย`,
@@ -706,11 +706,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4, 
-                        fillColor: '#3B82F6', 
+                        scale: 4,
+                        fillColor: '#3B82F6',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2, 
+                        strokeWeight: 2,
                     },
                     zIndex: 2003,
                     title: `จุดตัดท่อเมนรอง ↔ ท่อเมน`,
@@ -756,8 +756,8 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3, 
-                        fillColor: '#10B981', 
+                        scale: 3,
+                        fillColor: '#10B981',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
                         strokeWeight: 1.5,
@@ -804,10 +804,10 @@ const GoogleMapsResultsOverlays: React.FC<{
                             <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${10 * iconSize}" font-weight="bold">${plantSymbol}</text>
                         </svg>
                     `),
-                    scaledSize: new google.maps.Size(28 * iconSize, 28 * iconSize), 
+                    scaledSize: new google.maps.Size(28 * iconSize, 28 * iconSize),
                     anchor: new google.maps.Point(14 * iconSize, 14 * iconSize),
                 },
-                zIndex: 500, 
+                zIndex: 500,
                 title: `${plant.plantData.name} (${plant.id})`,
             });
             overlaysRef.current.markers.set(plant.id, plantMarker);
@@ -853,8 +853,8 @@ const generateEmitterLinesForExistingPipes = (
         const distance =
             Math.sqrt(
                 Math.pow(closestPointOnLateral.lat - plant.position.lat, 2) +
-                    Math.pow(closestPointOnLateral.lng - plant.position.lng, 2)
-            ) * 111320; 
+                Math.pow(closestPointOnLateral.lng - plant.position.lng, 2)
+            ) * 111320;
 
         if (distance <= 15) {
             const emitterLine = {
@@ -945,6 +945,36 @@ function EnhancedHorticultureResultsPageContent() {
 
     const mapRef = useRef<google.maps.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
+    const elevationServiceRef = useRef<google.maps.ElevationService | null>(null);
+
+    const [pumpElevation, setPumpElevation] = useState<number | null>(null);
+    const [highestPlantElevation, setHighestPlantElevation] = useState<number | null>(null);
+    const [, setHighestPlantInfo] = useState<{ id: string; lat: number; lng: number } | null>(null);
+    const [pumpGroundOffset, setPumpGroundOffset] = useState<number>(0);
+
+    const displayedPumpElevation = useMemo(() => {
+        if (pumpElevation == null) return null;
+        return pumpElevation + (isFinite(pumpGroundOffset) ? pumpGroundOffset : 0);
+    }, [pumpElevation, pumpGroundOffset]);
+
+    const elevationDiff = useMemo(() => {
+        if (displayedPumpElevation == null || highestPlantElevation == null) return null;
+        // positive if plant higher, negative if pump higher
+        return parseFloat((highestPlantElevation - displayedPumpElevation).toFixed(2));
+    }, [displayedPumpElevation, highestPlantElevation]);
+
+    // Persist elevation difference for use in InputForm (keep negative values as-is)
+    useEffect(() => {
+        try {
+            if (elevationDiff == null || !isFinite(elevationDiff)) {
+                localStorage.removeItem('horticulture_elevation_diff_m');
+            } else {
+                localStorage.setItem('horticulture_elevation_diff_m', String(elevationDiff));
+            }
+        } catch (error) {
+            console.warn('Unable to persist elevation difference:', error);
+        }
+    }, [elevationDiff]);
 
     useEffect(() => {
         try {
@@ -966,7 +996,7 @@ function EnhancedHorticultureResultsPageContent() {
                             lateralPipe.totalFlowRate || (lateralPipe.plants?.length || 0) * 2.5,
                         connectionPoint: lateralPipe.connectionPoint ||
                             lateralPipe.coordinates?.[0] || { lat: 0, lng: 0 },
-                        emitterLines: lateralPipe.emitterLines || [], 
+                        emitterLines: lateralPipe.emitterLines || [],
                     }));
                 }
 
@@ -987,7 +1017,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 plant.position,
                                                 coord
                                             );
-                                            return distance <= 15; 
+                                            return distance <= 15;
                                         });
                                     });
                                 }
@@ -1148,6 +1178,81 @@ function EnhancedHorticultureResultsPageContent() {
         []
     );
 
+    // Initialize ElevationService when map is ready
+    useEffect(() => {
+        if (mapLoaded && mapRef.current && window.google?.maps?.ElevationService) {
+            elevationServiceRef.current = new google.maps.ElevationService();
+        }
+    }, [mapLoaded]);
+
+    // Compute pump elevation and highest plant elevation
+    useEffect(() => {
+        const svc = elevationServiceRef.current;
+        if (!svc || !projectData) return;
+
+        // 1) Pump elevation
+        const pumpPos = projectData.pump?.position;
+        if (pumpPos) {
+            const pumpLatLng = new google.maps.LatLng(pumpPos.lat, pumpPos.lng);
+            svc.getElevationForLocations({ locations: [pumpLatLng] }, (results, status) => {
+                if (status === google.maps.ElevationStatus.OK && results && results[0]) {
+                    const elev = results[0].elevation || 0;
+                    setPumpElevation(parseFloat(elev.toFixed(2)));
+                }
+            });
+        } else {
+            setPumpElevation(null);
+        }
+
+        // 2) Highest plant elevation
+        const plants = projectData.plants || [];
+        if (!plants.length) {
+            setHighestPlantElevation(null);
+            setHighestPlantInfo(null);
+            return;
+        }
+
+        // Batch requests to respect API limits
+        const chunkSize = 200;
+        const chunks: { latLngs: google.maps.LatLng[]; plants: typeof plants }[] = [];
+        for (let i = 0; i < plants.length; i += chunkSize) {
+            const slice = plants.slice(i, i + chunkSize);
+            const latLngs = slice.map((p) => new google.maps.LatLng(p.position.lat, p.position.lng));
+            chunks.push({ latLngs, plants: slice });
+        }
+
+        let globalMax = -Infinity;
+        let globalPlant: { id: string; lat: number; lng: number } | null = null;
+        let completed = 0;
+
+        chunks.forEach((chunk) => {
+            svc.getElevationForLocations({ locations: chunk.latLngs }, (results, status) => {
+                if (status === google.maps.ElevationStatus.OK && results) {
+                    results.forEach((r, idx) => {
+                        const elev = (r?.elevation ?? 0);
+                        if (elev > globalMax) {
+                            globalMax = elev;
+                            const plant = chunk.plants[idx];
+                            if (plant) {
+                                globalPlant = { id: plant.id, lat: plant.position.lat, lng: plant.position.lng };
+                            }
+                        }
+                    });
+                }
+                completed += 1;
+                if (completed === chunks.length) {
+                    if (isFinite(globalMax)) {
+                        setHighestPlantElevation(parseFloat(globalMax.toFixed(2)));
+                        setHighestPlantInfo(globalPlant);
+                    } else {
+                        setHighestPlantElevation(null);
+                        setHighestPlantInfo(null);
+                    }
+                }
+            });
+        });
+    }, [projectData, mapLoaded]);
+
     const handleSprinklerConfigSave = () => {
         const sprinklerConfig = loadSprinklerConfig();
         if (sprinklerConfig) {
@@ -1287,210 +1392,210 @@ function EnhancedHorticultureResultsPageContent() {
                         zones:
                             irrigationZones && irrigationZones.length > 0
                                 ? irrigationZones.map((zone: IrrigationZoneExtended) => {
-                                      const zoneData = projectSummary?.zoneDetails?.find(
-                                          (z: { zoneId: string }) => z.zoneId === zone.id
-                                      );
-                                      const plantCount = zone.plants ? zone.plants.length : 0;
-                                      const waterNeedPerMinute = calculateTotalFlowRate(
-                                          plantCount,
-                                          enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
-                                      );
-                                      const waterPerTree =
-                                          plantCount > 0 ? zone.totalWaterNeed / plantCount : 0;
+                                    const zoneData = projectSummary?.zoneDetails?.find(
+                                        (z: { zoneId: string }) => z.zoneId === zone.id
+                                    );
+                                    const plantCount = zone.plants ? zone.plants.length : 0;
+                                    const waterNeedPerMinute = calculateTotalFlowRate(
+                                        plantCount,
+                                        enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
+                                    );
+                                    const waterPerTree =
+                                        plantCount > 0 ? zone.totalWaterNeed / plantCount : 0;
 
-                                      const bestMainPipe = findBestMainPipeInZone(
-                                          zone.id,
-                                          projectData,
-                                          irrigationZones,
-                                          sprinklerConfig
-                                      );
-                                      const bestSubMainPipe = findBestSubMainPipeInZone(
-                                          zone.id,
-                                          projectData,
-                                          irrigationZones,
-                                          sprinklerConfig
-                                      );
-                                      const bestBranchPipe = findBestBranchPipeInZone(
-                                          zone.id,
-                                          projectData,
-                                          irrigationZones,
-                                          sprinklerConfig
-                                      );
+                                    const bestMainPipe = findBestMainPipeInZone(
+                                        zone.id,
+                                        projectData,
+                                        irrigationZones,
+                                        sprinklerConfig
+                                    );
+                                    const bestSubMainPipe = findBestSubMainPipeInZone(
+                                        zone.id,
+                                        projectData,
+                                        irrigationZones,
+                                        sprinklerConfig
+                                    );
+                                    const bestBranchPipe = findBestBranchPipeInZone(
+                                        zone.id,
+                                        projectData,
+                                        irrigationZones,
+                                        sprinklerConfig
+                                    );
 
-                                      const calculatePolygonArea = (
-                                          coords: { lat: number; lng: number }[]
-                                      ): number => {
-                                          if (!coords || coords.length < 3) return 0;
+                                    const calculatePolygonArea = (
+                                        coords: { lat: number; lng: number }[]
+                                    ): number => {
+                                        if (!coords || coords.length < 3) return 0;
 
-                                          let area = 0;
-                                          for (let i = 0; i < coords.length; i++) {
-                                              const j = (i + 1) % coords.length;
-                                              area += coords[i].lat * coords[j].lng;
-                                              area -= coords[j].lat * coords[i].lng;
-                                          }
-                                          area = Math.abs(area) / 2;
+                                        let area = 0;
+                                        for (let i = 0; i < coords.length; i++) {
+                                            const j = (i + 1) % coords.length;
+                                            area += coords[i].lat * coords[j].lng;
+                                            area -= coords[j].lat * coords[i].lng;
+                                        }
+                                        area = Math.abs(area) / 2;
 
-                                          const metersPerDegree = 111320; 
-                                          return area * metersPerDegree * metersPerDegree;
-                                      };
+                                        const metersPerDegree = 111320;
+                                        return area * metersPerDegree * metersPerDegree;
+                                    };
 
-                                      const areaInSquareMeters =
-                                          zone.area || calculatePolygonArea(zone.coordinates);
+                                    const areaInSquareMeters =
+                                        zone.area || calculatePolygonArea(zone.coordinates);
 
-                                      return {
-                                          id: zone.id,
-                                          name: zone.name,
-                                          plantCount: plantCount,
-                                          totalWaterNeed: zone.totalWaterNeed || 0,
-                                          waterPerTree: waterPerTree,
-                                          waterNeedPerMinute: waterNeedPerMinute,
-                                          area: areaInSquareMeters,
-                                          color: zone.color,
-                                          pipes: zoneData
-                                              ? {
-                                                    mainPipes: {
-                                                        count: zoneData.mainPipesInZone?.count || 0,
-                                                        totalLength:
-                                                            zoneData.mainPipesInZone?.totalLength ||
-                                                            0,
-                                                        longest:
-                                                            zoneData.mainPipesInZone?.longest || 0,
-                                                    },
-                                                    subMainPipes: {
+                                    return {
+                                        id: zone.id,
+                                        name: zone.name,
+                                        plantCount: plantCount,
+                                        totalWaterNeed: zone.totalWaterNeed || 0,
+                                        waterPerTree: waterPerTree,
+                                        waterNeedPerMinute: waterNeedPerMinute,
+                                        area: areaInSquareMeters,
+                                        color: zone.color,
+                                        pipes: zoneData
+                                            ? {
+                                                mainPipes: {
+                                                    count: zoneData.mainPipesInZone?.count || 0,
+                                                    totalLength:
+                                                        zoneData.mainPipesInZone?.totalLength ||
+                                                        0,
+                                                    longest:
+                                                        zoneData.mainPipesInZone?.longest || 0,
+                                                },
+                                                subMainPipes: {
+                                                    count:
+                                                        zoneData.subMainPipesInZone?.count || 0,
+                                                    totalLength:
+                                                        zoneData.subMainPipesInZone
+                                                            ?.totalLength || 0,
+                                                    longest:
+                                                        zoneData.subMainPipesInZone?.longest ||
+                                                        0,
+                                                },
+                                                branchPipes: {
+                                                    count:
+                                                        zoneData.branchPipesInZone?.count || 0,
+                                                    totalLength:
+                                                        zoneData.branchPipesInZone
+                                                            ?.totalLength || 0,
+                                                    longest:
+                                                        zoneData.branchPipesInZone?.longest ||
+                                                        0,
+                                                },
+                                                emitterPipes: zoneData.emitterPipesInZone
+                                                    ? {
                                                         count:
-                                                            zoneData.subMainPipesInZone?.count || 0,
+                                                            zoneData.emitterPipesInZone
+                                                                .count || 0,
                                                         totalLength:
-                                                            zoneData.subMainPipesInZone
-                                                                ?.totalLength || 0,
+                                                            zoneData.emitterPipesInZone
+                                                                .totalLength || 0,
                                                         longest:
-                                                            zoneData.subMainPipesInZone?.longest ||
-                                                            0,
-                                                    },
-                                                    branchPipes: {
-                                                        count:
-                                                            zoneData.branchPipesInZone?.count || 0,
-                                                        totalLength:
-                                                            zoneData.branchPipesInZone
-                                                                ?.totalLength || 0,
-                                                        longest:
-                                                            zoneData.branchPipesInZone?.longest ||
-                                                            0,
-                                                    },
-                                                    emitterPipes: zoneData.emitterPipesInZone
-                                                        ? {
-                                                              count:
-                                                                  zoneData.emitterPipesInZone
-                                                                      .count || 0,
-                                                              totalLength:
-                                                                  zoneData.emitterPipesInZone
-                                                                      .totalLength || 0,
-                                                              longest:
-                                                                  zoneData.emitterPipesInZone
-                                                                      .longest || 0,
-                                                          }
-                                                        : null,
-                                                }
-                                              : null,
-                                          bestPipes: {
-                                              main: bestMainPipe,
-                                              subMain: bestSubMainPipe,
-                                              branch: bestBranchPipe,
-                                          },
-                                      };
-                                  })
+                                                            zoneData.emitterPipesInZone
+                                                                .longest || 0,
+                                                    }
+                                                    : null,
+                                            }
+                                            : null,
+                                        bestPipes: {
+                                            main: bestMainPipe,
+                                            subMain: bestSubMainPipe,
+                                            branch: bestBranchPipe,
+                                        },
+                                    };
+                                })
                                 : [
-                                      {
-                                          id: 'main-area',
-                                          name: 'พื้นที่หลัก',
-                                          plantCount: projectData.plants
-                                              ? projectData.plants.length
-                                              : 0,
-                                          totalWaterNeed: 0,
-                                          waterPerTree: 0,
-                                          waterNeedPerMinute: calculateTotalFlowRate(
-                                              projectData.plants ? projectData.plants.length : 0,
-                                              enhancedStats?.sprinklerFlowRate?.flowRatePerPlant ||
-                                                  2.5
-                                          ),
-                                          area: projectData.totalArea || 0,
-                                          color: '#22c55e',
-                                          pipes: projectSummary
-                                              ? {
-                                                    mainPipes: {
-                                                        count: projectSummary.mainPipes?.count || 0,
-                                                        totalLength:
-                                                            projectSummary.mainPipes?.totalLength ||
-                                                            0,
-                                                        longest:
-                                                            projectSummary.mainPipes?.longest || 0,
-                                                    },
-                                                    subMainPipes: {
+                                    {
+                                        id: 'main-area',
+                                        name: 'พื้นที่หลัก',
+                                        plantCount: projectData.plants
+                                            ? projectData.plants.length
+                                            : 0,
+                                        totalWaterNeed: 0,
+                                        waterPerTree: 0,
+                                        waterNeedPerMinute: calculateTotalFlowRate(
+                                            projectData.plants ? projectData.plants.length : 0,
+                                            enhancedStats?.sprinklerFlowRate?.flowRatePerPlant ||
+                                            2.5
+                                        ),
+                                        area: projectData.totalArea || 0,
+                                        color: '#22c55e',
+                                        pipes: projectSummary
+                                            ? {
+                                                mainPipes: {
+                                                    count: projectSummary.mainPipes?.count || 0,
+                                                    totalLength:
+                                                        projectSummary.mainPipes?.totalLength ||
+                                                        0,
+                                                    longest:
+                                                        projectSummary.mainPipes?.longest || 0,
+                                                },
+                                                subMainPipes: {
+                                                    count:
+                                                        projectSummary.subMainPipes?.count || 0,
+                                                    totalLength:
+                                                        projectSummary.subMainPipes
+                                                            ?.totalLength || 0,
+                                                    longest:
+                                                        projectSummary.subMainPipes?.longest ||
+                                                        0,
+                                                },
+                                                branchPipes: {
+                                                    count:
+                                                        projectSummary.branchPipes?.count || 0,
+                                                    totalLength:
+                                                        projectSummary.branchPipes
+                                                            ?.totalLength || 0,
+                                                    longest:
+                                                        projectSummary.branchPipes?.longest ||
+                                                        0,
+                                                },
+                                                emitterPipes: projectSummary.emitterPipes
+                                                    ? {
                                                         count:
-                                                            projectSummary.subMainPipes?.count || 0,
+                                                            projectSummary.emitterPipes
+                                                                .count || 0,
                                                         totalLength:
-                                                            projectSummary.subMainPipes
-                                                                ?.totalLength || 0,
+                                                            projectSummary.emitterPipes
+                                                                .totalLength || 0,
                                                         longest:
-                                                            projectSummary.subMainPipes?.longest ||
-                                                            0,
-                                                    },
-                                                    branchPipes: {
-                                                        count:
-                                                            projectSummary.branchPipes?.count || 0,
-                                                        totalLength:
-                                                            projectSummary.branchPipes
-                                                                ?.totalLength || 0,
-                                                        longest:
-                                                            projectSummary.branchPipes?.longest ||
-                                                            0,
-                                                    },
-                                                    emitterPipes: projectSummary.emitterPipes
-                                                        ? {
-                                                              count:
-                                                                  projectSummary.emitterPipes
-                                                                      .count || 0,
-                                                              totalLength:
-                                                                  projectSummary.emitterPipes
-                                                                      .totalLength || 0,
-                                                              longest:
-                                                                  projectSummary.emitterPipes
-                                                                      .longest || 0,
-                                                          }
-                                                        : null,
-                                                }
-                                              : null,
-                                          bestPipes: {
-                                              main: findBestMainPipeInZone(
-                                                  'main-area',
-                                                  projectData,
-                                                  irrigationZones,
-                                                  sprinklerConfig
-                                              ),
-                                              subMain: findBestSubMainPipeInZone(
-                                                  'main-area',
-                                                  projectData,
-                                                  irrigationZones,
-                                                  sprinklerConfig
-                                              ),
-                                              branch: findBestBranchPipeInZone(
-                                                  'main-area',
-                                                  projectData,
-                                                  irrigationZones,
-                                                  sprinklerConfig
-                                              ),
-                                          },
-                                      },
-                                  ],
+                                                            projectSummary.emitterPipes
+                                                                .longest || 0,
+                                                    }
+                                                    : null,
+                                            }
+                                            : null,
+                                        bestPipes: {
+                                            main: findBestMainPipeInZone(
+                                                'main-area',
+                                                projectData,
+                                                irrigationZones,
+                                                sprinklerConfig
+                                            ),
+                                            subMain: findBestSubMainPipeInZone(
+                                                'main-area',
+                                                projectData,
+                                                irrigationZones,
+                                                sprinklerConfig
+                                            ),
+                                            branch: findBestBranchPipeInZone(
+                                                'main-area',
+                                                projectData,
+                                                irrigationZones,
+                                                sprinklerConfig
+                                            ),
+                                        },
+                                    },
+                                ],
                         totalPlants:
                             irrigationZones && irrigationZones.length > 0
                                 ? irrigationZones.reduce(
-                                      (total, zone) =>
-                                          total + (zone.plants ? zone.plants.length : 0),
-                                      0
-                                  )
+                                    (total, zone) =>
+                                        total + (zone.plants ? zone.plants.length : 0),
+                                    0
+                                )
                                 : projectData.plants
-                                  ? projectData.plants.length
-                                  : 0,
+                                    ? projectData.plants.length
+                                    : 0,
                         isMultipleZones: !!(irrigationZones && irrigationZones.length > 0),
                     };
 
@@ -1630,8 +1735,9 @@ function EnhancedHorticultureResultsPageContent() {
                                         📏 {t('ขนาดไอคอน')}
                                     </h4>
                                     <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-2">
                                         <div className="flex items-center gap-2">
-                                            <label className="w-16 text-xs text-gray-300">
+                                            <label className="text-xs text-gray-300">
                                                 {t('ท่อ')}:
                                             </label>
                                             <input
@@ -1650,7 +1756,7 @@ function EnhancedHorticultureResultsPageContent() {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <label className="w-16 text-xs text-gray-300">
+                                            <label className="text-xs text-gray-300">
                                                 {t('ไอคอน')}:
                                             </label>
                                             <input
@@ -1667,6 +1773,7 @@ function EnhancedHorticultureResultsPageContent() {
                                             <span className="w-12 text-xs text-yellow-300">
                                                 {iconSize.toFixed(1)}x
                                             </span>
+                                        </div>
                                         </div>
                                         <button
                                             onClick={resetSizes}
@@ -1688,14 +1795,24 @@ function EnhancedHorticultureResultsPageContent() {
                                     zoom={mapZoom}
                                     onMapLoad={handleMapLoad}
                                     mapOptions={{
+                                        disableDefaultUI: true,
                                         zoomControl: false,
                                         fullscreenControl: false,
                                         mapTypeControl: false,
                                         streetViewControl: false,
                                         clickableIcons: false,
-                                        scrollwheel: false,
+                                        // gestures remain enabled; we only hide Google UI
+                                        scrollwheel: true,
                                         disableDoubleClickZoom: false,
-                                        gestureHandling: 'none',
+                                        gestureHandling: 'greedy',
+                                        // Hide labels/POIs/roads/transit/admin on results page
+                                        styles: [
+                                            { featureType: 'all', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+                                            { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+                                            { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+                                            { featureType: 'road', stylers: [{ visibility: 'off' }] },
+                                            { featureType: 'administrative', stylers: [{ visibility: 'off' }] },
+                                        ],
                                     }}
                                 >
                                     {mapLoaded && (
@@ -1718,7 +1835,7 @@ function EnhancedHorticultureResultsPageContent() {
                                 </h4>
                                 <div className="space-y-3">
                                     {/* ท่อ */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="grid grid-cols-5 gap-2 text-xs">
                                         <div className="flex items-center gap-2">
                                             <div
                                                 className="h-1 w-4"
@@ -1753,18 +1870,18 @@ function EnhancedHorticultureResultsPageContent() {
                                             (pipe) =>
                                                 pipe.emitterLines && pipe.emitterLines.length > 0
                                         ) && (
-                                            <div className="flex items-center gap-2">
-                                                <div
-                                                    className="h-1 w-4"
-                                                    style={{
-                                                        backgroundColor: '#90EE90',
-                                                        height: `${1 * pipeSize}px`,
-                                                        border: '1px dashed #ffffff80',
-                                                    }}
-                                                ></div>
-                                                <span>{t('ท่อย่อยแยก')}</span>
-                                            </div>
-                                        )}
+                                                <div className="flex items-center gap-2">
+                                                    <div
+                                                        className="h-1 w-4"
+                                                        style={{
+                                                            backgroundColor: '#90EE90',
+                                                            height: `${1 * pipeSize}px`,
+                                                            border: '1px dashed #ffffff80',
+                                                        }}
+                                                    ></div>
+                                                    <span>{t('ท่อย่อยแยก')}</span>
+                                                </div>
+                                            )}
                                         <div className="flex items-center gap-2">
                                             <img
                                                 src="/images/water-pump.png"
@@ -1821,7 +1938,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                     {projectData.exclusionAreas.map((area) => {
                                                         const exclusionColor =
                                                             EXCLUSION_COLORS[
-                                                                area.type as keyof typeof EXCLUSION_COLORS
+                                                            area.type as keyof typeof EXCLUSION_COLORS
                                                             ] || EXCLUSION_COLORS.other;
                                                         return (
                                                             <div
@@ -2110,1119 +2227,1138 @@ function EnhancedHorticultureResultsPageContent() {
                                     </div>
                                 </div>
 
-                                {/* Enhanced Statistics */}
-                                {enhancedStats && enhancedStats?.sprinklerFlowRate && (
-                                    <div className="mt-6 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
-                                        <h4 className="mb-3 text-lg font-semibold text-cyan-300">
-                                            🚿 {t('ข้อมูลระบบหัวฉีดของพื้นที่รวมทั้ังหมด')} (แรงดัน{' '}
-                                            {enhancedStats?.sprinklerFlowRate.pressureBar} บาร์ /
-                                            รัศมี {enhancedStats?.sprinklerFlowRate.radiusMeters}{' '}
-                                            ม.)
-                                        </h4>
-                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                            <div className="text-center">
-                                                <div className="text-sm text-gray-400">
-                                                    Q หัวฉีด
-                                                </div>
-                                                <div className="text-lg font-bold text-cyan-400">
-                                                    {
-                                                        enhancedStats?.sprinklerFlowRate
-                                                            .flowRatePerPlant
-                                                    }{' '}
-                                                    L/M
-                                                </div>
+                                <h4 className="mb-3 mt-4 text-lg font-semibold">⛰️ {t('ข้อมูลความสูงจากระดับน้ำทะเล')}</h4>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
+                                    <div
+                                        className="rounded-md bg-gray-700 p-3 cursor-pointer hover:bg-gray-600/70 transition-colors"
+                                        onClick={() => {
+                                            if (pumpElevation == null) return;
+                                            const input = prompt(
+                                                t('ใส่ค่าความสูงปั๊มเหนือพื้นดิน (เมตร)') || 'ใส่ค่าความสูงปั๊มเหนือพื้นดิน (เมตร)',
+                                                pumpGroundOffset.toString()
+                                            );
+                                            if (input === null) return;
+                                            const value = parseFloat(input);
+                                            if (!isNaN(value)) {
+                                                setPumpGroundOffset(value);
+                                            }
+                                        }}
+                                        title={t('คลิกเพื่อเพิ่มความสูงจากพื้นดิน') || 'คลิกเพื่อเพิ่มความสูงจากพื้นดิน'}
+                                    >
+                                        <div className="text-gray-300">{t('ความสูงปั๊มน้ำจากระดับน้ำทะเล')}</div>
+                                        <div className="text-lg font-bold text-white">
+                                            {displayedPumpElevation != null ? `${displayedPumpElevation.toFixed(2)} เมตร` : '-'}
+                                        </div>
+                                        {pumpElevation != null && (
+                                            <div className="mt-1 text-xs text-gray-300">
+                                                {t('เดิม')} {pumpElevation.toFixed(2)} {t('เมตร')} {t(' + ')} {pumpGroundOffset.toFixed(2)} {t('เมตร')}
                                             </div>
-                                            <div className="text-center">
-                                                <div className="text-sm text-gray-400">
-                                                    Q รวม/นาที
-                                                </div>
-                                                <div className="text-lg font-bold text-blue-400">
-                                                    {
-                                                        enhancedStats?.sprinklerFlowRate
-                                                            .formattedFlowRatePerMinute
-                                                    }
-                                                </div>
-                                            </div>
-                                            <div className="text-center">
-                                                <div className="text-sm text-gray-400">
-                                                    Q รวม/ชั่วโมง
-                                                </div>
-                                                <div className="text-lg font-bold text-purple-400">
-                                                    {
-                                                        enhancedStats?.sprinklerFlowRate
-                                                            .formattedFlowRatePerHour
-                                                    }
-                                                </div>
-                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="rounded-md bg-gray-700 p-3">
+                                        <div className="text-gray-300">{t('ความสูงต้นไม้สูงที่สุด')}</div>
+                                        <div className="text-lg font-bold text-white">
+                                            {highestPlantElevation != null ? `${highestPlantElevation.toFixed(2)} เมตร` : '-'}
                                         </div>
                                     </div>
-                                )}
+                                    <div className="rounded-md bg-gray-700 p-3">
+                                        <div className="text-gray-300">{t('ส่วนต่างความสูง (ต้นไม้ - ปั๊ม)')}</div>
+                                        <div className={`text-lg font-bold ${elevationDiff != null ? (elevationDiff >= 0 ? 'text-green-300' : 'text-red-300') : 'text-white'}`}>
+                                            {elevationDiff != null ? `${elevationDiff.toFixed(2)} เมตร` : '-'}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="rounded-lg bg-gray-800 p-6">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
-                                    🔧 {t('ระบบท่อทั้งหมด')}
+                                    🔧 {t('คุณสมบัติหัวฉีดน้ำและความยาวท่อรวม')}
                                 </h3>
-
-                                {/* ท่อเมนหลัก */}
-                                <div className="mb-2 rounded bg-red-700/20 p-2">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            🔴 {t('ท่อเมนหลัก')} ({projectSummary.mainPipes.count}{' '}
-                                            ท่อ)
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-gray-400">ยาวรวม:</span>{' '}
-                                            <span className="font-bold text-red-400">
-                                                {formatDistance(
-                                                    projectSummary.mainPipes.totalLength
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* ท่อเมนรอง */}
-                                <div className="mb-2 rounded bg-purple-800/20 p-2">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            🟣 {t('ท่อเมนรอง')} ({projectSummary.subMainPipes.count}{' '}
-                                            ท่อ)
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-gray-400">ยาวรวม:</span>{' '}
-                                            <span className="font-bold text-purple-400">
-                                                {formatDistance(
-                                                    projectSummary.subMainPipes.totalLength
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* ท่อย่อย */}
-                                <div className="mb-2 rounded bg-yellow-800/20 p-2">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            🟡 {t('ท่อย่อย')} ({projectSummary.branchPipes.count}{' '}
-                                            ท่อ)
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-gray-400">ยาวรวม:</span>{' '}
-                                            <span className="font-bold text-yellow-400">
-                                                {formatDistance(
-                                                    projectSummary.branchPipes.totalLength
-                                                )}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* ท่อย่อยแยก */}
-                                {projectSummary.emitterPipes.count > 0 && (
-                                    <div className="mb-2 rounded bg-green-800/20 p-2">
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                🟢 {t('ท่อย่อยแยก')} (
-                                                {projectSummary.emitterPipes.count} ท่อ)
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    {enhancedStats && enhancedStats?.sprinklerFlowRate && (
+                                        <div className="rounded-lg bg-blue-800/10 p-2 shadow-inner h-full flex flex-col justify-center">
+                                            <div className="mb-1 text-2xl font-semibold text-cyan-300 flex items-center gap-2">
+                                                🚿 {t('ข้อมูลหัวฉีดน้ำ')}
                                             </div>
-                                            <div className="text-right">
-                                                <span className="text-gray-400">ยาวรวม:</span>{' '}
-                                                <span className="font-bold text-green-400">
-                                                    {formatDistance(
-                                                        projectSummary.emitterPipes.totalLength
-                                                    )}
-                                                </span>
+                                            <div className="text-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-200">{t('แรงดันหัวฉีด')}:</span>
+                                                    <span className="font-bold text-blue-300">{enhancedStats?.sprinklerFlowRate.pressureBar} <span className="font-normal text-gray-300">บาร์</span></span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-200">{t('รัศมีหัวฉีด')}:</span>
+                                                    <span className="font-bold text-cyan-300">{enhancedStats?.sprinklerFlowRate.radiusMeters} <span className="font-normal text-gray-300">เมตร</span></span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-200">{t('อัตราการไหล/หัว')}:</span>
+                                                    <span className="font-bold text-indigo-300">{enhancedStats?.sprinklerFlowRate.flowRatePerPlant} <span className="font-normal text-gray-300">ลิตร/นาที</span></span>
+                                                </div>
                                             </div>
                                         </div>
+                                    )}
+
+                                    <div className="flex flex-col gap-2">
+                                        {/* ท่อเมนหลัก */}
+                                        <div className="mb-0.5 rounded bg-red-700/20 p-2">
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    🔴 {t('ท่อเมนหลัก')} ({projectSummary.mainPipes.count}{' '}
+                                                    {t('ท่อ')})
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-gray-400">{t('ยาวรวม')}:</span>{' '}
+                                                    <span className="font-bold text-red-400">
+                                                        {formatDistance(
+                                                            projectSummary.mainPipes.totalLength
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ท่อเมนรอง */}
+                                        <div className="mb-0.5 rounded bg-purple-800/20 p-2">
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    🟣 {t('ท่อเมนรอง')} ({projectSummary.subMainPipes.count}{' '}
+                                                    {t('ท่อ')})
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-gray-400">{t('ยาวรวม')}:</span>{' '}
+                                                    <span className="font-bold text-purple-400">
+                                                        {formatDistance(
+                                                            projectSummary.subMainPipes.totalLength
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ท่อย่อย */}
+                                        <div className="mb-0.5 rounded bg-yellow-800/20 p-2">
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    🟡 {t('ท่อย่อย')} ({projectSummary.branchPipes.count}{' '}
+                                                    {t('ท่อ')})
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-gray-400">{t('ยาวรวม')}:</span>{' '}
+                                                    <span className="font-bold text-yellow-400">
+                                                        {formatDistance(
+                                                            projectSummary.branchPipes.totalLength
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ท่อย่อยแยก */}
+                                        {projectSummary.emitterPipes.count > 0 && (
+                                            <div className="rounded bg-green-800/20 p-2">
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        🟢 {t('ท่อย่อยแยก')} (
+                                                        {projectSummary.emitterPipes.count} {t('ท่อ')})
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-gray-400">{t('ยาวรวม')}:</span>{' '}
+                                                        <span className="font-bold text-green-400">
+                                                            {formatDistance(
+                                                                projectSummary.emitterPipes.totalLength
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </div>
 
                             {/* Zone Details Section */}
                             {(irrigationZones.length > 0 ||
                                 projectSummary.zoneDetails.length > 0) && (
-                                <div className="rounded-lg bg-gray-800 p-6">
-                                    <h3 className="mb-4 text-xl font-semibold text-green-400">
-                                        🏞️{' '}
-                                        {irrigationZones.length > 0
-                                            ? t('ข้อมูลโซนการให้น้ำ')
-                                            : t('ข้อมูลพื้นที่หลัก')}
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {irrigationZones.length > 0
-                                            ? 
-                                              irrigationZones.map((zone, index) => {
-                                                  const isCollapsed = collapsedZones.has(zone.id);
-                                                  return (
-                                                      <div
-                                                          key={zone.id}
-                                                          className="rounded bg-gray-700 p-4"
-                                                      >
-                                                          <div
-                                                              className="-m-2 flex cursor-pointer items-center justify-between rounded transition-colors hover:bg-gray-600"
-                                                              onClick={() =>
-                                                                  toggleZoneCollapse(zone.id)
-                                                              }
-                                                          >
-                                                              <div className="flex items-center gap-3">
-                                                                  <div className="text-lg">
-                                                                      {isCollapsed ? '▶️' : '🔽'}
-                                                                  </div>
-                                                                  <h4 className="text-lg font-semibold text-green-300">
-                                                                      {zone.name}
-                                                                  </h4>
-                                                              </div>
-                                                              <div className="flex items-center gap-2">
-                                                                  <div
-                                                                      className="h-4 w-4 rounded"
-                                                                      style={{
-                                                                          backgroundColor:
-                                                                              zone.color,
-                                                                      }}
-                                                                  />
-                                                                  <span className="text-sm text-gray-400">
-                                                                      #{index + 1}
-                                                                  </span>
-                                                              </div>
-                                                          </div>
+                                    <div className="rounded-lg bg-gray-800 p-6">
+                                        <h3 className="mb-4 text-xl font-semibold text-green-400">
+                                            🏞️{' '}
+                                            {irrigationZones.length > 0
+                                                ? t('ข้อมูลโซนการให้น้ำ')
+                                                : t('ข้อมูลพื้นที่หลัก')}
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {irrigationZones.length > 0
+                                                ?
+                                                irrigationZones.map((zone, index) => {
+                                                    const isCollapsed = collapsedZones.has(zone.id);
+                                                    return (
+                                                        <div
+                                                            key={zone.id}
+                                                            className="rounded bg-gray-700 p-4"
+                                                        >
+                                                            <div
+                                                                className="-m-2 flex cursor-pointer items-center justify-between rounded transition-colors hover:bg-gray-600"
+                                                                onClick={() =>
+                                                                    toggleZoneCollapse(zone.id)
+                                                                }
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="text-lg">
+                                                                        {isCollapsed ? '▶️' : '🔽'}
+                                                                    </div>
+                                                                    <h4 className="text-lg font-semibold text-green-300">
+                                                                        {zone.name}
+                                                                    </h4>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div
+                                                                        className="h-4 w-4 rounded"
+                                                                        style={{
+                                                                            backgroundColor:
+                                                                                zone.color,
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-sm text-gray-400">
+                                                                        #{index + 1}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
 
-                                                          {!isCollapsed && (
-                                                              <div>
-                                                                  {/* Plant Information */}
-                                                                  <div className="mb-2 mt-4 rounded border border-green-700/50 bg-green-900/20 p-3">
-                                                                      <h5 className="mb-2 text-sm font-semibold text-green-300">
-                                                                          🌱 ข้อมูลการปลูก
-                                                                      </h5>
-                                                                      <div className="grid grid-cols-5 gap-3 text-sm">
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  พื้นที่โซน:
-                                                                              </span>
-                                                                              <div className="font-bold text-orange-400">
-                                                                                  {(() => {
-                                                                                      
-                                                                                      const calculatePolygonArea =
-                                                                                          (
-                                                                                              coords: {
-                                                                                                  lat: number;
-                                                                                                  lng: number;
-                                                                                              }[]
-                                                                                          ): number => {
-                                                                                              if (
-                                                                                                  coords.length <
-                                                                                                  3
-                                                                                              )
-                                                                                                  return 0;
+                                                            {!isCollapsed && (
+                                                                <div>
+                                                                    {/* Plant Information */}
+                                                                    <div className="mb-2 mt-4 rounded border border-green-700/50 bg-green-900/20 p-3">
+                                                                        <h5 className="mb-2 text-sm font-semibold text-green-300">
+                                                                            🌱 ข้อมูลการปลูก
+                                                                        </h5>
+                                                                        <div className="grid grid-cols-5 gap-3 text-sm">
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    พื้นที่โซน:
+                                                                                </span>
+                                                                                <div className="font-bold text-orange-400">
+                                                                                    {(() => {
 
-                                                                                              let area = 0;
-                                                                                              for (
-                                                                                                  let i = 0;
-                                                                                                  i <
-                                                                                                  coords.length;
-                                                                                                  i++
-                                                                                              ) {
-                                                                                                  const j =
-                                                                                                      (i +
-                                                                                                          1) %
-                                                                                                      coords.length;
-                                                                                                  area +=
-                                                                                                      coords[
-                                                                                                          i
-                                                                                                      ]
-                                                                                                          .lat *
-                                                                                                      coords[
-                                                                                                          j
-                                                                                                      ]
-                                                                                                          .lng;
-                                                                                                  area -=
-                                                                                                      coords[
-                                                                                                          j
-                                                                                                      ]
-                                                                                                          .lat *
-                                                                                                      coords[
-                                                                                                          i
-                                                                                                      ]
-                                                                                                          .lng;
-                                                                                              }
-                                                                                              area =
-                                                                                                  Math.abs(
-                                                                                                      area
-                                                                                                  ) /
-                                                                                                  2;
+                                                                                        const calculatePolygonArea =
+                                                                                            (
+                                                                                                coords: {
+                                                                                                    lat: number;
+                                                                                                    lng: number;
+                                                                                                }[]
+                                                                                            ): number => {
+                                                                                                if (
+                                                                                                    coords.length <
+                                                                                                    3
+                                                                                                )
+                                                                                                    return 0;
 
-                                                                                              
-                                                                                              const metersPerDegree = 111320; 
-                                                                                              return (
-                                                                                                  area *
-                                                                                                  metersPerDegree *
-                                                                                                  metersPerDegree
-                                                                                              );
-                                                                                          };
+                                                                                                let area = 0;
+                                                                                                for (
+                                                                                                    let i = 0;
+                                                                                                    i <
+                                                                                                    coords.length;
+                                                                                                    i++
+                                                                                                ) {
+                                                                                                    const j =
+                                                                                                        (i +
+                                                                                                            1) %
+                                                                                                        coords.length;
+                                                                                                    area +=
+                                                                                                        coords[
+                                                                                                            i
+                                                                                                        ]
+                                                                                                            .lat *
+                                                                                                        coords[
+                                                                                                            j
+                                                                                                        ]
+                                                                                                            .lng;
+                                                                                                    area -=
+                                                                                                        coords[
+                                                                                                            j
+                                                                                                        ]
+                                                                                                            .lat *
+                                                                                                        coords[
+                                                                                                            i
+                                                                                                        ]
+                                                                                                            .lng;
+                                                                                                }
+                                                                                                area =
+                                                                                                    Math.abs(
+                                                                                                        area
+                                                                                                    ) /
+                                                                                                    2;
 
-                                                                                      
-                                                                                      const areaInSquareMeters =
-                                                                                          zone.area ||
-                                                                                          calculatePolygonArea(
-                                                                                              zone.coordinates
-                                                                                          );
-                                                                                      const areaInRai =
-                                                                                          areaInSquareMeters /
-                                                                                          1600; 
 
-                                                                                      return areaInRai >
-                                                                                          0
-                                                                                          ? `${areaInRai.toFixed(2)} ไร่`
-                                                                                          : 'ไม่ระบุ';
-                                                                                  })()}
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  จำนวนต้นไม้:
-                                                                              </span>
-                                                                              <div className="font-bold text-green-400">
-                                                                                  {zone.plants.length.toLocaleString()}{' '}
-                                                                                  ต้น
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  ปริมาณน้ำรวม:
-                                                                              </span>
-                                                                              <div className="font-bold text-cyan-400">
-                                                                                  {formatWaterVolume(
-                                                                                      zone.totalWaterNeed
-                                                                                  )}
-                                                                                  /ครั้ง
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  น้ำต่อต้น:
-                                                                              </span>
-                                                                              <div className="font-bold text-cyan-400">
-                                                                                  {zone.plants
-                                                                                      .length > 0
-                                                                                      ? (
+                                                                                                const metersPerDegree = 111320;
+                                                                                                return (
+                                                                                                    area *
+                                                                                                    metersPerDegree *
+                                                                                                    metersPerDegree
+                                                                                                );
+                                                                                            };
+
+
+                                                                                        const areaInSquareMeters =
+                                                                                            zone.area ||
+                                                                                            calculatePolygonArea(
+                                                                                                zone.coordinates
+                                                                                            );
+                                                                                        const areaInRai =
+                                                                                            areaInSquareMeters /
+                                                                                            1600;
+
+                                                                                        return areaInRai >
+                                                                                            0
+                                                                                            ? `${areaInRai.toFixed(2)} ไร่`
+                                                                                            : 'ไม่ระบุ';
+                                                                                    })()}
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    จำนวนต้นไม้:
+                                                                                </span>
+                                                                                <div className="font-bold text-green-400">
+                                                                                    {zone.plants.length.toLocaleString()}{' '}
+                                                                                    ต้น
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    ปริมาณน้ำรวม:
+                                                                                </span>
+                                                                                <div className="font-bold text-cyan-400">
+                                                                                    {formatWaterVolume(
+                                                                                        zone.totalWaterNeed
+                                                                                    )}
+                                                                                    /ครั้ง
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    น้ำต่อต้น:
+                                                                                </span>
+                                                                                <div className="font-bold text-cyan-400">
+                                                                                    {zone.plants
+                                                                                        .length > 0
+                                                                                        ? (
                                                                                             zone.totalWaterNeed /
                                                                                             zone
                                                                                                 .plants
                                                                                                 .length
                                                                                         ).toFixed(0)
-                                                                                      : 0}{' '}
-                                                                                  ลิตร/ต้น
-                                                                              </div>
-                                                                          </div>
-                                                                          {sprinklerConfig && (
-                                                                              <div>
-                                                                                  <span className="text-gray-200">
-                                                                                      ความต้องการน้ำ:
-                                                                                  </span>
-                                                                                  <div className="font-bold text-cyan-400">
-                                                                                      {calculateTotalFlowRate(
-                                                                                          zone
-                                                                                              .plants
-                                                                                              .length,
-                                                                                          sprinklerConfig.flowRatePerMinute
-                                                                                      ).toLocaleString()}{' '}
-                                                                                      L/min
-                                                                                  </div>
-                                                                              </div>
-                                                                          )}
-                                                                      </div>
-                                                                  </div>
+                                                                                        : 0}{' '}
+                                                                                    ลิตร/ต้น
+                                                                                </div>
+                                                                            </div>
+                                                                            {sprinklerConfig && (
+                                                                                <div>
+                                                                                    <span className="text-gray-200">
+                                                                                        ความต้องการน้ำ:
+                                                                                    </span>
+                                                                                    <div className="font-bold text-cyan-400">
+                                                                                        {calculateTotalFlowRate(
+                                                                                            zone
+                                                                                                .plants
+                                                                                                .length,
+                                                                                            sprinklerConfig.flowRatePerMinute
+                                                                                        ).toLocaleString()}{' '}
+                                                                                        L/min
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
 
-                                                                  {(() => {
-                                                                      
-                                                                      const zoneData =
-                                                                          projectSummary?.zoneDetails?.find(
-                                                                              (z) =>
-                                                                                  z.zoneId ===
-                                                                                  zone.id
-                                                                          );
+                                                                    {(() => {
 
-                                                                      if (!zoneData) {
-                                                                          
-                                                                          const lateralPipesInThisZone =
-                                                                              lateralPipes?.filter(
-                                                                                  (lateral) => {
-                                                                                      
-                                                                                      const plantsInThisZone =
-                                                                                          lateral.plants.filter(
-                                                                                              (
-                                                                                                  lateralPlant
-                                                                                              ) => {
-                                                                                                  return zone.plants.some(
-                                                                                                      (
-                                                                                                          zonePlant
-                                                                                                      ) =>
-                                                                                                          zonePlant.id ===
-                                                                                                          lateralPlant.id
-                                                                                                  );
-                                                                                              }
-                                                                                          );
-                                                                                      return (
-                                                                                          plantsInThisZone.length >
-                                                                                          lateral
-                                                                                              .plants
-                                                                                              .length /
-                                                                                              2
-                                                                                      ); 
-                                                                                  }
-                                                                              ) || [];
+                                                                        const zoneData =
+                                                                            projectSummary?.zoneDetails?.find(
+                                                                                (z) =>
+                                                                                    z.zoneId ===
+                                                                                    zone.id
+                                                                            );
 
-                                                                          return (
-                                                                              <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
-                                                                                  <h5 className="mb-2 text-sm font-semibold text-blue-300">
-                                                                                      🔧
-                                                                                      ระบบท่อในโซน
-                                                                                      (คำนวณแบบ
-                                                                                      Direct)
-                                                                                  </h5>
+                                                                        if (!zoneData) {
 
-                                                                                  
-                                                                                  <div className="mb-2 rounded bg-yellow-700/20 px-2 py-1">
-                                                                                      <div className="grid grid-cols-2 items-center gap-2 text-xs">
-                                                                                          <div className="text-left text-sm font-bold">
-                                                                                              🟡
-                                                                                              ท่อย่อย
-                                                                                              (
-                                                                                              {
-                                                                                                  lateralPipesInThisZone.length
-                                                                                              }{' '}
-                                                                                              ท่อ)
-                                                                                              (ยาวรวม:{' '}
-                                                                                              {formatDistance(
-                                                                                                  lateralPipesInThisZone.reduce(
-                                                                                                      (
-                                                                                                          sum,
-                                                                                                          pipe
-                                                                                                      ) =>
-                                                                                                          sum +
-                                                                                                          pipe.length,
-                                                                                                      0
-                                                                                                  )
-                                                                                              )}
-                                                                                              )
-                                                                                          </div>
-                                                                                          <div className="text-center">
-                                                                                              {lateralPipesInThisZone.length >
-                                                                                              0 ? (
-                                                                                                  <span className="flex flex-col items-center font-semibold text-gray-100">
-                                                                                                      <p>
-                                                                                                          🔥
-                                                                                                          ข้อมูลท่อย่อย:
-                                                                                                      </p>
-                                                                                                      <p>
-                                                                                                          รวม{' '}
-                                                                                                          {
-                                                                                                              lateralPipesInThisZone.length
-                                                                                                          }{' '}
-                                                                                                          ท่อ
-                                                                                                      </p>
-                                                                                                      <p>
-                                                                                                          ปลายท่อรวม:{' '}
-                                                                                                          {lateralPipesInThisZone.reduce(
-                                                                                                              (
-                                                                                                                  sum,
-                                                                                                                  pipe
-                                                                                                              ) =>
-                                                                                                                  sum +
-                                                                                                                  pipe
-                                                                                                                      .plants
-                                                                                                                      .length,
-                                                                                                              0
-                                                                                                          )}{' '}
-                                                                                                          จุด
-                                                                                                      </p>
-                                                                                                      <p>
-                                                                                                          ใช้น้ำรวม:{' '}
-                                                                                                          {lateralPipesInThisZone
-                                                                                                              .reduce(
-                                                                                                                  (
-                                                                                                                      sum,
-                                                                                                                      pipe
-                                                                                                                  ) =>
-                                                                                                                      sum +
-                                                                                                                      pipe.totalFlowRate,
-                                                                                                                  0
-                                                                                                              )
-                                                                                                              .toFixed(
-                                                                                                                  1
-                                                                                                              )}{' '}
-                                                                                                          L/min
-                                                                                                      </p>
-                                                                                                  </span>
-                                                                                              ) : (
-                                                                                                  <span className="text-gray-500">
-                                                                                                      ไม่พบท่อย่อยในโซน
-                                                                                                  </span>
-                                                                                              )}
-                                                                                          </div>
-                                                                                      </div>
-                                                                                  </div>
+                                                                            const lateralPipesInThisZone =
+                                                                                lateralPipes?.filter(
+                                                                                    (lateral) => {
 
-                                                                                  
-                                                                                  {(() => {
-                                                                                      const allEmitterLines =
-                                                                                          lateralPipesInThisZone.flatMap(
-                                                                                              (
-                                                                                                  lateral
-                                                                                              ) =>
-                                                                                                  lateral.emitterLines ||
-                                                                                                  []
-                                                                                          );
-                                                                                      return (
-                                                                                          allEmitterLines.length >
-                                                                                              0 && (
-                                                                                              <div className="mb-2 rounded bg-green-700/20 px-2 py-1">
-                                                                                                  <div className="grid grid-cols-2 items-center gap-2 text-xs">
-                                                                                                      <div className="text-left text-sm font-bold">
-                                                                                                          🟢
-                                                                                                          ท่อย่อยแยก
-                                                                                                          (
-                                                                                                          {
-                                                                                                              allEmitterLines.length
-                                                                                                          }{' '}
-                                                                                                          ท่อ)
-                                                                                                      </div>
-                                                                                                      <div className="text-left text-sm font-bold">
-                                                                                                          ยาวรวม:{' '}
-                                                                                                          {formatDistance(
-                                                                                                              allEmitterLines.reduce(
-                                                                                                                  (
-                                                                                                                      sum,
-                                                                                                                      emitter
-                                                                                                                  ) =>
-                                                                                                                      sum +
-                                                                                                                      emitter.length,
-                                                                                                                  0
-                                                                                                              )
-                                                                                                          )}
-                                                                                                      </div>
-                                                                                                  </div>
-                                                                                              </div>
-                                                                                          )
-                                                                                      );
-                                                                                  })()}
+                                                                                        const plantsInThisZone =
+                                                                                            lateral.plants.filter(
+                                                                                                (
+                                                                                                    lateralPlant
+                                                                                                ) => {
+                                                                                                    return zone.plants.some(
+                                                                                                        (
+                                                                                                            zonePlant
+                                                                                                        ) =>
+                                                                                                            zonePlant.id ===
+                                                                                                            lateralPlant.id
+                                                                                                    );
+                                                                                                }
+                                                                                            );
+                                                                                        return (
+                                                                                            plantsInThisZone.length >
+                                                                                            lateral
+                                                                                                .plants
+                                                                                                .length /
+                                                                                            2
+                                                                                        );
+                                                                                    }
+                                                                                ) || [];
 
-                                                                                  <div className="mt-2 text-xs text-orange-400">
-                                                                                      ℹ️
-                                                                                      คำนวณโดยตรงจากข้อมูลท่อย่อย
-                                                                                      (Zone ID:{' '}
-                                                                                      {zone.id})
-                                                                                  </div>
-                                                                              </div>
-                                                                          );
-                                                                      }
+                                                                            return (
+                                                                                <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
+                                                                                    <h5 className="mb-2 text-sm font-semibold text-blue-300">
+                                                                                        🔧
+                                                                                        ระบบท่อในโซน
+                                                                                        (คำนวณแบบ
+                                                                                        Direct)
+                                                                                    </h5>
 
-                                                                      return (
-                                                                          <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
-                                                                              <h5 className="mb-2 text-sm font-semibold text-blue-300">
-                                                                                  🔧 ระบบท่อในโซน
-                                                                              </h5>
 
-                                                                              
-                                                                              <div className="mb-2 rounded bg-red-700/20 px-2 py-1">
-                                                                                  <div className="grid grid-cols-2 items-center gap-2 text-xs">
-                                                                                      <div className="text-left text-sm font-bold">
-                                                                                          🔴
-                                                                                          ท่อเมนหลัก
-                                                                                          (
-                                                                                          {zoneData
-                                                                                              .mainPipesInZone
-                                                                                              ?.count ||
-                                                                                              0}{' '}
-                                                                                          ท่อ)
-                                                                                          (ยาวรวม:{' '}
-                                                                                          {formatDistance(
-                                                                                              zoneData
-                                                                                                  .mainPipesInZone
-                                                                                                  ?.totalLength ||
-                                                                                                  0
-                                                                                          )}
-                                                                                          )
-                                                                                      </div>
-                                                                                      <div className="text-center">
-                                                                                          {(() => {
-                                                                                              const bestMain =
-                                                                                                  findBestMainPipeInZone(
-                                                                                                      zone.id,
-                                                                                                      projectData,
-                                                                                                      irrigationZones,
-                                                                                                      sprinklerConfig
-                                                                                                  );
-                                                                                              return bestMain ? (
-                                                                                                  <span className="flex flex-col items-center font-semibold text-gray-100">
-                                                                                                      <p>
-                                                                                                          🔥
-                                                                                                          ท่อที่ต้องการน้ำมากที่สุด:{' '}
-                                                                                                      </p>
-                                                                                                      <p>
-                                                                                                          ยาว{' '}
-                                                                                                          {formatDistance(
-                                                                                                              bestMain.length
-                                                                                                          )}
+                                                                                    <div className="mb-2 rounded bg-yellow-700/20 px-2 py-1">
+                                                                                        <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                            <div className="text-left text-sm font-bold">
+                                                                                                🟡
+                                                                                                ท่อย่อย
+                                                                                                (
+                                                                                                {
+                                                                                                    lateralPipesInThisZone.length
+                                                                                                }{' '}
+                                                                                                ท่อ)
+                                                                                                (ยาวรวม:{' '}
+                                                                                                {formatDistance(
+                                                                                                    lateralPipesInThisZone.reduce(
+                                                                                                        (
+                                                                                                            sum,
+                                                                                                            pipe
+                                                                                                        ) =>
+                                                                                                            sum +
+                                                                                                            pipe.length,
+                                                                                                        0
+                                                                                                    )
+                                                                                                )}
+                                                                                                )
+                                                                                            </div>
+                                                                                            <div className="text-center">
+                                                                                                {lateralPipesInThisZone.length >
+                                                                                                    0 ? (
+                                                                                                    <span className="flex flex-col items-center font-semibold text-gray-100">
+                                                                                                        <p>
+                                                                                                            🔥
+                                                                                                            ข้อมูลท่อย่อย:
+                                                                                                        </p>
+                                                                                                        <p>
+                                                                                                            รวม{' '}
+                                                                                                            {
+                                                                                                                lateralPipesInThisZone.length
+                                                                                                            }{' '}
+                                                                                                            ท่อ
+                                                                                                        </p>
+                                                                                                        <p>
+                                                                                                            ปลายท่อรวม:{' '}
+                                                                                                            {lateralPipesInThisZone.reduce(
+                                                                                                                (
+                                                                                                                    sum,
+                                                                                                                    pipe
+                                                                                                                ) =>
+                                                                                                                    sum +
+                                                                                                                    pipe
+                                                                                                                        .plants
+                                                                                                                        .length,
+                                                                                                                0
+                                                                                                            )}{' '}
+                                                                                                            จุด
+                                                                                                        </p>
+                                                                                                        <p>
+                                                                                                            ใช้น้ำรวม:{' '}
+                                                                                                            {lateralPipesInThisZone
+                                                                                                                .reduce(
+                                                                                                                    (
+                                                                                                                        sum,
+                                                                                                                        pipe
+                                                                                                                    ) =>
+                                                                                                                        sum +
+                                                                                                                        pipe.totalFlowRate,
+                                                                                                                    0
+                                                                                                                )
+                                                                                                                .toFixed(
+                                                                                                                    1
+                                                                                                                )}{' '}
+                                                                                                            L/min
+                                                                                                        </p>
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <span className="text-gray-500">
+                                                                                                        ไม่พบท่อย่อยในโซน
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
 
-                                                                                                          ,
-                                                                                                          เชื่อม{' '}
-                                                                                                          {
-                                                                                                              bestMain.count
-                                                                                                          }{' '}
-                                                                                                          ท่อเมนรอง,
-                                                                                                          ใช้น้ำ{' '}
-                                                                                                          {bestMain.waterFlowRate.toFixed(
-                                                                                                              1
-                                                                                                          )}{' '}
-                                                                                                          L/min
-                                                                                                      </p>
-                                                                                                  </span>
-                                                                                              ) : (
-                                                                                                  <span className="text-gray-500">
-                                                                                                      ไม่พบท่อเมนในโซน
-                                                                                                  </span>
-                                                                                              );
-                                                                                          })()}
-                                                                                      </div>
-                                                                                  </div>
-                                                                              </div>
 
-                                                                              <div className="mb-2 rounded bg-purple-700/20 px-2 py-1">
-                                                                                  <div className="grid grid-cols-2 items-center gap-2 text-xs">
-                                                                                      <div className="text-left text-sm font-bold">
-                                                                                          🟣
-                                                                                          ท่อเมนรอง
-                                                                                          (
-                                                                                          {zoneData
-                                                                                              .subMainPipesInZone
-                                                                                              ?.count ||
-                                                                                              0}{' '}
-                                                                                          ท่อ)
-                                                                                          (ยาวรวม:{' '}
-                                                                                          {formatDistance(
-                                                                                              zoneData
-                                                                                                  .subMainPipesInZone
-                                                                                                  ?.totalLength ||
-                                                                                                  0
-                                                                                          )}
-                                                                                          )
-                                                                                      </div>
-                                                                                      <div className="text-center">
-                                                                                          {(() => {
-                                                                                              const bestSubMain =
-                                                                                                  findBestSubMainPipeInZone(
-                                                                                                      zone.id,
-                                                                                                      projectData,
-                                                                                                      irrigationZones,
-                                                                                                      sprinklerConfig
-                                                                                                  );
-                                                                                              return bestSubMain ? (
-                                                                                                  <span className="flex flex-col items-center font-semibold text-gray-100">
-                                                                                                      <p>
-                                                                                                          🔥
-                                                                                                          ท่อที่ต้องการน้ำมากที่สุด:{' '}
-                                                                                                      </p>
-                                                                                                      <p>
-                                                                                                          ยาว{' '}
-                                                                                                          {formatDistance(
-                                                                                                              bestSubMain.length
-                                                                                                          )}
+                                                                                    {(() => {
+                                                                                        const allEmitterLines =
+                                                                                            lateralPipesInThisZone.flatMap(
+                                                                                                (
+                                                                                                    lateral
+                                                                                                ) =>
+                                                                                                    lateral.emitterLines ||
+                                                                                                    []
+                                                                                            );
+                                                                                        return (
+                                                                                            allEmitterLines.length >
+                                                                                            0 && (
+                                                                                                <div className="mb-2 rounded bg-green-700/20 px-2 py-1">
+                                                                                                    <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                                        <div className="text-left text-sm font-bold">
+                                                                                                            🟢
+                                                                                                            ท่อย่อยแยก
+                                                                                                            (
+                                                                                                            {
+                                                                                                                allEmitterLines.length
+                                                                                                            }{' '}
+                                                                                                            ท่อ)
+                                                                                                        </div>
+                                                                                                        <div className="text-left text-sm font-bold">
+                                                                                                            ยาวรวม:{' '}
+                                                                                                            {formatDistance(
+                                                                                                                allEmitterLines.reduce(
+                                                                                                                    (
+                                                                                                                        sum,
+                                                                                                                        emitter
+                                                                                                                    ) =>
+                                                                                                                        sum +
+                                                                                                                        emitter.length,
+                                                                                                                    0
+                                                                                                                )
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )
+                                                                                        );
+                                                                                    })()}
 
-                                                                                                          ,
-                                                                                                          เชื่อม{' '}
-                                                                                                          {
-                                                                                                              bestSubMain.count
-                                                                                                          }{' '}
-                                                                                                          ท่อย่อย,
-                                                                                                          ใช้น้ำ{' '}
-                                                                                                          {bestSubMain.waterFlowRate.toFixed(
-                                                                                                              1
-                                                                                                          )}{' '}
-                                                                                                          L/min
-                                                                                                      </p>
-                                                                                                  </span>
-                                                                                              ) : (
-                                                                                                  <span className="text-gray-500">
-                                                                                                      ไม่พบท่อเมนรองในโซน
-                                                                                                  </span>
-                                                                                              );
-                                                                                          })()}
-                                                                                      </div>
-                                                                                  </div>
-                                                                              </div>
+                                                                                    <div className="mt-2 text-xs text-orange-400">
+                                                                                        ℹ️
+                                                                                        คำนวณโดยตรงจากข้อมูลท่อย่อย
+                                                                                        (Zone ID:{' '}
+                                                                                        {zone.id})
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        }
 
-                                                                              <div className="mb-2 rounded bg-yellow-700/20 px-2 py-1">
-                                                                                  <div className="grid grid-cols-2 items-center gap-2 text-xs">
-                                                                                      <div className="text-left text-sm font-bold">
-                                                                                          🟡 ท่อย่อย
-                                                                                          (
-                                                                                          {zoneData
-                                                                                              .branchPipesInZone
-                                                                                              ?.count ||
-                                                                                              0}{' '}
-                                                                                          ท่อ)
-                                                                                          (ยาวรวม:{' '}
-                                                                                          {formatDistance(
-                                                                                              zoneData
-                                                                                                  .branchPipesInZone
-                                                                                                  ?.totalLength ||
-                                                                                                  0
-                                                                                          )}
-                                                                                          )
-                                                                                      </div>
-                                                                                      <div className="text-center">
-                                                                                          {(() => {
-                                                                                              const bestBranch =
-                                                                                                  findBestBranchPipeInZone(
-                                                                                                      zone.id,
-                                                                                                      projectData,
-                                                                                                      irrigationZones,
-                                                                                                      sprinklerConfig
-                                                                                                  );
-                                                                                              return bestBranch ? (
-                                                                                                  <span className="flex flex-col items-center font-semibold text-gray-100">
-                                                                                                      <p>
-                                                                                                          🔥
-                                                                                                          ท่อที่ต้องการน้ำมากที่สุด:{' '}
-                                                                                                      </p>
-                                                                                                      <p>
-                                                                                                          ยาว{' '}
-                                                                                                          {formatDistance(
-                                                                                                              bestBranch.length
-                                                                                                          )}
+                                                                        return (
+                                                                            <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
+                                                                                <h5 className="mb-2 text-sm font-semibold text-blue-300">
+                                                                                    🔧 ระบบท่อในโซน
+                                                                                </h5>
 
-                                                                                                          ,
-                                                                                                          ให้น้ำ{' '}
-                                                                                                          {
-                                                                                                              bestBranch.count
-                                                                                                          }{' '}
-                                                                                                          ต้นไม้,
-                                                                                                          ใช้น้ำ{' '}
-                                                                                                          {bestBranch.waterFlowRate.toFixed(
-                                                                                                              1
-                                                                                                          )}{' '}
-                                                                                                          L/min
-                                                                                                      </p>
-                                                                                                  </span>
-                                                                                              ) : (
-                                                                                                  <span className="text-gray-500">
-                                                                                                      ไม่พบท่อย่อยในโซน
-                                                                                                  </span>
-                                                                                              );
-                                                                                          })()}
-                                                                                      </div>
-                                                                                  </div>
-                                                                              </div>
 
-                                                                              {(zoneData
-                                                                                  .emitterPipesInZone
-                                                                                  ?.count || 0) >
-                                                                                  0 && (
-                                                                                  <div className="mb-2 rounded bg-green-700/20 px-2 py-1">
-                                                                                      <div className="grid grid-cols-2 items-center gap-2 text-xs">
-                                                                                          <div className="text-left text-sm font-bold">
-                                                                                              🟢
-                                                                                              ท่อย่อยแยก
-                                                                                              (
-                                                                                              {zoneData
-                                                                                                  .emitterPipesInZone
-                                                                                                  ?.count ||
-                                                                                                  0}{' '}
-                                                                                              ท่อ)
-                                                                                          </div>
-                                                                                          <div className="text-left text-sm font-bold">
-                                                                                              ยาวรวม:{' '}
-                                                                                              {formatDistance(
-                                                                                                  zoneData
-                                                                                                      .emitterPipesInZone
-                                                                                                      ?.totalLength ||
-                                                                                                      0
-                                                                                              )}
-                                                                                          </div>
-                                                                                      </div>
-                                                                                  </div>
-                                                                              )}
-                                                                          </div>
-                                                                      );
-                                                                  })()}
-                                                              </div>
-                                                          )}
-                                                      </div>
-                                                  );
-                                              })
-                                            : 
-                                              projectSummary.zoneDetails.map((zone, index) => {
-                                                  const waterPerPlant = zone.waterPerPlant || 0;
-                                                  const isCollapsed = collapsedZones.has(
-                                                      zone.zoneId
-                                                  );
+                                                                                <div className="mb-2 rounded bg-red-700/20 px-2 py-1">
+                                                                                    <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                        <div className="text-left text-sm font-bold">
+                                                                                            🔴
+                                                                                            ท่อเมนหลัก
+                                                                                            (
+                                                                                            {zoneData
+                                                                                                .mainPipesInZone
+                                                                                                ?.count ||
+                                                                                                0}{' '}
+                                                                                            ท่อ)
+                                                                                            (ยาวรวม:{' '}
+                                                                                            {formatDistance(
+                                                                                                zoneData
+                                                                                                    .mainPipesInZone
+                                                                                                    ?.totalLength ||
+                                                                                                0
+                                                                                            )}
+                                                                                            )
+                                                                                        </div>
+                                                                                        <div className="text-center">
+                                                                                            {(() => {
+                                                                                                const bestMain =
+                                                                                                    findBestMainPipeInZone(
+                                                                                                        zone.id,
+                                                                                                        projectData,
+                                                                                                        irrigationZones,
+                                                                                                        sprinklerConfig
+                                                                                                    );
+                                                                                                return bestMain ? (
+                                                                                                    <span className="flex flex-col items-center font-semibold text-gray-100">
+                                                                                                        <p>
+                                                                                                            🔥
+                                                                                                            ท่อที่ต้องการน้ำมากที่สุด:{' '}
+                                                                                                        </p>
+                                                                                                        <p>
+                                                                                                            ยาว{' '}
+                                                                                                            {formatDistance(
+                                                                                                                bestMain.length
+                                                                                                            )}
 
-                                                  const zoneColor = projectData.useZones
-                                                      ? projectData.zones.find(
+                                                                                                            ,
+                                                                                                            เชื่อม{' '}
+                                                                                                            {
+                                                                                                                bestMain.count
+                                                                                                            }{' '}
+                                                                                                            ท่อเมนรอง,
+                                                                                                            ใช้น้ำ{' '}
+                                                                                                            {bestMain.waterFlowRate.toFixed(
+                                                                                                                1
+                                                                                                            )}{' '}
+                                                                                                            L/min
+                                                                                                        </p>
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <span className="text-gray-500">
+                                                                                                        ไม่พบท่อเมนในโซน
+                                                                                                    </span>
+                                                                                                );
+                                                                                            })()}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="mb-2 rounded bg-purple-700/20 px-2 py-1">
+                                                                                    <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                        <div className="text-left text-sm font-bold">
+                                                                                            🟣
+                                                                                            ท่อเมนรอง
+                                                                                            (
+                                                                                            {zoneData
+                                                                                                .subMainPipesInZone
+                                                                                                ?.count ||
+                                                                                                0}{' '}
+                                                                                            ท่อ)
+                                                                                            (ยาวรวม:{' '}
+                                                                                            {formatDistance(
+                                                                                                zoneData
+                                                                                                    .subMainPipesInZone
+                                                                                                    ?.totalLength ||
+                                                                                                0
+                                                                                            )}
+                                                                                            )
+                                                                                        </div>
+                                                                                        <div className="text-center">
+                                                                                            {(() => {
+                                                                                                const bestSubMain =
+                                                                                                    findBestSubMainPipeInZone(
+                                                                                                        zone.id,
+                                                                                                        projectData,
+                                                                                                        irrigationZones,
+                                                                                                        sprinklerConfig
+                                                                                                    );
+                                                                                                return bestSubMain ? (
+                                                                                                    <span className="flex flex-col items-center font-semibold text-gray-100">
+                                                                                                        <p>
+                                                                                                            🔥
+                                                                                                            ท่อที่ต้องการน้ำมากที่สุด:{' '}
+                                                                                                        </p>
+                                                                                                        <p>
+                                                                                                            ยาว{' '}
+                                                                                                            {formatDistance(
+                                                                                                                bestSubMain.length
+                                                                                                            )}
+
+                                                                                                            ,
+                                                                                                            เชื่อม{' '}
+                                                                                                            {
+                                                                                                                bestSubMain.count
+                                                                                                            }{' '}
+                                                                                                            ท่อย่อย,
+                                                                                                            ใช้น้ำ{' '}
+                                                                                                            {bestSubMain.waterFlowRate.toFixed(
+                                                                                                                1
+                                                                                                            )}{' '}
+                                                                                                            L/min
+                                                                                                        </p>
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <span className="text-gray-500">
+                                                                                                        ไม่พบท่อเมนรองในโซน
+                                                                                                    </span>
+                                                                                                );
+                                                                                            })()}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="mb-2 rounded bg-yellow-700/20 px-2 py-1">
+                                                                                    <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                        <div className="text-left text-sm font-bold">
+                                                                                            🟡 ท่อย่อย
+                                                                                            (
+                                                                                            {zoneData
+                                                                                                .branchPipesInZone
+                                                                                                ?.count ||
+                                                                                                0}{' '}
+                                                                                            ท่อ)
+                                                                                            (ยาวรวม:{' '}
+                                                                                            {formatDistance(
+                                                                                                zoneData
+                                                                                                    .branchPipesInZone
+                                                                                                    ?.totalLength ||
+                                                                                                0
+                                                                                            )}
+                                                                                            )
+                                                                                        </div>
+                                                                                        <div className="text-center">
+                                                                                            {(() => {
+                                                                                                const bestBranch =
+                                                                                                    findBestBranchPipeInZone(
+                                                                                                        zone.id,
+                                                                                                        projectData,
+                                                                                                        irrigationZones,
+                                                                                                        sprinklerConfig
+                                                                                                    );
+                                                                                                return bestBranch ? (
+                                                                                                    <span className="flex flex-col items-center font-semibold text-gray-100">
+                                                                                                        <p>
+                                                                                                            🔥
+                                                                                                            ท่อที่ต้องการน้ำมากที่สุด:{' '}
+                                                                                                        </p>
+                                                                                                        <p>
+                                                                                                            ยาว{' '}
+                                                                                                            {formatDistance(
+                                                                                                                bestBranch.length
+                                                                                                            )}
+
+                                                                                                            ,
+                                                                                                            ให้น้ำ{' '}
+                                                                                                            {
+                                                                                                                bestBranch.count
+                                                                                                            }{' '}
+                                                                                                            ต้นไม้,
+                                                                                                            ใช้น้ำ{' '}
+                                                                                                            {bestBranch.waterFlowRate.toFixed(
+                                                                                                                1
+                                                                                                            )}{' '}
+                                                                                                            L/min
+                                                                                                        </p>
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <span className="text-gray-500">
+                                                                                                        ไม่พบท่อย่อยในโซน
+                                                                                                    </span>
+                                                                                                );
+                                                                                            })()}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {(zoneData
+                                                                                    .emitterPipesInZone
+                                                                                    ?.count || 0) >
+                                                                                    0 && (
+                                                                                        <div className="mb-2 rounded bg-green-700/20 px-2 py-1">
+                                                                                            <div className="grid grid-cols-2 items-center gap-2 text-xs">
+                                                                                                <div className="text-left text-sm font-bold">
+                                                                                                    🟢
+                                                                                                    ท่อย่อยแยก
+                                                                                                    (
+                                                                                                    {zoneData
+                                                                                                        .emitterPipesInZone
+                                                                                                        ?.count ||
+                                                                                                        0}{' '}
+                                                                                                    ท่อ)
+                                                                                                </div>
+                                                                                                <div className="text-left text-sm font-bold">
+                                                                                                    ยาวรวม:{' '}
+                                                                                                    {formatDistance(
+                                                                                                        zoneData
+                                                                                                            .emitterPipesInZone
+                                                                                                            ?.totalLength ||
+                                                                                                        0
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })
+                                                :
+                                                projectSummary.zoneDetails.map((zone, index) => {
+                                                    const waterPerPlant = zone.waterPerPlant || 0;
+                                                    const isCollapsed = collapsedZones.has(
+                                                        zone.zoneId
+                                                    );
+
+                                                    const zoneColor = projectData.useZones
+                                                        ? projectData.zones.find(
                                                             (z) => z.id === zone.zoneId
                                                         )?.color
-                                                      : null;
+                                                        : null;
 
-                                                  return (
-                                                      <div
-                                                          key={zone.zoneId}
-                                                          className="rounded bg-gray-700 p-4"
-                                                      >
-                                                          <div
-                                                              className="-m-2 flex cursor-pointer items-center justify-between rounded p-2 transition-colors hover:bg-gray-600"
-                                                              onClick={() =>
-                                                                  toggleZoneCollapse(zone.zoneId)
-                                                              }
-                                                          >
-                                                              <div className="flex items-center gap-3">
-                                                                  <div className="text-lg">
-                                                                      {isCollapsed ? '▶️' : '🔽'}
-                                                                  </div>
-                                                                  <h4 className="text-lg font-semibold text-green-300">
-                                                                      {zone.zoneName}
-                                                                  </h4>
-                                                              </div>
-                                                              <div className="flex items-center gap-2">
-                                                                  {zoneColor && (
-                                                                      <div
-                                                                          className="h-4 w-4 rounded"
-                                                                          style={{
-                                                                              backgroundColor:
-                                                                                  zoneColor,
-                                                                          }}
-                                                                      />
-                                                                  )}
-                                                                  <span className="text-sm text-gray-400">
-                                                                      #{index + 1}
-                                                                  </span>
-                                                              </div>
-                                                          </div>
+                                                    return (
+                                                        <div
+                                                            key={zone.zoneId}
+                                                            className="rounded bg-gray-700 p-4"
+                                                        >
+                                                            <div
+                                                                className="-m-2 flex cursor-pointer items-center justify-between rounded p-2 transition-colors hover:bg-gray-600"
+                                                                onClick={() =>
+                                                                    toggleZoneCollapse(zone.zoneId)
+                                                                }
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="text-lg">
+                                                                        {isCollapsed ? '▶️' : '🔽'}
+                                                                    </div>
+                                                                    <h4 className="text-lg font-semibold text-green-300">
+                                                                        {zone.zoneName}
+                                                                    </h4>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {zoneColor && (
+                                                                        <div
+                                                                            className="h-4 w-4 rounded"
+                                                                            style={{
+                                                                                backgroundColor:
+                                                                                    zoneColor,
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                    <span className="text-sm text-gray-400">
+                                                                        #{index + 1}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
 
-                                                          {!isCollapsed && (
-                                                              <div>
-                                                                  <div className="mt-4 rounded border border-green-700/50 bg-green-900/20 p-3">
-                                                                      <h5 className="mb-2 text-sm font-semibold text-green-300">
-                                                                          🌱 ข้อมูลการปลูก
-                                                                      </h5>
-                                                                      <div className="grid grid-cols-5 gap-3 text-sm">
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  พื้นที่โซน:
-                                                                              </span>
-                                                                              <div className="font-bold text-blue-400">
-                                                                                  {zone.areaInRai.toFixed(
-                                                                                      2
-                                                                                  )}{' '}
-                                                                                  ไร่
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  จำนวนต้นไม้:
-                                                                              </span>
-                                                                              <div className="font-bold text-green-400">
-                                                                                  {zone.plantCount.toLocaleString()}{' '}
-                                                                                  ต้น
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  น้ำต่อต้น:
-                                                                              </span>
-                                                                              <div className="font-bold text-cyan-400">
-                                                                                  {waterPerPlant.toFixed(
-                                                                                      0
-                                                                                  )}{' '}
-                                                                                  ลิตร/ต้น
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  น้ำรวมต่อครั้ง:
-                                                                              </span>
-                                                                              <div className="font-bold text-cyan-400">
-                                                                                  {formatWaterVolume(
-                                                                                      zone.waterNeedPerSession
-                                                                                  )}
-                                                                                  /ครั้ง
-                                                                              </div>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-200">
-                                                                                  น้ำรวมต่อนาที:
-                                                                              </span>
-                                                                              <div className="font-bold text-cyan-400">
-                                                                                  {zone.plantCount *
-                                                                                      (enhancedStats
-                                                                                          ?.sprinklerFlowRate
-                                                                                          ?.flowRatePerPlant ||
-                                                                                          2.5)}{' '}
-                                                                                  ลิตร/นาที
-                                                                              </div>
-                                                                          </div>
-                                                                      </div>
-                                                                  </div>
+                                                            {!isCollapsed && (
+                                                                <div>
+                                                                    <div className="mt-4 rounded border border-green-700/50 bg-green-900/20 p-3">
+                                                                        <h5 className="mb-2 text-sm font-semibold text-green-300">
+                                                                            🌱 ข้อมูลการปลูก
+                                                                        </h5>
+                                                                        <div className="grid grid-cols-5 gap-3 text-sm">
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    พื้นที่โซน:
+                                                                                </span>
+                                                                                <div className="font-bold text-blue-400">
+                                                                                    {zone.areaInRai.toFixed(
+                                                                                        2
+                                                                                    )}{' '}
+                                                                                    ไร่
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    จำนวนต้นไม้:
+                                                                                </span>
+                                                                                <div className="font-bold text-green-400">
+                                                                                    {zone.plantCount.toLocaleString()}{' '}
+                                                                                    ต้น
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    น้ำต่อต้น:
+                                                                                </span>
+                                                                                <div className="font-bold text-cyan-400">
+                                                                                    {waterPerPlant.toFixed(
+                                                                                        0
+                                                                                    )}{' '}
+                                                                                    ลิตร/ต้น
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    น้ำรวมต่อครั้ง:
+                                                                                </span>
+                                                                                <div className="font-bold text-cyan-400">
+                                                                                    {formatWaterVolume(
+                                                                                        zone.waterNeedPerSession
+                                                                                    )}
+                                                                                    /ครั้ง
+                                                                                </div>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="text-gray-200">
+                                                                                    น้ำรวมต่อนาที:
+                                                                                </span>
+                                                                                <div className="font-bold text-cyan-400">
+                                                                                    {zone.plantCount *
+                                                                                        (enhancedStats
+                                                                                            ?.sprinklerFlowRate
+                                                                                            ?.flowRatePerPlant ||
+                                                                                            2.5)}{' '}
+                                                                                    ลิตร/นาที
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
 
-                                                                  <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
-                                                                      <h5 className="mb-2 text-sm font-semibold text-blue-300">
-                                                                          🔧 ระบบท่อในโซน
-                                                                      </h5>
+                                                                    <div className="rounded border border-blue-700/50 bg-blue-900/20 p-3">
+                                                                        <h5 className="mb-2 text-sm font-semibold text-blue-300">
+                                                                            🔧 ระบบท่อในโซน
+                                                                        </h5>
 
-                                                                      <div className="mb-3 rounded bg-red-700/20 p-2">
-                                                                          <h6 className="mb-2 text-xs font-medium text-red-300">
-                                                                              🔴 ท่อเมนหลัก
-                                                                          </h6>
-                                                                          <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-                                                                              <div className="flex items-center gap-2">
-                                                                                  <span className="text-gray-200">
-                                                                                      จำนวน:
-                                                                                  </span>
-                                                                                  <span className="font-bold text-red-400">
-                                                                                      {
-                                                                                          zone
-                                                                                              .mainPipesInZone
-                                                                                              .count
-                                                                                      }{' '}
-                                                                                      ท่อ
-                                                                                  </span>
-                                                                              </div>
-                                                                              <div className="flex items-center gap-2">
-                                                                                  <span className="text-gray-200">
-                                                                                      ยาวรวม:
-                                                                                  </span>
-                                                                                  <span className="font-bold text-red-400">
-                                                                                      {formatDistance(
-                                                                                          zone
-                                                                                              .mainPipesInZone
-                                                                                              .totalLength
-                                                                                      )}
-                                                                                  </span>
-                                                                              </div>
-                                                                              <div className="flex items-center gap-2">
-                                                                                  {(() => {
-                                                                                      const bestMain =
-                                                                                          findBestMainPipeInZone(
-                                                                                              zone.zoneId,
-                                                                                              projectData,
-                                                                                              irrigationZones,
-                                                                                              sprinklerConfig
-                                                                                          );
-                                                                                      return bestMain ? (
-                                                                                          <span className="text-xs font-semibold text-orange-400">
-                                                                                              🔥
-                                                                                              ต้องการน้ำมากที่สุด:
-                                                                                              ยาว{' '}
-                                                                                              {formatDistance(
-                                                                                                  bestMain.length
-                                                                                              )}
-                                                                                              ,
-                                                                                              เชื่อม{' '}
-                                                                                              {
-                                                                                                  bestMain.count
-                                                                                              }{' '}
-                                                                                              ท่อเมนรอง,{' '}
-                                                                                              {bestMain.waterFlowRate.toFixed(
-                                                                                                  1
-                                                                                              )}{' '}
-                                                                                              L/min
-                                                                                          </span>
-                                                                                      ) : (
-                                                                                          <span className="text-xs text-gray-500">
-                                                                                              ไม่พบท่อเมนในโซน
-                                                                                          </span>
-                                                                                      );
-                                                                                  })()}
-                                                                              </div>
-                                                                          </div>
-                                                                      </div>
+                                                                        <div className="mb-3 rounded bg-red-700/20 p-2">
+                                                                            <h6 className="mb-2 text-xs font-medium text-red-300">
+                                                                                🔴 ท่อเมนหลัก
+                                                                            </h6>
+                                                                            <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-200">
+                                                                                        จำนวน:
+                                                                                    </span>
+                                                                                    <span className="font-bold text-red-400">
+                                                                                        {
+                                                                                            zone
+                                                                                                .mainPipesInZone
+                                                                                                .count
+                                                                                        }{' '}
+                                                                                        ท่อ
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-200">
+                                                                                        ยาวรวม:
+                                                                                    </span>
+                                                                                    <span className="font-bold text-red-400">
+                                                                                        {formatDistance(
+                                                                                            zone
+                                                                                                .mainPipesInZone
+                                                                                                .totalLength
+                                                                                        )}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {(() => {
+                                                                                        const bestMain =
+                                                                                            findBestMainPipeInZone(
+                                                                                                zone.zoneId,
+                                                                                                projectData,
+                                                                                                irrigationZones,
+                                                                                                sprinklerConfig
+                                                                                            );
+                                                                                        return bestMain ? (
+                                                                                            <span className="text-xs font-semibold text-orange-400">
+                                                                                                🔥
+                                                                                                ต้องการน้ำมากที่สุด:
+                                                                                                ยาว{' '}
+                                                                                                {formatDistance(
+                                                                                                    bestMain.length
+                                                                                                )}
+                                                                                                ,
+                                                                                                เชื่อม{' '}
+                                                                                                {
+                                                                                                    bestMain.count
+                                                                                                }{' '}
+                                                                                                ท่อเมนรอง,{' '}
+                                                                                                {bestMain.waterFlowRate.toFixed(
+                                                                                                    1
+                                                                                                )}{' '}
+                                                                                                L/min
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="text-xs text-gray-500">
+                                                                                                ไม่พบท่อเมนในโซน
+                                                                                            </span>
+                                                                                        );
+                                                                                    })()}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
 
-                                                                      <div className="mb-3 rounded bg-purple-700/20 p-2">
-                                                                          <h6 className="mb-2 text-xs font-medium text-purple-300">
-                                                                              🟣 ท่อเมนรอง
-                                                                          </h6>
-                                                                          <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-                                                                              <div className="flex items-center gap-2">
-                                                                                  <span className="text-gray-200">
-                                                                                      จำนวน:
-                                                                                  </span>
-                                                                                  <span className="font-bold text-purple-400">
-                                                                                      {
-                                                                                          zone
-                                                                                              .subMainPipesInZone
-                                                                                              .count
-                                                                                      }{' '}
-                                                                                      ท่อ
-                                                                                  </span>
-                                                                              </div>
-                                                                              <div className="flex items-center gap-2">
-                                                                                  <span className="text-gray-200">
-                                                                                      ยาวรวม:
-                                                                                  </span>
-                                                                                  <span className="font-bold text-purple-400">
-                                                                                      {formatDistance(
-                                                                                          zone
-                                                                                              .subMainPipesInZone
-                                                                                              .totalLength
-                                                                                      )}
-                                                                                  </span>
-                                                                              </div>
-                                                                              <div className="flex items-center gap-2">
-                                                                                  {(() => {
-                                                                                      const bestSubMain =
-                                                                                          findBestSubMainPipeInZone(
-                                                                                              zone.zoneId,
-                                                                                              projectData,
-                                                                                              irrigationZones,
-                                                                                              sprinklerConfig
-                                                                                          );
-                                                                                      return bestSubMain ? (
-                                                                                          <span className="text-xs font-semibold text-orange-400">
-                                                                                              🔥
-                                                                                              ต้องการน้ำมากที่สุด:
-                                                                                              ยาว{' '}
-                                                                                              {formatDistance(
-                                                                                                  bestSubMain.length
-                                                                                              )}
-                                                                                              ,
-                                                                                              เชื่อม{' '}
-                                                                                              {
-                                                                                                  bestSubMain.count
-                                                                                              }{' '}
-                                                                                              ท่อย่อย,{' '}
-                                                                                              {bestSubMain.waterFlowRate.toFixed(
-                                                                                                  1
-                                                                                              )}{' '}
-                                                                                              L/min
-                                                                                          </span>
-                                                                                      ) : (
-                                                                                          <span className="text-xs text-gray-500">
-                                                                                              ไม่พบท่อเมนรองในโซน
-                                                                                          </span>
-                                                                                      );
-                                                                                  })()}
-                                                                              </div>
-                                                                          </div>
-                                                                      </div>
+                                                                        <div className="mb-3 rounded bg-purple-700/20 p-2">
+                                                                            <h6 className="mb-2 text-xs font-medium text-purple-300">
+                                                                                🟣 ท่อเมนรอง
+                                                                            </h6>
+                                                                            <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-200">
+                                                                                        จำนวน:
+                                                                                    </span>
+                                                                                    <span className="font-bold text-purple-400">
+                                                                                        {
+                                                                                            zone
+                                                                                                .subMainPipesInZone
+                                                                                                .count
+                                                                                        }{' '}
+                                                                                        ท่อ
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-200">
+                                                                                        ยาวรวม:
+                                                                                    </span>
+                                                                                    <span className="font-bold text-purple-400">
+                                                                                        {formatDistance(
+                                                                                            zone
+                                                                                                .subMainPipesInZone
+                                                                                                .totalLength
+                                                                                        )}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {(() => {
+                                                                                        const bestSubMain =
+                                                                                            findBestSubMainPipeInZone(
+                                                                                                zone.zoneId,
+                                                                                                projectData,
+                                                                                                irrigationZones,
+                                                                                                sprinklerConfig
+                                                                                            );
+                                                                                        return bestSubMain ? (
+                                                                                            <span className="text-xs font-semibold text-orange-400">
+                                                                                                🔥
+                                                                                                ต้องการน้ำมากที่สุด:
+                                                                                                ยาว{' '}
+                                                                                                {formatDistance(
+                                                                                                    bestSubMain.length
+                                                                                                )}
+                                                                                                ,
+                                                                                                เชื่อม{' '}
+                                                                                                {
+                                                                                                    bestSubMain.count
+                                                                                                }{' '}
+                                                                                                ท่อย่อย,{' '}
+                                                                                                {bestSubMain.waterFlowRate.toFixed(
+                                                                                                    1
+                                                                                                )}{' '}
+                                                                                                L/min
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="text-xs text-gray-500">
+                                                                                                ไม่พบท่อเมนรองในโซน
+                                                                                            </span>
+                                                                                        );
+                                                                                    })()}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
 
-                                                                      {/* ท่อย่อย */}
-                                                                      <div className="mb-3 rounded bg-yellow-700/20 p-2">
-                                                                          <h6 className="mb-2 text-xs font-medium text-yellow-300">
-                                                                              🟡 ท่อย่อย
-                                                                          </h6>
-                                                                          <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-                                                                              <div className="flex items-center gap-2">
-                                                                                  <span className="text-gray-200">
-                                                                                      จำนวน:
-                                                                                  </span>
-                                                                                  <span className="font-bold text-yellow-400">
-                                                                                      {
-                                                                                          zone
-                                                                                              .branchPipesInZone
-                                                                                              .count
-                                                                                      }{' '}
-                                                                                      ท่อ
-                                                                                  </span>
-                                                                              </div>
-                                                                              <div className="flex items-center gap-2">
-                                                                                  <span className="text-gray-200">
-                                                                                      ยาวรวม:
-                                                                                  </span>
-                                                                                  <span className="font-bold text-yellow-400">
-                                                                                      {formatDistance(
-                                                                                          zone
-                                                                                              .branchPipesInZone
-                                                                                              .totalLength
-                                                                                      )}
-                                                                                  </span>
-                                                                              </div>
-                                                                              <div className="flex items-center gap-2">
-                                                                                  {(() => {
-                                                                                      const bestBranch =
-                                                                                          findBestBranchPipeInZone(
-                                                                                              zone.zoneId,
-                                                                                              projectData,
-                                                                                              irrigationZones,
-                                                                                              sprinklerConfig
-                                                                                          );
-                                                                                      return bestBranch ? (
-                                                                                          <span className="text-xs font-semibold text-orange-400">
-                                                                                              🔥
-                                                                                              ต้องการน้ำมากที่สุด:
-                                                                                              ยาว{' '}
-                                                                                              {formatDistance(
-                                                                                                  bestBranch.length
-                                                                                              )}
-                                                                                              ,
-                                                                                              ให้น้ำ{' '}
-                                                                                              {
-                                                                                                  bestBranch.count
-                                                                                              }{' '}
-                                                                                              ต้นไม้,{' '}
-                                                                                              {bestBranch.waterFlowRate.toFixed(
-                                                                                                  1
-                                                                                              )}{' '}
-                                                                                              L/min
-                                                                                          </span>
-                                                                                      ) : (
-                                                                                          <span className="text-xs text-gray-500">
-                                                                                              ไม่พบท่อย่อยในโซน
-                                                                                          </span>
-                                                                                      );
-                                                                                  })()}
-                                                                              </div>
-                                                                          </div>
-                                                                      </div>
+                                                                        {/* ท่อย่อย */}
+                                                                        <div className="mb-3 rounded bg-yellow-700/20 p-2">
+                                                                            <h6 className="mb-2 text-xs font-medium text-yellow-300">
+                                                                                🟡 ท่อย่อย
+                                                                            </h6>
+                                                                            <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-200">
+                                                                                        จำนวน:
+                                                                                    </span>
+                                                                                    <span className="font-bold text-yellow-400">
+                                                                                        {
+                                                                                            zone
+                                                                                                .branchPipesInZone
+                                                                                                .count
+                                                                                        }{' '}
+                                                                                        ท่อ
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-200">
+                                                                                        ยาวรวม:
+                                                                                    </span>
+                                                                                    <span className="font-bold text-yellow-400">
+                                                                                        {formatDistance(
+                                                                                            zone
+                                                                                                .branchPipesInZone
+                                                                                                .totalLength
+                                                                                        )}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {(() => {
+                                                                                        const bestBranch =
+                                                                                            findBestBranchPipeInZone(
+                                                                                                zone.zoneId,
+                                                                                                projectData,
+                                                                                                irrigationZones,
+                                                                                                sprinklerConfig
+                                                                                            );
+                                                                                        return bestBranch ? (
+                                                                                            <span className="text-xs font-semibold text-orange-400">
+                                                                                                🔥
+                                                                                                ต้องการน้ำมากที่สุด:
+                                                                                                ยาว{' '}
+                                                                                                {formatDistance(
+                                                                                                    bestBranch.length
+                                                                                                )}
+                                                                                                ,
+                                                                                                ให้น้ำ{' '}
+                                                                                                {
+                                                                                                    bestBranch.count
+                                                                                                }{' '}
+                                                                                                ต้นไม้,{' '}
+                                                                                                {bestBranch.waterFlowRate.toFixed(
+                                                                                                    1
+                                                                                                )}{' '}
+                                                                                                L/min
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="text-xs text-gray-500">
+                                                                                                ไม่พบท่อย่อยในโซน
+                                                                                            </span>
+                                                                                        );
+                                                                                    })()}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
 
-                                                                      {/* ท่อย่อยแยก */}
-                                                                      {zone.emitterPipesInZone &&
-                                                                          zone.emitterPipesInZone
-                                                                              .count > 0 && (
-                                                                              <div className="mb-3 rounded bg-green-700/20 p-2">
-                                                                                  <h6 className="mb-2 text-xs font-medium text-green-300">
-                                                                                      🟢 ท่อย่อยแยก
-                                                                                  </h6>
-                                                                                  <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-                                                                                      <div className="flex items-center gap-2">
-                                                                                          <span className="text-gray-200">
-                                                                                              จำนวน:
-                                                                                          </span>
-                                                                                          <span className="font-bold text-green-400">
-                                                                                              {
-                                                                                                  zone
-                                                                                                      .emitterPipesInZone
-                                                                                                      .count
-                                                                                              }{' '}
-                                                                                              ท่อ
-                                                                                          </span>
-                                                                                      </div>
+                                                                        {/* ท่อย่อยแยก */}
+                                                                        {zone.emitterPipesInZone &&
+                                                                            zone.emitterPipesInZone
+                                                                                .count > 0 && (
+                                                                                <div className="mb-3 rounded bg-green-700/20 p-2">
+                                                                                    <h6 className="mb-2 text-xs font-medium text-green-300">
+                                                                                        🟢 ท่อย่อยแยก
+                                                                                    </h6>
+                                                                                    <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-gray-200">
+                                                                                                จำนวน:
+                                                                                            </span>
+                                                                                            <span className="font-bold text-green-400">
+                                                                                                {
+                                                                                                    zone
+                                                                                                        .emitterPipesInZone
+                                                                                                        .count
+                                                                                                }{' '}
+                                                                                                ท่อ
+                                                                                            </span>
+                                                                                        </div>
 
-                                                                                      <div className="flex items-center gap-2 font-bold text-green-400">
-                                                                                          <div className="flex items-center gap-2">
-                                                                                              <span className="text-gray-200">
-                                                                                                  ยาวรวม:
-                                                                                              </span>
-                                                                                              <span className="font-bold text-green-400">
-                                                                                                  {formatDistance(
-                                                                                                      zone
-                                                                                                          .emitterPipesInZone
-                                                                                                          .totalLength
-                                                                                                  )}
-                                                                                              </span>
-                                                                                          </div>
-                                                                                      </div>
-                                                                                  </div>
-                                                                              </div>
-                                                                          )}
-                                                                  </div>
-                                                              </div>
-                                                          )}
-                                                      </div>
-                                                  );
-                                              })}
+                                                                                        <div className="flex items-center gap-2 font-bold text-green-400">
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-gray-200">
+                                                                                                    ยาวรวม:
+                                                                                                </span>
+                                                                                                <span className="font-bold text-green-400">
+                                                                                                    {formatDistance(
+                                                                                                        zone
+                                                                                                            .emitterPipesInZone
+                                                                                                            .totalLength
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
                         </div>
                     </div>
                 </div>

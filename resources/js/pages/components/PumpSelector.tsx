@@ -668,7 +668,21 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 horticulturePipeHeadLoss = results.headLoss?.total || 0;
             }
             
-            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss;
+            // เพิ่ม static head (ความสูงจากปั๊มไปจุดสูงสุด) จาก localStorage
+            let staticHeadM = 0;
+            try {
+                const stored = localStorage.getItem('horticulture_elevation_diff_m');
+                if (stored !== null) {
+                    const value = parseFloat(stored);
+                    if (isFinite(value)) {
+                        staticHeadM = value;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error reading elevation difference from localStorage:', error);
+            }
+            
+            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
             return totalPumpHead;
         } else if (projectMode === 'garden') {
             // สำหรับ garden mode ให้ใช้ cachedMaxPumpHead หรือ fallback
@@ -910,12 +924,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
         return (
             <div className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300">
-                <img
-                    src="/images/water-pump.png"
-                    alt="Water Pump"
-                    className="h-6 w-6 object-contain"
-                />
-                {t('ปั๊ม')}
+                
+                {t('ไม่มีรูปปั๊ม')}
             </div>
         );
     };
@@ -1313,7 +1323,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         <img
                             src={modalImage.src}
                             alt={modalImage.alt}
-                            className="max-h-full max-w-full rounded-lg shadow-2xl"
+                            className="max-h-[80vh] max-w-[80vw] rounded-lg shadow-2xl object-contain"
+                            style={{ display: 'block', margin: '0 auto' }}
                         />
                         <div className="mt-2 text-center">
                             <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
@@ -1330,7 +1341,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     onClick={() => setShowAccessoriesModal(false)}
                 >
                     <div
-                        className="relative mx-4 max-h-[90vh] w-full max-w-[800px] overflow-hidden rounded-lg bg-gray-800 shadow-2xl"
+                        className="relative mx-4 max-h-[90vh] w-full max-w-[90vw] overflow-hidden rounded-lg bg-gray-800 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between bg-purple-900 px-4 py-3">

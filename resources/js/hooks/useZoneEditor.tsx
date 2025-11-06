@@ -41,6 +41,7 @@ export interface UseZoneEditorReturn {
     handleControlPointDragEnd: () => void;
     applyZoneChanges: () => void;
     cancelZoneChanges: () => void;
+    deleteSelectedZone: () => void;
 
     // Helper functions
     pixelToCoordinate: (pixelX: number, pixelY: number) => Coordinate;
@@ -330,6 +331,30 @@ export const useZoneEditor = ({
         exitEditMode();
     }, [originalZone, exitEditMode]);
 
+    // ลบโซนที่เลือกอยู่
+    const deleteSelectedZone = useCallback(() => {
+        if (!editState.editingZone) {
+            onError?.('กรุณาเลือกโซนก่อนลบ');
+            return;
+        }
+
+        try {
+            const targetId = editState.editingZone.id;
+            const zoneExists = zones.some((z) => z.id === targetId);
+            if (!zoneExists) {
+                onError?.('ไม่พบโซนที่ต้องการลบ');
+                return;
+            }
+
+            const updatedZones = zones.filter((z) => z.id !== targetId);
+            onZonesUpdate(updatedZones);
+            exitEditMode();
+            onSuccess?.('ลบโซนเรียบร้อย');
+        } catch (e) {
+            onError?.('เกิดข้อผิดพลาดในการลบโซน');
+        }
+    }, [editState.editingZone, zones, onZonesUpdate, exitEditMode, onError, onSuccess]);
+
     return {
         // State
         editState,
@@ -345,6 +370,7 @@ export const useZoneEditor = ({
         handleControlPointDragEnd,
         applyZoneChanges,
         cancelZoneChanges,
+        deleteSelectedZone,
 
         // Helper functions
         pixelToCoordinate,

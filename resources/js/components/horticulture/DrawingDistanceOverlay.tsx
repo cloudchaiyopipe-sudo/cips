@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FaRuler, FaTimes } from 'react-icons/fa';
+import { 
+    calculateDistance, 
+    formatDistance, 
+    getDrawingModeText, 
+    isPolygonMode, 
+    isPolylineMode,
+    isValidCoordinate 
+} from '../../utils/distanceMeasurementUtils';
 
 interface Coordinate {
     lat: number;
@@ -28,57 +36,15 @@ const DrawingDistanceOverlay: React.FC<DrawingDistanceOverlayProps> = ({
     const [distance, setDistance] = useState(0);
     const [isVisible, setIsVisible] = useState(false);
 
-    const calculateDistance = (point1: Coordinate, point2: Coordinate): number => {
-        const R = 6371000; // Earth's radius in meters
-        const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
-        const dLng = ((point2.lng - point1.lng) * Math.PI) / 180;
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((point1.lat * Math.PI) / 180) *
-                Math.cos((point2.lat * Math.PI) / 180) *
-                Math.sin(dLng / 2) *
-                Math.sin(dLng / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    };
-
-    const formatDistance = (meters: number): string => {
-        if (meters < 1000) {
-            return `${meters.toFixed(1)} ม.`;
-        } else {
-            return `${(meters / 1000).toFixed(2)} กม.`;
-        }
-    };
+    // Distance calculation functions are now imported from utils
 
 
-    const getDrawingModeText = (mode: string | null): string => {
-        switch (mode) {
-            case 'mainArea':
-                return t('วาดพื้นที่หลัก') || 'วาดพื้นที่หลัก';
-            case 'zone':
-                return t('วาดโซน') || 'วาดโซน';
-            case 'exclusion':
-                return t('วาดพื้นที่ยกเว้น') || 'วาดพื้นที่ยกเว้น';
-            case 'mainPipe':
-                return t('วาดท่อเมน') || 'วาดท่อเมน';
-            case 'subMainPipe':
-                return t('วาดท่อเมนรอง') || 'วาดท่อเมนรอง';
-            default:
-                return t('วาด') || 'วาด';
-        }
-    };
-
-    const isPolygonMode = (mode: string | null): boolean => {
-        return mode === 'mainArea' || mode === 'zone' || mode === 'exclusion';
-    };
-
-    const isPolylineMode = (mode: string | null): boolean => {
-        return mode === 'mainPipe' || mode === 'subMainPipe';
-    };
+    // Mode checking functions are now imported from utils
 
     // Calculate distance when start point and current mouse position change
     useEffect(() => {
-        if (startPoint && currentMousePosition) {
+        if (startPoint && currentMousePosition && 
+            isValidCoordinate(startPoint) && isValidCoordinate(currentMousePosition)) {
             const calculatedDistance = calculateDistance(startPoint, currentMousePosition);
             setDistance(calculatedDistance);
         } else {
@@ -104,7 +70,7 @@ const DrawingDistanceOverlay: React.FC<DrawingDistanceOverlayProps> = ({
                     <div className="flex items-center space-x-2">
                         <FaRuler className="text-sm" />
                         <span className="text-sm font-medium">
-                            {getDrawingModeText(editMode)}
+                            {getDrawingModeText(editMode, t)}
                         </span>
                     </div>
                     <button

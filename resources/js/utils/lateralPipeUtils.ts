@@ -1733,8 +1733,10 @@ export const computeOverPlantsMode = (
     snapThreshold: number,
     direction: 'rows' | 'columns'
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
+
     const rows = groupPlantsByRows(plants);
     const cols = groupPlantsByColumns(plants);
+
 
     const findClosestPlantToStart = (
         group: PlantLocation[]
@@ -1860,6 +1862,7 @@ export const computeOverPlantsMode = (
         return { alignedEnd: rawEndPoint, selectedPlants: [], snappedStart: initialStartPoint };
     }
 
+
     const alignment = bestAlignment as OverPlantsAlignment;
     const projectedStart = findClosestPointOnLineSegment(
         initialStartPoint,
@@ -1946,6 +1949,7 @@ export const computeOverPlantsMode = (
         return result;
     });
 
+
     return { alignedEnd, selectedPlants, snappedStart };
 };
 
@@ -1956,24 +1960,10 @@ export const computeBetweenPlantsMode = (
     snapThreshold: number,
     direction: 'rows' | 'columns'
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
-    console.log('🌱 computeBetweenPlantsMode called:', {
-        initialStartPoint,
-        rawEndPoint,
-        plantsCount: plants.length,
-        snapThreshold,
-        direction
-    });
     
     const rows = groupPlantsByRows(plants);
     const cols = groupPlantsByColumns(plants);
     
-    console.log('📊 Plant groups:', {
-        rowsCount: rows.length,
-        colsCount: cols.length,
-        rowsLengths: rows.map(r => r.length),
-        colsLengths: cols.map(c => c.length)
-    });
-
     const findClosestPlantToStartInPair = (
         group1: PlantLocation[],
         group2: PlantLocation[]
@@ -2045,9 +2035,9 @@ export const computeBetweenPlantsMode = (
         const maxGroupDistance = 20.0; 
 
         const isSuitablePair =
-            closestToStart.distance <= adjustedSnapThreshold * 1.5 && // เพิ่ม tolerance
-            distanceBetweenGroupsCalc >= minGroupDistance * 0.5 && // ลด minimum distance
-            distanceBetweenGroupsCalc <= maxGroupDistance * 1.5; // เพิ่ม maximum distance
+            closestToStart.distance <= adjustedSnapThreshold * 1.5 &&
+            distanceBetweenGroupsCalc >= minGroupDistance * 0.5 &&
+            distanceBetweenGroupsCalc <= maxGroupDistance * 1.5;
 
         let centerLineStart: Coordinate;
         let centerLineEnd: Coordinate;
@@ -2114,14 +2104,14 @@ export const computeBetweenPlantsMode = (
         );
 
         const isOptimalDistance =
-            distanceBetweenGroupsCalc >= 1.0 && distanceBetweenGroupsCalc <= 25.0; // เพิ่ม range
+            distanceBetweenGroupsCalc >= 1.0 && distanceBetweenGroupsCalc <= 25.0;
 
         const isBetterChoice =
             !bestAlignment ||
-            distanceToCenterLine < bestAlignment.firstPlantDistance * 0.8 || // เพิ่ม tolerance
-            (distanceToCenterLine <= bestAlignment.firstPlantDistance * 1.2 && isOptimalDistance); // เพิ่ม tolerance
+            distanceToCenterLine < bestAlignment.firstPlantDistance * 0.8 ||
+            (distanceToCenterLine <= bestAlignment.firstPlantDistance * 1.2 && isOptimalDistance);
 
-        const isCloseToCenterLine = distanceToCenterLine <= adjustedSnapThreshold * 1.2; // เพิ่ม tolerance 
+        const isCloseToCenterLine = distanceToCenterLine <= adjustedSnapThreshold * 1.2;
 
         const isGoodPair = isSuitablePair && isBetterChoice && isCloseToCenterLine;
 
@@ -2182,7 +2172,6 @@ export const computeBetweenPlantsMode = (
     }
 
     if (!bestAlignment) {
-        console.log('⚠️ No best alignment found, using fallback');
         const allPlants = [...plants];
         const directPlants = allPlants.filter((plant) => {
             const closestPoint = findClosestPointOnLineSegment(
@@ -2192,14 +2181,10 @@ export const computeBetweenPlantsMode = (
             );
             const distance = calculateDistanceBetweenPoints(plant.position, closestPoint);
 
-            return distance <= 25.0; // เพิ่ม tolerance สำหรับ fallback
+            return distance <= 25.0;
         });
         
-        console.log('🔄 Fallback plants found:', directPlants.length);
-        
-        // ถ้ายังไม่พบต้นไม้ ให้ใช้ต้นไม้ที่ใกล้ที่สุด
         if (directPlants.length === 0 && allPlants.length > 0) {
-            console.log('🆘 Using closest plant fallback');
             const closestPlant = allPlants.reduce((closest, plant) => {
                 const distance = calculateDistanceBetweenPoints(plant.position, initialStartPoint);
                 const closestDistance = calculateDistanceBetweenPoints(closest.position, initialStartPoint);
@@ -2269,7 +2254,7 @@ export const computeBetweenPlantsMode = (
         const distanceToEnd = calculateDistanceBetweenPoints(plantProjected, alignedEnd);
         const lateralLength = calculateDistanceBetweenPoints(snappedStart, alignedEnd);
 
-        const pipeLengthTolerance = Math.max(3.0, avgPlantSpacing * 0.6); // เพิ่ม tolerance
+        const pipeLengthTolerance = Math.max(3.0, avgPlantSpacing * 0.6);
 
         const isWithinPipeLength =
             distanceToStart + distanceToEnd <= lateralLength + pipeLengthTolerance;
@@ -2277,23 +2262,23 @@ export const computeBetweenPlantsMode = (
         let isInRange = false;
 
         if (rotationInfo.hasRotation) {
-            const tolerance = Math.max(3.0, lateralLength * 0.08); // เพิ่ม tolerance
+            const tolerance = Math.max(3.0, lateralLength * 0.08);
             isInRange = distanceToStart + distanceToEnd <= lateralLength + tolerance;
         } else {
             if (bestAlignment.type === 'between_rows') {
                 const minLng = Math.min(snappedStart.lng, alignedEnd.lng);
                 const maxLng = Math.max(snappedStart.lng, alignedEnd.lng);
-                const lngTolerance = Math.max(0.000003, avgPlantSpacing * 0.000005); // ลด tolerance
+                const lngTolerance = Math.max(0.000003, avgPlantSpacing * 0.000005);
                 isInRange =
-                    plantProjected.lng >= minLng - lngTolerance && // เปลี่ยนเป็น - เพื่อให้กว้างขึ้น
-                    plantProjected.lng <= maxLng + lngTolerance; // เปลี่ยนเป็น + เพื่อให้กว้างขึ้น
+                    plantProjected.lng >= minLng - lngTolerance &&
+                    plantProjected.lng <= maxLng + lngTolerance;
             } else {
                 const minLat = Math.min(snappedStart.lat, alignedEnd.lat);
                 const maxLat = Math.max(snappedStart.lat, alignedEnd.lat);
                 const latTolerance = Math.max(0.000003, avgPlantSpacing * 0.000005); // ลด tolerance
                 isInRange =
-                    plantProjected.lat >= minLat - latTolerance && // เปลี่ยนเป็น - เพื่อให้กว้างขึ้น
-                    plantProjected.lat <= maxLat + latTolerance; // เปลี่ยนเป็น + เพื่อให้กว้างขึ้น
+                    plantProjected.lat >= minLat - latTolerance &&
+                    plantProjected.lat <= maxLat + latTolerance;
             }
         }
 
@@ -2326,11 +2311,11 @@ export const computeBetweenPlantsMode = (
 
         let distanceTolerance;
         if (avgPlantSpacing < 3.0) {
-            distanceTolerance = Math.max(1.2, avgPlantSpacing * 0.3); // เพิ่ม tolerance
+            distanceTolerance = Math.max(1.2, avgPlantSpacing * 0.3);
         } else if (avgPlantSpacing < 8.0) {
-            distanceTolerance = Math.max(1.8, avgPlantSpacing * 0.35); // เพิ่ม tolerance
+            distanceTolerance = Math.max(1.8, avgPlantSpacing * 0.35);
         } else {
-            distanceTolerance = Math.max(2.0, Math.min(4.0, avgPlantSpacing * 0.4)); // เพิ่ม tolerance
+            distanceTolerance = Math.max(2.0, Math.min(4.0, avgPlantSpacing * 0.4));
         }
         const result =
             isInRange &&
@@ -2354,27 +2339,20 @@ export const computeBetweenPlantsMode = (
 
             let fallbackTolerance;
             if (avgPlantSpacing < 3.0) {
-                fallbackTolerance = 2.5; // เพิ่ม tolerance
+                fallbackTolerance = 2.5;
             } else if (avgPlantSpacing < 8.0) {
-                fallbackTolerance = 4.0; // เพิ่ม tolerance
+                fallbackTolerance = 4.0;
             } else {
-                fallbackTolerance = 6.0; // เพิ่ม tolerance
+                fallbackTolerance = 6.0;
             }
             return distance <= fallbackTolerance;
         });
 
         if (fallbackPlants.length > 0) {
-            console.log('🔄 Using fallback plants:', fallbackPlants.length);
             return { alignedEnd, selectedPlants: fallbackPlants, snappedStart };
         }
     }
 
-    console.log('✅ computeBetweenPlantsMode result:', {
-        alignedEnd,
-        selectedPlantsCount: selectedPlants.length,
-        snappedStart
-    });
-    
     return { alignedEnd, selectedPlants, snappedStart };
 };
 
@@ -2657,10 +2635,12 @@ export const computeMultiSegmentAlignment = (
     const processedPlantIds = new Set<string>();
     const waypointProximityThreshold = snapThreshold * 1.5; 
 
+
    
     for (let i = 0; i < allWaypoints.length - 1; i++) {
         const segmentStart = i === 0 ? startPoint : lastAlignedEnd;
         const segmentEnd = allWaypoints[i + 1];
+
 
         const segmentResult = computeAlignedLateral(
             segmentStart,
@@ -2670,25 +2650,52 @@ export const computeMultiSegmentAlignment = (
             snapThreshold
         );
 
+
         const filteredSegmentPlants: PlantLocation[] = [];
 
         segmentResult.selectedPlants.forEach((plant) => {
             let shouldAddPlant = true;
 
+            // DEBUG: Check waypoint proximity for each plant
+            // Only check waypoints that are NOT part of the current segment
             for (let j = 0; j < waypoints.length; j++) {
                 const waypoint = waypoints[j];
                 const distanceToWaypoint = calculateDistanceBetweenPoints(plant.position, waypoint);
 
                 if (distanceToWaypoint <= waypointProximityThreshold) {
-
-                    if (i !== j) {
+                    // FIXED: Only exclude plant if it's close to a waypoint that's NOT part of current segment
+                    // Current segment i uses waypoints at indices i and i+1
+                    // For segment 0: waypoints 0,1
+                    // For segment 1: waypoints 1,2  
+                    // For segment 2: waypoints 2,3
+                    // etc.
+                    const isWaypointInCurrentSegment = (j === i) || (j === i + 1);
+                    
+                    // SPECIAL CASE: For the first segment (i=0), waypoint 0 is the start point
+                    // and should not exclude plants even if they are very close to it
+                    // Also, for any segment, if the waypoint is the start of that segment, don't exclude
+                    const isFirstSegmentStartPoint = (i === 0) && (j === 0);
+                    const isCurrentSegmentStartPoint = (j === i);
+                    
+                    // Additional check: Don't exclude plants near waypoint 0 if it's the start of any segment
+                    // This handles the case where waypoint 0 is used as start point for multiple segments
+                    const isWaypoint0StartPoint = (j === 0);
+                    
+                    // Also don't exclude plants near waypoint 1 if it's the start of any segment
+                    // This handles the case where waypoint 1 is used as start point for multiple segments
+                    const isWaypoint1StartPoint = (j === 1);
+                    
+                    
+                    if (!isWaypointInCurrentSegment && !isFirstSegmentStartPoint && !isCurrentSegmentStartPoint && !isWaypoint0StartPoint && !isWaypoint1StartPoint) {
                         shouldAddPlant = false;
                         break;
                     } else {
+                        // Plant is close to current segment's waypoint - this is OK
                         shouldAddPlant = true;
                     }
                 }
             }
+
 
             if (shouldAddPlant && !processedPlantIds.has(plant.id)) {
                 filteredSegmentPlants.push(plant);
@@ -2696,6 +2703,7 @@ export const computeMultiSegmentAlignment = (
                 processedPlantIds.add(plant.id);
             }
         });
+
 
         segmentResults.push({
             startPoint: segmentStart,
@@ -2708,6 +2716,7 @@ export const computeMultiSegmentAlignment = (
     }
 
     const totalWaterNeed = calculateTotalWaterNeed(allSelectedPlants);
+
 
     return {
         allSelectedPlants,

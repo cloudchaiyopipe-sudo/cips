@@ -7,7 +7,6 @@ import {
     FaInfoCircle,
     FaCheck,
     FaTimes,
-    FaTint,
 } from 'react-icons/fa';
 import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 
@@ -240,27 +239,15 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 p-3">
-                        <div className="flex items-center gap-2 text-blue-700">
-                            <FaTint size={16} />
-                            <span className="text-sm font-medium">
-                                {t('Q หัวฉีด') || 'Q หัวฉีด'}
-                            </span>
-                        </div>
-                        <div className="text-lg font-bold text-blue-800">
-                            {flowRatePerMinute.toFixed(1)} L/M
-                        </div>
-                    </div>
-
                     <div className="flex items-center justify-between rounded-md border border-cyan-200 bg-cyan-50 p-3">
                         <div className="flex items-center gap-2 text-cyan-700">
                             <FaWater size={16} />
                             <span className="text-sm font-medium">
-                                {t('Q รวม/นาที') || 'Q รวม/นาที'}
+                                {t('อัตราการไหล') || 'อัตราการไหล'}
                             </span>
                         </div>
                         <div className="text-lg font-bold text-cyan-800">
-                            {totalFlowRatePerMinute.toLocaleString()} L/M
+                            {totalFlowRatePerMinute.toLocaleString()} {t('ลิตร/นาที') || 'ลิตร/นาที'}
                         </div>
                     </div>
 
@@ -272,7 +259,7 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                             </span>
                         </div>
                         <div className="text-lg font-bold text-orange-800">
-                            {length.toFixed(1)} m
+                            {length.toFixed(1)} {t('เมตร') || 'เมตร'}
                         </div>
                     </div>
                 </div>

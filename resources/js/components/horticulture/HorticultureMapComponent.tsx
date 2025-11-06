@@ -146,50 +146,52 @@ const MapComponent: React.FC<{
                     minZoom: null,
                     maxZoom: null,
                     restriction: null,
-                    zoomControl: true,
-                    scrollwheel: true,
-                    gestureHandling: 'greedy',
-                    // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่
-                    clickableIcons: true,
-                    mapTypeControl: true,
-                    mapTypeControlOptions: {
-                        position: google.maps.ControlPosition.TOP_CENTER,
-                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                        mapTypeIds: [
-                            google.maps.MapTypeId.ROADMAP,
-                            google.maps.MapTypeId.SATELLITE,
-                            google.maps.MapTypeId.HYBRID,
-                            google.maps.MapTypeId.TERRAIN
-                        ]
-                    },
-                    // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่
-                    styles: [
+                    zoomControl: mapOptions?.zoomControl ?? true,
+                    scrollwheel: mapOptions?.scrollwheel ?? true,
+                    gestureHandling: mapOptions?.gestureHandling ?? 'greedy',
+                    // แสดง/ซ่อนชื่อสถานที่และไอคอนตามการตั้งค่าหน้าเพจ
+                    clickableIcons: mapOptions?.clickableIcons ?? true,
+                    mapTypeControl: mapOptions?.mapTypeControl ?? true,
+                    mapTypeControlOptions:
+                        mapOptions?.mapTypeControl === false
+                            ? undefined
+                            : {
+                                  position: google.maps.ControlPosition.TOP_CENTER,
+                                  style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                                  mapTypeIds: [
+                                      google.maps.MapTypeId.ROADMAP,
+                                      google.maps.MapTypeId.SATELLITE,
+                                      google.maps.MapTypeId.HYBRID,
+                                      google.maps.MapTypeId.TERRAIN,
+                                  ],
+                              },
+                    styles: mapOptions?.styles ?? [
                         {
                             featureType: 'poi',
                             elementType: 'labels',
-                            stylers: [{ visibility: 'on' }]
+                            stylers: [{ visibility: 'on' }],
                         },
                         {
                             featureType: 'administrative',
                             elementType: 'labels',
-                            stylers: [{ visibility: 'on' }]
+                            stylers: [{ visibility: 'on' }],
                         },
                         {
                             featureType: 'road',
                             elementType: 'labels',
-                            stylers: [{ visibility: 'on' }]
+                            stylers: [{ visibility: 'on' }],
                         },
                         {
                             featureType: 'transit',
                             elementType: 'labels',
-                            stylers: [{ visibility: 'on' }]
+                            stylers: [{ visibility: 'on' }],
                         },
                         {
                             featureType: 'water',
                             elementType: 'labels',
-                            stylers: [{ visibility: 'on' }]
-                        }
-                    ]
+                            stylers: [{ visibility: 'on' }],
+                        },
+                    ],
                 });
 
                 let isZooming = false;
@@ -236,22 +238,28 @@ const MapComponent: React.FC<{
                             maxZoom: null,
                         });
                     }
-                    
-                    // ตั้งค่าให้แสดงชื่อสถานที่เมื่อ zoom เปลี่ยน
+
+                    // เคารพการตั้งค่าจากหน้าเพจ: หากปิด mapTypeControl/clickableIcons ไว้ อย่าเปิดอีก
                     if (currentZoom && currentZoom >= 10) {
-                        newMap.setOptions({
-                            clickableIcons: true,
-                            mapTypeControl: true,
-                        });
+                        if (mapOptions?.clickableIcons === false || mapOptions?.mapTypeControl === false) {
+                            newMap.setOptions({
+                                clickableIcons: mapOptions?.clickableIcons ?? true,
+                                mapTypeControl: mapOptions?.mapTypeControl ?? true,
+                            });
+                        } else {
+                            newMap.setOptions({
+                                clickableIcons: true,
+                                mapTypeControl: true,
+                            });
+                        }
                     }
                 });
 
-                // เพิ่มการตั้งค่าเพื่อแสดงชื่อสถานที่เมื่อโหลดแผนที่เสร็จ
+                // เคารพการตั้งค่าจากหน้าเพจหลังโหลดแผนที่เสร็จ
                 newMap.addListener('idle', () => {
-                    // ตั้งค่าให้แสดงชื่อสถานที่ต่างๆ
                     newMap.setOptions({
-                        clickableIcons: true,
-                        mapTypeControl: true
+                        clickableIcons: mapOptions?.clickableIcons ?? true,
+                        mapTypeControl: mapOptions?.mapTypeControl ?? true,
                     });
                 });
 

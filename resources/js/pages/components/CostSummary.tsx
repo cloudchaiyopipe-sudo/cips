@@ -111,6 +111,86 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 }) => {
     const { t } = useLanguage();
 
+    // ฟังก์ชันแปลง zoneId เป็นชื่อโซนที่ถูกต้อง
+    const getZoneName = (zoneId: string): string => {
+        if (projectMode === 'garden' && gardenStats) {
+            const zone = gardenStats.zones.find((z) => z.zoneId === zoneId);
+            return zone?.zoneName || zoneId;
+        }
+        if (projectMode === 'field-crop' && fieldCropData) {
+            const zone = fieldCropData.zones.info.find((z: any) => z.id === zoneId);
+            return zone?.name || zoneId;
+        }
+        if (projectMode === 'greenhouse' && greenhouseData) {
+            const plot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === zoneId);
+            return plot?.plotName || zoneId;
+        }
+
+        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+        if (horticultureSystemDataStr) {
+            try {
+                const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                if (horticultureSystemData && horticultureSystemData.zones) {
+                    const zone = horticultureSystemData.zones.find((z: any) => z.id === zoneId);
+                    if (zone?.name) {
+                        return zone.name;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticultureSystemData:', error);
+            }
+        }
+
+        const zone = projectData?.zones.find((z) => z.id === zoneId);
+        return zone?.name || zoneId;
+    };
+
+    // ฟังก์ชันแปลงชื่อโซนเป็น "โซน 1,2,3,4"
+    const formatZoneNames = (zoneNames: string[]): string => {
+        if (!zoneNames || zoneNames.length === 0) return '';
+        
+        // ดึงตัวเลขลำดับโซน (1-3 หลัก) จากชื่อโซน
+        const zoneNumbers: number[] = [];
+        
+        zoneNames.forEach((zoneName) => {
+            // ลบข้อมูลในวงเล็บออก (เช่น "โซน 1 (area...)" -> "โซน 1")
+            const cleanedName = zoneName.split(' (')[0].trim();
+            
+            // หาเลขลำดับโซนที่อยู่หลังคำว่า "โซน" หรือ pattern ที่เหมาะสม
+            // 1. ลองหาจาก pattern "โซน {เลข 1-3 หลัก}"
+            let match = cleanedName.match(/โซน\s*(\d{1,3})\b/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > 0 && num <= 999 && !zoneNumbers.includes(num)) {
+                    zoneNumbers.push(num);
+                    return;
+                }
+            }
+            
+            // 2. ลองหาจาก pattern "Zone {เลข 1-3 หลัก}" (ภาษาอังกฤษ)
+            match = cleanedName.match(/Zone\s*(\d{1,3})\b/i);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > 0 && num <= 999 && !zoneNumbers.includes(num)) {
+                    zoneNumbers.push(num);
+                    return;
+                }
+            }
+            
+            // 3. ถ้าไม่มี pattern ที่ชัดเจน ให้ข้าม (ไม่ใช้ ID ที่ยาว)
+            // ไม่ดึงเลขจากชื่อโซนที่ไม่มี pattern ที่ชัดเจน เพราะอาจเป็น ID
+        });
+        
+        // ถ้ามีตัวเลข ให้เรียงลำดับและแสดงเป็น "โซน 1,2,3,4"
+        if (zoneNumbers.length > 0) {
+            zoneNumbers.sort((a, b) => a - b);
+            return `โซน ${zoneNumbers.join(',')}`;
+        }
+        
+        // ถ้าไม่มีตัวเลข ให้ใช้ชื่อโซนเดิม
+        return zoneNames.join(', ');
+    };
+
     const getItemName = () => {
         switch (projectMode) {
             case 'garden':
@@ -251,12 +331,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         extraPipeSummary = {
                             pipe,
                             totalLength: extraLength,
-                            zones: [zoneId],
+                            zones: [getZoneName(zoneId)],
                         };
                     } else if (extraPipeSummary.pipe.id === extraPipeId) {
                         extraPipeSummary.totalLength += extraLength;
-                        if (!extraPipeSummary.zones.includes(zoneId)) {
-                            extraPipeSummary.zones.push(zoneId);
+                        const zoneName = getZoneName(zoneId);
+                        if (!extraPipeSummary.zones.includes(zoneName)) {
+                            extraPipeSummary.zones.push(zoneName);
                         }
                     }
                 }
@@ -302,8 +383,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             pipeSummary.branch[key].extraLength =
                                 (pipeSummary.branch[key].extraLength || 0) + extraLength;
                             pipeSummary.branch[key].includesExtra = true;
-                            if (!pipeSummary.branch[key].zones.includes(zoneId)) {
-                                pipeSummary.branch[key].zones.push(zoneId);
+                            const zoneName = getZoneName(zoneId);
+                            if (!pipeSummary.branch[key].zones.includes(zoneName)) {
+                                pipeSummary.branch[key].zones.push(zoneName);
                             }
                             hasProcessedPipe = true;
                             return;
@@ -325,8 +407,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             pipeSummary.secondary[key].extraLength =
                                 (pipeSummary.secondary[key].extraLength || 0) + extraLength;
                             pipeSummary.secondary[key].includesExtra = true;
-                            if (!pipeSummary.secondary[key].zones.includes(zoneId)) {
-                                pipeSummary.secondary[key].zones.push(zoneId);
+                            const zoneName = getZoneName(zoneId);
+                            if (!pipeSummary.secondary[key].zones.includes(zoneName)) {
+                                pipeSummary.secondary[key].zones.push(zoneName);
                             }
                             hasProcessedPipe = true;
                             return;
@@ -348,8 +431,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             pipeSummary.main[key].extraLength =
                                 (pipeSummary.main[key].extraLength || 0) + extraLength;
                             pipeSummary.main[key].includesExtra = true;
-                            if (!pipeSummary.main[key].zones.includes(zoneId)) {
-                                pipeSummary.main[key].zones.push(zoneId);
+                            const zoneName = getZoneName(zoneId);
+                            if (!pipeSummary.main[key].zones.includes(zoneName)) {
+                                pipeSummary.main[key].zones.push(zoneName);
                             }
                             hasProcessedPipe = true;
                             return;
@@ -371,8 +455,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             pipeSummary.emitter[key].extraLength =
                                 (pipeSummary.emitter[key].extraLength || 0) + extraLength;
                             pipeSummary.emitter[key].includesExtra = true;
-                            if (!pipeSummary.emitter[key].zones.includes(zoneId)) {
-                                pipeSummary.emitter[key].zones.push(zoneId);
+                            const zoneName = getZoneName(zoneId);
+                            if (!pipeSummary.emitter[key].zones.includes(zoneName)) {
+                                pipeSummary.emitter[key].zones.push(zoneName);
                             }
                             hasProcessedPipe = true;
                             return;
@@ -392,12 +477,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             extraPipeSummary = {
                                 pipe: pipeData,
                                 totalLength: extraLength,
-                                zones: [zoneId],
+                                zones: [getZoneName(zoneId)],
                             };
                         } else if (extraPipeSummary.pipe.id === pipeData.id) {
                             extraPipeSummary.totalLength += extraLength;
-                            if (!extraPipeSummary.zones.includes(zoneId)) {
-                                extraPipeSummary.zones.push(zoneId);
+                            const zoneName = getZoneName(zoneId);
+                            if (!extraPipeSummary.zones.includes(zoneName)) {
+                                extraPipeSummary.zones.push(zoneName);
                             }
                         }
 
@@ -433,7 +519,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(zone.zoneName);
+                    sprinklerSummary[key].zones.push(getZoneName(effectiveZoneId));
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
@@ -454,7 +540,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(zone.zoneName);
+                        pipeSummary.branch[key].zones.push(getZoneName(effectiveZoneId));
                     }
 
                     const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
@@ -470,7 +556,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(zone.zoneName);
+                        pipeSummary.secondary[key].zones.push(getZoneName(effectiveZoneId));
                     }
 
                     const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
@@ -486,7 +572,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(zone.zoneName);
+                        pipeSummary.main[key].zones.push(getZoneName(effectiveZoneId));
                     }
                 }
             });
@@ -534,7 +620,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(zone.name);
+                    sprinklerSummary[key].zones.push(getZoneName(zone.id));
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
@@ -578,7 +664,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(zone.name);
+                        pipeSummary.branch[key].zones.push(getZoneName(zone.id));
                     }
 
                     const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
@@ -594,7 +680,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(zone.name);
+                        pipeSummary.secondary[key].zones.push(getZoneName(zone.id));
                     }
 
                     const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
@@ -610,7 +696,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(zone.name);
+                        pipeSummary.main[key].zones.push(getZoneName(zone.id));
                     }
 
                     const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
@@ -630,7 +716,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.emitter[key].totalLength += zoneInput.totalEmitterPipeM;
-                        pipeSummary.emitter[key].zones.push(zone.name);
+                        pipeSummary.emitter[key].zones.push(getZoneName(zone.id));
                     }
                 }
             });
@@ -656,7 +742,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(plot.plotName);
+                    sprinklerSummary[key].zones.push(getZoneName(plot.plotId));
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
@@ -678,7 +764,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(plot.plotName);
+                        pipeSummary.branch[key].zones.push(getZoneName(plot.plotId));
                     }
 
                     const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
@@ -694,7 +780,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(plot.plotName);
+                        pipeSummary.secondary[key].zones.push(getZoneName(plot.plotId));
                     }
 
                     const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
@@ -710,7 +796,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(plot.plotName);
+                        pipeSummary.main[key].zones.push(getZoneName(plot.plotId));
                     }
 
                     const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
@@ -730,7 +816,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.emitter[key].totalLength += zoneInput.totalEmitterPipeM;
-                        pipeSummary.emitter[key].zones.push(plot.plotName);
+                        pipeSummary.emitter[key].zones.push(getZoneName(plot.plotId));
                     }
                 }
             });
@@ -755,7 +841,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(zone.name);
+                    sprinklerSummary[key].zones.push(getZoneName(zone.id));
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
@@ -775,7 +861,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(zone.name);
+                        pipeSummary.branch[key].zones.push(getZoneName(zone.id));
                     }
 
                     const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
@@ -791,7 +877,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(zone.name);
+                        pipeSummary.secondary[key].zones.push(getZoneName(zone.id));
                     }
 
                     const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
@@ -807,7 +893,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(zone.name);
+                        pipeSummary.main[key].zones.push(getZoneName(zone.id));
                     }
 
                     const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
@@ -827,7 +913,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.emitter[key].totalLength += zoneInput.totalEmitterPipeM;
-                        pipeSummary.emitter[key].zones.push(zone.name);
+                        pipeSummary.emitter[key].zones.push(getZoneName(zone.id));
                     }
                 }
             });
@@ -852,9 +938,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(
-                        zoneId === 'main-area' ? t('พื้นที่หลัก') : `โซน ${zoneId}`
-                    );
+                    sprinklerSummary[key].zones.push(getZoneName(zoneId));
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
@@ -875,9 +959,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(
-                            zoneId === 'main-area' ? t('พื้นที่หลัก') : `โซน ${zoneId}`
-                        );
+                        pipeSummary.branch[key].zones.push(getZoneName(zoneId));
                     }
 
                     const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
@@ -893,9 +975,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(
-                            zoneId === 'main-area' ? t('พื้นที่หลัก') : `โซน ${zoneId}`
-                        );
+                        pipeSummary.secondary[key].zones.push(getZoneName(zoneId));
                     }
 
                     const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
@@ -911,9 +991,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(
-                            zoneId === 'main-area' ? t('พื้นที่หลัก') : `โซน ${zoneId}`
-                        );
+                        pipeSummary.main[key].zones.push(getZoneName(zoneId));
                     }
 
                     const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
@@ -933,9 +1011,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.emitter[key].totalLength += zoneInput.totalEmitterPipeM;
-                        pipeSummary.emitter[key].zones.push(
-                            zoneId === 'main-area' ? t('พื้นที่หลัก') : `โซน ${zoneId}`
-                        );
+                        pipeSummary.emitter[key].zones.push(getZoneName(zoneId));
                     }
                 }
             });
@@ -1295,7 +1371,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                 {t('บาท')}/{t('หัว')}
                                             </p>
                                             <p className="text-xs text-green-300">
-                                                {t('ใช้ในโซน:')} {item.zones.join(', ')}
+                                                {t('ใช้ในโซน:')} {formatZoneNames(item.zones)}
                                             </p>
                                         </div>
                                     </div>
@@ -1360,11 +1436,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                     <p className="font-medium text-white">
                                                         {item.pipe.name || item.pipe.productCode} -{' '}
                                                         {item.pipe.sizeMM}mm
-                                                        {item.pipe.isRecommended && (
-                                                            <span className="ml-1 text-green-400">
-                                                                ⭐
-                                                            </span>
-                                                        )}
                                                         {item.includesExtra && (
                                                             <span className="ml-1 text-yellow-400">
                                                                 +{t('Riser')}
@@ -1372,14 +1443,17 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         )}
                                                     </p>
                                                     <p className="text-xs text-purple-200">
-                                                        {item.zones.join(', ')} |{' '}
+                                                    <span>
+                                                        {item.zones.join(', ')}
+                                                        <span className="mx-1 text-xs text-red-500">|</span>
+                                                    </span>
                                                         {Number(
                                                             (Number(item.pipe.price) || 0).toFixed(
                                                                 2
                                                             )
                                                         ).toLocaleString('th-TH')}{' '}
                                                         {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                        {t('ม./ม้วน')}) | {t('รวมความยาว:')}{' '}
+                                                        {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
                                                         {item.extraLength &&
@@ -1440,19 +1514,17 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                             {item.pipe.name ||
                                                                 item.pipe.productCode}{' '}
                                                             - {item.pipe.sizeMM}mm
-                                                            {item.pipe.isRecommended && (
-                                                                <span className="ml-1 text-green-400">
-                                                                    ⭐
-                                                                </span>
-                                                            )}
                                                         </p>
                                                         <p className="text-xs text-purple-200">
-                                                            {item.zones.join(', ')} |{' '}
+                                                            <span>
+                                                                {item.zones.join(', ')}
+                                                                <span className="mx-1 text-xs text-red-500">|</span>
+                                                            </span>
                                                             {Number(
                                                                 (item.pipe.price || 0).toFixed(2)
                                                             ).toLocaleString('th-TH')}{' '}
                                                             {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                            {t('ม./ม้วน')}) | {t('รวมความยาว:')}{' '}
+                                                            {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
                                                             {(
                                                                 item.totalLength || 0
                                                             ).toLocaleString()}{' '}
@@ -1518,12 +1590,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         {item.pipe.sizeMM}mm
                                                     </p>
                                                     <p className="text-xs text-purple-200">
-                                                        {item.zones.join(', ')} |{' '}
+                                                    <span>
+                                                        {item.zones.join(', ')}
+                                                        <span className="mx-1 text-xs text-red-500">|</span>
+                                                    </span>
                                                         {Number(
                                                             (item.pipe.price || 0).toFixed(2)
                                                         ).toLocaleString('th-TH')}{' '}
                                                         {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                        {t('ม./ม้วน')}) | {t('รวมความยาว:')}{' '}
+                                                        {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
                                                         {item.extraLength &&
@@ -1584,12 +1659,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         {item.pipe.sizeMM}mm
                                                     </p>
                                                     <p className="text-xs text-purple-200">
-                                                        {item.zones.join(', ')} |{' '}
+                                                    <span>
+                                                        {item.zones.join(', ')}
+                                                        <span className="mx-1 text-xs text-red-500">|</span>
+                                                    </span>
                                                         {Number(
                                                             (item.pipe.price || 0).toFixed(2)
                                                         ).toLocaleString('th-TH')}{' '}
                                                         {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                        {t('ม./ม้วน')}) | {t('รวมความยาว:')}{' '}
+                                                        {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
                                                         {item.extraLength &&
@@ -1714,17 +1792,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             {effectivePump
                                 ? effectivePump.name || effectivePump.productCode
                                 : t('ไม่มีข้อมูล')}
-                        </p>
-                        <p className="text-sm">
-                            {t('จำนวน:')} 1 {t('ตัว')} ({effectivePump?.powerHP || 'N/A'} {t('HP')}){' '}
-                            {effectivePump?.powerKW || 'N/A'} {t('kW')}
-                        </p>
-                        <p>
-                            เข้า {effectivePump?.inlet_size_inch} {t('นิ้ว')} ออก{' '}
-                            {effectivePump?.outlet_size_inch} {t('นิ้ว')}
-                        </p>
-                        <p>
-                            กำลังยกสูงสุด {effectivePump?.max_head_m || 'N/A'} {t('เมตร')}
                         </p>
                         <p className="text-xl font-bold">
                             ราคา {Number((costs.pumpCost || 0).toFixed(2)).toLocaleString('th-TH')}{' '}
@@ -1908,33 +1975,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 )}
 
                 {/* Connection Equipment */}
-                {connectionEquipments && Object.keys(connectionEquipments).length > 0 && (
+                {costs.connectionEquipmentsCost > 0 ? (
                     <div className="rounded bg-gray-600 p-4">
                         <h4 className="font-medium text-orange-300">🔗 {t('อุปกรณ์เชื่อมต่อ')}</h4>
-                        {/* <div className="space-y-1 text-sm">
-                            {Object.entries(connectionEquipments).map(([zoneId, equipments]) => (
-                                <div key={zoneId} className="border-l-2 border-orange-400 pl-2">
-                                    <p className="text-xs text-gray-300">
-                                        {projectMode === 'greenhouse' ? t('แปลง') : t('โซน')}{' '}
-                                        {zoneId}:
-                                    </p>
-                                    {equipments.map((equipment: any, index: number) => (
-                                        <p key={index} className="text-xs">
-                                            •{' '}
-                                            {equipment.equipment?.name ||
-                                                equipment.equipment?.product_code}
-                                            <span className="text-gray-400">
-                                                ({equipment.count} {t('ชิ้น')} ×{' '}
-                                                {Number(
-                                                    (equipment.equipment?.price || 0).toFixed(2)
-                                                ).toLocaleString('th-TH')}{' '}
-                                                {t('บาท')})
-                                            </span>
-                                        </p>
-                                    ))}
-                                </div>
-                            ))}
-                        </div> */}
                         <p className="text-xl font-bold">
                             ราคา{' '}
                             {Number(
@@ -1943,7 +1986,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             {t('บาท')}
                         </p>
                     </div>
-                )}
+                ) : null}
 
                 <div className="flex flex-col items-center justify-center rounded bg-gradient-to-r from-green-600 to-blue-600 p-4">
                     <h4 className="font-medium text-white">

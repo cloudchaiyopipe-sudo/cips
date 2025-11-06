@@ -716,6 +716,25 @@ const InputForm: React.FC<InputFormProps> = ({
         }
     }, [projectMode, activeZone?.id, activeZone, fieldCropSystemData, fieldCropIrrigationSettings, calculateZoneIrrigationCounts]);
 
+    // Read elevation difference (tree - pump) computed on results page and set as static head (m)
+    useEffect(() => {
+        if (projectMode !== 'horticulture') return;
+        try {
+            const stored = localStorage.getItem('horticulture_elevation_diff_m');
+            if (stored !== null) {
+                const value = parseFloat(stored);
+                if (isFinite(value)) {
+                    if (Math.abs(value - inputRef.current.staticHeadM) > 0.01) {
+                        onInputChangeRef.current({
+                            ...inputRef.current,
+                            staticHeadM: value,
+                        });
+                    }
+                }
+            }
+        } catch {}
+    }, [projectMode, activeZone?.id]);
+
     const isMultiZone = input.numberOfZones > 1;
 
     const updateInput = (field: keyof IrrigationInput, value: number) => {
@@ -741,6 +760,9 @@ const InputForm: React.FC<InputFormProps> = ({
                 validatedValue = Math.max(1, Math.min(300, value));
                 break;
             case 'staticHeadM':
+                // อนุญาตให้เป็นค่าติดลบได้ (สำหรับ elevation difference)
+                validatedValue = value;
+                break;
             case 'pressureHeadM':
                 validatedValue = Math.max(0, value);
                 break;
@@ -766,6 +788,15 @@ const InputForm: React.FC<InputFormProps> = ({
         ].includes(field)
             ? formatNumber(validatedValue, 3)
             : Math.round(validatedValue);
+
+        // บันทึกค่า staticHeadM ที่แก้ไขกลับไปใน localStorage เพื่อให้ค่าคงที่ทุกโซน
+        if (field === 'staticHeadM' && projectMode === 'horticulture') {
+            try {
+                localStorage.setItem('horticulture_elevation_diff_m', String(formattedValue));
+            } catch (error) {
+                console.warn('Error saving elevation difference to localStorage:', error);
+            }
+        }
 
         onInputChangeRef.current({
             ...inputRef.current,
@@ -1320,9 +1351,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                 <input
                                     type="number"
                                     step="0.1"
-                                    defaultValue={input.staticHeadM.toFixed(1)}
+                                    value={input.staticHeadM}
                                     onChange={(e) => {
-                                        const value = parseFloat(e.target.value);
+                                        const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                         if (!isNaN(value)) {
                                             updateInput('staticHeadM', value);
                                         }
@@ -1330,12 +1361,16 @@ const InputForm: React.FC<InputFormProps> = ({
                                     onBlur={(e) => {
                                         const value = e.target.value;
                                         if (value === '' || isNaN(parseFloat(value))) {
-                                            e.target.value = input.staticHeadM.toFixed(1);
+                                            updateInput('staticHeadM', 0);
                                         }
                                     }}
-                                    min="0"
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                 />
+                                <p className="mt-1 text-xs text-gray-400">
+                                    {input.staticHeadM < 0
+                                        ? t('(ค่าติดลบหมายถึงปั๊มอยู่สูงกว่าต้นไม้)')
+                                        : ''}
+                                </p>
                             </div>
                         </div>
                     </div>

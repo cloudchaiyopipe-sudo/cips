@@ -178,6 +178,247 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
     return inside;
 };
 
+// Helper function to get spatial-based initial centroids for diverse zone patterns
+const getSpatialInitialCentroids = (
+    plants: PlantLocation[],
+    k: number,
+    seededRandom: SeededRandom | null
+): Coordinate[] => {
+    if (plants.length === 0) return [];
+
+    // Calculate bounding box
+    const lats = plants.map(p => p.position.lat);
+    const lngs = plants.map(p => p.position.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const latRange = maxLat - minLat;
+    const lngRange = maxLng - minLng;
+
+    const centroids: Coordinate[] = [];
+    
+    if (k === 2) {
+        // For 2 zones, try different patterns: horizontal, vertical, diagonal, L-shape
+        const patternType = seededRandom 
+            ? Math.floor(seededRandom.next() * 5) // 0=vertical, 1=horizontal, 2=diagonal, 3=L-top-left, 4=L-bottom-right
+            : Math.floor(Math.random() * 5);
+        
+        if (patternType === 0) {
+            // Vertical split (left-right) - varying positions
+            const splitRatio = 0.3 + (seededRandom?.next() || Math.random()) * 0.4; // 0.3 to 0.7
+            centroids.push({ lat: minLat + latRange * 0.5, lng: minLng + lngRange * (splitRatio * 0.5) });
+            centroids.push({ lat: minLat + latRange * 0.5, lng: minLng + lngRange * (0.5 + (1 - splitRatio) * 0.5) });
+        } else if (patternType === 1) {
+            // Horizontal split (top-bottom) - varying positions
+            const splitRatio = 0.3 + (seededRandom?.next() || Math.random()) * 0.4; // 0.3 to 0.7
+            centroids.push({ lat: minLat + latRange * (splitRatio * 0.5), lng: minLng + lngRange * 0.5 });
+            centroids.push({ lat: minLat + latRange * (0.5 + (1 - splitRatio) * 0.5), lng: minLng + lngRange * 0.5 });
+        } else if (patternType === 2) {
+            // Diagonal split (top-left to bottom-right)
+            centroids.push({ lat: minLat + latRange * 0.3, lng: minLng + lngRange * 0.3 });
+            centroids.push({ lat: minLat + latRange * 0.7, lng: minLng + lngRange * 0.7 });
+        } else if (patternType === 3) {
+            // Diagonal split (top-right to bottom-left)
+            centroids.push({ lat: minLat + latRange * 0.3, lng: minLng + lngRange * 0.7 });
+            centroids.push({ lat: minLat + latRange * 0.7, lng: minLng + lngRange * 0.3 });
+        } else {
+            // L-shape pattern (top-left corner + rest)
+            centroids.push({ lat: minLat + latRange * 0.25, lng: minLng + lngRange * 0.25 });
+            centroids.push({ lat: minLat + latRange * 0.65, lng: minLng + lngRange * 0.65 });
+        }
+    } else {
+        // For more zones, use diverse patterns: grid, rows, columns, random, etc.
+        const patternType = seededRandom 
+            ? Math.floor(seededRandom.next() * 8) // 0-7 different patterns (เพิ่มจาก 6 เป็น 8)
+            : Math.floor(Math.random() * 8);
+        
+        if (patternType === 0) {
+            // Grid pattern (rows x cols)
+            const gridCols = Math.ceil(Math.sqrt(k));
+            const gridRows = Math.ceil(k / gridCols);
+            
+            for (let i = 0; i < k; i++) {
+                const row = Math.floor(i / gridCols);
+                const col = i % gridCols;
+                
+                // Add randomness to grid positions
+                const rowOffset = seededRandom 
+                    ? (seededRandom.next() - 0.5) * 0.25 
+                    : (Math.random() - 0.5) * 0.25;
+                const colOffset = seededRandom 
+                    ? (seededRandom.next() - 0.5) * 0.25 
+                    : (Math.random() - 0.5) * 0.25;
+                
+                const lat = minLat + latRange * ((row + 0.5 + rowOffset) / gridRows);
+                const lng = minLng + lngRange * ((col + 0.5 + colOffset) / gridCols);
+                
+                centroids.push({ lat, lng });
+            }
+        } else if (patternType === 1) {
+            // Horizontal rows pattern (แบ่งเป็นแถวแนวนอน)
+            const numRows = Math.ceil(Math.sqrt(k));
+            const plantsPerRow = Math.ceil(k / numRows);
+            
+            for (let i = 0; i < k; i++) {
+                const row = Math.floor(i / plantsPerRow);
+                const col = i % plantsPerRow;
+                const totalCols = row === numRows - 1 ? (k - row * plantsPerRow) : plantsPerRow;
+                
+                const rowOffset = seededRandom 
+                    ? (seededRandom.next() - 0.5) * 0.2 
+                    : (Math.random() - 0.5) * 0.2;
+                const colOffset = seededRandom 
+                    ? (seededRandom.next() - 0.5) * 0.3 
+                    : (Math.random() - 0.5) * 0.3;
+                
+                const lat = minLat + latRange * ((row + 0.5 + rowOffset) / numRows);
+                const lng = minLng + lngRange * ((col + 0.5 + colOffset) / totalCols);
+                
+                centroids.push({ lat, lng });
+            }
+        } else if (patternType === 2) {
+            // Vertical columns pattern (แบ่งเป็นคอลัมน์แนวตั้ง)
+            const numCols = Math.ceil(Math.sqrt(k));
+            const plantsPerCol = Math.ceil(k / numCols);
+            
+            for (let i = 0; i < k; i++) {
+                const col = Math.floor(i / plantsPerCol);
+                const row = i % plantsPerCol;
+                const totalRows = col === numCols - 1 ? (k - col * plantsPerCol) : plantsPerCol;
+                
+                const rowOffset = seededRandom 
+                    ? (seededRandom.next() - 0.5) * 0.3 
+                    : (Math.random() - 0.5) * 0.3;
+                const colOffset = seededRandom 
+                    ? (seededRandom.next() - 0.5) * 0.2 
+                    : (Math.random() - 0.5) * 0.2;
+                
+                const lat = minLat + latRange * ((row + 0.5 + rowOffset) / totalRows);
+                const lng = minLng + lngRange * ((col + 0.5 + colOffset) / numCols);
+                
+                centroids.push({ lat, lng });
+            }
+        } else if (patternType === 3) {
+            // Diagonal stripes pattern (แถบแนวทแยง)
+            const numStripes = Math.ceil(Math.sqrt(k));
+            
+            for (let i = 0; i < k; i++) {
+                const stripe = i % numStripes;
+                const positionInStripe = Math.floor(i / numStripes);
+                const totalInStripe = Math.ceil(k / numStripes);
+                
+                // Create diagonal pattern
+                const diagonalRatio = (stripe + 0.5) / numStripes;
+                const lat = minLat + latRange * (diagonalRatio * 0.6 + 0.2);
+                const lng = minLng + lngRange * ((positionInStripe + 0.5) / totalInStripe);
+                
+                centroids.push({ lat, lng });
+            }
+        } else if (patternType === 4) {
+            // Circular/radial pattern (แบบวงกลม)
+            const centerLat = minLat + latRange * 0.5;
+            const centerLng = minLng + lngRange * 0.5;
+            const maxRadius = Math.min(latRange, lngRange) * 0.4;
+            
+            for (let i = 0; i < k; i++) {
+                const angle = (i * 2 * Math.PI) / k;
+                const radius = maxRadius * (0.3 + (seededRandom?.next() || Math.random()) * 0.7);
+                
+                const lat = centerLat + radius * Math.cos(angle) / 111000; // Convert to degrees
+                const lng = centerLng + radius * Math.sin(angle) / (111000 * Math.cos(centerLat * Math.PI / 180));
+                
+                centroids.push({ lat, lng });
+            }
+        } else if (patternType === 5) {
+            // Random spatial distribution with clustering
+            const clusters = Math.ceil(Math.sqrt(k));
+            const pointsPerCluster = Math.ceil(k / clusters);
+            
+            // Create cluster centers
+            const clusterCenters: Coordinate[] = [];
+            for (let c = 0; c < clusters; c++) {
+                const clusterLat = minLat + latRange * (0.2 + (seededRandom?.next() || Math.random()) * 0.6);
+                const clusterLng = minLng + lngRange * (0.2 + (seededRandom?.next() || Math.random()) * 0.6);
+                clusterCenters.push({ lat: clusterLat, lng: clusterLng });
+            }
+            
+            // Distribute points around cluster centers
+            for (let i = 0; i < k; i++) {
+                const clusterIdx = Math.floor(i / pointsPerCluster);
+                const pointInCluster = i % pointsPerCluster;
+                const center = clusterCenters[clusterIdx];
+                
+                const angle = (pointInCluster * 2 * Math.PI) / pointsPerCluster;
+                const radius = Math.min(latRange, lngRange) * 0.15 * (seededRandom?.next() || Math.random());
+                
+                const lat = center.lat + radius * Math.cos(angle) / 111000;
+                const lng = center.lng + radius * Math.sin(angle) / (111000 * Math.cos(center.lat * Math.PI / 180));
+                
+                centroids.push({ lat, lng });
+            }
+        } else if (patternType === 6) {
+            // Spiral pattern (แบบเกลียว)
+            const centerLat = minLat + latRange * 0.5;
+            const centerLng = minLng + lngRange * 0.5;
+            const maxRadius = Math.min(latRange, lngRange) * 0.45;
+            
+            for (let i = 0; i < k; i++) {
+                const spiralAngle = (i * 3 * Math.PI) / k; // 3 full rotations
+                const radius = (maxRadius * i) / k;
+                
+                const lat = centerLat + radius * Math.cos(spiralAngle) / 111000;
+                const lng = centerLng + radius * Math.sin(spiralAngle) / (111000 * Math.cos(centerLat * Math.PI / 180));
+                
+                centroids.push({ lat, lng });
+            }
+        } else {
+            // Hexagonal pattern (แบบหกเหลี่ยม)
+            const centerLat = minLat + latRange * 0.5;
+            const centerLng = minLng + lngRange * 0.5;
+            const hexRadius = Math.min(latRange, lngRange) * 0.35;
+            
+            // Create hexagonal grid
+            const hexRows = Math.ceil(Math.sqrt(k));
+            const hexCols = Math.ceil(k / hexRows);
+            const hexSize = hexRadius / Math.max(hexRows, hexCols);
+            
+            for (let i = 0; i < k; i++) {
+                const row = Math.floor(i / hexCols);
+                const col = i % hexCols;
+                
+                // Hexagonal offset
+                const offsetX = col * hexSize * 1.5;
+                const offsetY = row * hexSize * Math.sqrt(3) + (col % 2) * hexSize * Math.sqrt(3) / 2;
+                
+                const lat = centerLat + (offsetY - hexRadius) / 111000;
+                const lng = centerLng + (offsetX - hexRadius) / (111000 * Math.cos(centerLat * Math.PI / 180));
+                
+                centroids.push({ lat, lng });
+            }
+        }
+    }
+    
+    // Find closest plants to these spatial points
+    const finalCentroids: Coordinate[] = [];
+    for (const spatialPoint of centroids) {
+        let closestPlant = plants[0];
+        let minDist = calculateDistance(spatialPoint, plants[0].position);
+        
+        for (const plant of plants) {
+            const dist = calculateDistance(spatialPoint, plant.position);
+            if (dist < minDist) {
+                minDist = dist;
+                closestPlant = plant;
+            }
+        }
+        
+        finalCentroids.push({ ...closestPlant.position });
+    }
+    
+    return finalCentroids;
+};
+
 export const kMeansCluster = (
     plants: PlantLocation[],
     k: number,
@@ -195,42 +436,9 @@ export const kMeansCluster = (
     const centroids: Coordinate[] = [];
     const seededRandom = randomSeed !== undefined ? new SeededRandom(randomSeed) : null;
 
-    const shuffled = [...plants].sort(() =>
-        seededRandom ? seededRandom.compareFunction() : Math.random() - 0.5
-    );
-
-    if (seededRandom) {
-        const firstIndex = Math.floor(seededRandom.next() * shuffled.length);
-        centroids.push({ ...shuffled[firstIndex].position });
-
-        for (let i = 1; i < k && i < shuffled.length; i++) {
-            const distances = shuffled.map((plant) => {
-                const minDist = Math.min(
-                    ...centroids.map((centroid) => calculateDistance(plant.position, centroid))
-                );
-                return minDist * minDist;
-            });
-
-            const totalDistance = distances.reduce((sum, d) => sum + d, 0);
-            const randomValue = seededRandom.next() * totalDistance;
-
-            let cumulativeDistance = 0;
-            let selectedIndex = 0;
-            for (let j = 0; j < distances.length; j++) {
-                cumulativeDistance += distances[j];
-                if (cumulativeDistance >= randomValue) {
-                    selectedIndex = j;
-                    break;
-                }
-            }
-
-            centroids.push({ ...shuffled[selectedIndex].position });
-        }
-    } else {
-        for (let i = 0; i < k; i++) {
-            centroids.push({ ...shuffled[i].position });
-        }
-    }
+    // Use spatial-based initialization for more diverse patterns
+    const spatialCentroids = getSpatialInitialCentroids(plants, k, seededRandom);
+    centroids.push(...spatialCentroids);
 
     let clusters: PlantLocation[][] = Array(k)
         .fill(null)
@@ -257,9 +465,42 @@ export const kMeansCluster = (
             clusters[closestCentroid].push(plant);
         }
 
+        // Handle empty clusters - redistribute plants to ensure all k clusters have at least 1 plant
+        const emptyClusters: number[] = [];
+        for (let i = 0; i < k; i++) {
+            if (clusters[i].length === 0) {
+                emptyClusters.push(i);
+            }
+        }
+
+        // Redistribute plants from largest clusters to empty clusters
+        if (emptyClusters.length > 0) {
+            // Sort clusters by size (largest first)
+            const clusterSizes = clusters.map((cluster, idx) => ({ idx, size: cluster.length }));
+            clusterSizes.sort((a, b) => b.size - a.size);
+
+            for (const emptyIdx of emptyClusters) {
+                // Find the largest cluster with more than 1 plant
+                for (const { idx: sourceIdx, size } of clusterSizes) {
+                    if (size > 1 && sourceIdx !== emptyIdx) {
+                        // Move one plant from source to empty cluster
+                        const plantToMove = clusters[sourceIdx].pop();
+                        if (plantToMove) {
+                            clusters[emptyIdx].push(plantToMove);
+                            clusterSizes.find(c => c.idx === sourceIdx)!.size--;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         let converged = true;
         for (let i = 0; i < k; i++) {
-            if (clusters[i].length === 0) continue;
+            if (clusters[i].length === 0) {
+                // If still empty, use the centroid position as fallback
+                clusters[i] = [plants[Math.floor((i * plants.length) / k)]];
+            }
 
             const newCentroid = {
                 lat:
@@ -281,7 +522,26 @@ export const kMeansCluster = (
         iteration++;
     }
 
-    return clusters.filter((cluster) => cluster.length > 0);
+    // Ensure all k clusters exist (don't filter empty ones)
+    // Fill any remaining empty clusters with nearest plants
+    for (let i = 0; i < k; i++) {
+        if (clusters[i].length === 0) {
+            // Find the nearest plant to this centroid
+            let nearestPlant = plants[0];
+            let minDist = calculateDistance(centroids[i], plants[0].position);
+            
+            for (const plant of plants) {
+                const dist = calculateDistance(centroids[i], plant.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestPlant = plant;
+                }
+            }
+            clusters[i].push(nearestPlant);
+        }
+    }
+
+    return clusters; // Return all k clusters, don't filter
 };
 
 export const waterNeedAwareCluster = (
@@ -314,39 +574,8 @@ export const plantCountBalancedCluster = (
         targetSizes.push(targetPlantsPerZone + (i < extraPlants ? 1 : 0));
     }
 
-    const initialCentroids: Coordinate[] = [];
-    const usedPlants = new Set<number>();
-
-    const firstIndex = seededRandom
-        ? Math.floor(seededRandom.next() * plants.length)
-        : Math.floor(Math.random() * plants.length);
-    initialCentroids.push(plants[firstIndex].position);
-    usedPlants.add(firstIndex);
-
-    for (let i = 1; i < k; i++) {
-        let maxDistance = -1;
-        let bestIndex = -1;
-
-        for (let j = 0; j < plants.length; j++) {
-            if (usedPlants.has(j)) continue;
-
-            let minDistanceToExisting = Infinity;
-            for (const centroid of initialCentroids) {
-                const distance = calculateDistance(plants[j].position, centroid);
-                minDistanceToExisting = Math.min(minDistanceToExisting, distance);
-            }
-
-            if (minDistanceToExisting > maxDistance) {
-                maxDistance = minDistanceToExisting;
-                bestIndex = j;
-            }
-        }
-
-        if (bestIndex !== -1) {
-            initialCentroids.push(plants[bestIndex].position);
-            usedPlants.add(bestIndex);
-        }
-    }
+    // Use spatial-based initialization for more diverse patterns
+    const initialCentroids = getSpatialInitialCentroids(plants, k, seededRandom);
 
     const clusters: PlantLocation[][] = Array(k)
         .fill(null)
@@ -415,6 +644,51 @@ export const plantCountBalancedCluster = (
         if (!hasChanged) break;
     }
 
+    // Ensure all k clusters have at least 1 plant
+    const emptyClusters: number[] = [];
+    for (let i = 0; i < k; i++) {
+        if (clusters[i].length === 0) {
+            emptyClusters.push(i);
+        }
+    }
+
+    // Redistribute plants from largest clusters to empty clusters
+    if (emptyClusters.length > 0) {
+        const clusterSizes = clusters.map((cluster, idx) => ({ idx, size: cluster.length }));
+        clusterSizes.sort((a, b) => b.size - a.size);
+
+        for (const emptyIdx of emptyClusters) {
+            for (const { idx: sourceIdx, size } of clusterSizes) {
+                if (size > 1 && sourceIdx !== emptyIdx) {
+                    const plantToMove = clusters[sourceIdx].pop();
+                    if (plantToMove) {
+                        clusters[emptyIdx].push(plantToMove);
+                        clusterSizes.find(c => c.idx === sourceIdx)!.size--;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Final check: ensure all clusters have at least 1 plant
+    for (let i = 0; i < k; i++) {
+        if (clusters[i].length === 0) {
+            // Find nearest plant to initial centroid
+            let nearestPlant = plants[0];
+            let minDist = calculateDistance(initialCentroids[i], plants[0].position);
+            
+            for (const plant of plants) {
+                const dist = calculateDistance(initialCentroids[i], plant.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestPlant = plant;
+                }
+            }
+            clusters[i].push(nearestPlant);
+        }
+    }
+
     for (let iteration = 0; iteration < 10; iteration++) {
         let hasAdjusted = false;
 
@@ -455,7 +729,25 @@ export const plantCountBalancedCluster = (
         if (!hasAdjusted) break;
     }
 
-    return clusters.filter((cluster) => cluster.length > 0);
+    // Final check: ensure all k clusters exist
+    for (let i = 0; i < k; i++) {
+        if (clusters[i].length === 0) {
+            // Find nearest plant to initial centroid
+            let nearestPlant = plants[0];
+            let minDist = calculateDistance(initialCentroids[i], plants[0].position);
+            
+            for (const plant of plants) {
+                const dist = calculateDistance(initialCentroids[i], plant.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestPlant = plant;
+                }
+            }
+            clusters[i].push(nearestPlant);
+        }
+    }
+
+    return clusters; // Return all k clusters, don't filter
 };
 
 const perfectWaterBalanceCluster = (
@@ -573,7 +865,26 @@ const perfectWaterBalanceCluster = (
         if (!improved) break;
     }
 
-    return clusters.filter((cluster) => cluster.length > 0);
+    // Ensure all k clusters have at least 1 plant
+    for (let i = 0; i < k; i++) {
+        if (clusters[i].length === 0) {
+            // Find plant with closest water need to target
+            let bestPlant = plants[0];
+            let minDiff = Math.abs(plants[0].plantData.waterNeed - targetWaterNeed);
+            
+            for (const plant of plants) {
+                const diff = Math.abs(plant.plantData.waterNeed - targetWaterNeed);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    bestPlant = plant;
+                }
+            }
+            clusters[i].push(bestPlant);
+            clusterWaterNeeds[i] = bestPlant.plantData.waterNeed;
+        }
+    }
+
+    return clusters; // Return all k clusters, don't filter
 };
 
 export const calculateDistance = (coord1: Coordinate, coord2: Coordinate): number => {
@@ -1687,6 +1998,8 @@ export const createAutomaticZones = (
             clusters = kMeansCluster(plants, config.numberOfZones, 100, false, config.randomSeed);
         }
 
+        // Generate colors without randomSeed to maintain consistent color order
+        // The colors will be mapped back to zones in the calling function if needed
         const colors = generateZoneColors(config.numberOfZones);
 
         let zones = createZonesFromClusters(

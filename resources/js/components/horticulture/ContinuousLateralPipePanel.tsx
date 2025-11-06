@@ -33,7 +33,7 @@ const ContinuousLateralPipePanel: React.FC<ContinuousLateralPipePanelProps> = ({
     if (!isVisible) return null;
 
     return (
-        <div className="fixed left-4 top-[120px] z-[1000] min-w-[320px] max-w-[350px] rounded-lg border border-gray-200 bg-white shadow-xl">
+        <div className="fixed left-4 top-[10px] z-[1000] min-w-[320px] max-w-[350px] rounded-lg border border-gray-200 bg-white shadow-xl">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50 p-4">
                 <div className="flex items-center gap-3">

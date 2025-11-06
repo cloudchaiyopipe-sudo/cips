@@ -11,6 +11,7 @@ interface AutoZoneEditSectionProps {
     onZonesUpdate: (updatedZones: IrrigationZone[]) => void;
     onDeleteAllZones: () => void;
     className?: string;
+    onStartDrawNewZone?: () => void; // trigger manual zone draw in parent (optional)
 }
 
 const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
@@ -20,6 +21,7 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
     onZonesUpdate,
     onDeleteAllZones,
     className = '',
+    onStartDrawNewZone,
 }) => {
     const [statusMessage, setStatusMessage] = React.useState<{
         type: 'success' | 'error' | 'info';
@@ -85,6 +87,19 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
                     onExitEditMode={zoneEditor.exitEditMode}
                     disabled={!hasZones}
                 />
+                {/* ปุ่มวาดโซนใหม่ */}
+                <button
+                    onClick={onStartDrawNewZone}
+                    className={`
+                        flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium
+                        transition-all duration-200 ease-in-out
+                        ${hasZones ? 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600 hover:shadow-sm active:scale-95' : 'border-gray-300 bg-white text-gray-500 hover:border-gray-400 hover:bg-gray-50'}
+                    `}
+                    title={hasZones ? 'วาดโซนใหม่ด้วยมือ' : 'ยังไม่มีโซน - สามารถวาดโซนใหม่ได้'}
+                >
+                    <span className="text-lg">📐</span>
+                    <span>วาดโซนใหม่</span>
+                </button>
             </div>
 
             {/* Status Message */}
@@ -139,6 +154,18 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
                             >
                                 <span>❌</span>
                                 <span>ยกเลิก</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // simple confirm before delete
+                                    if (confirm('ต้องการลบโซนนี้หรือไม่?')) {
+                                        zoneEditor.deleteSelectedZone();
+                                    }
+                                }}
+                                className="flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-red-700"
+                            >
+                                <span>🗑️</span>
+                                <span>ลบโซนนี้</span>
                             </button>
                         </div>
                     </div>
