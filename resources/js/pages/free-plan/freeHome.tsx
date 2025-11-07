@@ -39,23 +39,25 @@ function FreeHome() {
     const [currentAdIndex, setCurrentAdIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showAdModal, setShowAdModal] = useState(false);
-    
+
     // State for manual/tutorial
     const [showManualModal, setShowManualModal] = useState(false);
-    
+
     // Ref to track if ad has been shown (to prevent showing again)
     const adShownRef = useRef(false);
-    
+
     // State for language
     const [translations, setTranslations] = useState(getTranslations());
-    
+
     // State for saved projects
-    const [savedProjects, setSavedProjects] = useState<Array<{
-        id: number;
-        projectName: string;
-        savedAt: string;
-    }>>([]);
-    
+    const [savedProjects, setSavedProjects] = useState<
+        Array<{
+            id: number;
+            projectName: string;
+            savedAt: string;
+        }>
+    >([]);
+
     // State for edit project name
     const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
     const [editProjectName, setEditProjectName] = useState<string>('');
@@ -65,7 +67,7 @@ function FreeHome() {
         loadAdvertisements();
         loadSavedProjects();
     }, []);
-    
+
     // Load saved projects from localStorage
     const loadSavedProjects = () => {
         try {
@@ -73,8 +75,9 @@ function FreeHome() {
             if (saved) {
                 const projects = JSON.parse(saved);
                 // Sort by savedAt descending (newest first)
-                const sortedProjects = projects.sort((a: { savedAt: string }, b: { savedAt: string }) => 
-                    new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
+                const sortedProjects = projects.sort(
+                    (a: { savedAt: string }, b: { savedAt: string }) =>
+                        new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
                 );
                 setSavedProjects(sortedProjects);
             }
@@ -105,7 +108,13 @@ function FreeHome() {
 
     // Show advertisement modal after manual is closed
     useEffect(() => {
-        if (!showManualModal && !loading && advertisements.length > 0 && !showAdModal && !adShownRef.current) {
+        if (
+            !showManualModal &&
+            !loading &&
+            advertisements.length > 0 &&
+            !showAdModal &&
+            !adShownRef.current
+        ) {
             // Show ad after manual is closed (only if ad hasn't been shown yet)
             adShownRef.current = true;
             const timer = setTimeout(() => {
@@ -123,10 +132,10 @@ function FreeHome() {
 
         // Listen for storage changes (when language is changed in other components)
         window.addEventListener('storage', handleLanguageChange);
-        
+
         // Listen for custom language change event
         window.addEventListener('languageChanged', handleLanguageChange);
-        
+
         // Also check on focus (when user comes back to tab)
         window.addEventListener('focus', handleLanguageChange);
 
@@ -168,19 +177,19 @@ function FreeHome() {
             'freeMapView',
             'projectMapImage',
             'freePlanSummary',
-            'projectName'
+            'projectName',
         ];
-        
-        dataToClear.forEach(key => {
+
+        dataToClear.forEach((key) => {
             localStorage.removeItem(key);
         });
-        
-        // Note: We keep selectedPlantData and flowRateConfig 
+
+        // Note: We keep selectedPlantData and flowRateConfig
         // in case user wants to reuse them
-        
+
         router.visit('/free-plan/choose-crop');
     };
-    
+
     const handleLoadProject = (projectId: number) => {
         try {
             const saved = localStorage.getItem('freePlanProjects');
@@ -189,22 +198,47 @@ function FreeHome() {
                 const project = projects.find((p: { id: number }) => p.id === projectId);
                 if (project) {
                     // Restore all data to localStorage
-                    if (project.drawnShapes) localStorage.setItem('drawnShapes', JSON.stringify(project.drawnShapes));
-                    if (project.waterSources) localStorage.setItem('waterSources', JSON.stringify(project.waterSources));
+                    if (project.drawnShapes)
+                        localStorage.setItem('drawnShapes', JSON.stringify(project.drawnShapes));
+                    if (project.waterSources)
+                        localStorage.setItem('waterSources', JSON.stringify(project.waterSources));
                     if (project.pumps) localStorage.setItem('pumps', JSON.stringify(project.pumps));
                     if (project.zones) localStorage.setItem('zones', JSON.stringify(project.zones));
-                    if (project.plantPoints) localStorage.setItem('plantPoints', JSON.stringify(project.plantPoints));
-                    if (project.mainPipes) localStorage.setItem('mainPipes', JSON.stringify(project.mainPipes));
-                    if (project.subMainPipes) localStorage.setItem('subMainPipes', JSON.stringify(project.subMainPipes));
-                    if (project.lateralPipes) localStorage.setItem('lateralPipes', JSON.stringify(project.lateralPipes));
-                    if (project.selectedPlantData) localStorage.setItem('selectedPlantData', JSON.stringify(project.selectedPlantData));
-                    if (project.flowRateConfig) localStorage.setItem('flowRateConfig', JSON.stringify(project.flowRateConfig));
-                    if (project.mapStepProgress) localStorage.setItem('mapStepProgress', JSON.stringify(project.mapStepProgress));
-                    if (project.freeMapView) localStorage.setItem('freeMapView', JSON.stringify(project.freeMapView));
-                    if (project.projectMapImage) localStorage.setItem('projectMapImage', project.projectMapImage);
-                    if (project.freePlanSummary) localStorage.setItem('freePlanSummary', JSON.stringify(project.freePlanSummary));
-                    if (project.projectName) localStorage.setItem('projectName', project.projectName);
-                    
+                    if (project.plantPoints)
+                        localStorage.setItem('plantPoints', JSON.stringify(project.plantPoints));
+                    if (project.mainPipes)
+                        localStorage.setItem('mainPipes', JSON.stringify(project.mainPipes));
+                    if (project.subMainPipes)
+                        localStorage.setItem('subMainPipes', JSON.stringify(project.subMainPipes));
+                    if (project.lateralPipes)
+                        localStorage.setItem('lateralPipes', JSON.stringify(project.lateralPipes));
+                    if (project.selectedPlantData)
+                        localStorage.setItem(
+                            'selectedPlantData',
+                            JSON.stringify(project.selectedPlantData)
+                        );
+                    if (project.flowRateConfig)
+                        localStorage.setItem(
+                            'flowRateConfig',
+                            JSON.stringify(project.flowRateConfig)
+                        );
+                    if (project.mapStepProgress)
+                        localStorage.setItem(
+                            'mapStepProgress',
+                            JSON.stringify(project.mapStepProgress)
+                        );
+                    if (project.freeMapView)
+                        localStorage.setItem('freeMapView', JSON.stringify(project.freeMapView));
+                    if (project.projectMapImage)
+                        localStorage.setItem('projectMapImage', project.projectMapImage);
+                    if (project.freePlanSummary)
+                        localStorage.setItem(
+                            'freePlanSummary',
+                            JSON.stringify(project.freePlanSummary)
+                        );
+                    if (project.projectName)
+                        localStorage.setItem('projectName', project.projectName);
+
                     // Navigate to map page
                     router.visit('/free-plan/map');
                 }
@@ -214,7 +248,7 @@ function FreeHome() {
             alert('เกิดข้อผิดพลาดในการโหลดโปรเจค');
         }
     };
-    
+
     const handleDeleteProject = (projectId: number, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm('คุณต้องการลบโปรเจคนี้หรือไม่?')) {
@@ -232,19 +266,19 @@ function FreeHome() {
             }
         }
     };
-    
+
     const handleEditProjectName = (projectId: number, currentName: string, e: React.MouseEvent) => {
         e.stopPropagation();
         setEditingProjectId(projectId);
         setEditProjectName(currentName);
     };
-    
+
     const handleSaveProjectName = (projectId: number) => {
         if (!editProjectName.trim()) {
             alert('กรุณากรอกชื่อโปรเจค');
             return;
         }
-        
+
         try {
             const saved = localStorage.getItem('freePlanProjects');
             if (saved) {
@@ -263,7 +297,7 @@ function FreeHome() {
             alert('เกิดข้อผิดพลาดในการแก้ไขชื่อโปรเจค');
         }
     };
-    
+
     const handleCancelEdit = () => {
         setEditingProjectId(null);
         setEditProjectName('');
@@ -299,9 +333,8 @@ function FreeHome() {
 
             {/* Main Content */}
             <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-between">
-                
                 {/* Welcome Section */}
-                <div className="w-full max-w-md px-4 pt-8 pb-4 text-center md:px-6 md:pt-12 md:pb-6 min-h-[80vh] md:min-h-auto">
+                <div className="md:min-h-auto min-h-[80vh] w-full max-w-md px-4 pb-4 pt-8 text-center md:px-6 md:pb-6 md:pt-12">
                     <h1 className="mb-8 text-3xl font-bold text-white md:mb-12 md:text-4xl lg:text-5xl">
                         {translations.welcomeTo}
                         <br />
@@ -329,14 +362,13 @@ function FreeHome() {
                         {translations.addField}
                     </button>
 
-
                     {/* Saved Files Section */}
-                    <div className="mb-6 rounded-lg border-2 border-dashed border-slate-500 bg-slate-600/30 p-4 md:mb-8 md:p-6 min-h-[240px] md:min-h-[200px]">
+                    <div className="mb-6 min-h-[240px] rounded-lg border-2 border-dashed border-slate-500 bg-slate-600/30 p-4 md:mb-8 md:min-h-[200px] md:p-6">
                         <h3 className="mb-4 text-center text-sm font-semibold text-slate-300 md:text-base">
                             {translations.yourSavedFiles}
                         </h3>
                         {savedProjects.length > 0 ? (
-                            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                            <div className="max-h-[300px] space-y-2 overflow-y-auto">
                                 {savedProjects.map((project) => (
                                     <div
                                         key={project.id}
@@ -346,9 +378,9 @@ function FreeHome() {
                                             }
                                         }}
                                         className={`group relative rounded-lg border border-slate-500 bg-slate-700/50 p-3 transition-all ${
-                                            editingProjectId === project.id 
-                                                ? 'cursor-default bg-slate-600/70' 
-                                                : 'cursor-pointer hover:bg-slate-600/70 hover:border-slate-400'
+                                            editingProjectId === project.id
+                                                ? 'cursor-default bg-slate-600/70'
+                                                : 'cursor-pointer hover:border-slate-400 hover:bg-slate-600/70'
                                         }`}
                                     >
                                         {editingProjectId === project.id ? (
@@ -357,7 +389,9 @@ function FreeHome() {
                                                 <input
                                                     type="text"
                                                     value={editProjectName}
-                                                    onChange={(e) => setEditProjectName(e.target.value)}
+                                                    onChange={(e) =>
+                                                        setEditProjectName(e.target.value)
+                                                    }
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter') {
                                                             handleSaveProjectName(project.id);
@@ -394,34 +428,67 @@ function FreeHome() {
                                             // View mode
                                             <div className="flex items-center justify-between">
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-medium text-white">{project.projectName}</p>
+                                                    <p className="text-sm font-medium text-white">
+                                                        {project.projectName}
+                                                    </p>
                                                     <p className="text-xs text-slate-400">
-                                                        {new Date(project.savedAt).toLocaleString('th-TH', {
-                                                            year: 'numeric',
-                                                            month: 'short',
-                                                            day: 'numeric',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        })}
+                                                        {new Date(project.savedAt).toLocaleString(
+                                                            'th-TH',
+                                                            {
+                                                                year: 'numeric',
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            }
+                                                        )}
                                                     </p>
                                                 </div>
                                                 <div className="ml-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                                                     <button
-                                                        onClick={(e) => handleEditProjectName(project.id, project.projectName, e)}
+                                                        onClick={(e) =>
+                                                            handleEditProjectName(
+                                                                project.id,
+                                                                project.projectName,
+                                                                e
+                                                            )
+                                                        }
                                                         className="rounded p-1 text-slate-400 hover:text-blue-400"
                                                         title="แก้ไขชื่อ"
                                                     >
-                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        <svg
+                                                            className="h-5 w-5"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                            />
                                                         </svg>
                                                     </button>
                                                     <button
-                                                        onClick={(e) => handleDeleteProject(project.id, e)}
+                                                        onClick={(e) =>
+                                                            handleDeleteProject(project.id, e)
+                                                        }
                                                         className="rounded p-1 text-slate-400 hover:text-red-400"
                                                         title="ลบโปรเจค"
                                                     >
-                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        <svg
+                                                            className="h-5 w-5"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                            />
                                                         </svg>
                                                     </button>
                                                 </div>
@@ -455,39 +522,41 @@ function FreeHome() {
             {/* Advertisement Modal */}
             {showAdModal && advertisements.length > 0 && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="relative mx-4 w-full max-w-2xl lg:max-w-3xl rounded-2xl bg-slate-800 p-6 md:p-8 shadow-2xl">
+                    <div className="relative mx-4 w-full max-w-2xl rounded-2xl bg-slate-800 p-6 shadow-2xl md:p-8 lg:max-w-3xl">
                         {/* Close Button */}
                         <button
                             onClick={handleCloseAdModal}
-                            className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
                         >
                             ✕
                         </button>
 
                         {/* Advertisement Content */}
-                        <div 
+                        <div
                             className="cursor-pointer rounded-lg p-4 transition-all"
                             onClick={() => handleAdClick(advertisements[currentAdIndex].link_url)}
                         >
                             <div className="mb-5 text-center">
-                                <h3 className="text-base font-semibold text-slate-200">{translations.sponsoredContent}</h3>
+                                <h3 className="text-base font-semibold text-slate-200">
+                                    {translations.sponsoredContent}
+                                </h3>
                             </div>
-                            
+
                             <div className="flex flex-col items-center gap-4">
                                 <img
                                     src={advertisements[currentAdIndex].image_url}
                                     alt={advertisements[currentAdIndex].title}
-                                    className="h-[24rem] md:h-[28rem] w-full rounded-lg object-cover"
+                                    className="h-[24rem] w-full rounded-lg object-cover md:h-[28rem]"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.src = '/images/no-image.jpg';
                                     }}
                                 />
                                 <div className="text-center">
-                                    <h4 className="font-semibold text-white text-2xl lg:text-3xl">
+                                    <h4 className="text-2xl font-semibold text-white lg:text-3xl">
                                         {advertisements[currentAdIndex].title}
                                     </h4>
-                                    <p className="text-base lg:text-lg text-slate-300 mt-2">
+                                    <p className="mt-2 text-base text-slate-300 lg:text-lg">
                                         {advertisements[currentAdIndex].description}
                                     </p>
                                 </div>
@@ -499,19 +568,19 @@ function FreeHome() {
                             <div className="mt-6 flex items-center justify-between">
                                 <button
                                     onClick={handlePrevAd}
-                                    className="rounded bg-slate-600 px-4 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+                                    className="rounded bg-slate-600 px-4 py-2 text-sm text-white transition-colors hover:bg-slate-700"
                                 >
                                     {translations.back}
                                 </button>
-                                
+
                                 <div className="flex gap-2">
                                     {advertisements.map((_, index) => (
                                         <button
                                             key={index}
                                             onClick={() => setCurrentAdIndex(index)}
                                             className={`h-3 w-3 rounded-full transition-colors ${
-                                                index === currentAdIndex 
-                                                    ? 'bg-blue-400' 
+                                                index === currentAdIndex
+                                                    ? 'bg-blue-400'
                                                     : 'bg-slate-500'
                                             }`}
                                         />
@@ -520,7 +589,7 @@ function FreeHome() {
 
                                 <button
                                     onClick={handleNextAd}
-                                    className="rounded bg-slate-600 px-4 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+                                    className="rounded bg-slate-600 px-4 py-2 text-sm text-white transition-colors hover:bg-slate-700"
                                 >
                                     {translations.next}
                                 </button>
@@ -536,9 +605,7 @@ function FreeHome() {
             )}
 
             {/* Manual/Tutorial Modal */}
-            {showManualModal && (
-                <Manual onClose={() => setShowManualModal(false)} />
-            )}
+            {showManualModal && <Manual onClose={() => setShowManualModal(false)} />}
         </div>
     );
 }

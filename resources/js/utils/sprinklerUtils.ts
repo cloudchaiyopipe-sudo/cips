@@ -1,9 +1,9 @@
 export interface SprinklerConfig {
-    flowRatePerMinute: number; 
-    pressureBar: number; 
-    radiusMeters: number; 
-    createdAt: string; 
-    updatedAt: string; 
+    flowRatePerMinute: number;
+    pressureBar: number;
+    radiusMeters: number;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface SprinklerFormData {
@@ -13,7 +13,6 @@ export interface SprinklerFormData {
 }
 
 export const SPRINKLER_STORAGE_KEY = 'sprinklerConfig';
-
 
 export const saveSprinklerConfig = (
     config: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'>
@@ -150,9 +149,9 @@ export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: nu
 };
 
 export const DEFAULT_SPRINKLER_CONFIG: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'> = {
-    flowRatePerMinute: 2.5, 
-    pressureBar: 2.0, 
-    radiusMeters: 4, 
+    flowRatePerMinute: 2.5,
+    pressureBar: 2.0,
+    radiusMeters: 4,
 };
 
 export default {

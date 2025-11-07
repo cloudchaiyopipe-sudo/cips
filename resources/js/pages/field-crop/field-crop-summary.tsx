@@ -15,10 +15,7 @@ import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
-import {
-    getEnhancedFieldCropData,
-    calculateEnhancedFieldStats,
-} from '../../utils/fieldCropData';
+import { getEnhancedFieldCropData, calculateEnhancedFieldStats } from '../../utils/fieldCropData';
 
 // Reduce verbose logs in production/dev by toggling these flags
 const DEBUG_ZONE_PIPE_STATS = false as const;
@@ -1723,7 +1720,7 @@ const createSubmainToMainConnectionPoints = (
 
         const submainStart = submain.coordinates[0];
         const submainEnd = submain.coordinates[submain.coordinates.length - 1];
-        
+
         // Processing submain pipe info
 
         mainPipes.forEach((main) => {
@@ -1732,7 +1729,7 @@ const createSubmainToMainConnectionPoints = (
             const mainStart = main.coordinates[0];
             const mainEnd = main.coordinates[main.coordinates.length - 1];
             const threshold = 2; // 2 meters
-            
+
             // Processing main pipe info
 
             // L-shape: submain end near main end
@@ -1811,7 +1808,7 @@ const createSubmainToMainConnectionPoints = (
                 );
                 if (intersection) {
                     // Found T-shape intersection between submain and main
-                    
+
                     const isAtMainStart =
                         calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
                     const isAtMainEnd =
@@ -1935,7 +1932,6 @@ const createSubmainToMainConnectionPoints = (
                     }
                 }
             }
-
 
             // + shape (actual intersection)
             for (let i = 0; i < main.coordinates.length - 1; i++) {
@@ -3950,7 +3946,6 @@ export default function FieldCropSummary() {
                                   });
                               }
 
-
                               return points;
                           })();
 
@@ -4047,7 +4042,6 @@ export default function FieldCropSummary() {
                                           });
                                       });
                                   }
-
 
                                   return points;
                               })();
@@ -4602,7 +4596,9 @@ export default function FieldCropSummary() {
 
                         // ตรวจสอบว่าคำนวณจากท่อย่อยหรือพื้นที่โซน
                         const calculationMethod =
-                            pipes && pipes.length > 0 ? t('From lateral pipes') : t('From zone area');
+                            pipes && pipes.length > 0
+                                ? t('From lateral pipes')
+                                : t('From zone area');
 
                         dbg(`📊 Zone ${zone.name} calculations with cropData (per irrigation):`, {
                             area: `${Math.round(zoneArea)} ตร.ม. (${Math.round((zoneArea / 1600) * 100) / 100} ไร่)`,
@@ -4869,40 +4865,42 @@ export default function FieldCropSummary() {
 
     const { center: optimalCenter, zoom: optimalZoom } = calculateMapBounds();
 
-    const uniqueIrrigationPoints = actualIrrigationPoints.filter((point, index, array) => {
-        if (!point || !point.id) return false;
-        const firstIndex = array.findIndex((p) => p && p.id === point.id);
-        return firstIndex === index;
-    }).map((point) => {
-        // Add radius information based on irrigation type and settings
-        const normalizedType = point.type?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
-        let radius = 0;
-        
-        // Get radius from irrigation settings
-        if (irrigationSettingsData && irrigationSettingsData[normalizedType]) {
-            radius = irrigationSettingsData[normalizedType].coverageRadius || 0;
-        }
-        
-        // Fallback radius values based on type
-        if (radius === 0) {
-            switch (normalizedType) {
-                case 'sprinkler':
-                case 'sprinkler_system':
-                    radius = 8; // 8 meters default
-                    break;
-                case 'pivot':
-                    radius = 50; // 50 meters default
-                    break;
-                default:
-                    radius = 5; // 5 meters default
+    const uniqueIrrigationPoints = actualIrrigationPoints
+        .filter((point, index, array) => {
+            if (!point || !point.id) return false;
+            const firstIndex = array.findIndex((p) => p && p.id === point.id);
+            return firstIndex === index;
+        })
+        .map((point) => {
+            // Add radius information based on irrigation type and settings
+            const normalizedType = point.type?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+            let radius = 0;
+
+            // Get radius from irrigation settings
+            if (irrigationSettingsData && irrigationSettingsData[normalizedType]) {
+                radius = irrigationSettingsData[normalizedType].coverageRadius || 0;
             }
-        }
-        
-        return {
-            ...point,
-            radius: radius
-        };
-    });
+
+            // Fallback radius values based on type
+            if (radius === 0) {
+                switch (normalizedType) {
+                    case 'sprinkler':
+                    case 'sprinkler_system':
+                        radius = 8; // 8 meters default
+                        break;
+                    case 'pivot':
+                        radius = 50; // 50 meters default
+                        break;
+                    default:
+                        radius = 5; // 5 meters default
+                }
+            }
+
+            return {
+                ...point,
+                radius: radius,
+            };
+        });
 
     // Debug: ตรวจสอบข้อมูลที่ได้รับ
     dbg('📊 Data received in summary:', {
@@ -5216,10 +5214,7 @@ export default function FieldCropSummary() {
                     };
 
                     // Save field crop data to localStorage in the format expected by product page
-                    localStorage.setItem(
-                        'fieldCropData',
-                        JSON.stringify(fieldCropData)
-                    );
+                    localStorage.setItem('fieldCropData', JSON.stringify(fieldCropData));
 
                     // Created fieldCropData successfully
                     localStorage.setItem('projectType', 'field-crop');
@@ -5370,8 +5365,6 @@ export default function FieldCropSummary() {
 
                                 {/* Save Project Button (removed by UI simplification request) */}
 
-                                
-
                                 {/* New Project Button */}
                                 <Link
                                     href="/step4-pipe-system?currentStep=4&completedSteps=4"
@@ -5438,7 +5431,7 @@ export default function FieldCropSummary() {
                                 </div>
                             </div>
                         )}
-                    </div>   
+                    </div>
                 </div>
             </div>
 
@@ -5525,11 +5518,7 @@ export default function FieldCropSummary() {
                                         </div>
                                         <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
                                             <div className="text-lg font-bold text-cyan-400 print:text-sm print:text-black">
-                                                {sprinklerPoints +
-                                                    pivotPoints +
-                                                    0 +
-                                                    0 +
-                                                    dripLines}
+                                                {sprinklerPoints + pivotPoints + 0 + 0 + dripLines}
                                             </div>
                                             <div className="text-xs text-gray-400 print:text-gray-600">
                                                 {t('Irrigation Points')}
@@ -6067,11 +6056,7 @@ export default function FieldCropSummary() {
                                                 Total Irrigation Points:
                                             </div>
                                             <div className="text-sm font-bold text-cyan-100 print:text-cyan-800">
-                                                {sprinklerPoints +
-                                                    pivotPoints +
-                                                    0 +
-                                                    0 +
-                                                    dripLines}{' '}
+                                                {sprinklerPoints + pivotPoints + 0 + 0 + dripLines}{' '}
                                                 จุด
                                             </div>
                                         </div>

@@ -8,12 +8,13 @@
 ## การทำงาน
 
 ### 1. Canvas-based Area Overlay
+
 ```typescript
 class ElevationAreaOverlay extends google.maps.OverlayView {
     private drawElevationAreas() {
         // สร้าง grid 20x20 pixels
         const gridSize = 20;
-        
+
         // วาดพื้นที่สีตามความสูง
         for (let y = 0; y < gridHeight; y++) {
             for (let x = 0; x < gridWidth; x++) {
@@ -28,6 +29,7 @@ class ElevationAreaOverlay extends google.maps.OverlayView {
 ```
 
 ### 2. Color Mapping
+
 ```typescript
 private getElevationColor(normalizedElevation: number): string {
     if (normalizedElevation < 0.2) {
@@ -45,6 +47,7 @@ private getElevationColor(normalizedElevation: number): string {
 ```
 
 ### 3. Grid-based Interpolation
+
 - สร้าง grid 20x20 pixels
 - หาจุดข้อมูลความสูงที่ใกล้ที่สุด
 - สร้างสีต่อเนื่องตามความสูง

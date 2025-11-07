@@ -7,16 +7,16 @@ import NotificationModal from '../../components/NotificationModal';
 import { isPointInPolygonEnhanced } from '../../utils/fieldCropData';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 import { getCropByValue } from './choose-crop';
-import { 
-    FieldCropPageProps, 
+import {
+    FieldCropPageProps,
     FieldData,
-    Coordinate, 
-    Obstacle, 
-    Zone, 
-    PlantPoint, 
-    IrrigationPositions, 
+    Coordinate,
+    Obstacle,
+    Zone,
+    PlantPoint,
+    IrrigationPositions,
     IrrigationSettings,
-    FIELD_STYLING 
+    FIELD_STYLING,
 } from '../../types/fieldCropTypes';
 import { useFieldData as useStandardizedFieldData } from '../../hooks/useFieldData';
 
@@ -202,21 +202,21 @@ interface DrawingState {
 // Helper function to check if a point is inside or on a polygon
 const isPointInOrOnPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
     if (polygon.length < 3) return false;
-    
+
     let inside = false;
     const { lat, lng } = point;
-    
+
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
         const xi = polygon[i].lng;
         const yi = polygon[i].lat;
         const xj = polygon[j].lng;
         const yj = polygon[j].lat;
-        
+
         if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
             inside = !inside;
         }
     }
-    
+
     return inside;
 };
 
@@ -417,7 +417,10 @@ const getPipeConfig = (type: PipeType) => {
 
 const getObstacleColors = (type: string) => {
     const obstacleType = type as keyof typeof FIELD_STYLING.OBSTACLES;
-    if (obstacleType in FIELD_STYLING.OBSTACLES && typeof FIELD_STYLING.OBSTACLES[obstacleType] === 'object') {
+    if (
+        obstacleType in FIELD_STYLING.OBSTACLES &&
+        typeof FIELD_STYLING.OBSTACLES[obstacleType] === 'object'
+    ) {
         return FIELD_STYLING.OBSTACLES[obstacleType] as { fill: string; stroke: string };
     }
     return FIELD_STYLING.OBSTACLES.default;
@@ -530,24 +533,23 @@ const usePipeManager = () => {
                 return;
             }
             const snapshot = deepCopyPipes(nextPipes);
-            
+
             // Update timestamp for pipe action
             lastPipeActionTime.current = Date.now();
-            
+
             if (resetHistory) {
                 setPipeHistory([snapshot]);
                 setPipeHistoryIndex(0);
                 return;
             }
-            
+
             setPipeHistoryIndex((prevIndex) => {
-                
                 setPipeHistory((prev) => {
                     const upto = prev.slice(0, prevIndex + 1);
                     const newHistory = [...upto, snapshot];
                     return newHistory;
                 });
-                
+
                 return prevIndex + 1;
             });
         },
@@ -759,8 +761,7 @@ const usePipeManager = () => {
             snapRadius: number = 2,
             options?: { lateralMode?: LateralMode; betweenRowsHalfWidth?: number }
         ) => {
-            if (coordinates.length < 2)
-                return { sprinklers: [], pivots: [] };
+            if (coordinates.length < 2) return { sprinklers: [], pivots: [] };
 
             const mode: LateralMode | undefined = options?.lateralMode;
             const halfWidth = options?.betweenRowsHalfWidth ?? 1.5;
@@ -814,7 +815,6 @@ const usePipeManager = () => {
             // สปริงเกลอร์
             const sprinklerFlow = Number(irrigationSettings.sprinkler_system?.flow) || 10;
             totalFlow += connectedPoints.sprinklers.length * sprinklerFlow;
-
 
             // Pivot
             const pivotFlow = Number(irrigationSettings.pivot?.flow) || 50;
@@ -1020,10 +1020,7 @@ const useSnapSystem = () => {
             const isBetweenRows = options?.lateralMode === 'betweenRows';
             const allIrrigationPoints =
                 pipeType === 'lateral' && !isBetweenRows
-                    ? [
-                          ...irrigationPositions.sprinklers,
-                          ...irrigationPositions.pivots,
-                      ]
+                    ? [...irrigationPositions.sprinklers, ...irrigationPositions.pivots]
                     : [];
 
             for (const irrigationPoint of allIrrigationPoints) {
@@ -1675,9 +1672,7 @@ const useMapManager = () => {
     //...
     const createIrrigationMarkers = useCallback(
         (map: google.maps.Map, positions: IrrigationPositions, settings: IrrigationSettings) => {
-            const totalIrrigationCount =
-                positions.sprinklers.length +
-                positions.pivots.length;
+            const totalIrrigationCount = positions.sprinklers.length + positions.pivots.length;
 
             if (overlaysRef.current.irrigation.size !== totalIrrigationCount) {
                 overlaysRef.current.irrigation.forEach((marker) => marker.setMap(null));
@@ -1768,9 +1763,8 @@ const useMapManager = () => {
                         overlaysRef.current.circles.set(id, circle);
                     }
                 });
-
             }
-            
+
             // เพิ่ม click listeners ให้กับ irrigation markers
             // addIrrigationClickListeners จะถูกเรียกจาก drawIrrigation แทน
         },
@@ -1799,7 +1793,6 @@ const useMapManager = () => {
             return 8; // Original size
         }
     }, []);
-
 
     // Draw plant points
     const drawPlantPoints = useCallback(
@@ -1981,7 +1974,6 @@ const useMapManager = () => {
                 type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
             }>
         ) => {
-            
             // ตรวจสอบ map reference ก่อนทำอะไร
             const currentMap = mapRef.current;
             if (!currentMap) {
@@ -1990,7 +1982,7 @@ const useMapManager = () => {
             }
 
             const overlays = overlaysRef.current;
-            
+
             // ลบจุดเชื่อมต่อเก่าทั้งหมดอย่างสมบูรณ์
             if (overlays.connectionPoints) {
                 overlays.connectionPoints.forEach((marker) => {
@@ -2008,7 +2000,7 @@ const useMapManager = () => {
 
             // สร้าง markers ใหม่แบบ batch เพื่อลดการกระพริบ
             const newMarkers: google.maps.Marker[] = [];
-            
+
             connectionPoints.forEach((connectionPoint) => {
                 try {
                     let title;
@@ -2068,7 +2060,6 @@ const useMapManager = () => {
                     });
 
                     newMarkers.push(marker);
-                    
                 } catch {
                     // Error creating marker for connection point
                 }
@@ -2081,87 +2072,126 @@ const useMapManager = () => {
                     overlays.connectionPoints.set(marker.getTitle() || 'unknown', marker);
                 }
             });
-
-            
         },
         [mapRef, overlaysRef]
     );
 
-    const handleIrrigationMarkerClick = useCallback((markerId: string, position: Coordinate, pipeManager: ReturnType<typeof usePipeManager>, lateralConnectionMode: { isActive: boolean; startPoint: Coordinate | null; startMarkerId: string | null }, setLateralConnectionMode: React.Dispatch<React.SetStateAction<{ isActive: boolean; startPoint: Coordinate | null; startMarkerId: string | null }>>) => {
-        // ทำงานเฉพาะเมื่อโหมดเชื่อมท่อเปิดอยู่
-        if (!lateralConnectionMode.isActive) {
-            return; // ไม่ทำอะไรถ้าโหมดเชื่อมท่อปิดอยู่
-        }
+    const handleIrrigationMarkerClick = useCallback(
+        (
+            markerId: string,
+            position: Coordinate,
+            pipeManager: ReturnType<typeof usePipeManager>,
+            lateralConnectionMode: {
+                isActive: boolean;
+                startPoint: Coordinate | null;
+                startMarkerId: string | null;
+            },
+            setLateralConnectionMode: React.Dispatch<
+                React.SetStateAction<{
+                    isActive: boolean;
+                    startPoint: Coordinate | null;
+                    startMarkerId: string | null;
+                }>
+            >
+        ) => {
+            // ทำงานเฉพาะเมื่อโหมดเชื่อมท่อเปิดอยู่
+            if (!lateralConnectionMode.isActive) {
+                return; // ไม่ทำอะไรถ้าโหมดเชื่อมท่อปิดอยู่
+            }
 
-        if (!lateralConnectionMode.startPoint) {
-            // เริ่มต้นการเชื่อมท่อย่อย
-            setLateralConnectionMode({
-                isActive: true,
-                startPoint: position,
-                startMarkerId: markerId,
-            });
-        } else {
-            // สร้างท่อย่อยเชื่อมระหว่างจุดเริ่มต้นและจุดปลาย
-            if (lateralConnectionMode.startMarkerId !== markerId) {
-                const newLateralPipe: Pipe = {
-                    id: `lateral-${Date.now()}`,
-                    type: 'lateral',
-                    coordinates: [lateralConnectionMode.startPoint, position],
-                    curveType: 'straight',
-                };
-
-                // คำนวณความยาวท่อย่อย
-                const length = calculateDistance(newLateralPipe.coordinates);
-                newLateralPipe.length = length;
-
-                // เพิ่มท่อย่อยใหม่
-                pipeManager.addPipe(newLateralPipe);
-                
-
-                // รีเซ็ตโหมดการเชื่อม
+            if (!lateralConnectionMode.startPoint) {
+                // เริ่มต้นการเชื่อมท่อย่อย
                 setLateralConnectionMode({
-                    isActive: true, // ยังคงเปิดโหมดไว้เพื่อเชื่อมต่อจุดอื่น
-                    startPoint: null,
-                    startMarkerId: null,
+                    isActive: true,
+                    startPoint: position,
+                    startMarkerId: markerId,
                 });
             } else {
-                // คลิกที่จุดเดียวกัน - ยกเลิกการเชื่อม
-                setLateralConnectionMode({
-                    isActive: true, // ยังคงเปิดโหมดไว้
-                    startPoint: null,
-                    startMarkerId: null,
-                });
+                // สร้างท่อย่อยเชื่อมระหว่างจุดเริ่มต้นและจุดปลาย
+                if (lateralConnectionMode.startMarkerId !== markerId) {
+                    const newLateralPipe: Pipe = {
+                        id: `lateral-${Date.now()}`,
+                        type: 'lateral',
+                        coordinates: [lateralConnectionMode.startPoint, position],
+                        curveType: 'straight',
+                    };
+
+                    // คำนวณความยาวท่อย่อย
+                    const length = calculateDistance(newLateralPipe.coordinates);
+                    newLateralPipe.length = length;
+
+                    // เพิ่มท่อย่อยใหม่
+                    pipeManager.addPipe(newLateralPipe);
+
+                    // รีเซ็ตโหมดการเชื่อม
+                    setLateralConnectionMode({
+                        isActive: true, // ยังคงเปิดโหมดไว้เพื่อเชื่อมต่อจุดอื่น
+                        startPoint: null,
+                        startMarkerId: null,
+                    });
+                } else {
+                    // คลิกที่จุดเดียวกัน - ยกเลิกการเชื่อม
+                    setLateralConnectionMode({
+                        isActive: true, // ยังคงเปิดโหมดไว้
+                        startPoint: null,
+                        startMarkerId: null,
+                    });
+                }
             }
-        }
-    }, []);
+        },
+        []
+    );
 
     // เพิ่ม click listeners ให้กับ irrigation markers
-    const addIrrigationClickListeners = useCallback((pipeManager: ReturnType<typeof usePipeManager>, lateralConnectionMode: { isActive: boolean; startPoint: Coordinate | null; startMarkerId: string | null }, setLateralConnectionMode: React.Dispatch<React.SetStateAction<{ isActive: boolean; startPoint: Coordinate | null; startMarkerId: string | null }>>) => {
-        if (!mapRef.current) return;
+    const addIrrigationClickListeners = useCallback(
+        (
+            pipeManager: ReturnType<typeof usePipeManager>,
+            lateralConnectionMode: {
+                isActive: boolean;
+                startPoint: Coordinate | null;
+                startMarkerId: string | null;
+            },
+            setLateralConnectionMode: React.Dispatch<
+                React.SetStateAction<{
+                    isActive: boolean;
+                    startPoint: Coordinate | null;
+                    startMarkerId: string | null;
+                }>
+            >
+        ) => {
+            if (!mapRef.current) return;
 
-        overlaysRef.current.irrigation.forEach((marker, markerId) => {
-            // ลบ listener เก่า (ถ้ามี)
-            if ((marker as ExtendedMarker).dragListener) {
-                google.maps.event.removeListener((marker as ExtendedMarker).dragListener!);
-            }
+            overlaysRef.current.irrigation.forEach((marker, markerId) => {
+                // ลบ listener เก่า (ถ้ามี)
+                if ((marker as ExtendedMarker).dragListener) {
+                    google.maps.event.removeListener((marker as ExtendedMarker).dragListener!);
+                }
 
-            // ปรับ clickable property ตามสถานะ Connect Mode
-            marker.setClickable(lateralConnectionMode.isActive);
+                // ปรับ clickable property ตามสถานะ Connect Mode
+                marker.setClickable(lateralConnectionMode.isActive);
 
-            // เพิ่ม click listener เฉพาะเมื่อ Connect Mode เปิดอยู่
-            if (lateralConnectionMode.isActive) {
-                (marker as ExtendedMarker).dragListener = marker.addListener('click', () => {
-                    const position = marker.getPosition();
-                    if (position) {
-                        handleIrrigationMarkerClick(markerId, {
-                            lat: position.lat(),
-                            lng: position.lng(),
-                        }, pipeManager, lateralConnectionMode, setLateralConnectionMode);
-                    }
-                });
-            }
-        });
-    }, [handleIrrigationMarkerClick]);
+                // เพิ่ม click listener เฉพาะเมื่อ Connect Mode เปิดอยู่
+                if (lateralConnectionMode.isActive) {
+                    (marker as ExtendedMarker).dragListener = marker.addListener('click', () => {
+                        const position = marker.getPosition();
+                        if (position) {
+                            handleIrrigationMarkerClick(
+                                markerId,
+                                {
+                                    lat: position.lat(),
+                                    lng: position.lng(),
+                                },
+                                pipeManager,
+                                lateralConnectionMode,
+                                setLateralConnectionMode
+                            );
+                        }
+                    });
+                }
+            });
+        },
+        [handleIrrigationMarkerClick]
+    );
 
     // วาดเส้นเชื่อมต่อระหว่างท่อย่อยกับสปริงเกลอร์
     const drawConnectionLines = useCallback(
@@ -2720,7 +2750,22 @@ const useMapManager = () => {
 
     // updateMapVisuals เรียกใช้ฟังก์ชันที่ปรับปรุงแล้ว
     const updateMapVisuals = useCallback(
-        (fieldData: FieldData, pipeManager: ReturnType<typeof usePipeManager>, lateralConnectionMode: { isActive: boolean; startPoint: Coordinate | null; startMarkerId: string | null }, setLateralConnectionMode: React.Dispatch<React.SetStateAction<{ isActive: boolean; startPoint: Coordinate | null; startMarkerId: string | null }>>) => {
+        (
+            fieldData: FieldData,
+            pipeManager: ReturnType<typeof usePipeManager>,
+            lateralConnectionMode: {
+                isActive: boolean;
+                startPoint: Coordinate | null;
+                startMarkerId: string | null;
+            },
+            setLateralConnectionMode: React.Dispatch<
+                React.SetStateAction<{
+                    isActive: boolean;
+                    startPoint: Coordinate | null;
+                    startMarkerId: string | null;
+                }>
+            >
+        ) => {
             if (!mapRef.current) return;
 
             if (fieldData.mainArea.length > 0) {
@@ -2738,10 +2783,21 @@ const useMapManager = () => {
             if (fieldData.irrigationPositions) {
                 drawIrrigation(fieldData.irrigationPositions, fieldData.irrigationSettings);
                 // เพิ่ม click listeners หลังจากสร้าง irrigation markers
-                addIrrigationClickListeners(pipeManager, lateralConnectionMode, setLateralConnectionMode);
+                addIrrigationClickListeners(
+                    pipeManager,
+                    lateralConnectionMode,
+                    setLateralConnectionMode
+                );
             }
         },
-        [drawMainArea, drawZones, drawObstacles, drawIrrigation, drawPlantPoints, addIrrigationClickListeners]
+        [
+            drawMainArea,
+            drawZones,
+            drawObstacles,
+            drawIrrigation,
+            drawPlantPoints,
+            addIrrigationClickListeners,
+        ]
     );
 
     const exposeOverlaysRef = useCallback(() => {
@@ -2817,8 +2873,12 @@ const useMapManager = () => {
 export default function PipeGenerate(props: FieldCropPageProps) {
     const { t } = useLanguage();
     // Use standardized field data management
-    const { fieldData: standardizedFieldData, updateFieldData, resetPipesOnly } = useStandardizedFieldData(props);
-    
+    const {
+        fieldData: standardizedFieldData,
+        updateFieldData,
+        resetPipesOnly,
+    } = useStandardizedFieldData(props);
+
     // Helper function to load from storage (for compatibility)
     const loadFromStorage = useCallback((): Partial<FieldData> | null => {
         try {
@@ -2860,13 +2920,13 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // ฟังก์ชันเปิด/ปิดโหมดเชื่อมท่อ
     const toggleLateralConnectionMode = useCallback(() => {
-        setLateralConnectionMode(prev => {
+        setLateralConnectionMode((prev) => {
             const newMode = {
                 isActive: !prev.isActive,
                 startPoint: null,
                 startMarkerId: null,
             };
-            
+
             // อัปเดต clickable property ของ markers ทันที
             setTimeout(() => {
                 // เรียกใช้ addIrrigationClickListeners โดยตรง
@@ -2876,7 +2936,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     });
                 }
             }, 0);
-            
+
             return newMode;
         });
     }, [mapManager]);
@@ -2886,7 +2946,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // Use standardized field data from the hook
     const [fieldData, setFieldData] = useState<FieldData>(standardizedFieldData);
-    
+
     // Update fieldData when standardizedFieldData changes
     useEffect(() => {
         setFieldData(standardizedFieldData);
@@ -2896,7 +2956,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         center: standardizedFieldData.mapCenter,
         zoom: standardizedFieldData.mapZoom,
     });
-    
+
     // Update mapStatus when fieldData changes
     useEffect(() => {
         setMapStatus({
@@ -2904,7 +2964,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             zoom: fieldData.mapZoom,
         });
     }, [fieldData.mapCenter, fieldData.mapZoom]);
-
 
     // Notification modal state
     const [notificationModal, setNotificationModal] = useState({
@@ -2921,7 +2980,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     // ===== Sprinkler-based recommended pipe length warnings (submain & lateral only) =====
     // Deprecated legacy maps for prior logic removed
 
-
     const [pumps, setPumps] = useState<Pump[]>([]);
     // History stacks for undo/redo of pump operations
     const [pumpHistory, setPumpHistory] = useState<Pump[][]>([[]]);
@@ -2930,7 +2988,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     const [isPlacingPump, setIsPlacingPump] = useState(false);
     const isPlacingPumpRef = useRef(false);
     const [mapZoom, setMapZoom] = useState<number>(18); // Track map zoom level
-    
+
     // Track last pump action timestamp to determine which history to undo/redo
     const lastPumpActionTime = useRef<number>(0);
 
@@ -2970,13 +3028,13 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         // Only handle pipes and pumps restoration from localStorage
         const loadPipesAndPumps = () => {
             const storageData = loadFromStorage();
-            
+
             if (storageData) {
                 // Restore pipes
                 if (storageData.pipes && Array.isArray(storageData.pipes)) {
                     setPipes(storageData.pipes, { resetHistory: true });
                 }
-                
+
                 // Restore pumps from equipment/equipmentIcons saved in storage
                 try {
                     const eqSource = (storageData ?? {}) as Partial<{
@@ -2985,7 +3043,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     }>;
                     const eq: StoredEquipment[] =
                         eqSource.equipment ?? eqSource.equipmentIcons ?? [];
-                    
+
                     if (Array.isArray(eq) && eq.length > 0) {
                         const restored = eq
                             .filter(
@@ -3065,7 +3123,12 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             }
 
             mapVisualsDebounceTimer.current = setTimeout(() => {
-                mapManager.updateMapVisuals(fieldData, pipeManager, lateralConnectionMode, setLateralConnectionMode);
+                mapManager.updateMapVisuals(
+                    fieldData,
+                    pipeManager,
+                    lateralConnectionMode,
+                    setLateralConnectionMode
+                );
             }, 100); // 100ms debounce สำหรับ map visuals
         }
 
@@ -3074,16 +3137,36 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 clearTimeout(mapVisualsDebounceTimer.current);
             }
         };
-    }, [fieldData, createFieldDataHash, mapManager, mapZoom, pipeManager, lateralConnectionMode, setLateralConnectionMode]); // Added lateralConnectionMode to dependencies
+    }, [
+        fieldData,
+        createFieldDataHash,
+        mapManager,
+        mapZoom,
+        pipeManager,
+        lateralConnectionMode,
+        setLateralConnectionMode,
+    ]); // Added lateralConnectionMode to dependencies
 
     // useEffect แยกสำหรับการโหลดข้อมูลทันทีเมื่อเข้าสู่หน้า
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (fieldData.mainArea.length > 0 && mapManager.mapRef.current) {
             // อัปเดต map visuals ทันทีเมื่อมีข้อมูลและ map พร้อม
-            mapManager.updateMapVisuals(fieldData, pipeManager, lateralConnectionMode, setLateralConnectionMode);
+            mapManager.updateMapVisuals(
+                fieldData,
+                pipeManager,
+                lateralConnectionMode,
+                setLateralConnectionMode
+            );
         }
-    }, [fieldData, mapManager, mapZoom, pipeManager, lateralConnectionMode, setLateralConnectionMode]); // Added lateralConnectionMode to dependencies
+    }, [
+        fieldData,
+        mapManager,
+        mapZoom,
+        pipeManager,
+        lateralConnectionMode,
+        setLateralConnectionMode,
+    ]); // Added lateralConnectionMode to dependencies
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
@@ -3480,7 +3563,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     );
 
     // generateGuidedLateralsFromTemplate will be defined later (hoisted via function declaration)
-    const generateGuidedLateralsFromTemplateRef = useRef<((template: Pipe, selectedPattern?: 'extending' | 'crossing') => Pipe[]) | null>(null);
+    const generateGuidedLateralsFromTemplateRef = useRef<
+        ((template: Pipe, selectedPattern?: 'extending' | 'crossing') => Pipe[]) | null
+    >(null);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const startDrawing = useCallback(
@@ -3834,8 +3919,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
                         // สร้างข้อความแสดงจำนวนจุดเชื่อมแต่ละประเภท
                         const totalPoints =
-                            connectedPoints.sprinklers.length +
-                            connectedPoints.pivots.length;
+                            connectedPoints.sprinklers.length + connectedPoints.pivots.length;
                         let labelText = `💧 ${Math.round(totalFlow)} L/min`;
                         if (totalPoints > 0) {
                             const parts: string[] = [];
@@ -3871,7 +3955,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                             pipeManager.lateralMode,
                             pipeManager.findNearbyConnectedIrrigationPoints
                         );
-
 
                         // สร้างท่อด้านตรงข้ามโดยอัตโนมัติ (เฉพาะโหมดระหว่างแถวและเริ่มจากท่อเมนย่อย)
                         if (
@@ -4014,7 +4097,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         const existOpp = mapLabels.get(oppositePipe.id) || [];
                                         mapLabels.set(oppositePipe.id, [...existOpp, oppLabel]);
 
-
                                         // วาดเส้นเชื่อมต่อสำหรับท่อย่อยที่สร้างอัตโนมัติ
                                         const updatedLateralPipes = pipeManager.pipes.filter(
                                             (p) => p.type === 'lateral'
@@ -4043,10 +4125,11 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                             type: 'warning',
                             showColorOptions: true,
                             onConfirm: (selectedPattern?: 'extending' | 'crossing') => {
-                                const generated = generateGuidedLateralsFromTemplateRef.current?.(
-                                    newPipe,
-                                    selectedPattern
-                                ) || [];
+                                const generated =
+                                    generateGuidedLateralsFromTemplateRef.current?.(
+                                        newPipe,
+                                        selectedPattern
+                                    ) || [];
                                 if (generated.length > 0) {
                                     pipeManager.setPipes((prev) => [...prev, ...generated]);
 
@@ -4584,7 +4667,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         const mainPipes = pipeManager.pipes.filter((p) => p.type === 'main');
         const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
 
-
         if (mainPipes.length === 0 || submainPipes.length === 0) {
             // No main or submain pipes, returning empty connection points
             return connectionPoints;
@@ -5018,10 +5100,10 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         const lateralPipes = pipeManager.pipes.filter((p) => p.type === 'lateral');
         const mainPipes = pipeManager.pipes.filter((p) => p.type === 'main');
         const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
-        
+
         // ตรวจสอบว่ามีท่อครบถ้วนหรือไม่
         const hasCompletePipeSystem = mainPipes.length > 0 && submainPipes.length > 0;
-        
+
         const allConnectionPoints: Array<{
             id: string;
             position: Coordinate;
@@ -5046,13 +5128,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             connectionPoints: allConnectionPoints,
             lateralPipes: lateralPipes,
             hasData: allConnectionPoints.length > 0,
-            hasCompleteSystem: hasCompletePipeSystem
+            hasCompleteSystem: hasCompletePipeSystem,
         };
-    }, [
-        pipeManager.pipes,
-        createLateralConnectionPoints,
-        createSubmainToMainConnectionPoints,
-    ]);
+    }, [pipeManager.pipes, createLateralConnectionPoints, createSubmainToMainConnectionPoints]);
 
     // ฟังก์ชันสำหรับการวาดจุดเชื่อมต่อ
     const renderConnectionPoints = useCallback(() => {
@@ -5075,7 +5153,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         // วาดจุดเชื่อมต่อใหม่ (เฉพาะเมื่อมีระบบท่อครบถ้วน)
         if (connectionPointsData.hasData && connectionPointsData.hasCompleteSystem) {
             mapManager.drawConnectionPoints(connectionPointsData.connectionPoints);
-            
+
             // วาดเส้นเชื่อมต่อระหว่างท่อย่อยกับสปริงเกลอร์
             if (connectionPointsData.lateralPipes.length > 0) {
                 mapManager.drawConnectionLines(
@@ -6039,8 +6117,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         [pipeManager, mapManager]
     );
 
-
-
     // Helper function to deep copy pumps
     const deepCopyPumps = useCallback((pumps: Pump[]): Pump[] => {
         return pumps.map((pump) => ({ ...pump }));
@@ -6130,7 +6206,12 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             }
 
             // Initial draw
-            mapManager.updateMapVisuals(fieldData, pipeManager, lateralConnectionMode, setLateralConnectionMode);
+            mapManager.updateMapVisuals(
+                fieldData,
+                pipeManager,
+                lateralConnectionMode,
+                setLateralConnectionMode
+            );
 
             // Ensure pipes are drawn on first map load with currently loaded state
             try {
@@ -6375,20 +6456,30 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     const combinedUndo = useCallback(() => {
         const canUndoPipe = pipeManager.pipeHistoryIndex > 0;
         const canUndoPump = pumpHistoryIndex > 0;
-        
+
         if (!canUndoPipe && !canUndoPump) {
             console.log('❌ No undo available');
             return;
         }
-        
+
         // Determine which action was more recent based on timestamp
-        const shouldUndoPipe = canUndoPipe && (!canUndoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
-        
+        const shouldUndoPipe =
+            canUndoPipe &&
+            (!canUndoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
+
         if (shouldUndoPipe) {
-            console.log('🔙 Undoing pipe action (last pipe action:', new Date(pipeManager.lastPipeActionTime.current).toLocaleTimeString(), ')');
+            console.log(
+                '🔙 Undoing pipe action (last pipe action:',
+                new Date(pipeManager.lastPipeActionTime.current).toLocaleTimeString(),
+                ')'
+            );
             pipeManager.undo();
         } else {
-            console.log('🔙 Undoing pump action (last pump action:', new Date(lastPumpActionTime.current).toLocaleTimeString(), ')');
+            console.log(
+                '🔙 Undoing pump action (last pump action:',
+                new Date(lastPumpActionTime.current).toLocaleTimeString(),
+                ')'
+            );
             undoPump();
         }
     }, [pipeManager, pumpHistoryIndex, undoPump, lastPumpActionTime]);
@@ -6396,15 +6487,17 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     const combinedRedo = useCallback(() => {
         const canRedoPipe = pipeManager.pipeHistoryIndex < pipeManager.pipeHistoryLength - 1;
         const canRedoPump = pumpHistoryIndex < pumpHistory.length - 1;
-        
+
         if (!canRedoPipe && !canRedoPump) {
             console.log('❌ No redo available');
             return;
         }
-        
+
         // Determine which action to redo based on timestamp
-        const shouldRedoPipe = canRedoPipe && (!canRedoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
-        
+        const shouldRedoPipe =
+            canRedoPipe &&
+            (!canRedoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
+
         if (shouldRedoPipe) {
             console.log('🔜 Redoing pipe action');
             pipeManager.redo();
@@ -6429,9 +6522,17 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             pipeHistoryLength: pipeManager.pipeHistoryLength,
             pumpHistoryIndex,
             pumpHistoryLength: pumpHistory.length,
-            pipesCount: pipeManager.pipes.length
+            pipesCount: pipeManager.pipes.length,
         });
-    }, [canUndo, canRedo, pipeManager.pipeHistoryIndex, pipeManager.pipeHistoryLength, pumpHistoryIndex, pumpHistory.length, pipeManager.pipes.length]);
+    }, [
+        canUndo,
+        canRedo,
+        pipeManager.pipeHistoryIndex,
+        pipeManager.pipeHistoryLength,
+        pumpHistoryIndex,
+        pumpHistory.length,
+        pipeManager.pipes.length,
+    ]);
 
     useEffect(() => {
         console.log('[PipeGenerate] Drawing pumps on map (useEffect):', pumps);
@@ -6474,7 +6575,10 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             case 1: // Initial Area
                 return fieldData.mainArea.length >= 3;
             case 2: // Irrigation Generate
-                return fieldData.irrigationPositions.sprinklers.length > 0 || fieldData.irrigationPositions.pivots.length > 0;
+                return (
+                    fieldData.irrigationPositions.sprinklers.length > 0 ||
+                    fieldData.irrigationPositions.pivots.length > 0
+                );
             case 3: // Zone Obstacle
                 return fieldData.zones.some(
                     (zone) =>
@@ -6526,7 +6630,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             // Original logic for incomplete steps
             // Update completed steps before navigating
             const updatedCompletedSteps = updateCompletedSteps();
-            
+
             const params = {
                 crops: fieldData.selectedCrops.join(','),
                 currentStep: step.id,
@@ -7086,7 +7190,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                                             : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
                                                     }`}
                                                 >
-                                                    {lateralConnectionMode.isActive ? t('ON') : t('OFF')}
+                                                    {lateralConnectionMode.isActive
+                                                        ? t('ON')
+                                                        : t('OFF')}
                                                 </button>
                                             </div>
 
@@ -7399,7 +7505,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         {t('Back')}
                                     </button>
 
-
                                     <button
                                         onClick={handleContinue}
                                         className="flex-1 rounded border border-white bg-green-600 px-4 py-2 text-sm text-white transition-colors hover:bg-green-700"
@@ -7516,7 +7621,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                     </div>
                                 )}
 
-
                                 {/* Floating Distance Meter */}
                                 {pipeManager.isDrawing &&
                                     pipeManager.drawingState.currentDistance > 0 && (
@@ -7611,7 +7715,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         )}
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>
@@ -7641,10 +7744,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                         <div className="flex items-center space-x-2">
                             <div className="h-2 w-2 animate-pulse rounded-full bg-green-400"></div>
                             <span className="text-sm font-medium">
-                                {lateralConnectionMode.startPoint 
+                                {lateralConnectionMode.startPoint
                                     ? t('Click on another irrigation point to connect lateral pipe')
-                                    : t('Click on an irrigation point to start connecting')
-                                }
+                                    : t('Click on an irrigation point to start connecting')}
                             </span>
                             <button
                                 onClick={toggleLateralConnectionMode}

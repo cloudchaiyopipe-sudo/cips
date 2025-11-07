@@ -7,6 +7,7 @@
 ## การแก้ไข
 
 ### 1. เปลี่ยนจาก bounds เป็น center point
+
 ```typescript
 // เก่า: ใช้ bounds.getSouth(), bounds.getNorth()
 const bounds = map.getBounds();
@@ -14,10 +15,11 @@ const lat = bounds.getSouth() + (bounds.getNorth() - bounds.getSouth()) * (i / (
 
 // ใหม่: ใช้ center point และสร้าง grid รอบๆ
 const center = map.getCenter();
-const lat = center.lat() + (i - gridSize/2) * latRange / gridSize;
+const lat = center.lat() + ((i - gridSize / 2) * latRange) / gridSize;
 ```
 
 ### 2. ลดจำนวนจุดตัวอย่าง
+
 ```typescript
 // เก่า: 10x10 = 100 points
 const gridSize = 10;
@@ -27,6 +29,7 @@ const gridSize = 5;
 ```
 
 ### 3. เพิ่มปุ่มทดสอบ
+
 ```typescript
 {!isLoading && !error && elevationData.length === 0 && (
     <button onClick={loadElevationData}>
@@ -36,6 +39,7 @@ const gridSize = 5;
 ```
 
 ### 4. เพิ่ม Debug Information
+
 - Console logging สำหรับ debug
 - แสดงสถานะการโหลด
 - แสดงจำนวนจุดข้อมูล

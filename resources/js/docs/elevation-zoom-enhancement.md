@@ -8,6 +8,7 @@
 ## การปรับปรุง
 
 ### 1. **เพิ่มความละเอียด**
+
 ```typescript
 // เก่า: 7x7 grid (49 พื้นที่)
 const gridSize = 7;
@@ -17,20 +18,25 @@ const gridSize = 10;
 ```
 
 ### 2. **ปรับปรุงการคำนวณสี**
+
 ```typescript
 // เก่า: 5 สี
-if (normalizedElevation < 0.2) return '#0000FF'; // Blue
+if (normalizedElevation < 0.2)
+    return '#0000FF'; // Blue
 else if (normalizedElevation < 0.4) return '#00FF00'; // Green
 // ...
 
 // ใหม่: 10 สีที่แตกต่างกันชัดเจน
-if (normalizedElevation < 0.1) return '#0066CC'; // Dark Blue
-else if (normalizedElevation < 0.2) return '#0088FF'; // Light Blue
+if (normalizedElevation < 0.1)
+    return '#0066CC'; // Dark Blue
+else if (normalizedElevation < 0.2)
+    return '#0088FF'; // Light Blue
 else if (normalizedElevation < 0.3) return '#00AA44'; // Dark Green
 // ... 10 ระดับสี
 ```
 
 ### 3. **ปรับปรุงการแสดงผล**
+
 ```typescript
 // เพิ่ม stroke สีขาวเพื่อแยกพื้นที่
 strokeColor: '#FFFFFF',
@@ -42,6 +48,7 @@ fillOpacity: 0.7,
 ```
 
 ### 4. **อัปเดต Legend**
+
 - เพิ่มสีใหม่ 10 ระดับ
 - แสดงความหมายของแต่ละสี
 - แสดงจำนวนพื้นที่ (10×10 = 100 พื้นที่)

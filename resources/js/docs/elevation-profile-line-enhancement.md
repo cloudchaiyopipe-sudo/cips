@@ -5,28 +5,31 @@
 ### 🎯 **ฟีเจอร์ใหม่:**
 
 #### **1. เส้นตรงระหว่างจุด**
+
 - **สี**: ส้ม (#FF5722)
 - **ความหนา**: 4px
 - **ความโปร่งใส**: 1.0 (ไม่โปร่งใส)
 - **แสดงผล**: หลังจากคลิกจุดจบ
 
 #### **2. การทำงาน:**
+
 ```typescript
 // เมื่อคลิกจุดจบ
 if (!endPointRef.current) {
     endPointRef.current = event.latLng;
     setEndPoint(event.latLng);
     createMarker(event.latLng, 'end');
-    
+
     // Create line between start and end points
     createLineBetweenPoints(startPointRef.current, event.latLng);
-    
+
     createElevationProfile(startPointRef.current, event.latLng);
     setIsDrawing(false);
 }
 ```
 
 #### **3. ฟังก์ชัน createLineBetweenPoints:**
+
 ```typescript
 const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.LatLng) => {
     if (!map) return;
@@ -43,7 +46,7 @@ const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.Lat
         strokeColor: '#FF5722', // Orange color for profile line
         strokeOpacity: 1.0,
         strokeWeight: 4,
-        map
+        map,
     });
 
     console.log('Created permanent line between start and end points');
@@ -53,16 +56,19 @@ const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.Lat
 ### 🎨 **การออกแบบ:**
 
 #### **1. สีเส้นตรง**
+
 - **สี**: ส้ม (#FF5722)
 - **เหตุผล**: แตกต่างจากเส้นอื่น (สีน้ำเงิน)
 - **ความชัดเจน**: ดูง่ายบนแผนที่
 
 #### **2. ความหนาเส้น**
+
 - **ความหนา**: 4px
 - **เหตุผล**: หนากว่าเส้นอื่น (3px)
 - **ความชัดเจน**: เห็นได้ชัดเจน
 
 #### **3. ความโปร่งใส**
+
 - **ความโปร่งใส**: 1.0 (ไม่โปร่งใส)
 - **เหตุผล**: ต้องการให้เห็นชัดเจน
 - **ความชัดเจน**: ไม่บังแผนที่
@@ -70,12 +76,14 @@ const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.Lat
 ### 🔧 **การทำงาน:**
 
 #### **1. ขั้นตอนการใช้งาน**
+
 1. **คลิกจุดเริ่ม**: สร้าง marker สีเขียว
 2. **คลิกจุดจบ**: สร้าง marker สีแดง
 3. **สร้างเส้นตรง**: แสดงเส้นส้มระหว่าง 2 จุด
 4. **สร้างโปรไฟล์**: แสดงกราฟความสูง
 
 #### **2. การลบเส้นตรง**
+
 - **เมื่อรีเซ็ต**: ลบเส้นตรงออก
 - **เมื่อยกเลิก**: ลบเส้นตรงออก
 - **เมื่อปิดเครื่องมือ**: ลบเส้นตรงออก
@@ -83,16 +91,19 @@ const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.Lat
 ### 📊 **ประโยชน์:**
 
 #### **1. การมองเห็น**
+
 - เห็นเส้นทางที่เลือกได้ชัดเจน
 - รู้ว่าคลิกจุดไหนไป
 - ง่ายต่อการติดตาม
 
 #### **2. การใช้งาน**
+
 - ใช้งานง่ายขึ้น
 - เห็นผลลัพธ์ทันที
 - ไม่สับสน
 
 #### **3. การวางแผน**
+
 - วางแผนเส้นทางได้ดี
 - เห็นระยะทางชัดเจน
 - วางแผนการเดินทางได้
@@ -100,6 +111,7 @@ const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.Lat
 ### ✅ **การทดสอบ:**
 
 #### **1. ขั้นตอนการทดสอบ**
+
 1. **เปิดเครื่องมือ**: คลิกปุ่ม 🏔️
 2. **เลือกโปรไฟล์**: คลิก "โปรไฟล์ความสูง"
 3. **เริ่มวาด**: คลิก "เริ่มวาดเส้นทาง"
@@ -108,6 +120,7 @@ const createLineBetweenPoints = (start: google.maps.LatLng, end: google.maps.Lat
 6. **ตรวจสอบ**: ควรเห็นเส้นส้มระหว่าง 2 จุด
 
 #### **2. ผลลัพธ์ที่คาดหวัง**
+
 - ✅ **Marker สีเขียว**: จุดเริ่มต้น
 - ✅ **Marker สีแดง**: จุดสิ้นสุด
 - ✅ **เส้นส้ม**: ระหว่าง 2 จุด

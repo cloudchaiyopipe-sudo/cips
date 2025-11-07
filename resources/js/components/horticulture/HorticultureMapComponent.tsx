@@ -37,29 +37,29 @@ const getGoogleMapsConfig = () => {
                 {
                     featureType: 'poi',
                     elementType: 'labels',
-                    stylers: [{ visibility: 'on' }]
+                    stylers: [{ visibility: 'on' }],
                 },
                 {
                     featureType: 'administrative',
                     elementType: 'labels',
-                    stylers: [{ visibility: 'on' }]
+                    stylers: [{ visibility: 'on' }],
                 },
                 {
                     featureType: 'road',
                     elementType: 'labels',
-                    stylers: [{ visibility: 'on' }]
+                    stylers: [{ visibility: 'on' }],
                 },
                 {
                     featureType: 'transit',
                     elementType: 'labels',
-                    stylers: [{ visibility: 'on' }]
+                    stylers: [{ visibility: 'on' }],
                 },
                 {
                     featureType: 'water',
                     elementType: 'labels',
-                    stylers: [{ visibility: 'on' }]
-                }
-            ]
+                    stylers: [{ visibility: 'on' }],
+                },
+            ],
         },
     };
 };
@@ -106,21 +106,22 @@ const MapComponent: React.FC<{
     children?: React.ReactNode;
     mapOptions?: Partial<google.maps.MapOptions>;
 }> = ({ center, zoom, onLoad, children, mapOptions }) => {
-    const validCenter = useMemo(() => 
-        center &&
-        typeof center.lat === 'number' &&
-        typeof center.lng === 'number' &&
-        !isNaN(center.lat) &&
-        !isNaN(center.lng) &&
-        isFinite(center.lat) &&
-        isFinite(center.lng)
-            ? center
-            : { lat: 13.7563, lng: 100.5018 },
+    const validCenter = useMemo(
+        () =>
+            center &&
+            typeof center.lat === 'number' &&
+            typeof center.lng === 'number' &&
+            !isNaN(center.lat) &&
+            !isNaN(center.lng) &&
+            isFinite(center.lat) &&
+            isFinite(center.lng)
+                ? center
+                : { lat: 13.7563, lng: 100.5018 },
         [center]
     );
 
-    const validZoom = useMemo(() => 
-        typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16,
+    const validZoom = useMemo(
+        () => (typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16),
         [zoom]
     );
     const ref = useRef<HTMLDivElement>(null);
@@ -241,7 +242,10 @@ const MapComponent: React.FC<{
 
                     // เคารพการตั้งค่าจากหน้าเพจ: หากปิด mapTypeControl/clickableIcons ไว้ อย่าเปิดอีก
                     if (currentZoom && currentZoom >= 10) {
-                        if (mapOptions?.clickableIcons === false || mapOptions?.mapTypeControl === false) {
+                        if (
+                            mapOptions?.clickableIcons === false ||
+                            mapOptions?.mapTypeControl === false
+                        ) {
                             newMap.setOptions({
                                 clickableIcons: mapOptions?.clickableIcons ?? true,
                                 mapTypeControl: mapOptions?.mapTypeControl ?? true,

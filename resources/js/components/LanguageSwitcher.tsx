@@ -14,8 +14,15 @@ const LanguageSwitcher: React.FC = () => {
             className="flex items-center gap-1 rounded-lg border border-gray-600 bg-gray-800 px-2 py-1 text-white transition-colors duration-200 hover:border-gray-500 hover:bg-gray-700 sm:gap-2 sm:px-3 sm:py-2"
             title={language === 'en' ? 'เปลี่ยนเป็นภาษาไทย' : 'Switch to English'}
         >
-            <span className="text-xs font-medium sm:text-sm">{language === 'en' ? '🇺🇸 EN' : '🇹🇭 TH'}</span>
-            <svg className="h-3 w-3 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="text-xs font-medium sm:text-sm">
+                {language === 'en' ? '🇺🇸 EN' : '🇹🇭 TH'}
+            </span>
+            <svg
+                className="h-3 w-3 sm:h-4 sm:w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
                 <path
                     strokeLinecap="round"
                     strokeLinejoin="round"

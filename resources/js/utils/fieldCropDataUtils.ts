@@ -1,13 +1,13 @@
-import { 
-    FieldData, 
-    FieldCropPageProps, 
-    Coordinate, 
-    Obstacle, 
-    Zone, 
-    PlantPoint, 
+import {
+    FieldData,
+    FieldCropPageProps,
+    Coordinate,
+    Obstacle,
+    Zone,
+    PlantPoint,
     DEFAULT_IRRIGATION_COUNTS,
     DEFAULT_IRRIGATION_POSITIONS,
-    MAP_CONFIG
+    MAP_CONFIG,
 } from '../types/fieldCropTypes';
 
 // Safe JSON parsing utility
@@ -23,7 +23,7 @@ export const parseJsonSafely = <T>(jsonString: string | undefined, fallback: T):
 // Standardized data parsing from props
 export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<FieldData> => {
     console.log('parseFieldDataFromProps - Input props:', props);
-    
+
     // Always try to load from localStorage first, then merge with props
     let localStorageData: Partial<FieldData> = {};
     try {
@@ -37,7 +37,7 @@ export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<Fiel
                 obstacles: localStorageData.obstacles?.length || 0,
                 plantPoints: localStorageData.plantPoints?.length || 0,
                 zones: localStorageData.zones?.length || 0,
-                pipes: localStorageData.pipes?.length || 0
+                pipes: localStorageData.pipes?.length || 0,
             });
         }
     } catch (error) {
@@ -46,9 +46,9 @@ export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<Fiel
 
     // Parse from props (only if they exist)
     const propsData: Partial<FieldData> = {};
-    
+
     if (props.crops) {
-        propsData.selectedCrops = props.crops.split(',').filter(c => c.trim());
+        propsData.selectedCrops = props.crops.split(',').filter((c) => c.trim());
     }
     if (props.mainArea) {
         propsData.mainArea = parseJsonSafely(props.mainArea, []);
@@ -69,7 +69,9 @@ export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<Fiel
         propsData.selectedIrrigationType = props.selectedIrrigationType;
     }
     if (props.irrigationCounts) {
-        propsData.irrigationCounts = parseJsonSafely(props.irrigationCounts, { ...DEFAULT_IRRIGATION_COUNTS });
+        propsData.irrigationCounts = parseJsonSafely(props.irrigationCounts, {
+            ...DEFAULT_IRRIGATION_COUNTS,
+        });
     }
     if (props.totalWaterRequirement) {
         propsData.totalWaterRequirement = parseFloat(props.totalWaterRequirement) || 0;
@@ -78,7 +80,9 @@ export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<Fiel
         propsData.irrigationSettings = parseJsonSafely(props.irrigationSettings, {});
     }
     if (props.irrigationPositions) {
-        propsData.irrigationPositions = parseJsonSafely(props.irrigationPositions, { ...DEFAULT_IRRIGATION_POSITIONS });
+        propsData.irrigationPositions = parseJsonSafely(props.irrigationPositions, {
+            ...DEFAULT_IRRIGATION_POSITIONS,
+        });
     }
     if (props.areaRai) {
         propsData.areaRai = parseFloat(props.areaRai) || null;
@@ -105,18 +109,18 @@ export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<Fiel
     // Merge localStorage data with props data (props take precedence)
     const mergedData = {
         ...localStorageData,
-        ...propsData
+        ...propsData,
     };
-    
+
     console.log('parseFieldDataFromProps - Final merged data:', {
         selectedCrops: mergedData.selectedCrops?.length || 0,
         mainArea: mergedData.mainArea?.length || 0,
         obstacles: mergedData.obstacles?.length || 0,
         plantPoints: mergedData.plantPoints?.length || 0,
         zones: mergedData.zones?.length || 0,
-        pipes: mergedData.pipes?.length || 0
+        pipes: mergedData.pipes?.length || 0,
     });
-    
+
     return mergedData;
 };
 
@@ -143,7 +147,7 @@ export const mergeWithLocalStorage = (propsData: Partial<FieldData>): FieldData 
         plantSpacing: propsData.plantSpacing || {},
         mapCenter: propsData.mapCenter || MAP_CONFIG.DEFAULT_CENTER,
         mapZoom: propsData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM,
-        realPlantCount: propsData.realPlantCount || 0
+        realPlantCount: propsData.realPlantCount || 0,
     };
 };
 
@@ -185,13 +189,13 @@ export const fieldDataStorage = {
         } catch (error) {
             console.error('Error resetting pipes only:', error);
         }
-    }
+    },
 };
 
 // Data validation utilities
 export const validateCoordinates = (coords: unknown[]): Coordinate[] => {
     if (!Array.isArray(coords)) return [];
-    
+
     return coords.filter((coord: unknown): coord is Coordinate => {
         return (
             coord !== null &&
@@ -217,7 +221,7 @@ export const validateMainArea = (mainArea: unknown): Coordinate[] => {
 
 export const validateObstacles = (obstacles: unknown[]): Obstacle[] => {
     if (!Array.isArray(obstacles)) return [];
-    
+
     return obstacles.filter((obstacle: unknown): obstacle is Obstacle => {
         return (
             obstacle !== null &&
@@ -234,7 +238,7 @@ export const validateObstacles = (obstacles: unknown[]): Obstacle[] => {
 
 export const validatePlantPoints = (plantPoints: unknown[]): PlantPoint[] => {
     if (!Array.isArray(plantPoints)) return [];
-    
+
     return plantPoints.filter((point: unknown): point is PlantPoint => {
         return (
             point !== null &&
@@ -253,7 +257,7 @@ export const validatePlantPoints = (plantPoints: unknown[]): PlantPoint[] => {
 
 export const validateZones = (zones: unknown[]): Zone[] => {
     if (!Array.isArray(zones)) return [];
-    
+
     return zones.filter((zone: unknown): zone is Zone => {
         return (
             zone !== null &&

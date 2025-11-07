@@ -687,7 +687,8 @@ function CropCard({
                     </div>
                     <div className="flex justify-between">
                         <span>
-                            {t('Water')}: {crop.waterRequirement}{t('liters per irrigation')}
+                            {t('Water')}: {crop.waterRequirement}
+                            {t('liters per irrigation')}
                         </span>
                         <span>
                             {t('Price')}: ฿{crop.price}/kg

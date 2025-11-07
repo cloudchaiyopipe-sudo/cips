@@ -344,7 +344,7 @@ export default function GreenhouseSummary() {
             const { createDynamicZoneMapping } = await import('../../utils/greenhouseZoneMapping');
             // ใช้ plotPipeData ที่เป็น array จาก summaryData
             const activeZoneIds = summaryData.shapes
-                .filter(shape => shape.type === 'plot')
+                .filter((shape) => shape.type === 'plot')
                 .map((shape, index) => `plot-${Date.now()}-${index}`); // สร้าง dynamic ID
             createDynamicZoneMapping(activeZoneIds, [plotPipeData]); // wrap ใน array
 
@@ -806,7 +806,6 @@ export default function GreenhouseSummary() {
                 );
 
                 plotPipeData.hasPipes = true;
-
             }
 
             // คำนวณจำนวน emitters ในแปลงนี้
@@ -5236,8 +5235,7 @@ export default function GreenhouseSummary() {
                                                 const calculatedFlowRate =
                                                     plotPipe?.totalFlowRate || 0;
                                                 const totalFlowRate = calculatedFlowRate.toFixed(1);
-                                                
-                                                
+
                                                 // Debug: ตรวจสอบการคำนวณอัตราการไหลในแต่ละแปลง
                                                 console.log(
                                                     `🔍 ${plotWater.plotName} flow rate calculation:`,
@@ -5444,8 +5442,12 @@ export default function GreenhouseSummary() {
                                                                                 </td>
                                                                                 <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
                                                                                     {(() => {
-                                                                                        const mainFlowRate = plotPipe?.totalFlowRate || 0;
-                                                                                        return mainFlowRate.toFixed(2);
+                                                                                        const mainFlowRate =
+                                                                                            plotPipe?.totalFlowRate ||
+                                                                                            0;
+                                                                                        return mainFlowRate.toFixed(
+                                                                                            2
+                                                                                        );
                                                                                     })()}{' '}
                                                                                     {t('L/min')}
                                                                                 </td>

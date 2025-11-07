@@ -8,6 +8,7 @@
 ## การทำงาน
 
 ### 1. Polygon-based Area Overlay
+
 ```typescript
 // สร้าง grid 5x5 polygons
 const gridSize = 5; // 5x5 grid
@@ -18,7 +19,7 @@ for (let i = 0; i < gridSize; i++) {
     for (let j = 0; j < gridSize; j++) {
         // หาจุดข้อมูลความสูงที่ใกล้ที่สุด
         const closestPoint = findClosestElevationPoint(lat, lng);
-        
+
         // สร้าง polygon
         const polygon = new google.maps.Polygon({
             paths: [...],
@@ -35,6 +36,7 @@ for (let i = 0; i < gridSize; i++) {
 ```
 
 ### 2. Color Mapping
+
 ```typescript
 const getElevationColorForPolygon = (normalizedElevation: number): string => {
     if (normalizedElevation < 0.2) {
@@ -52,6 +54,7 @@ const getElevationColorForPolygon = (normalizedElevation: number): string => {
 ```
 
 ### 3. Grid-based Interpolation
+
 - สร้าง grid 5×5 polygons
 - หาจุดข้อมูลความสูงที่ใกล้ที่สุด
 - สร้างสีตามความสูง

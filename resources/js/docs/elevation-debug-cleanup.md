@@ -5,6 +5,7 @@
 ### 📁 **ไฟล์ที่ทำการลบ Debug Code:**
 
 #### **1. ElevationProfile.tsx**
+
 - ลบ `console.log` จาก `handleMapClick`
 - ลบ `console.log` จาก `createLineBetweenPoints`
 - ลบ `console.log` จาก `createElevationProfile`
@@ -12,10 +13,12 @@
 - ลบ `console.log` จาก `calculateDistance`
 
 #### **2. ElevationControlPanel.tsx**
+
 - ลบ `logElevationDebugInfo()` call
 - ลบ import `logElevationDebugInfo`
 
 #### **3. elevationDebugUtils.ts**
+
 - ลบ `console.log` จาก `logElevationDebugInfo`
 - ลบ `console.log` จาก `testElevationService`
 - ลบ `console.log` จาก `testElevationAPI`
@@ -26,6 +29,7 @@
 #### **1. ElevationProfile.tsx**
 
 **ก่อน:**
+
 ```typescript
 console.log('Map clicked:', event.latLng.lat(), event.latLng.lng());
 console.log('Current refs - startPoint:', startPointRef.current, 'endPoint:', endPointRef.current);
@@ -33,7 +37,14 @@ console.log('Setting start point');
 console.log('Setting end point and creating profile');
 console.log('Stored points for profile:', startPointForProfile, endPointForProfile);
 console.log('Checking points in setTimeout:', startPointForProfile, endPointForProfile);
-console.log('Creating elevation profile from', start.lat(), start.lng(), 'to', end.lat(), end.lng());
+console.log(
+    'Creating elevation profile from',
+    start.lat(),
+    start.lng(),
+    'to',
+    end.lat(),
+    end.lng()
+);
 console.log('Polyline before profile creation:', polylineRef.current);
 console.log('Created path with', path.length, 'points');
 console.log('Elevation service response:', status, results);
@@ -48,6 +59,7 @@ console.error('Start or end point is null in calculateDistance:', start, end);
 ```
 
 **หลัง:**
+
 ```typescript
 // ลบ console.log ทั้งหมด
 // เก็บเฉพาะ error handling ที่จำเป็น
@@ -56,8 +68,13 @@ console.error('Start or end point is null in calculateDistance:', start, end);
 #### **2. ElevationControlPanel.tsx**
 
 **ก่อน:**
+
 ```typescript
-import { testElevationService, testElevationAPI, logElevationDebugInfo } from '../../utils/elevationDebugUtils';
+import {
+    testElevationService,
+    testElevationAPI,
+    logElevationDebugInfo,
+} from '../../utils/elevationDebugUtils';
 
 useEffect(() => {
     if (isVisible) {
@@ -68,6 +85,7 @@ useEffect(() => {
 ```
 
 **หลัง:**
+
 ```typescript
 import { testElevationService, testElevationAPI } from '../../utils/elevationDebugUtils';
 
@@ -81,6 +99,7 @@ useEffect(() => {
 #### **3. elevationDebugUtils.ts**
 
 **ก่อน:**
+
 ```typescript
 export const logElevationDebugInfo = (): void => {
     console.log('=== Elevation Debug Info ===');
@@ -97,7 +116,7 @@ export const testElevationService = (): boolean => {
             console.error('Google Maps ElevationService not available');
             return false;
         }
-        
+
         const elevationService = new window.google.maps.ElevationService();
         console.log('ElevationService created successfully');
         return true;
@@ -115,22 +134,29 @@ export const testElevationAPI = async (): Promise<boolean> => {
         }
 
         const elevationService = new window.google.maps.ElevationService();
-        
+
         // Test with a simple location
         const testLocation = new window.google.maps.LatLng(13.7563, 100.5018); // Bangkok
-        
+
         return new Promise((resolve) => {
-            elevationService.getElevationForLocations({
-                locations: [testLocation]
-            }, (results, status) => {
-                if (status === window.google.maps.ElevationStatus.OK && results && results.length > 0) {
-                    console.log('Elevation API test successful:', results[0]);
-                    resolve(true);
-                } else {
-                    console.error('Elevation API test failed:', status);
-                    resolve(false);
+            elevationService.getElevationForLocations(
+                {
+                    locations: [testLocation],
+                },
+                (results, status) => {
+                    if (
+                        status === window.google.maps.ElevationStatus.OK &&
+                        results &&
+                        results.length > 0
+                    ) {
+                        console.log('Elevation API test successful:', results[0]);
+                        resolve(true);
+                    } else {
+                        console.error('Elevation API test failed:', status);
+                        resolve(false);
+                    }
                 }
-            });
+            );
         });
     } catch (error) {
         console.error('Error testing elevation API:', error);
@@ -143,14 +169,15 @@ export const debugElevationData = (elevationData: any[]): void => {
     console.log('Data points:', elevationData.length);
     if (elevationData.length > 0) {
         console.log('Sample point:', elevationData[0]);
-        console.log('Min elevation:', Math.min(...elevationData.map(d => d.elevation)));
-        console.log('Max elevation:', Math.max(...elevationData.map(d => d.elevation)));
+        console.log('Min elevation:', Math.min(...elevationData.map((d) => d.elevation)));
+        console.log('Max elevation:', Math.max(...elevationData.map((d) => d.elevation)));
     }
     console.log('==========================');
 };
 ```
 
 **หลัง:**
+
 ```typescript
 export const logElevationDebugInfo = (): void => {
     // Debug info removed for production
@@ -161,7 +188,7 @@ export const testElevationService = (): boolean => {
         if (!window.google?.maps?.ElevationService) {
             return false;
         }
-        
+
         const elevationService = new window.google.maps.ElevationService();
         return true;
     } catch (error) {
@@ -176,20 +203,27 @@ export const testElevationAPI = async (): Promise<boolean> => {
         }
 
         const elevationService = new window.google.maps.ElevationService();
-        
+
         // Test with a simple location
         const testLocation = new window.google.maps.LatLng(13.7563, 100.5018); // Bangkok
-        
+
         return new Promise((resolve) => {
-            elevationService.getElevationForLocations({
-                locations: [testLocation]
-            }, (results, status) => {
-                if (status === window.google.maps.ElevationStatus.OK && results && results.length > 0) {
-                    resolve(true);
-                } else {
-                    resolve(false);
+            elevationService.getElevationForLocations(
+                {
+                    locations: [testLocation],
+                },
+                (results, status) => {
+                    if (
+                        status === window.google.maps.ElevationStatus.OK &&
+                        results &&
+                        results.length > 0
+                    ) {
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
                 }
-            });
+            );
         });
     } catch (error) {
         return false;
@@ -204,16 +238,19 @@ export const debugElevationData = (elevationData: any[]): void => {
 ### ✅ **ผลลัพธ์ที่ได้:**
 
 #### **1. Production Ready Code**
+
 - ✅ ไม่มี console.log ใน production
 - ✅ ไม่มี debug output
 - ✅ Code สะอาดและเป็นระเบียบ
 
 #### **2. Performance Improvement**
+
 - ✅ ลด overhead จาก console.log
 - ✅ ลด memory usage
 - ✅ เพิ่ม performance
 
 #### **3. Security**
+
 - ✅ ไม่มี sensitive data ใน console
 - ✅ ไม่มี debug information leak
 - ✅ Production safe
@@ -221,16 +258,19 @@ export const debugElevationData = (elevationData: any[]): void => {
 ### 🎯 **ประโยชน์ที่ได้:**
 
 #### **1. Clean Code**
+
 - Code สะอาดและอ่านง่าย
 - ไม่มี debug clutter
 - Professional appearance
 
 #### **2. Better Performance**
+
 - ลด console overhead
 - ลด memory usage
 - เพิ่ม runtime performance
 
 #### **3. Production Ready**
+
 - พร้อมสำหรับ production
 - ไม่มี debug information
 - Security compliant
@@ -238,16 +278,19 @@ export const debugElevationData = (elevationData: any[]): void => {
 ### 💡 **เคล็ดลับ:**
 
 #### **1. Debug Code Management**
+
 - ใช้ console.log เฉพาะ development
 - ลบออกก่อน production
 - ใช้ proper logging library
 
 #### **2. Code Organization**
+
 - แยก debug code ออกจาก production code
 - ใช้ environment variables
 - ใช้ proper error handling
 
 #### **3. Performance Optimization**
+
 - ลด console.log calls
 - ใช้ conditional logging
 - ใช้ proper debugging tools

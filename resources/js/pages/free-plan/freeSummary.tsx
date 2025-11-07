@@ -10,7 +10,10 @@ function FreeSummary() {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<unknown>(null);
     const [summaryData, setSummaryData] = useState<{
-        area: { totalRai: number; byZone: Array<{ zoneId: number; name: string; areaRai: number }> };
+        area: {
+            totalRai: number;
+            byZone: Array<{ zoneId: number; name: string; areaRai: number }>;
+        };
         plants: { total: number; byZone: Array<{ zoneId: number; name: string; plants: number }> };
         pipes: {
             mainMeters: number;
@@ -19,11 +22,11 @@ function FreeSummary() {
             mainOutlets?: number;
             subMainOutlets?: number;
             lateralOutlets?: number;
-            byZone: Array<{ 
-                zoneId: number; 
-                name: string; 
-                mainMeters: number; 
-                subMainMeters: number; 
+            byZone: Array<{
+                zoneId: number;
+                name: string;
+                mainMeters: number;
+                subMainMeters: number;
                 lateralMeters: number;
                 mainOutlets?: number;
                 subMainOutlets?: number;
@@ -59,7 +62,7 @@ function FreeSummary() {
     const [flowRateConfig, setFlowRateConfig] = useState({
         flowRatePerMin: 2.5,
         waterPressure: 2.0,
-        radius: 4.0
+        radius: 4.0,
     });
     const [translations, setTranslations] = useState(getTranslations());
 
@@ -71,10 +74,10 @@ function FreeSummary() {
 
         // Listen for storage changes (when language is changed in other components)
         window.addEventListener('storage', handleLanguageChange);
-        
+
         // Listen for custom language change event
         window.addEventListener('languageChanged', handleLanguageChange);
-        
+
         // Also check on focus (when user comes back to tab)
         window.addEventListener('focus', handleLanguageChange);
 
@@ -87,7 +90,7 @@ function FreeSummary() {
 
     // Toggle zone expansion
     const toggleZone = (zoneId: number) => {
-        setExpandedZones(prev => {
+        setExpandedZones((prev) => {
             const newSet = new Set(prev);
             if (newSet.has(zoneId)) {
                 newSet.delete(zoneId);
@@ -99,17 +102,20 @@ function FreeSummary() {
     };
 
     // Function to calculate distance between two points
-    const calculateDistance = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }) => {
+    const calculateDistance = (
+        point1: { lat: number; lng: number },
+        point2: { lat: number; lng: number }
+    ) => {
         const R = 6371e3; // Earth's radius in meters
-        const φ1 = point1.lat * Math.PI / 180;
-        const φ2 = point2.lat * Math.PI / 180;
-        const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
-        const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
+        const φ1 = (point1.lat * Math.PI) / 180;
+        const φ2 = (point2.lat * Math.PI) / 180;
+        const Δφ = ((point2.lat - point1.lat) * Math.PI) / 180;
+        const Δλ = ((point2.lng - point1.lng) * Math.PI) / 180;
 
-        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const a =
+            Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return R * c; // Distance in meters
     };
@@ -118,7 +124,13 @@ function FreeSummary() {
     const calculateLongestPipes = () => {
         if (!summaryData) return {};
 
-        const longestPipes: { [zoneId: number]: { longestMain: number; longestSubMain: number; longestLateral: number } } = {};
+        const longestPipes: {
+            [zoneId: number]: {
+                longestMain: number;
+                longestSubMain: number;
+                longestLateral: number;
+            };
+        } = {};
 
         // Get pipe data from localStorage
         const mainPipes = localStorage.getItem('mainPipes');
@@ -128,15 +140,25 @@ function FreeSummary() {
         if (mainPipes) {
             try {
                 const mainPipesData = JSON.parse(mainPipes);
-                mainPipesData.forEach((pipe: { zoneId: number; fromPump: { lat: number; lng: number }; toZoneCenter: { lat: number; lng: number } }) => {
-                    if (!longestPipes[pipe.zoneId]) {
-                        longestPipes[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                mainPipesData.forEach(
+                    (pipe: {
+                        zoneId: number;
+                        fromPump: { lat: number; lng: number };
+                        toZoneCenter: { lat: number; lng: number };
+                    }) => {
+                        if (!longestPipes[pipe.zoneId]) {
+                            longestPipes[pipe.zoneId] = {
+                                longestMain: 0,
+                                longestSubMain: 0,
+                                longestLateral: 0,
+                            };
+                        }
+                        const length = calculateDistance(pipe.fromPump, pipe.toZoneCenter);
+                        if (length > longestPipes[pipe.zoneId].longestMain) {
+                            longestPipes[pipe.zoneId].longestMain = length;
+                        }
                     }
-                    const length = calculateDistance(pipe.fromPump, pipe.toZoneCenter);
-                    if (length > longestPipes[pipe.zoneId].longestMain) {
-                        longestPipes[pipe.zoneId].longestMain = length;
-                    }
-                });
+                );
             } catch (error) {
                 console.error('Error parsing main pipes:', error);
             }
@@ -145,18 +167,24 @@ function FreeSummary() {
         if (subMainPipes) {
             try {
                 const subMainPipesData = JSON.parse(subMainPipes);
-                subMainPipesData.forEach((pipe: { zoneId: number; path: Array<{ lat: number; lng: number }> }) => {
-                    if (!longestPipes[pipe.zoneId]) {
-                        longestPipes[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                subMainPipesData.forEach(
+                    (pipe: { zoneId: number; path: Array<{ lat: number; lng: number }> }) => {
+                        if (!longestPipes[pipe.zoneId]) {
+                            longestPipes[pipe.zoneId] = {
+                                longestMain: 0,
+                                longestSubMain: 0,
+                                longestLateral: 0,
+                            };
+                        }
+                        let totalLength = 0;
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
+                        }
+                        if (totalLength > longestPipes[pipe.zoneId].longestSubMain) {
+                            longestPipes[pipe.zoneId].longestSubMain = totalLength;
+                        }
                     }
-                    let totalLength = 0;
-                    for (let i = 0; i < pipe.path.length - 1; i++) {
-                        totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
-                    }
-                    if (totalLength > longestPipes[pipe.zoneId].longestSubMain) {
-                        longestPipes[pipe.zoneId].longestSubMain = totalLength;
-                    }
-                });
+                );
             } catch (error) {
                 console.error('Error parsing sub-main pipes:', error);
             }
@@ -165,18 +193,24 @@ function FreeSummary() {
         if (lateralPipes) {
             try {
                 const lateralPipesData = JSON.parse(lateralPipes);
-                lateralPipesData.forEach((pipe: { zoneId: number; path: Array<{ lat: number; lng: number }> }) => {
-                    if (!longestPipes[pipe.zoneId]) {
-                        longestPipes[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                lateralPipesData.forEach(
+                    (pipe: { zoneId: number; path: Array<{ lat: number; lng: number }> }) => {
+                        if (!longestPipes[pipe.zoneId]) {
+                            longestPipes[pipe.zoneId] = {
+                                longestMain: 0,
+                                longestSubMain: 0,
+                                longestLateral: 0,
+                            };
+                        }
+                        let totalLength = 0;
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
+                        }
+                        if (totalLength > longestPipes[pipe.zoneId].longestLateral) {
+                            longestPipes[pipe.zoneId].longestLateral = totalLength;
+                        }
                     }
-                    let totalLength = 0;
-                    for (let i = 0; i < pipe.path.length - 1; i++) {
-                        totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
-                    }
-                    if (totalLength > longestPipes[pipe.zoneId].longestLateral) {
-                        longestPipes[pipe.zoneId].longestLateral = totalLength;
-                    }
-                });
+                );
             } catch (error) {
                 console.error('Error parsing lateral pipes:', error);
             }
@@ -190,38 +224,44 @@ function FreeSummary() {
         const savedSummary = localStorage.getItem('freePlanSummary');
         const savedZones = localStorage.getItem('zones');
         const savedFlowRateConfig = localStorage.getItem('flowRateConfig');
-        
+
         if (savedSummary) {
             try {
                 const summary = JSON.parse(savedSummary);
                 const zones = savedZones ? JSON.parse(savedZones) : [];
-                
+
                 // Calculate flow rate data
                 const flowRatePerMin = flowRateConfig.flowRatePerMin;
                 const totalPlants = summary.plants?.total || 0;
                 const totalLPM = totalPlants * flowRatePerMin;
-                
+
                 // Calculate flow rate by zone
-                const flowRateByZone = summary.plants?.byZone?.map(zone => ({
-                    zoneId: zone.zoneId,
-                    name: zone.name,
-                    plants: zone.plants,
-                    lpm: zone.plants * flowRatePerMin
-                })) || [];
-                
+                const flowRateByZone =
+                    summary.plants?.byZone?.map((zone) => ({
+                        zoneId: zone.zoneId,
+                        name: zone.name,
+                        plants: zone.plants,
+                        lpm: zone.plants * flowRatePerMin,
+                    })) || [];
+
                 setSummaryData({
                     area: summary.area || { totalRai: 0, byZone: [] },
                     plants: summary.plants || { total: 0, byZone: [] },
-                    pipes: summary.pipes || { mainMeters: 0, subMainMeters: 0, lateralMeters: 0, byZone: [] },
+                    pipes: summary.pipes || {
+                        mainMeters: 0,
+                        subMainMeters: 0,
+                        lateralMeters: 0,
+                        byZone: [],
+                    },
                     flowRate: {
                         totalLPM,
                         flowRatePerMin,
                         waterPressure: flowRateConfig.waterPressure,
                         radius: flowRateConfig.radius,
-                        byZone: flowRateByZone
+                        byZone: flowRateByZone,
                     },
                     selectedPlant: summary.selectedPlant || undefined,
-                    zones: zones.length || 0
+                    zones: zones.length || 0,
                 });
             } catch (error) {
                 console.error('Error loading summary data:', error);
@@ -286,7 +326,9 @@ function FreeSummary() {
                                     clickable: false,
                                     zIndex: 1000,
                                 });
-                                zone.coordinates.forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                                zone.coordinates.forEach((p) =>
+                                    bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
+                                );
                             } else if (zone.bounds) {
                                 overlay = new window.google.maps.Rectangle({
                                     bounds: new window.google.maps.LatLngBounds(
@@ -301,8 +343,18 @@ function FreeSummary() {
                                     clickable: false,
                                     zIndex: 1000,
                                 });
-                                bounds.extend(new window.google.maps.LatLng(zone.bounds.north, zone.bounds.east));
-                                bounds.extend(new window.google.maps.LatLng(zone.bounds.south, zone.bounds.west));
+                                bounds.extend(
+                                    new window.google.maps.LatLng(
+                                        zone.bounds.north,
+                                        zone.bounds.east
+                                    )
+                                );
+                                bounds.extend(
+                                    new window.google.maps.LatLng(
+                                        zone.bounds.south,
+                                        zone.bounds.west
+                                    )
+                                );
                             }
                             if (overlay) overlay.setMap(map);
 
@@ -321,7 +373,9 @@ function FreeSummary() {
                                     },
                                     zIndex: 1500,
                                 });
-                                bounds.extend(new window.google.maps.LatLng(zone.center.lat, zone.center.lng));
+                                bounds.extend(
+                                    new window.google.maps.LatLng(zone.center.lat, zone.center.lng)
+                                );
                             }
                         });
                     } catch {
@@ -342,7 +396,9 @@ function FreeSummary() {
                 }
                 if (savedPlantPoints) {
                     try {
-                        const plantPoints = JSON.parse(savedPlantPoints) as Array<{ position: { lat: number; lng: number } }>;
+                        const plantPoints = JSON.parse(savedPlantPoints) as Array<{
+                            position: { lat: number; lng: number };
+                        }>;
                         plantPoints.forEach((point) => {
                             new window.google.maps.Marker({
                                 position: point.position,
@@ -362,7 +418,12 @@ function FreeSummary() {
                                 },
                                 clickable: false,
                             });
-                            bounds.extend(new window.google.maps.LatLng(point.position.lat, point.position.lng));
+                            bounds.extend(
+                                new window.google.maps.LatLng(
+                                    point.position.lat,
+                                    point.position.lng
+                                )
+                            );
                         });
                     } catch {
                         // ignore parse error
@@ -373,7 +434,9 @@ function FreeSummary() {
                 const savedWaterSources = localStorage.getItem('waterSources');
                 if (savedWaterSources) {
                     try {
-                        const waterSources = JSON.parse(savedWaterSources) as Array<{ position: { lat: number; lng: number } }>;
+                        const waterSources = JSON.parse(savedWaterSources) as Array<{
+                            position: { lat: number; lng: number };
+                        }>;
                         waterSources.forEach((ws) => {
                             new window.google.maps.Marker({
                                 position: ws.position,
@@ -393,7 +456,9 @@ function FreeSummary() {
                                     anchor: new window.google.maps.Point(18, 18),
                                 },
                             });
-                            bounds.extend(new window.google.maps.LatLng(ws.position.lat, ws.position.lng));
+                            bounds.extend(
+                                new window.google.maps.LatLng(ws.position.lat, ws.position.lng)
+                            );
                         });
                     } catch {
                         // ignore parse error
@@ -404,7 +469,9 @@ function FreeSummary() {
                 const savedPumps = localStorage.getItem('pumps');
                 if (savedPumps) {
                     try {
-                        const pumps = JSON.parse(savedPumps) as Array<{ position: { lat: number; lng: number } }>;
+                        const pumps = JSON.parse(savedPumps) as Array<{
+                            position: { lat: number; lng: number };
+                        }>;
                         pumps.forEach((pump) => {
                             new window.google.maps.Marker({
                                 position: pump.position,
@@ -416,7 +483,9 @@ function FreeSummary() {
                                     anchor: new window.google.maps.Point(16, 16),
                                 },
                             });
-                            bounds.extend(new window.google.maps.LatLng(pump.position.lat, pump.position.lng));
+                            bounds.extend(
+                                new window.google.maps.LatLng(pump.position.lat, pump.position.lng)
+                            );
                         });
                     } catch {
                         // ignore parse error
@@ -427,7 +496,10 @@ function FreeSummary() {
                 const savedMainPipes = localStorage.getItem('mainPipes');
                 if (savedMainPipes) {
                     try {
-                        const mainPipes = JSON.parse(savedMainPipes) as Array<{ fromPump: { lat: number; lng: number }; toZoneCenter: { lat: number; lng: number } }>;
+                        const mainPipes = JSON.parse(savedMainPipes) as Array<{
+                            fromPump: { lat: number; lng: number };
+                            toZoneCenter: { lat: number; lng: number };
+                        }>;
                         mainPipes.forEach((pipe) => {
                             const poly = new window.google.maps.Polyline({
                                 path: [pipe.fromPump, pipe.toZoneCenter],
@@ -438,7 +510,9 @@ function FreeSummary() {
                                 zIndex: 1200,
                             });
                             poly.setMap(map);
-                            [pipe.fromPump, pipe.toZoneCenter].forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                            [pipe.fromPump, pipe.toZoneCenter].forEach((p) =>
+                                bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
+                            );
                         });
                     } catch {
                         // ignore parse error
@@ -448,7 +522,9 @@ function FreeSummary() {
                 const savedSubMainPipes = localStorage.getItem('subMainPipes');
                 if (savedSubMainPipes) {
                     try {
-                        const subMainPipes = JSON.parse(savedSubMainPipes) as Array<{ path: Array<{ lat: number; lng: number }> }>;
+                        const subMainPipes = JSON.parse(savedSubMainPipes) as Array<{
+                            path: Array<{ lat: number; lng: number }>;
+                        }>;
                         subMainPipes.forEach((pipe) => {
                             const poly = new window.google.maps.Polyline({
                                 path: pipe.path,
@@ -459,7 +535,9 @@ function FreeSummary() {
                                 zIndex: 1100,
                             });
                             poly.setMap(map);
-                            pipe.path.forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                            pipe.path.forEach((p) =>
+                                bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
+                            );
                         });
                     } catch {
                         // ignore parse error
@@ -469,7 +547,9 @@ function FreeSummary() {
                 const savedLateralPipes = localStorage.getItem('lateralPipes');
                 if (savedLateralPipes) {
                     try {
-                        const lateralPipes = JSON.parse(savedLateralPipes) as Array<{ path: Array<{ lat: number; lng: number }> }>;
+                        const lateralPipes = JSON.parse(savedLateralPipes) as Array<{
+                            path: Array<{ lat: number; lng: number }>;
+                        }>;
                         lateralPipes.forEach((pipe) => {
                             const poly = new window.google.maps.Polyline({
                                 path: pipe.path,
@@ -480,7 +560,9 @@ function FreeSummary() {
                                 zIndex: 1000,
                             });
                             poly.setMap(map);
-                            pipe.path.forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                            pipe.path.forEach((p) =>
+                                bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
+                            );
                         });
                     } catch {
                         // ignore parse error
@@ -495,16 +577,30 @@ function FreeSummary() {
                             type: string;
                             data: {
                                 path?: Array<{ lat: number; lng: number }>;
-                                bounds?: { north: number; south: number; east: number; west: number };
+                                bounds?: {
+                                    north: number;
+                                    south: number;
+                                    east: number;
+                                    west: number;
+                                };
                                 center?: { lat: number; lng: number };
                                 radius?: number;
                             };
                         }>;
                         drawnShapes.forEach((shape) => {
-                            console.log('🔍 Reading shape from localStorage:', shape.type, 'typeof:', typeof shape.type);
+                            console.log(
+                                '🔍 Reading shape from localStorage:',
+                                shape.type,
+                                'typeof:',
+                                typeof shape.type
+                            );
                             if (shape.data) {
-                                let overlay: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | undefined;
-                                
+                                let overlay:
+                                    | google.maps.Polygon
+                                    | google.maps.Rectangle
+                                    | google.maps.Circle
+                                    | undefined;
+
                                 if (shape.type === 'polygon' && shape.data.path) {
                                     overlay = new window.google.maps.Polygon({
                                         paths: shape.data.path,
@@ -514,14 +610,22 @@ function FreeSummary() {
                                         strokeOpacity: 0.6,
                                         strokeWeight: 2,
                                         clickable: false,
-                                        zIndex: 100
+                                        zIndex: 100,
                                     });
-                                    shape.data.path.forEach((p) => bounds.extend(new window.google.maps.LatLng(p.lat, p.lng)));
+                                    shape.data.path.forEach((p) =>
+                                        bounds.extend(new window.google.maps.LatLng(p.lat, p.lng))
+                                    );
                                 } else if (shape.type === 'rectangle' && shape.data.bounds) {
                                     overlay = new window.google.maps.Rectangle({
                                         bounds: new window.google.maps.LatLngBounds(
-                                            { lat: shape.data.bounds.south, lng: shape.data.bounds.west },
-                                            { lat: shape.data.bounds.north, lng: shape.data.bounds.east }
+                                            {
+                                                lat: shape.data.bounds.south,
+                                                lng: shape.data.bounds.west,
+                                            },
+                                            {
+                                                lat: shape.data.bounds.north,
+                                                lng: shape.data.bounds.east,
+                                            }
                                         ),
                                         fillColor: '#10b981',
                                         fillOpacity: 0.2,
@@ -529,13 +633,30 @@ function FreeSummary() {
                                         strokeOpacity: 0.6,
                                         strokeWeight: 2,
                                         clickable: false,
-                                        zIndex: 100
+                                        zIndex: 100,
                                     });
-                                    bounds.extend(new window.google.maps.LatLng(shape.data.bounds.north, shape.data.bounds.east));
-                                    bounds.extend(new window.google.maps.LatLng(shape.data.bounds.south, shape.data.bounds.west));
-                                } else if (shape.type === 'circle' && shape.data.center && shape.data.radius) {
+                                    bounds.extend(
+                                        new window.google.maps.LatLng(
+                                            shape.data.bounds.north,
+                                            shape.data.bounds.east
+                                        )
+                                    );
+                                    bounds.extend(
+                                        new window.google.maps.LatLng(
+                                            shape.data.bounds.south,
+                                            shape.data.bounds.west
+                                        )
+                                    );
+                                } else if (
+                                    shape.type === 'circle' &&
+                                    shape.data.center &&
+                                    shape.data.radius
+                                ) {
                                     overlay = new window.google.maps.Circle({
-                                        center: { lat: shape.data.center.lat, lng: shape.data.center.lng },
+                                        center: {
+                                            lat: shape.data.center.lat,
+                                            lng: shape.data.center.lng,
+                                        },
                                         radius: shape.data.radius,
                                         fillColor: '#10b981',
                                         fillOpacity: 0.2,
@@ -543,11 +664,16 @@ function FreeSummary() {
                                         strokeOpacity: 0.6,
                                         strokeWeight: 2,
                                         clickable: false,
-                                        zIndex: 100
+                                        zIndex: 100,
                                     });
-                                    bounds.extend(new window.google.maps.LatLng(shape.data.center.lat, shape.data.center.lng));
+                                    bounds.extend(
+                                        new window.google.maps.LatLng(
+                                            shape.data.center.lat,
+                                            shape.data.center.lng
+                                        )
+                                    );
                                 }
-                                
+
                                 if (overlay) {
                                     overlay.setMap(map);
                                 }
@@ -597,40 +723,68 @@ function FreeSummary() {
         try {
             // Get project name from localStorage or use default
             const savedProjectName = localStorage.getItem('projectName') || 'Untitled Project';
-            
+
             // Collect all project data
             const projectData = {
                 id: Date.now(),
                 projectName: savedProjectName,
                 savedAt: new Date().toISOString(),
                 // Map data
-                drawnShapes: localStorage.getItem('drawnShapes') ? JSON.parse(localStorage.getItem('drawnShapes') || '[]') : [],
-                waterSources: localStorage.getItem('waterSources') ? JSON.parse(localStorage.getItem('waterSources') || '[]') : [],
-                pumps: localStorage.getItem('pumps') ? JSON.parse(localStorage.getItem('pumps') || '[]') : [],
-                zones: localStorage.getItem('zones') ? JSON.parse(localStorage.getItem('zones') || '[]') : [],
-                plantPoints: localStorage.getItem('plantPoints') ? JSON.parse(localStorage.getItem('plantPoints') || '[]') : [],
-                mainPipes: localStorage.getItem('mainPipes') ? JSON.parse(localStorage.getItem('mainPipes') || '[]') : [],
-                subMainPipes: localStorage.getItem('subMainPipes') ? JSON.parse(localStorage.getItem('subMainPipes') || '[]') : [],
-                lateralPipes: localStorage.getItem('lateralPipes') ? JSON.parse(localStorage.getItem('lateralPipes') || '[]') : [],
+                drawnShapes: localStorage.getItem('drawnShapes')
+                    ? JSON.parse(localStorage.getItem('drawnShapes') || '[]')
+                    : [],
+                waterSources: localStorage.getItem('waterSources')
+                    ? JSON.parse(localStorage.getItem('waterSources') || '[]')
+                    : [],
+                pumps: localStorage.getItem('pumps')
+                    ? JSON.parse(localStorage.getItem('pumps') || '[]')
+                    : [],
+                zones: localStorage.getItem('zones')
+                    ? JSON.parse(localStorage.getItem('zones') || '[]')
+                    : [],
+                plantPoints: localStorage.getItem('plantPoints')
+                    ? JSON.parse(localStorage.getItem('plantPoints') || '[]')
+                    : [],
+                mainPipes: localStorage.getItem('mainPipes')
+                    ? JSON.parse(localStorage.getItem('mainPipes') || '[]')
+                    : [],
+                subMainPipes: localStorage.getItem('subMainPipes')
+                    ? JSON.parse(localStorage.getItem('subMainPipes') || '[]')
+                    : [],
+                lateralPipes: localStorage.getItem('lateralPipes')
+                    ? JSON.parse(localStorage.getItem('lateralPipes') || '[]')
+                    : [],
                 // Config data
-                selectedPlantData: localStorage.getItem('selectedPlantData') ? JSON.parse(localStorage.getItem('selectedPlantData') || 'null') : null,
-                flowRateConfig: localStorage.getItem('flowRateConfig') ? JSON.parse(localStorage.getItem('flowRateConfig') || '{}') : null,
-                mapStepProgress: localStorage.getItem('mapStepProgress') ? JSON.parse(localStorage.getItem('mapStepProgress') || '{}') : null,
-                freeMapView: localStorage.getItem('freeMapView') ? JSON.parse(localStorage.getItem('freeMapView') || '{}') : null,
+                selectedPlantData: localStorage.getItem('selectedPlantData')
+                    ? JSON.parse(localStorage.getItem('selectedPlantData') || 'null')
+                    : null,
+                flowRateConfig: localStorage.getItem('flowRateConfig')
+                    ? JSON.parse(localStorage.getItem('flowRateConfig') || '{}')
+                    : null,
+                mapStepProgress: localStorage.getItem('mapStepProgress')
+                    ? JSON.parse(localStorage.getItem('mapStepProgress') || '{}')
+                    : null,
+                freeMapView: localStorage.getItem('freeMapView')
+                    ? JSON.parse(localStorage.getItem('freeMapView') || '{}')
+                    : null,
                 projectMapImage: localStorage.getItem('projectMapImage') || null,
                 // Summary data
-                freePlanSummary: summaryData ? {
-                    ...summaryData,
-                    savedAt: new Date().toISOString()
-                } : null
+                freePlanSummary: summaryData
+                    ? {
+                          ...summaryData,
+                          savedAt: new Date().toISOString(),
+                      }
+                    : null,
             };
 
             // Get existing saved projects
             const savedProjects = localStorage.getItem('freePlanProjects');
             const projects = savedProjects ? JSON.parse(savedProjects) : [];
-            
+
             // Check if project with same name exists, update it, otherwise add new
-            const existingIndex = projects.findIndex((p: { projectName: string }) => p.projectName === savedProjectName);
+            const existingIndex = projects.findIndex(
+                (p: { projectName: string }) => p.projectName === savedProjectName
+            );
             if (existingIndex >= 0) {
                 // Update existing project
                 projects[existingIndex] = projectData;
@@ -640,25 +794,31 @@ function FreeSummary() {
                 let deletedProjectName = null;
                 if (projects.length >= 2) {
                     // Sort projects by savedAt (oldest first)
-                    const sortedProjects = [...projects].sort((a: { savedAt: string }, b: { savedAt: string }) => {
-                        return new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime();
-                    });
-                    
+                    const sortedProjects = [...projects].sort(
+                        (a: { savedAt: string }, b: { savedAt: string }) => {
+                            return new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime();
+                        }
+                    );
+
                     // Remove the oldest project
                     const oldestProjectName = sortedProjects[0].projectName;
-                    const oldestIndex = projects.findIndex((p: { projectName: string }) => p.projectName === oldestProjectName);
+                    const oldestIndex = projects.findIndex(
+                        (p: { projectName: string }) => p.projectName === oldestProjectName
+                    );
                     if (oldestIndex >= 0) {
                         projects.splice(oldestIndex, 1);
                         deletedProjectName = oldestProjectName;
                     }
                 }
-                
+
                 // Add new project
                 projects.push(projectData);
-                
+
                 // Show alert message
                 if (deletedProjectName) {
-                    alert(`โปรเจค "${deletedProjectName}" ถูกลบออกเนื่องจากจำกัดไว้เพียง 2 โปรเจคเท่านั้น\n\nบันทึกโปรเจค "${savedProjectName}" สำเร็จ!`);
+                    alert(
+                        `โปรเจค "${deletedProjectName}" ถูกลบออกเนื่องจากจำกัดไว้เพียง 2 โปรเจคเท่านั้น\n\nบันทึกโปรเจค "${savedProjectName}" สำเร็จ!`
+                    );
                 } else {
                     alert('บันทึกโปรเจคสำเร็จ!');
                 }
@@ -683,25 +843,26 @@ function FreeSummary() {
     const handleFlowRateApply = () => {
         // Save flow rate configuration
         localStorage.setItem('flowRateConfig', JSON.stringify(flowRateConfig));
-        
+
         // Also update the summary data with flow rate config
         const savedSummary = localStorage.getItem('freePlanSummary');
         if (savedSummary) {
             try {
                 const summary = JSON.parse(savedSummary);
-                
+
                 // Calculate flow rate data
                 const totalPlants = summary.plants?.total || 0;
                 const totalLPM = totalPlants * flowRateConfig.flowRatePerMin;
-                
+
                 // Calculate flow rate by zone
-                const flowRateByZone = summary.plants?.byZone?.map(zone => ({
-                    zoneId: zone.zoneId,
-                    name: zone.name,
-                    plants: zone.plants,
-                    lpm: zone.plants * flowRateConfig.flowRatePerMin
-                })) || [];
-                
+                const flowRateByZone =
+                    summary.plants?.byZone?.map((zone) => ({
+                        zoneId: zone.zoneId,
+                        name: zone.name,
+                        plants: zone.plants,
+                        lpm: zone.plants * flowRateConfig.flowRatePerMin,
+                    })) || [];
+
                 // Update summary with flow rate data
                 const updatedSummary = {
                     ...summary,
@@ -710,37 +871,40 @@ function FreeSummary() {
                         flowRatePerMin: flowRateConfig.flowRatePerMin,
                         waterPressure: flowRateConfig.waterPressure,
                         radius: flowRateConfig.radius,
-                        byZone: flowRateByZone
-                    }
+                        byZone: flowRateByZone,
+                    },
                 };
-                
+
                 localStorage.setItem('freePlanSummary', JSON.stringify(updatedSummary));
-                
+
                 // Update local state
-                setSummaryData(prev => prev ? {
-                    ...prev,
-                    flowRate: {
-                        totalLPM,
-                        flowRatePerMin: flowRateConfig.flowRatePerMin,
-                        waterPressure: flowRateConfig.waterPressure,
-                        radius: flowRateConfig.radius,
-                        byZone: flowRateByZone
-                    }
-                } : null);
-                
+                setSummaryData((prev) =>
+                    prev
+                        ? {
+                              ...prev,
+                              flowRate: {
+                                  totalLPM,
+                                  flowRatePerMin: flowRateConfig.flowRatePerMin,
+                                  waterPressure: flowRateConfig.waterPressure,
+                                  radius: flowRateConfig.radius,
+                                  byZone: flowRateByZone,
+                              },
+                          }
+                        : null
+                );
             } catch (error) {
                 console.error('Error updating summary with flow rate config:', error);
             }
         }
-        
+
         setShowFlowRateModal(false);
         alert('Flow rate configuration saved!');
     };
 
     const handleFlowRateChange = (field: string, value: number) => {
-        setFlowRateConfig(prev => ({
+        setFlowRateConfig((prev) => ({
             ...prev,
-            [field]: value
+            [field]: value,
         }));
     };
 
@@ -756,10 +920,22 @@ function FreeSummary() {
             {/* Header */}
             <div className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white md:text-xl">{translations.irrigationSummary}</h2>
+                    <h2 className="text-lg font-bold text-white md:text-xl">
+                        {translations.irrigationSummary}
+                    </h2>
                     <div className="flex items-center gap-2 text-xs text-emerald-300">
-                        <button onClick={handleSave} className="rounded-lg bg-green-600 px-6 py-2 font-medium text-white hover:bg-green-700">{translations.save}</button>
-                        <button onClick={handleEdit} className="rounded-lg bg-amber-600 px-6 py-2 font-medium text-white hover:bg-amber-700">{translations.edit}</button>
+                        <button
+                            onClick={handleSave}
+                            className="rounded-lg bg-green-600 px-6 py-2 font-medium text-white hover:bg-green-700"
+                        >
+                            {translations.save}
+                        </button>
+                        <button
+                            onClick={handleEdit}
+                            className="rounded-lg bg-amber-600 px-6 py-2 font-medium text-white hover:bg-amber-700"
+                        >
+                            {translations.edit}
+                        </button>
                     </div>
                 </div>
 
@@ -767,7 +943,11 @@ function FreeSummary() {
                 <div className="mb-6 h-[500px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40">
                     <div ref={mapRef} className="h-full w-full" />
                     {!window.google && imageUrl && (
-                        <img src={imageUrl} alt="Map snapshot" className="h-full w-full object-cover" />
+                        <img
+                            src={imageUrl}
+                            alt="Map snapshot"
+                            className="h-full w-full object-cover"
+                        />
                     )}
                 </div>
 
@@ -786,42 +966,70 @@ function FreeSummary() {
                         </div>
                         <div className="rounded-lg bg-slate-700/40 p-3 text-center text-white">
                             <div className="text-sm">{translations.plants}</div>
-                            <div className="text-lg font-semibold">{summaryData?.plants.total || 0}</div>
+                            <div className="text-lg font-semibold">
+                                {summaryData?.plants.total || 0}
+                            </div>
                         </div>
                         <div className="rounded-lg bg-slate-700/40 p-3 text-center text-white">
                             <div className="text-sm">{translations.flow}</div>
                             <div className="text-lg font-semibold text-blue-400">
-                                {summaryData?.flowRate?.totalLPM ? Math.round(summaryData.flowRate.totalLPM) : 0} LPM
+                                {summaryData?.flowRate?.totalLPM
+                                    ? Math.round(summaryData.flowRate.totalLPM)
+                                    : 0}{' '}
+                                LPM
                             </div>
-                            <div className="text-[10px] text-slate-400">~{summaryData?.flowRate?.flowRatePerMin || flowRateConfig.flowRatePerMin} L/plant/min</div>
+                            <div className="text-[10px] text-slate-400">
+                                ~
+                                {summaryData?.flowRate?.flowRatePerMin ||
+                                    flowRateConfig.flowRatePerMin}{' '}
+                                L/plant/min
+                            </div>
                         </div>
                     </div>
 
                     {/* Selected Plant Information */}
                     {summaryData?.selectedPlant && (
                         <div className="mb-3 text-white">
-                            <h3 className="mb-2 text-base font-semibold">Selected Plant Information</h3>
+                            <h3 className="mb-2 text-base font-semibold">
+                                Selected Plant Information
+                            </h3>
                             <div className="rounded-lg bg-slate-700/40 p-3">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-2xl">{summaryData.selectedPlant.icon}</span>
-                                    <span className="text-lg font-semibold">{summaryData.selectedPlant.name}</span>
+                                <div className="mb-2 flex items-center gap-2">
+                                    <span className="text-2xl">
+                                        {summaryData.selectedPlant.icon}
+                                    </span>
+                                    <span className="text-lg font-semibold">
+                                        {summaryData.selectedPlant.name}
+                                    </span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-slate-300">Water Need:</span>
-                                        <span className="text-blue-400 font-semibold">{summaryData.selectedPlant.waterNeed} L/day/plant</span>
+                                        <span className="font-semibold text-blue-400">
+                                            {summaryData.selectedPlant.waterNeed} L/day/plant
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-300">Plant Spacing:</span>
-                                        <span className="text-green-400 font-semibold">{summaryData.selectedPlant.plantSpacing} cm</span>
+                                        <span className="font-semibold text-green-400">
+                                            {summaryData.selectedPlant.plantSpacing} cm
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-300">Row Spacing:</span>
-                                        <span className="text-green-400 font-semibold">{summaryData.selectedPlant.rowSpacing} cm</span>
+                                        <span className="font-semibold text-green-400">
+                                            {summaryData.selectedPlant.rowSpacing} cm
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-300">Total Water Need:</span>
-                                        <span className="text-cyan-400 font-semibold">{Math.round(summaryData.selectedPlant.waterNeed * (summaryData?.plants?.total || 0))} L/day</span>
+                                        <span className="font-semibold text-cyan-400">
+                                            {Math.round(
+                                                summaryData.selectedPlant.waterNeed *
+                                                    (summaryData?.plants?.total || 0)
+                                            )}{' '}
+                                            L/day
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -830,20 +1038,28 @@ function FreeSummary() {
 
                     {/* Flow Rate Summary */}
                     <div className="mb-3 text-white">
-                        <h3 className="mb-2 text-base font-semibold">{translations.flowRateSummary}</h3>
+                        <h3 className="mb-2 text-base font-semibold">
+                            {translations.flowRateSummary}
+                        </h3>
                         <div className="space-y-2 text-sm">
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="h-3 w-3 rounded-full bg-blue-500"></span> 
+                                        <span className="h-3 w-3 rounded-full bg-blue-500"></span>
                                         {translations.totalFlowRate}
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-blue-400 font-semibold text-lg">
-                                            {summaryData?.flowRate?.totalLPM ? Math.round(summaryData.flowRate.totalLPM) : 0} LPM
+                                        <div className="text-lg font-semibold text-blue-400">
+                                            {summaryData?.flowRate?.totalLPM
+                                                ? Math.round(summaryData.flowRate.totalLPM)
+                                                : 0}{' '}
+                                            LPM
                                         </div>
                                         <div className="text-xs text-slate-400">
-                                            {summaryData?.plants?.total || 0} plants × {summaryData?.flowRate?.flowRatePerMin || flowRateConfig.flowRatePerMin} LPM
+                                            {summaryData?.plants?.total || 0} plants ×{' '}
+                                            {summaryData?.flowRate?.flowRatePerMin ||
+                                                flowRateConfig.flowRatePerMin}{' '}
+                                            LPM
                                         </div>
                                     </div>
                                 </div>
@@ -851,12 +1067,14 @@ function FreeSummary() {
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="h-3 w-3 rounded-full bg-yellow-500"></span> 
+                                        <span className="h-3 w-3 rounded-full bg-yellow-500"></span>
                                         {translations.waterPressure}
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-yellow-400 font-semibold text-lg">
-                                            {summaryData?.flowRate?.waterPressure || flowRateConfig.waterPressure} Bar
+                                        <div className="text-lg font-semibold text-yellow-400">
+                                            {summaryData?.flowRate?.waterPressure ||
+                                                flowRateConfig.waterPressure}{' '}
+                                            Bar
                                         </div>
                                     </div>
                                 </div>
@@ -864,12 +1082,13 @@ function FreeSummary() {
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="h-3 w-3 rounded-full bg-gray-500"></span> 
+                                        <span className="h-3 w-3 rounded-full bg-gray-500"></span>
                                         {translations.sprinklerRadius}
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-gray-400 font-semibold text-lg">
-                                            {summaryData?.flowRate?.radius || flowRateConfig.radius} m
+                                        <div className="text-lg font-semibold text-gray-400">
+                                            {summaryData?.flowRate?.radius || flowRateConfig.radius}{' '}
+                                            m
                                         </div>
                                     </div>
                                 </div>
@@ -879,18 +1098,32 @@ function FreeSummary() {
 
                     {/* Pipe System Summary */}
                     <div className="mb-3 text-white">
-                        <h3 className="mb-2 text-base font-semibold">{translations.pipeSystemSummary}</h3>
+                        <h3 className="mb-2 text-base font-semibold">
+                            {translations.pipeSystemSummary}
+                        </h3>
                         <div className="space-y-2 text-sm">
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="h-3 w-3 rounded-full bg-red-500"></span> 
+                                        <span className="h-3 w-3 rounded-full bg-red-500"></span>
                                         {translations.mainPipe} ({summaryData?.zones || 0})
                                     </div>
                                     <div className="text-right">
-                                        <div>{translations.length}: <span className="text-red-400 font-semibold text-lg">{summaryData ? summaryData.pipes.mainMeters.toFixed(1) : '0.0'} m</span></div>
+                                        <div>
+                                            {translations.length}:{' '}
+                                            <span className="text-lg font-semibold text-red-400">
+                                                {summaryData
+                                                    ? summaryData.pipes.mainMeters.toFixed(1)
+                                                    : '0.0'}{' '}
+                                                m
+                                            </span>
+                                        </div>
                                         {summaryData?.pipes.mainOutlets !== undefined && (
-                                            <div className="text-xs text-slate-400">{translations.outlets}: {summaryData.pipes.mainOutlets} {translations.subMainPipe.toLowerCase()}</div>
+                                            <div className="text-xs text-slate-400">
+                                                {translations.outlets}:{' '}
+                                                {summaryData.pipes.mainOutlets}{' '}
+                                                {translations.subMainPipe.toLowerCase()}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -898,13 +1131,25 @@ function FreeSummary() {
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="h-3 w-3 rounded-full bg-purple-500"></span> 
+                                        <span className="h-3 w-3 rounded-full bg-purple-500"></span>
                                         {translations.subMainPipe} ({summaryData?.zones || 0})
                                     </div>
                                     <div className="text-right">
-                                        <div>{translations.length}: <span className="text-purple-400 font-semibold text-lg">{summaryData ? summaryData.pipes.subMainMeters.toFixed(1) : '0.0'} m</span></div>
+                                        <div>
+                                            {translations.length}:{' '}
+                                            <span className="text-lg font-semibold text-purple-400">
+                                                {summaryData
+                                                    ? summaryData.pipes.subMainMeters.toFixed(1)
+                                                    : '0.0'}{' '}
+                                                m
+                                            </span>
+                                        </div>
                                         {summaryData?.pipes.subMainOutlets !== undefined && (
-                                            <div className="text-xs text-slate-400">{translations.outlets}: {summaryData.pipes.subMainOutlets} {translations.lateralPipe.toLowerCase()}</div>
+                                            <div className="text-xs text-slate-400">
+                                                {translations.outlets}:{' '}
+                                                {summaryData.pipes.subMainOutlets}{' '}
+                                                {translations.lateralPipe.toLowerCase()}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -912,13 +1157,26 @@ function FreeSummary() {
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className="h-3 w-3 rounded-full bg-yellow-500"></span> 
-                                        {translations.lateralPipe} ({summaryData?.pipes.subMainOutlets || 0})
+                                        <span className="h-3 w-3 rounded-full bg-yellow-500"></span>
+                                        {translations.lateralPipe} (
+                                        {summaryData?.pipes.subMainOutlets || 0})
                                     </div>
                                     <div className="text-right">
-                                        <div>{translations.length}: <span className="text-yellow-400 font-semibold text-lg">{summaryData ? summaryData.pipes.lateralMeters.toFixed(1) : '0.0'} m</span></div>
+                                        <div>
+                                            {translations.length}:{' '}
+                                            <span className="text-lg font-semibold text-yellow-400">
+                                                {summaryData
+                                                    ? summaryData.pipes.lateralMeters.toFixed(1)
+                                                    : '0.0'}{' '}
+                                                m
+                                            </span>
+                                        </div>
                                         {summaryData?.pipes.lateralOutlets !== undefined && (
-                                            <div className="text-xs text-slate-400">{translations.outlets}: {summaryData.pipes.lateralOutlets} {translations.plants.toLowerCase()}</div>
+                                            <div className="text-xs text-slate-400">
+                                                {translations.outlets}:{' '}
+                                                {summaryData.pipes.lateralOutlets}{' '}
+                                                {translations.plants.toLowerCase()}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -930,90 +1188,148 @@ function FreeSummary() {
                     <div className="space-y-2">
                         {summaryData && summaryData.pipes.byZone.length > 0 ? (
                             summaryData.pipes.byZone.map((zone) => {
-                                const zoneArea = summaryData.area.byZone.find(z => z.zoneId === zone.zoneId);
-                                const zonePlants = summaryData.plants.byZone.find(z => z.zoneId === zone.zoneId);
+                                const zoneArea = summaryData.area.byZone.find(
+                                    (z) => z.zoneId === zone.zoneId
+                                );
+                                const zonePlants = summaryData.plants.byZone.find(
+                                    (z) => z.zoneId === zone.zoneId
+                                );
                                 const isExpanded = expandedZones.has(zone.zoneId);
-                                
+
                                 return (
-                                    <div key={zone.zoneId} className="rounded-lg bg-slate-700/40 overflow-hidden text-white">
+                                    <div
+                                        key={zone.zoneId}
+                                        className="overflow-hidden rounded-lg bg-slate-700/40 text-white"
+                                    >
                                         <button
                                             onClick={() => toggleZone(zone.zoneId)}
-                                            className="w-full p-3 flex items-center justify-between hover:bg-slate-600/40 transition-colors"
+                                            className="flex w-full items-center justify-between p-3 transition-colors hover:bg-slate-600/40"
                                         >
                                             <div className="flex items-center gap-2">
-                                                <span className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                                                <span
+                                                    className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                                                >
                                                     ▶
                                                 </span>
                                                 <span className="font-semibold">{zone.name}</span>
                                             </div>
                                             <div className="text-xs text-slate-300">
-                                                {zoneArea ? `${zoneArea.areaRai.toFixed(2)} Rai` : ''} • {zonePlants?.plants || 0} Plants
+                                                {zoneArea
+                                                    ? `${zoneArea.areaRai.toFixed(2)} Rai`
+                                                    : ''}{' '}
+                                                • {zonePlants?.plants || 0} Plants
                                             </div>
                                         </button>
-                                        
+
                                         {isExpanded && (
-                                            <div className="px-3 pb-3 space-y-2 text-xs text-slate-300 border-t border-slate-600/50 pt-2">
+                                            <div className="space-y-2 border-t border-slate-600/50 px-3 pb-3 pt-2 text-xs text-slate-300">
                                                 {/* Flow Rate for this zone */}
-                                                <div className="flex items-center justify-between mb-2">
+                                                <div className="mb-2 flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <span className="h-2 w-2 rounded-full bg-blue-500"></span>
                                                         Flow Rate
                                                     </div>
                                                     <div className="text-right">
-                                                        <div className="font-semibold text-blue-400 text-lg">
-                                                            {summaryData?.flowRate?.byZone?.find(z => z.zoneId === zone.zoneId)?.lpm ? 
-                                                                Math.round(summaryData.flowRate.byZone.find(z => z.zoneId === zone.zoneId)!.lpm) : 
-                                                                Math.round((zonePlants?.plants || 0) * flowRateConfig.flowRatePerMin)
-                                                            } LPM
+                                                        <div className="text-lg font-semibold text-blue-400">
+                                                            {summaryData?.flowRate?.byZone?.find(
+                                                                (z) => z.zoneId === zone.zoneId
+                                                            )?.lpm
+                                                                ? Math.round(
+                                                                      summaryData.flowRate.byZone.find(
+                                                                          (z) =>
+                                                                              z.zoneId ===
+                                                                              zone.zoneId
+                                                                      )!.lpm
+                                                                  )
+                                                                : Math.round(
+                                                                      (zonePlants?.plants || 0) *
+                                                                          flowRateConfig.flowRatePerMin
+                                                                  )}{' '}
+                                                            LPM
                                                         </div>
                                                         <div className="text-[10px] text-slate-400">
-                                                            {zonePlants?.plants || 0} plants × {summaryData?.flowRate?.flowRatePerMin || flowRateConfig.flowRatePerMin} LPM
+                                                            {zonePlants?.plants || 0} plants ×{' '}
+                                                            {summaryData?.flowRate
+                                                                ?.flowRatePerMin ||
+                                                                flowRateConfig.flowRatePerMin}{' '}
+                                                            LPM
                                                         </div>
                                                     </div>
                                                 </div>
-                                                
+
                                                 {/* Water Need per Session for this zone */}
                                                 {summaryData?.selectedPlant && (
-                                                    <div className="flex items-center justify-between mb-2">
+                                                    <div className="mb-2 flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
                                                             <span className="h-2 w-2 rounded-full bg-cyan-500"></span>
                                                             {translations.waterNeedPerSession}
                                                         </div>
                                                         <div className="text-right">
-                                                            <div className="font-semibold text-cyan-400 text-lg">
-                                                                {Math.round((zonePlants?.plants || 0) * summaryData.selectedPlant.waterNeed)} L/session
+                                                            <div className="text-lg font-semibold text-cyan-400">
+                                                                {Math.round(
+                                                                    (zonePlants?.plants || 0) *
+                                                                        summaryData.selectedPlant
+                                                                            .waterNeed
+                                                                )}{' '}
+                                                                L/session
                                                             </div>
                                                             <div className="text-[10px] text-slate-400">
-                                                                {zonePlants?.plants || 0} plants × {summaryData.selectedPlant.waterNeed} L/day/plant
+                                                                {zonePlants?.plants || 0} plants ×{' '}
+                                                                {
+                                                                    summaryData.selectedPlant
+                                                                        .waterNeed
+                                                                }{' '}
+                                                                L/day/plant
                                                             </div>
                                                         </div>
                                                     </div>
                                                 )}
-                                                
+
                                                 {/* Pipe Information */}
                                                 <div className="space-y-2">
                                                     {/* Main Pipe */}
                                                     <div className="rounded-lg bg-slate-600/30 p-2">
-                                                        <div className="flex items-center justify-between mb-1">
+                                                        <div className="mb-1 flex items-center justify-between">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                                                                <span className="font-medium">{translations.mainPipe}</span>
+                                                                <span className="font-medium">
+                                                                    {translations.mainPipe}
+                                                                </span>
                                                             </div>
                                                             <div className="text-right">
                                                                 <div>
-                                                                    <span className="text-red-400 font-semibold text-lg">{zone.mainMeters.toFixed(1)} m</span>
+                                                                    <span className="text-lg font-semibold text-red-400">
+                                                                        {zone.mainMeters.toFixed(1)}{' '}
+                                                                        m
+                                                                    </span>
                                                                     {(() => {
-                                                                        const longestPipes = calculateLongestPipes();
-                                                                        const longestMain = longestPipes[zone.zoneId]?.longestMain || 0;
-                                                                        return longestMain > 0 && (
-                                                                            <span className="text-red-300 text-sm ml-2">
-                                                                                ({translations.longest}: {longestMain.toFixed(1)} m)
-                                                                            </span>
+                                                                        const longestPipes =
+                                                                            calculateLongestPipes();
+                                                                        const longestMain =
+                                                                            longestPipes[
+                                                                                zone.zoneId
+                                                                            ]?.longestMain || 0;
+                                                                        return (
+                                                                            longestMain > 0 && (
+                                                                                <span className="ml-2 text-sm text-red-300">
+                                                                                    (
+                                                                                    {
+                                                                                        translations.longest
+                                                                                    }
+                                                                                    :{' '}
+                                                                                    {longestMain.toFixed(
+                                                                                        1
+                                                                                    )}{' '}
+                                                                                    m)
+                                                                                </span>
+                                                                            )
                                                                         );
                                                                     })()}
                                                                 </div>
                                                                 {zone.mainOutlets !== undefined && (
-                                                                    <div className="text-[10px] text-slate-400">{zone.mainOutlets} outlets</div>
+                                                                    <div className="text-[10px] text-slate-400">
+                                                                        {zone.mainOutlets} outlets
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -1021,26 +1337,51 @@ function FreeSummary() {
 
                                                     {/* Sub Main Pipe */}
                                                     <div className="rounded-lg bg-slate-600/30 p-2">
-                                                        <div className="flex items-center justify-between mb-1">
+                                                        <div className="mb-1 flex items-center justify-between">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="h-2 w-2 rounded-full bg-purple-500"></span>
-                                                                <span className="font-medium">{translations.subMainPipe}</span>
+                                                                <span className="font-medium">
+                                                                    {translations.subMainPipe}
+                                                                </span>
                                                             </div>
                                                             <div className="text-right">
                                                                 <div>
-                                                                    <span className="text-purple-400 font-semibold text-lg">{zone.subMainMeters.toFixed(1)} m</span>
+                                                                    <span className="text-lg font-semibold text-purple-400">
+                                                                        {zone.subMainMeters.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        m
+                                                                    </span>
                                                                     {(() => {
-                                                                        const longestPipes = calculateLongestPipes();
-                                                                        const longestSubMain = longestPipes[zone.zoneId]?.longestSubMain || 0;
-                                                                        return longestSubMain > 0 && (
-                                                                            <span className="text-purple-300 text-sm ml-2">
-                                                                                ({translations.longest}: {longestSubMain.toFixed(1)} m)
-                                                                            </span>
+                                                                        const longestPipes =
+                                                                            calculateLongestPipes();
+                                                                        const longestSubMain =
+                                                                            longestPipes[
+                                                                                zone.zoneId
+                                                                            ]?.longestSubMain || 0;
+                                                                        return (
+                                                                            longestSubMain > 0 && (
+                                                                                <span className="ml-2 text-sm text-purple-300">
+                                                                                    (
+                                                                                    {
+                                                                                        translations.longest
+                                                                                    }
+                                                                                    :{' '}
+                                                                                    {longestSubMain.toFixed(
+                                                                                        1
+                                                                                    )}{' '}
+                                                                                    m)
+                                                                                </span>
+                                                                            )
                                                                         );
                                                                     })()}
                                                                 </div>
-                                                                {zone.subMainOutlets !== undefined && (
-                                                                    <div className="text-[10px] text-slate-400">{zone.subMainOutlets} outlets</div>
+                                                                {zone.subMainOutlets !==
+                                                                    undefined && (
+                                                                    <div className="text-[10px] text-slate-400">
+                                                                        {zone.subMainOutlets}{' '}
+                                                                        outlets
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -1048,26 +1389,51 @@ function FreeSummary() {
 
                                                     {/* Lateral Pipe */}
                                                     <div className="rounded-lg bg-slate-600/30 p-2">
-                                                        <div className="flex items-center justify-between mb-1">
+                                                        <div className="mb-1 flex items-center justify-between">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="h-2 w-2 rounded-full bg-yellow-500"></span>
-                                                                <span className="font-medium">{translations.lateralPipe}</span>
+                                                                <span className="font-medium">
+                                                                    {translations.lateralPipe}
+                                                                </span>
                                                             </div>
                                                             <div className="text-right">
                                                                 <div>
-                                                                    <span className="text-yellow-400 font-semibold text-lg">{zone.lateralMeters.toFixed(1)} m</span>
+                                                                    <span className="text-lg font-semibold text-yellow-400">
+                                                                        {zone.lateralMeters.toFixed(
+                                                                            1
+                                                                        )}{' '}
+                                                                        m
+                                                                    </span>
                                                                     {(() => {
-                                                                        const longestPipes = calculateLongestPipes();
-                                                                        const longestLateral = longestPipes[zone.zoneId]?.longestLateral || 0;
-                                                                        return longestLateral > 0 && (
-                                                                            <span className="text-yellow-300 text-sm ml-2">
-                                                                                ({translations.longest}: {longestLateral.toFixed(1)} m)
-                                                                            </span>
+                                                                        const longestPipes =
+                                                                            calculateLongestPipes();
+                                                                        const longestLateral =
+                                                                            longestPipes[
+                                                                                zone.zoneId
+                                                                            ]?.longestLateral || 0;
+                                                                        return (
+                                                                            longestLateral > 0 && (
+                                                                                <span className="ml-2 text-sm text-yellow-300">
+                                                                                    (
+                                                                                    {
+                                                                                        translations.longest
+                                                                                    }
+                                                                                    :{' '}
+                                                                                    {longestLateral.toFixed(
+                                                                                        1
+                                                                                    )}{' '}
+                                                                                    m)
+                                                                                </span>
+                                                                            )
                                                                         );
                                                                     })()}
                                                                 </div>
-                                                                {zone.lateralOutlets !== undefined && (
-                                                                    <div className="text-[10px] text-slate-400">{zone.lateralOutlets} outlets</div>
+                                                                {zone.lateralOutlets !==
+                                                                    undefined && (
+                                                                    <div className="text-[10px] text-slate-400">
+                                                                        {zone.lateralOutlets}{' '}
+                                                                        outlets
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -1087,9 +1453,19 @@ function FreeSummary() {
 
                     {/* Equipment Calculation button */}
                     <div className="mt-4 flex items-center justify-between">
-                        <button onClick={() => router.visit('/free-plan/map')} className="rounded-lg bg-slate-600 px-6 py-2 font-medium text-white hover:bg-slate-500">{translations.back}</button>
+                        <button
+                            onClick={() => router.visit('/free-plan/map')}
+                            className="rounded-lg bg-slate-600 px-6 py-2 font-medium text-white hover:bg-slate-500"
+                        >
+                            {translations.back}
+                        </button>
                         <div className="text-center">
-                            <button onClick={() => router.visit('/free-plan/product')} className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white hover:bg-blue-700">{translations.next}</button>
+                            <button
+                                onClick={() => router.visit('/free-plan/product')}
+                                className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white hover:bg-blue-700"
+                            >
+                                {translations.next}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1098,7 +1474,7 @@ function FreeSummary() {
             {/* Flow Rate Config Modal */}
             {showFlowRateModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-slate-800 p-4 text-white sm:p-6">
+                    <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-slate-800 p-4 text-white sm:p-6">
                         {/* Header */}
                         <div className="mb-6">
                             <h3 className="text-xl font-bold">{translations.flowRateConfig}</h3>
@@ -1106,11 +1482,15 @@ function FreeSummary() {
 
                         {/* Flow Rate Setting Section */}
                         <div className="mb-6">
-                            <h4 className="mb-2 text-lg font-semibold">{translations.flowRateSetting}</h4>
+                            <h4 className="mb-2 text-lg font-semibold">
+                                {translations.flowRateSetting}
+                            </h4>
                             <p className="mb-4 text-sm text-slate-300">
-                                {translations.determineFlowRateProperties} ({summaryData?.plants.total || 0} {translations.plants.toLowerCase()})
+                                {translations.determineFlowRateProperties} (
+                                {summaryData?.plants.total || 0} {translations.plants.toLowerCase()}
+                                )
                             </p>
-                            
+
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {/* Flow Rate per min */}
                                 <div className="rounded-lg bg-slate-700/50 p-3">
@@ -1118,17 +1498,26 @@ function FreeSummary() {
                                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 sm:h-8 sm:w-8">
                                             <span className="text-xs sm:text-sm">💧</span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">{translations.flowRatePerMin}</span>
+                                        <span className="text-xs font-medium sm:text-sm">
+                                            {translations.flowRatePerMin}
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="number"
                                             step="0.1"
                                             value={flowRateConfig.flowRatePerMin}
-                                            onChange={(e) => handleFlowRateChange('flowRatePerMin', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) =>
+                                                handleFlowRateChange(
+                                                    'flowRatePerMin',
+                                                    parseFloat(e.target.value) || 0
+                                                )
+                                            }
                                             className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
                                         />
-                                        <span className="text-xs text-slate-300 sm:text-sm">LPM</span>
+                                        <span className="text-xs text-slate-300 sm:text-sm">
+                                            LPM
+                                        </span>
                                     </div>
                                 </div>
 
@@ -1138,17 +1527,26 @@ function FreeSummary() {
                                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 sm:h-8 sm:w-8">
                                             <span className="text-xs sm:text-sm">⚡</span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">{translations.waterPressure}</span>
+                                        <span className="text-xs font-medium sm:text-sm">
+                                            {translations.waterPressure}
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="number"
                                             step="0.1"
                                             value={flowRateConfig.waterPressure}
-                                            onChange={(e) => handleFlowRateChange('waterPressure', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) =>
+                                                handleFlowRateChange(
+                                                    'waterPressure',
+                                                    parseFloat(e.target.value) || 0
+                                                )
+                                            }
                                             className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
                                         />
-                                        <span className="text-xs text-slate-300 sm:text-sm">Bar</span>
+                                        <span className="text-xs text-slate-300 sm:text-sm">
+                                            Bar
+                                        </span>
                                     </div>
                                 </div>
 
@@ -1158,14 +1556,21 @@ function FreeSummary() {
                                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-500 sm:h-8 sm:w-8">
                                             <span className="text-xs sm:text-sm">📏</span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">{translations.sprinklerRadius}</span>
+                                        <span className="text-xs font-medium sm:text-sm">
+                                            {translations.sprinklerRadius}
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="number"
                                             step="0.1"
                                             value={flowRateConfig.radius}
-                                            onChange={(e) => handleFlowRateChange('radius', parseFloat(e.target.value) || 0)}
+                                            onChange={(e) =>
+                                                handleFlowRateChange(
+                                                    'radius',
+                                                    parseFloat(e.target.value) || 0
+                                                )
+                                            }
                                             className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
                                         />
                                         <span className="text-xs text-slate-300 sm:text-sm">m</span>
@@ -1180,17 +1585,23 @@ function FreeSummary() {
                                 <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 sm:h-6 sm:w-6">
                                     <span className="text-xs">📊</span>
                                 </div>
-                                <h4 className="text-base font-semibold sm:text-lg">{translations.realTimeStatistics}</h4>
+                                <h4 className="text-base font-semibold sm:text-lg">
+                                    {translations.realTimeStatistics}
+                                </h4>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
                                 {/* Total plants */}
                                 <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
                                     <div className="mb-1 flex justify-center">
                                         <span className="text-sm sm:text-lg">🌱</span>
                                     </div>
-                                    <div className="text-sm font-bold sm:text-lg">{summaryData?.plants.total || 0}</div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.totalPlants}</div>
+                                    <div className="text-sm font-bold sm:text-lg">
+                                        {summaryData?.plants.total || 0}
+                                    </div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">
+                                        {translations.totalPlants}
+                                    </div>
                                 </div>
 
                                 {/* LPM/plant */}
@@ -1198,8 +1609,12 @@ function FreeSummary() {
                                     <div className="mb-1 flex justify-center">
                                         <span className="text-sm sm:text-lg">💧</span>
                                     </div>
-                                    <div className="text-sm font-bold sm:text-lg">{flowRateConfig.flowRatePerMin}</div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.lpmPerPlant}</div>
+                                    <div className="text-sm font-bold sm:text-lg">
+                                        {flowRateConfig.flowRatePerMin}
+                                    </div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">
+                                        {translations.lpmPerPlant}
+                                    </div>
                                 </div>
 
                                 {/* LPM Total */}
@@ -1208,9 +1623,14 @@ function FreeSummary() {
                                         <span className="text-sm sm:text-lg">🚿</span>
                                     </div>
                                     <div className="text-sm font-bold sm:text-lg">
-                                        {((summaryData?.plants.total || 0) * flowRateConfig.flowRatePerMin).toFixed(0)}
+                                        {(
+                                            (summaryData?.plants.total || 0) *
+                                            flowRateConfig.flowRatePerMin
+                                        ).toFixed(0)}
                                     </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.lpmTotal}</div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">
+                                        {translations.lpmTotal}
+                                    </div>
                                 </div>
 
                                 {/* LPHr Total */}
@@ -1219,9 +1639,15 @@ function FreeSummary() {
                                         <span className="text-sm sm:text-lg">⏰</span>
                                     </div>
                                     <div className="text-sm font-bold sm:text-lg">
-                                        {(((summaryData?.plants.total || 0) * flowRateConfig.flowRatePerMin) * 60).toFixed(0)}
+                                        {(
+                                            (summaryData?.plants.total || 0) *
+                                            flowRateConfig.flowRatePerMin *
+                                            60
+                                        ).toFixed(0)}
                                     </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">{translations.lphrTotal}</div>
+                                    <div className="text-[10px] text-slate-300 sm:text-xs">
+                                        {translations.lphrTotal}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1250,5 +1676,3 @@ function FreeSummary() {
 
 // 3. Export
 export default FreeSummary;
-
-

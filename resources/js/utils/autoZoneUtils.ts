@@ -187,8 +187,8 @@ const getSpatialInitialCentroids = (
     if (plants.length === 0) return [];
 
     // Calculate bounding box
-    const lats = plants.map(p => p.position.lat);
-    const lngs = plants.map(p => p.position.lng);
+    const lats = plants.map((p) => p.position.lat);
+    const lngs = plants.map((p) => p.position.lng);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
@@ -197,23 +197,35 @@ const getSpatialInitialCentroids = (
     const lngRange = maxLng - minLng;
 
     const centroids: Coordinate[] = [];
-    
+
     if (k === 2) {
         // For 2 zones, try different patterns: horizontal, vertical, diagonal, L-shape
-        const patternType = seededRandom 
+        const patternType = seededRandom
             ? Math.floor(seededRandom.next() * 5) // 0=vertical, 1=horizontal, 2=diagonal, 3=L-top-left, 4=L-bottom-right
             : Math.floor(Math.random() * 5);
-        
+
         if (patternType === 0) {
             // Vertical split (left-right) - varying positions
             const splitRatio = 0.3 + (seededRandom?.next() || Math.random()) * 0.4; // 0.3 to 0.7
-            centroids.push({ lat: minLat + latRange * 0.5, lng: minLng + lngRange * (splitRatio * 0.5) });
-            centroids.push({ lat: minLat + latRange * 0.5, lng: minLng + lngRange * (0.5 + (1 - splitRatio) * 0.5) });
+            centroids.push({
+                lat: minLat + latRange * 0.5,
+                lng: minLng + lngRange * (splitRatio * 0.5),
+            });
+            centroids.push({
+                lat: minLat + latRange * 0.5,
+                lng: minLng + lngRange * (0.5 + (1 - splitRatio) * 0.5),
+            });
         } else if (patternType === 1) {
             // Horizontal split (top-bottom) - varying positions
             const splitRatio = 0.3 + (seededRandom?.next() || Math.random()) * 0.4; // 0.3 to 0.7
-            centroids.push({ lat: minLat + latRange * (splitRatio * 0.5), lng: minLng + lngRange * 0.5 });
-            centroids.push({ lat: minLat + latRange * (0.5 + (1 - splitRatio) * 0.5), lng: minLng + lngRange * 0.5 });
+            centroids.push({
+                lat: minLat + latRange * (splitRatio * 0.5),
+                lng: minLng + lngRange * 0.5,
+            });
+            centroids.push({
+                lat: minLat + latRange * (0.5 + (1 - splitRatio) * 0.5),
+                lng: minLng + lngRange * 0.5,
+            });
         } else if (patternType === 2) {
             // Diagonal split (top-left to bottom-right)
             centroids.push({ lat: minLat + latRange * 0.3, lng: minLng + lngRange * 0.3 });
@@ -229,90 +241,90 @@ const getSpatialInitialCentroids = (
         }
     } else {
         // For more zones, use diverse patterns: grid, rows, columns, random, etc.
-        const patternType = seededRandom 
+        const patternType = seededRandom
             ? Math.floor(seededRandom.next() * 8) // 0-7 different patterns (เพิ่มจาก 6 เป็น 8)
             : Math.floor(Math.random() * 8);
-        
+
         if (patternType === 0) {
             // Grid pattern (rows x cols)
             const gridCols = Math.ceil(Math.sqrt(k));
             const gridRows = Math.ceil(k / gridCols);
-            
+
             for (let i = 0; i < k; i++) {
                 const row = Math.floor(i / gridCols);
                 const col = i % gridCols;
-                
+
                 // Add randomness to grid positions
-                const rowOffset = seededRandom 
-                    ? (seededRandom.next() - 0.5) * 0.25 
+                const rowOffset = seededRandom
+                    ? (seededRandom.next() - 0.5) * 0.25
                     : (Math.random() - 0.5) * 0.25;
-                const colOffset = seededRandom 
-                    ? (seededRandom.next() - 0.5) * 0.25 
+                const colOffset = seededRandom
+                    ? (seededRandom.next() - 0.5) * 0.25
                     : (Math.random() - 0.5) * 0.25;
-                
+
                 const lat = minLat + latRange * ((row + 0.5 + rowOffset) / gridRows);
                 const lng = minLng + lngRange * ((col + 0.5 + colOffset) / gridCols);
-                
+
                 centroids.push({ lat, lng });
             }
         } else if (patternType === 1) {
             // Horizontal rows pattern (แบ่งเป็นแถวแนวนอน)
             const numRows = Math.ceil(Math.sqrt(k));
             const plantsPerRow = Math.ceil(k / numRows);
-            
+
             for (let i = 0; i < k; i++) {
                 const row = Math.floor(i / plantsPerRow);
                 const col = i % plantsPerRow;
-                const totalCols = row === numRows - 1 ? (k - row * plantsPerRow) : plantsPerRow;
-                
-                const rowOffset = seededRandom 
-                    ? (seededRandom.next() - 0.5) * 0.2 
+                const totalCols = row === numRows - 1 ? k - row * plantsPerRow : plantsPerRow;
+
+                const rowOffset = seededRandom
+                    ? (seededRandom.next() - 0.5) * 0.2
                     : (Math.random() - 0.5) * 0.2;
-                const colOffset = seededRandom 
-                    ? (seededRandom.next() - 0.5) * 0.3 
+                const colOffset = seededRandom
+                    ? (seededRandom.next() - 0.5) * 0.3
                     : (Math.random() - 0.5) * 0.3;
-                
+
                 const lat = minLat + latRange * ((row + 0.5 + rowOffset) / numRows);
                 const lng = minLng + lngRange * ((col + 0.5 + colOffset) / totalCols);
-                
+
                 centroids.push({ lat, lng });
             }
         } else if (patternType === 2) {
             // Vertical columns pattern (แบ่งเป็นคอลัมน์แนวตั้ง)
             const numCols = Math.ceil(Math.sqrt(k));
             const plantsPerCol = Math.ceil(k / numCols);
-            
+
             for (let i = 0; i < k; i++) {
                 const col = Math.floor(i / plantsPerCol);
                 const row = i % plantsPerCol;
-                const totalRows = col === numCols - 1 ? (k - col * plantsPerCol) : plantsPerCol;
-                
-                const rowOffset = seededRandom 
-                    ? (seededRandom.next() - 0.5) * 0.3 
+                const totalRows = col === numCols - 1 ? k - col * plantsPerCol : plantsPerCol;
+
+                const rowOffset = seededRandom
+                    ? (seededRandom.next() - 0.5) * 0.3
                     : (Math.random() - 0.5) * 0.3;
-                const colOffset = seededRandom 
-                    ? (seededRandom.next() - 0.5) * 0.2 
+                const colOffset = seededRandom
+                    ? (seededRandom.next() - 0.5) * 0.2
                     : (Math.random() - 0.5) * 0.2;
-                
+
                 const lat = minLat + latRange * ((row + 0.5 + rowOffset) / totalRows);
                 const lng = minLng + lngRange * ((col + 0.5 + colOffset) / numCols);
-                
+
                 centroids.push({ lat, lng });
             }
         } else if (patternType === 3) {
             // Diagonal stripes pattern (แถบแนวทแยง)
             const numStripes = Math.ceil(Math.sqrt(k));
-            
+
             for (let i = 0; i < k; i++) {
                 const stripe = i % numStripes;
                 const positionInStripe = Math.floor(i / numStripes);
                 const totalInStripe = Math.ceil(k / numStripes);
-                
+
                 // Create diagonal pattern
                 const diagonalRatio = (stripe + 0.5) / numStripes;
                 const lat = minLat + latRange * (diagonalRatio * 0.6 + 0.2);
                 const lng = minLng + lngRange * ((positionInStripe + 0.5) / totalInStripe);
-                
+
                 centroids.push({ lat, lng });
             }
         } else if (patternType === 4) {
@@ -320,41 +332,48 @@ const getSpatialInitialCentroids = (
             const centerLat = minLat + latRange * 0.5;
             const centerLng = minLng + lngRange * 0.5;
             const maxRadius = Math.min(latRange, lngRange) * 0.4;
-            
+
             for (let i = 0; i < k; i++) {
                 const angle = (i * 2 * Math.PI) / k;
                 const radius = maxRadius * (0.3 + (seededRandom?.next() || Math.random()) * 0.7);
-                
-                const lat = centerLat + radius * Math.cos(angle) / 111000; // Convert to degrees
-                const lng = centerLng + radius * Math.sin(angle) / (111000 * Math.cos(centerLat * Math.PI / 180));
-                
+
+                const lat = centerLat + (radius * Math.cos(angle)) / 111000; // Convert to degrees
+                const lng =
+                    centerLng +
+                    (radius * Math.sin(angle)) / (111000 * Math.cos((centerLat * Math.PI) / 180));
+
                 centroids.push({ lat, lng });
             }
         } else if (patternType === 5) {
             // Random spatial distribution with clustering
             const clusters = Math.ceil(Math.sqrt(k));
             const pointsPerCluster = Math.ceil(k / clusters);
-            
+
             // Create cluster centers
             const clusterCenters: Coordinate[] = [];
             for (let c = 0; c < clusters; c++) {
-                const clusterLat = minLat + latRange * (0.2 + (seededRandom?.next() || Math.random()) * 0.6);
-                const clusterLng = minLng + lngRange * (0.2 + (seededRandom?.next() || Math.random()) * 0.6);
+                const clusterLat =
+                    minLat + latRange * (0.2 + (seededRandom?.next() || Math.random()) * 0.6);
+                const clusterLng =
+                    minLng + lngRange * (0.2 + (seededRandom?.next() || Math.random()) * 0.6);
                 clusterCenters.push({ lat: clusterLat, lng: clusterLng });
             }
-            
+
             // Distribute points around cluster centers
             for (let i = 0; i < k; i++) {
                 const clusterIdx = Math.floor(i / pointsPerCluster);
                 const pointInCluster = i % pointsPerCluster;
                 const center = clusterCenters[clusterIdx];
-                
+
                 const angle = (pointInCluster * 2 * Math.PI) / pointsPerCluster;
-                const radius = Math.min(latRange, lngRange) * 0.15 * (seededRandom?.next() || Math.random());
-                
-                const lat = center.lat + radius * Math.cos(angle) / 111000;
-                const lng = center.lng + radius * Math.sin(angle) / (111000 * Math.cos(center.lat * Math.PI / 180));
-                
+                const radius =
+                    Math.min(latRange, lngRange) * 0.15 * (seededRandom?.next() || Math.random());
+
+                const lat = center.lat + (radius * Math.cos(angle)) / 111000;
+                const lng =
+                    center.lng +
+                    (radius * Math.sin(angle)) / (111000 * Math.cos((center.lat * Math.PI) / 180));
+
                 centroids.push({ lat, lng });
             }
         } else if (patternType === 6) {
@@ -362,14 +381,17 @@ const getSpatialInitialCentroids = (
             const centerLat = minLat + latRange * 0.5;
             const centerLng = minLng + lngRange * 0.5;
             const maxRadius = Math.min(latRange, lngRange) * 0.45;
-            
+
             for (let i = 0; i < k; i++) {
                 const spiralAngle = (i * 3 * Math.PI) / k; // 3 full rotations
                 const radius = (maxRadius * i) / k;
-                
-                const lat = centerLat + radius * Math.cos(spiralAngle) / 111000;
-                const lng = centerLng + radius * Math.sin(spiralAngle) / (111000 * Math.cos(centerLat * Math.PI / 180));
-                
+
+                const lat = centerLat + (radius * Math.cos(spiralAngle)) / 111000;
+                const lng =
+                    centerLng +
+                    (radius * Math.sin(spiralAngle)) /
+                        (111000 * Math.cos((centerLat * Math.PI) / 180));
+
                 centroids.push({ lat, lng });
             }
         } else {
@@ -377,34 +399,37 @@ const getSpatialInitialCentroids = (
             const centerLat = minLat + latRange * 0.5;
             const centerLng = minLng + lngRange * 0.5;
             const hexRadius = Math.min(latRange, lngRange) * 0.35;
-            
+
             // Create hexagonal grid
             const hexRows = Math.ceil(Math.sqrt(k));
             const hexCols = Math.ceil(k / hexRows);
             const hexSize = hexRadius / Math.max(hexRows, hexCols);
-            
+
             for (let i = 0; i < k; i++) {
                 const row = Math.floor(i / hexCols);
                 const col = i % hexCols;
-                
+
                 // Hexagonal offset
                 const offsetX = col * hexSize * 1.5;
-                const offsetY = row * hexSize * Math.sqrt(3) + (col % 2) * hexSize * Math.sqrt(3) / 2;
-                
+                const offsetY =
+                    row * hexSize * Math.sqrt(3) + ((col % 2) * hexSize * Math.sqrt(3)) / 2;
+
                 const lat = centerLat + (offsetY - hexRadius) / 111000;
-                const lng = centerLng + (offsetX - hexRadius) / (111000 * Math.cos(centerLat * Math.PI / 180));
-                
+                const lng =
+                    centerLng +
+                    (offsetX - hexRadius) / (111000 * Math.cos((centerLat * Math.PI) / 180));
+
                 centroids.push({ lat, lng });
             }
         }
     }
-    
+
     // Find closest plants to these spatial points
     const finalCentroids: Coordinate[] = [];
     for (const spatialPoint of centroids) {
         let closestPlant = plants[0];
         let minDist = calculateDistance(spatialPoint, plants[0].position);
-        
+
         for (const plant of plants) {
             const dist = calculateDistance(spatialPoint, plant.position);
             if (dist < minDist) {
@@ -412,10 +437,10 @@ const getSpatialInitialCentroids = (
                 closestPlant = plant;
             }
         }
-        
+
         finalCentroids.push({ ...closestPlant.position });
     }
-    
+
     return finalCentroids;
 };
 
@@ -487,7 +512,7 @@ export const kMeansCluster = (
                         const plantToMove = clusters[sourceIdx].pop();
                         if (plantToMove) {
                             clusters[emptyIdx].push(plantToMove);
-                            clusterSizes.find(c => c.idx === sourceIdx)!.size--;
+                            clusterSizes.find((c) => c.idx === sourceIdx)!.size--;
                             break;
                         }
                     }
@@ -529,7 +554,7 @@ export const kMeansCluster = (
             // Find the nearest plant to this centroid
             let nearestPlant = plants[0];
             let minDist = calculateDistance(centroids[i], plants[0].position);
-            
+
             for (const plant of plants) {
                 const dist = calculateDistance(centroids[i], plant.position);
                 if (dist < minDist) {
@@ -663,7 +688,7 @@ export const plantCountBalancedCluster = (
                     const plantToMove = clusters[sourceIdx].pop();
                     if (plantToMove) {
                         clusters[emptyIdx].push(plantToMove);
-                        clusterSizes.find(c => c.idx === sourceIdx)!.size--;
+                        clusterSizes.find((c) => c.idx === sourceIdx)!.size--;
                         break;
                     }
                 }
@@ -677,7 +702,7 @@ export const plantCountBalancedCluster = (
             // Find nearest plant to initial centroid
             let nearestPlant = plants[0];
             let minDist = calculateDistance(initialCentroids[i], plants[0].position);
-            
+
             for (const plant of plants) {
                 const dist = calculateDistance(initialCentroids[i], plant.position);
                 if (dist < minDist) {
@@ -735,7 +760,7 @@ export const plantCountBalancedCluster = (
             // Find nearest plant to initial centroid
             let nearestPlant = plants[0];
             let minDist = calculateDistance(initialCentroids[i], plants[0].position);
-            
+
             for (const plant of plants) {
                 const dist = calculateDistance(initialCentroids[i], plant.position);
                 if (dist < minDist) {
@@ -871,7 +896,7 @@ const perfectWaterBalanceCluster = (
             // Find plant with closest water need to target
             let bestPlant = plants[0];
             let minDiff = Math.abs(plants[0].plantData.waterNeed - targetWaterNeed);
-            
+
             for (const plant of plants) {
                 const diff = Math.abs(plant.plantData.waterNeed - targetWaterNeed);
                 if (diff < minDiff) {
@@ -1233,7 +1258,7 @@ export const createVoronoiZones = (
         const voronoiZones = createTrueVoronoiZones(centroids, mainArea);
 
         const allPlants = clusters.flat();
-        
+
         clusters.forEach((cluster, index) => {
             if (cluster.length === 0 || index >= voronoiZones.length) return;
 
@@ -1356,7 +1381,10 @@ export const createVoronoiZones = (
         // นับต้นไม้จริงๆ ในโซนเสมอ
         const allPlants = clusters.flat();
         const finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
-        const totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
+        const totalWaterNeed = finalPlants.reduce(
+            (sum, plant) => sum + plant.plantData.waterNeed,
+            0
+        );
 
         const zone: IrrigationZone = {
             id: `auto-zone-${index + 1}`,
@@ -1570,35 +1598,48 @@ export const createZonesFromClusters = (
         zoneCoordinates = addPolygonPadding(zoneCoordinates, paddingMeters, mainArea);
 
         if (zoneCoordinates.length < 3) {
-            console.warn(`⚠️ Zone ${index + 1}: Insufficient coordinates after padding (${zoneCoordinates.length})`);
+            console.warn(
+                `⚠️ Zone ${index + 1}: Insufficient coordinates after padding (${zoneCoordinates.length})`
+            );
             return;
         }
 
         // นับต้นไม้จริงๆ ในโซนที่สร้างขึ้น ไม่ใช่จาก cluster
         const finalPlants = findPlantsInPolygon(allPlants, zoneCoordinates);
-        const totalWaterNeed = finalPlants.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
-        
+        const totalWaterNeed = finalPlants.reduce(
+            (sum, plant) => sum + plant.plantData.waterNeed,
+            0
+        );
+
         // ตรวจสอบความแตกต่างระหว่าง cluster และต้นไม้จริงในโซน
         if (config?.debugMode) {
             const clusterCount = cluster.length;
             const actualCount = finalPlants.length;
             const difference = Math.abs(clusterCount - actualCount);
-            
+
             if (difference > 0) {
-                console.log(`🔍 Zone ${index + 1}: Cluster=${clusterCount}, Actual=${actualCount}, Diff=${difference}`);
-                
+                console.log(
+                    `🔍 Zone ${index + 1}: Cluster=${clusterCount}, Actual=${actualCount}, Diff=${difference}`
+                );
+
                 // หาต้นไม้ที่หายไปหรือเพิ่มขึ้น
-                const clusterPlantIds = new Set(cluster.map(p => p.id));
-                const actualPlantIds = new Set(finalPlants.map(p => p.id));
-                
-                const missingPlants = cluster.filter(p => !actualPlantIds.has(p.id));
-                const extraPlants = finalPlants.filter(p => !clusterPlantIds.has(p.id));
-                
+                const clusterPlantIds = new Set(cluster.map((p) => p.id));
+                const actualPlantIds = new Set(finalPlants.map((p) => p.id));
+
+                const missingPlants = cluster.filter((p) => !actualPlantIds.has(p.id));
+                const extraPlants = finalPlants.filter((p) => !clusterPlantIds.has(p.id));
+
                 if (missingPlants.length > 0) {
-                    console.log(`❌ Missing plants in zone ${index + 1}:`, missingPlants.map(p => p.id));
+                    console.log(
+                        `❌ Missing plants in zone ${index + 1}:`,
+                        missingPlants.map((p) => p.id)
+                    );
                 }
                 if (extraPlants.length > 0) {
-                    console.log(`➕ Extra plants in zone ${index + 1}:`, extraPlants.map(p => p.id));
+                    console.log(
+                        `➕ Extra plants in zone ${index + 1}:`,
+                        extraPlants.map((p) => p.id)
+                    );
                 }
             }
         }
@@ -1628,7 +1669,7 @@ export const addPolygonPadding = (
         console.warn('⚠️ Cannot add padding to polygon with less than 3 points');
         return polygon;
     }
-    
+
     if (paddingMeters <= 0) return polygon;
 
     try {
@@ -1648,7 +1689,9 @@ export const addPolygonPadding = (
                 clippedPolygon.length < 3 ||
                 calculatePolygonArea(clippedPolygon) < calculatePolygonArea(polygon) * 0.5
             ) {
-                console.warn('⚠️ Clipping resulted in insufficient area, using conservative padding');
+                console.warn(
+                    '⚠️ Clipping resulted in insufficient area, using conservative padding'
+                );
                 return createConservativePadding(polygon, mainArea, paddingMeters);
             }
 
@@ -1761,11 +1804,11 @@ export const calculatePolygonArea = (polygon: Coordinate[]): number => {
 
 export const calculateOverlapArea = (poly1: Coordinate[], poly2: Coordinate[]): number => {
     if (poly1.length < 3 || poly2.length < 3) return 0;
-    
+
     try {
         const intersection = findPolygonIntersection(poly1, poly2);
         if (intersection.length < 3) return 0;
-        
+
         return calculatePolygonArea(intersection);
     } catch (error) {
         console.warn('Error calculating overlap area:', error);
@@ -2025,7 +2068,7 @@ export const createAutomaticZones = (
         //         waterNeed: zone.totalWaterNeed,
         //         coordinateCount: zone.coordinates.length
         //     })));
-            
+
         //     // เปรียบเทียบจำนวนต้นไม้ใน cluster vs โซนจริง
         //     const totalClusterPlants = clusters.reduce((sum, cluster) => sum + cluster.length, 0);
         //     const totalActualPlants = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
@@ -2201,8 +2244,12 @@ const validateZoneOverlaps = (
             const zone1 = zones[i];
             const zone2 = zones[j];
 
-            if (!zone1.coordinates || !zone2.coordinates || 
-                zone1.coordinates.length < 3 || zone2.coordinates.length < 3) {
+            if (
+                !zone1.coordinates ||
+                !zone2.coordinates ||
+                zone1.coordinates.length < 3 ||
+                zone2.coordinates.length < 3
+            ) {
                 continue;
             }
 
@@ -2224,7 +2271,7 @@ const validateZoneOverlaps = (
                 const overlapArea = calculateOverlapArea(zone1.coordinates, zone2.coordinates);
                 const zone1Area = calculatePolygonArea(zone1.coordinates);
                 const overlapPercentage = (overlapArea / zone1Area) * 100;
-                
+
                 if (overlapPercentage > 5) {
                     errors.push(
                         `โซน ${i + 1} และโซน ${j + 1} มีพื้นที่ทับซ้อนกัน ${overlapPercentage.toFixed(1)}% - ต้องแยกจากกันอย่างสมบูรณ์`
@@ -2247,9 +2294,11 @@ const validateZoneOverlaps = (
                 const totalOverlapPoints = zone1InZone2.length + zone2InZone1.length;
                 const totalPoints = zone1.coordinates.length + zone2.coordinates.length;
                 const overlapPercentage = (totalOverlapPoints / totalPoints) * 100;
-                
+
                 if (overlapPercentage > 10) {
-                    warnings.push(`โซน ${i + 1} และโซน ${j + 1} มีจุดทับซ้อนกัน ${overlapPercentage.toFixed(1)}%`);
+                    warnings.push(
+                        `โซน ${i + 1} และโซน ${j + 1} มีจุดทับซ้อนกัน ${overlapPercentage.toFixed(1)}%`
+                    );
                 }
             }
         }
@@ -2366,14 +2415,20 @@ const validatePlantAssignment = (
 
         if (plantsOutsideZone.length > 0) {
             const outsidePercentage = (plantsOutsideZone.length / zone.plants.length) * 100;
-            
+
             if (outsidePercentage > 50) {
-                errors.push(`โซน ${index + 1} มีต้นไม้ ${plantsOutsideZone.length} ต้น (${outsidePercentage.toFixed(1)}%) อยู่นอกขอบเขตโซน`);
+                errors.push(
+                    `โซน ${index + 1} มีต้นไม้ ${plantsOutsideZone.length} ต้น (${outsidePercentage.toFixed(1)}%) อยู่นอกขอบเขตโซน`
+                );
             } else if (outsidePercentage > 20) {
-                warnings.push(`โซน ${index + 1} มีต้นไม้ ${plantsOutsideZone.length} ต้น (${outsidePercentage.toFixed(1)}%) อยู่นอกขอบเขตโซน`);
+                warnings.push(
+                    `โซน ${index + 1} มีต้นไม้ ${plantsOutsideZone.length} ต้น (${outsidePercentage.toFixed(1)}%) อยู่นอกขอบเขตโซน`
+                );
             } else {
                 // For small percentages, just log to console without showing warnings
-                console.log(`โซน ${index + 1}: ${plantsOutsideZone.length} ต้นไม้นอกขอบเขต (${outsidePercentage.toFixed(1)}%)`);
+                console.log(
+                    `โซน ${index + 1}: ${plantsOutsideZone.length} ต้นไม้นอกขอบเขต (${outsidePercentage.toFixed(1)}%)`
+                );
             }
         }
     });

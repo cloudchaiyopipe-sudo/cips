@@ -93,7 +93,11 @@ declare global {
                     };
                 };
                 event: {
-                    addListener: (instance: any, eventName: string, handler: (...args: any[]) => void) => any;
+                    addListener: (
+                        instance: any,
+                        eventName: string,
+                        handler: (...args: any[]) => void
+                    ) => any;
                     removeListener: (listener: any) => void;
                     clearListeners: (instance: any, eventName?: string) => void;
                     clearInstanceListeners: (instance: any) => void;
