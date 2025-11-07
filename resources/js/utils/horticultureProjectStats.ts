@@ -266,13 +266,12 @@ export const getSubMainPipeBranchCount = ():
                 subMain.branchPipes?.reduce((sum, branch) => sum + branch.length, 0) || 0;
 
             if (projectData.lateralPipes) {
-               
                 const lateralConnections = findSubMainToLateralStartConnections(
                     [subMain],
                     projectData.lateralPipes,
                     projectData.zones || [],
                     projectData.irrigationZones || [],
-                    100 
+                    100
                 );
 
                 branchCount += lateralConnections.length;
@@ -530,11 +529,7 @@ export const createMapImage = async (
         return null;
     }
 
-    const {
-        quality = 0.9,
-        scale = 2,
-        backgroundColor = '#1F2937',
-    } = options;
+    const { quality = 0.9, scale = 2, backgroundColor = '#1F2937' } = options;
 
     try {
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -1014,7 +1009,11 @@ export const findPipeZoneForConnection = (
 
     if (irrigationZones && irrigationZones.length > 0) {
         for (const zone of irrigationZones) {
-            if (zone.coordinates && zone.coordinates.length >= 3 && isPointInPolygon(endPoint, zone.coordinates)) {
+            if (
+                zone.coordinates &&
+                zone.coordinates.length >= 3 &&
+                isPointInPolygon(endPoint, zone.coordinates)
+            ) {
                 return zone.id;
             }
         }
@@ -1022,7 +1021,11 @@ export const findPipeZoneForConnection = (
 
     if (zones && zones.length > 0) {
         for (const zone of zones) {
-            if (zone.coordinates && zone.coordinates.length >= 3 && isPointInPolygon(endPoint, zone.coordinates)) {
+            if (
+                zone.coordinates &&
+                zone.coordinates.length >= 3 &&
+                isPointInPolygon(endPoint, zone.coordinates)
+            ) {
                 return zone.id;
             }
         }
@@ -1200,7 +1203,6 @@ export const findBestSubMainPipeInZone = (
                         const distance = calculateDistanceBetweenPoints(lateralStart, closestPoint);
 
                         if (distance <= 50) {
-                           
                             let isClosestToThisSubMain = true;
 
                             for (const otherSubMain of zoneSubMains) {
@@ -1323,7 +1325,7 @@ export const findBestMainPipeInZone = (
             [mainPipe],
             projectData.subMainPipes,
             projectData.zones || [],
-            irrigationZones || [],
+            irrigationZones || []
         );
 
         for (const connection of endToEndConnections) {
@@ -1348,7 +1350,7 @@ export const findBestMainPipeInZone = (
         const midConnections = findMidConnections(
             projectData.subMainPipes,
             [mainPipe],
-            100, 
+            100,
             projectData.zones || [],
             irrigationZones || []
         );
@@ -1392,7 +1394,7 @@ export const findBestMainPipeInZone = (
                     projectData.lateralPipes,
                     projectData.zones || [],
                     irrigationZones || [],
-                    20 
+                    20
                 );
 
                 for (const lateralConnection of lateralConnections) {
@@ -1458,7 +1460,7 @@ export const findBestMainPipeInZone = (
         const realOutletCount = connectedSubMains.length;
         return {
             mainPipe,
-            realSubMainCount: realOutletCount, 
+            realSubMainCount: realOutletCount,
             totalWaterFlow,
             length: mainPipe.length || 0,
         };
@@ -1526,14 +1528,14 @@ export const countConnectionPointsByZone = (
             projectData.mainPipes,
             projectData.subMainPipes,
             projectData.zones || [],
-            irrigationZones,
+            irrigationZones
         );
 
         const mainToSubMainConnections = findMainToSubMainConnections(
             projectData.mainPipes,
             projectData.subMainPipes,
             projectData.zones || [],
-            irrigationZones,
+            irrigationZones
         );
 
         for (const connection of endToEndConnections) {
@@ -1557,8 +1559,11 @@ export const countConnectionPointsByZone = (
                 if (mainZoneId === zone.id && subMainZoneId === zone.id) {
                     const connectionKey = `end-to-end-${connection.mainPipeId}-${connection.subMainPipeId}`;
                     const globalKey = `global-end-to-end-${connection.mainPipeId}-${connection.subMainPipeId}`;
-                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
-                        zoneStats.mainToSubMain++; 
+                    if (
+                        !countedConnections.has(connectionKey) &&
+                        !globalConnectionKeys.has(globalKey)
+                    ) {
+                        zoneStats.mainToSubMain++;
                         countedConnections.add(connectionKey);
                         globalConnectionKeys.add(globalKey);
                     }
@@ -1587,8 +1592,11 @@ export const countConnectionPointsByZone = (
                 if (mainZoneId === zone.id && subMainZoneId === zone.id) {
                     const connectionKey = `main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`;
                     const globalKey = `global-main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`;
-                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
-                        zoneStats.subMainToMainMid++; 
+                    if (
+                        !countedConnections.has(connectionKey) &&
+                        !globalConnectionKeys.has(globalKey)
+                    ) {
+                        zoneStats.subMainToMainMid++;
                         countedConnections.add(connectionKey);
                         globalConnectionKeys.add(globalKey);
                     }
@@ -1599,7 +1607,7 @@ export const countConnectionPointsByZone = (
         const midConnections = findMidConnections(
             projectData.subMainPipes,
             projectData.mainPipes,
-            15, 
+            15,
             projectData.zones || [],
             irrigationZones
         );
@@ -1625,8 +1633,11 @@ export const countConnectionPointsByZone = (
                 if (subMainZoneId === zone.id && mainZoneId === zone.id) {
                     const connectionKey = `mid-connection-${connection.sourcePipeId}-${connection.targetPipeId}`;
                     const globalKey = `global-mid-connection-${connection.sourcePipeId}-${connection.targetPipeId}`;
-                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
-                        zoneStats.subMainToLateral++; 
+                    if (
+                        !countedConnections.has(connectionKey) &&
+                        !globalConnectionKeys.has(globalKey)
+                    ) {
+                        zoneStats.subMainToLateral++;
                         countedConnections.add(connectionKey);
                         globalConnectionKeys.add(globalKey);
                     }
@@ -1639,7 +1650,7 @@ export const countConnectionPointsByZone = (
             projectData.lateralPipes,
             projectData.zones || [],
             irrigationZones,
-            20 
+            20
         );
 
         for (const connection of subMainToLateralConnections) {
@@ -1665,8 +1676,11 @@ export const countConnectionPointsByZone = (
                 if (subMainZoneId === zone.id && lateralZoneId === zone.id) {
                     const connectionKey = `submain-lateral-start-${connection.subMainPipeId}-${connection.lateralPipeId}`;
                     const globalKey = `global-submain-lateral-start-${connection.subMainPipeId}-${connection.lateralPipeId}`;
-                    if (!countedConnections.has(connectionKey) && !globalConnectionKeys.has(globalKey)) {
-                        zoneStats.subMainToMainIntersection++; 
+                    if (
+                        !countedConnections.has(connectionKey) &&
+                        !globalConnectionKeys.has(globalKey)
+                    ) {
+                        zoneStats.subMainToMainIntersection++;
                         countedConnections.add(connectionKey);
                         globalConnectionKeys.add(globalKey);
                     }
@@ -1702,8 +1716,11 @@ export const countConnectionPointsByZone = (
                 if (subMainZoneId === zone.id && mainZoneId === zone.id) {
                     const intersectionKey = `submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`;
                     const globalKey = `global-submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`;
-                    if (!countedConnections.has(intersectionKey) && !globalConnectionKeys.has(globalKey)) {
-                        zoneStats.subMainToMainIntersection++; 
+                    if (
+                        !countedConnections.has(intersectionKey) &&
+                        !globalConnectionKeys.has(globalKey)
+                    ) {
+                        zoneStats.subMainToMainIntersection++;
                         countedConnections.add(intersectionKey);
                         globalConnectionKeys.add(globalKey);
                     }
@@ -1715,7 +1732,7 @@ export const countConnectionPointsByZone = (
             projectData.lateralPipes,
             projectData.subMainPipes,
             projectData.zones || [],
-            irrigationZones,
+            irrigationZones
         );
 
         for (const intersection of lateralToSubMainIntersections) {
@@ -1742,7 +1759,10 @@ export const countConnectionPointsByZone = (
                     const intersectionKey = `lateral-submain-intersection-${intersection.lateralPipeId}-${intersection.subMainPipeId}`;
                     const globalKey = `global-lateral-submain-intersection-${intersection.lateralPipeId}-${intersection.subMainPipeId}`;
 
-                    if (!countedConnections.has(intersectionKey) && !globalConnectionKeys.has(globalKey)) {
+                    if (
+                        !countedConnections.has(intersectionKey) &&
+                        !globalConnectionKeys.has(globalKey)
+                    ) {
                         zoneStats.lateralToSubMainIntersection++;
                         countedConnections.add(intersectionKey);
                         globalConnectionKeys.add(globalKey);
@@ -1828,7 +1848,7 @@ export const findMainToSubMainConnectionsInResults = (
                 const isCloseConnection = connectionDistance <= snapThreshold;
 
                 if (!isMultiZoneMainPipe && !isCloseConnection) {
-                    continue; 
+                    continue;
                 }
             }
 
@@ -1857,7 +1877,6 @@ const checkMainPipePassesThroughMultipleZones = (
     const zonesFound = new Set<string>();
 
     for (const point of mainPipe.coordinates) {
-        
         if (irrigationZones) {
             for (const zone of irrigationZones) {
                 if (isPointInPolygon(point, zone.coordinates)) {
@@ -1866,7 +1885,6 @@ const checkMainPipePassesThroughMultipleZones = (
             }
         }
 
-        
         if (zones) {
             for (const zone of zones) {
                 if (isPointInPolygon(point, zone.coordinates)) {
@@ -1876,6 +1894,5 @@ const checkMainPipePassesThroughMultipleZones = (
         }
     }
 
-    
     return zonesFound.size > 1;
 };

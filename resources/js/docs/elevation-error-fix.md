@@ -5,16 +5,19 @@
 ### 🚨 **ข้อผิดพลาดที่ 1: `polygons is not defined`**
 
 #### **ปัญหา:**
+
 ```
 Uncaught ReferenceError: polygons is not defined
     at ElevationOverlay.tsx:161:9
 ```
 
 #### **สาเหตุ:**
+
 - ตัวแปร `polygons` ไม่ได้ถูกประกาศ
 - ใช้ `polygons.push()` แต่ไม่ได้สร้าง array
 
 #### **วิธีแก้ไข:**
+
 ```typescript
 // เปลี่ยนจาก
 polygons.push(overlay as any);
@@ -28,15 +31,18 @@ overlayRef.current = overlay as any;
 ### 🚨 **ข้อผิดพลาดที่ 2: `createImageData` Error**
 
 #### **ปัญหา:**
+
 ```
 Uncaught IndexSizeError: Failed to execute 'createImageData' on 'CanvasRenderingContext2D': The source width is zero or not a number.
 ```
 
 #### **สาเหตุ:**
+
 - Canvas width หรือ height เป็น 0
 - Map div ยังไม่ได้ render เสร็จ
 
 #### **วิธีแก้ไข:**
+
 ```typescript
 // เพิ่มการตรวจสอบ dimensions
 const width = mapDiv.offsetWidth || 800;
@@ -55,6 +61,7 @@ if (canvas.width === 0 || canvas.height === 0) {
 ### 🔧 **การปรับปรุงระบบ:**
 
 #### **1. การจัดการ Overlay**
+
 ```typescript
 // ใช้ OverlayView แทน Polygon array
 const overlay = new google.maps.OverlayView();
@@ -63,6 +70,7 @@ overlayRef.current = overlay as any;
 ```
 
 #### **2. การจัดการ Canvas**
+
 ```typescript
 // ตรวจสอบ dimensions
 const width = mapDiv.offsetWidth || 800;
@@ -75,6 +83,7 @@ if (canvas.width === 0 || canvas.height === 0) {
 ```
 
 #### **3. การ Cleanup**
+
 ```typescript
 // ลดความซับซ้อนของ cleanup
 return () => {

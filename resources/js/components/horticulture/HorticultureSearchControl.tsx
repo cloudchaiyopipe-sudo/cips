@@ -418,7 +418,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
             setIsCoordinateSearch(isCoordinate);
 
             if (isCoordinate) {
-
                 searchTimeoutRef.current = setTimeout(async () => {
                     setIsLoading(true);
                     try {

@@ -38,7 +38,9 @@ export function createMarker(options: MarkerOptions): any {
         });
     } else {
         // Fallback to deprecated Marker
-        console.warn('Using deprecated google.maps.Marker. Consider updating to AdvancedMarkerElement.');
+        console.warn(
+            'Using deprecated google.maps.Marker. Consider updating to AdvancedMarkerElement.'
+        );
         return new window.google.maps.Marker({
             position: options.position,
             map: options.map,
@@ -66,11 +68,11 @@ function createDefaultMarkerContent(options: MarkerOptions): HTMLElement {
         border-radius: 50%;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     `;
-    
+
     if (options.title) {
         content.title = options.title;
     }
-    
+
     return content;
 }
 
@@ -121,7 +123,10 @@ export function removeMarker(marker: any): void {
 /**
  * Adds click listener to marker
  */
-export function addMarkerClickListener(marker: any, callback: (event: any) => void): google.maps.MapsEventListener | null {
+export function addMarkerClickListener(
+    marker: any,
+    callback: (event: any) => void
+): google.maps.MapsEventListener | null {
     if (marker.addListener) {
         return marker.addListener('click', callback);
     }

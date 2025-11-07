@@ -50,7 +50,7 @@ const smoothPath = (
 
     // Use Catmull-Rom spline interpolation for natural curves
     // This creates smooth curves while preserving the original shape
-    
+
     // First, remove only points that are extremely close (less than 0.3 meters)
     const filtered: Coordinate[] = [coordinates[0]];
     const minDistance = tolerance / 111320; // 0.3 meters in degrees
@@ -78,29 +78,29 @@ const smoothPath = (
     // Use simple moving average for gentle smoothing that preserves curves
     // This approach keeps all points but smooths the transitions between them
     const smoothed: Coordinate[] = [];
-    
+
     // Always keep first point
     smoothed.push(filtered[0]);
-    
+
     // Smooth intermediate points with gentle averaging
     for (let i = 1; i < filtered.length - 1; i++) {
         const prev = filtered[i - 1];
         const current = filtered[i];
         const next = filtered[i + 1];
-        
+
         // Gentle smoothing: weight current point more heavily to preserve user's intent
         // Only smooth slightly to reduce jaggedness without changing the shape much
         const smoothedPoint: Coordinate = {
             lat: prev.lat * 0.15 + current.lat * 0.7 + next.lat * 0.15,
             lng: prev.lng * 0.15 + current.lng * 0.7 + next.lng * 0.15,
         };
-        
+
         // Check if smoothing would move point too far from original
         const distance = Math.sqrt(
-            Math.pow(smoothedPoint.lat - current.lat, 2) + 
-            Math.pow(smoothedPoint.lng - current.lng, 2)
+            Math.pow(smoothedPoint.lat - current.lat, 2) +
+                Math.pow(smoothedPoint.lng - current.lng, 2)
         );
-        
+
         // Only use smoothed point if it's close to original (preserves user intent)
         // Threshold: ~11 meters (0.0001 degrees)
         if (distance < 0.0001) {
@@ -110,7 +110,7 @@ const smoothPath = (
             smoothed.push(current);
         }
     }
-    
+
     // Always keep last point
     smoothed.push(filtered[filtered.length - 1]);
 
@@ -150,8 +150,7 @@ const optimizePath = (coordinates: Coordinate[]): Coordinate[] => {
             0,
             Math.min(
                 1,
-                ((current.lng - prev.lng) * dx + (current.lat - prev.lat) * dy) /
-                    lengthSquared
+                ((current.lng - prev.lng) * dx + (current.lat - prev.lat) * dy) / lengthSquared
             )
         );
 
@@ -167,7 +166,7 @@ const optimizePath = (coordinates: Coordinate[]): Coordinate[] => {
         const segmentLength = Math.sqrt(
             Math.pow(next.lat - prev.lat, 2) + Math.pow(next.lng - prev.lng, 2)
         );
-        
+
         if (distance > threshold || segmentLength < 0.001) {
             // Keep the point to preserve curve details
             optimized.push(current);
@@ -236,13 +235,13 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
 
         // Determine stroke color based on pipe type
         const pipeStrokeColor =
-            editMode === 'mainPipe' 
-                ? '#FF0000' 
-                : editMode === 'subMainPipe' 
-                ? '#8B5CF6' 
-                : editMode === 'lateralPipe'
-                ? '#FFD700'
-                : strokeColor;
+            editMode === 'mainPipe'
+                ? '#FF0000'
+                : editMode === 'subMainPipe'
+                  ? '#8B5CF6'
+                  : editMode === 'lateralPipe'
+                    ? '#FFD700'
+                    : strokeColor;
 
         // Get map container for direct event handling
         const mapDiv = map.getDiv();
@@ -256,7 +255,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
         let lastPointTime = 0; // Track time when last point was added
         let ignoreNextMouseUp = false; // Flag to ignore premature mouseup
         let mouseUpTimeoutId: number | null = null; // Track delayed mouseup (use number for browser setTimeout)
-        
+
         // Global mouse button state tracking to prevent false mouseup events
         let globalMouseButtonState = false; // Track if mouse button is actually down globally
 
@@ -282,14 +281,17 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             // Close any open info windows when starting to draw
             const infoWindows = document.querySelectorAll('.gm-style-iw');
             infoWindows.forEach((iw) => {
-                const closeBtn = (iw as HTMLElement).querySelector('button[aria-label*="Close"]') as HTMLElement;
+                const closeBtn = (iw as HTMLElement).querySelector(
+                    'button[aria-label*="Close"]'
+                ) as HTMLElement;
                 if (closeBtn) {
                     closeBtn.click();
                 }
             });
 
             // Check if clicking on info window - if so, just close it and return
-            const isInfoWindow = target?.closest('.gm-style-iw') || target?.closest('.gm-style-iw-c');
+            const isInfoWindow =
+                target?.closest('.gm-style-iw') || target?.closest('.gm-style-iw-c');
             if (isInfoWindow) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -325,7 +327,8 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             // If clicking near pump and in mainPipe mode, use pump position
             if (editMode === 'mainPipe' && pump) {
                 const distance = calculateDistanceBetweenPoints(startPoint, pump);
-                if (distance < 0.00015) { // Very close to pump (about 16 meters)
+                if (distance < 0.00015) {
+                    // Very close to pump (about 16 meters)
                     startPoint = pump;
                 }
             }
@@ -345,7 +348,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             globalMouseButtonState = true; // Track global state
             ignoreNextMouseUp = false;
             lastMouseMoveTime = Date.now();
-            
+
             isDrawingRef.current = true;
             hasStartedDrawing = true;
             setIsDrawing(true);
@@ -379,10 +382,10 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
                     dblClickEvent.stopImmediatePropagation();
                 }
             };
-            
+
             // Temporarily add double-click prevention
             mapDiv.addEventListener('dblclick', preventDoubleClick, true);
-            
+
             // Remove it after a short delay
             setTimeout(() => {
                 mapDiv.removeEventListener('dblclick', preventDoubleClick, true);
@@ -407,14 +410,14 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             const currentTime = Date.now();
             const timeSinceLastPoint = currentTime - lastPointTime;
             const pixelDistance = Math.sqrt(
-                Math.pow(e.clientX - lastMouseMovePosition.x, 2) + 
-                Math.pow(e.clientY - lastMouseMovePosition.y, 2)
+                Math.pow(e.clientX - lastMouseMovePosition.x, 2) +
+                    Math.pow(e.clientY - lastMouseMovePosition.y, 2)
             );
-            
+
             // Update last mouse move position (but keep lastPointTime for next calculation)
             lastMouseMovePosition = { x: e.clientX, y: e.clientY };
             lastMouseMoveTime = currentTime;
-            
+
             // Verify mouse button is still pressed during mousemove
             // Use global state as primary check, e.buttons as secondary
             if (e.buttons !== undefined) {
@@ -443,15 +446,16 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             const lastPoint = currentPathRef.current[currentPathRef.current.length - 1];
             if (lastPoint) {
                 const distance = calculateDistanceBetweenPoints(lastPoint, currentPoint);
-                
+
                 // Calculate movement speed (pixels per ms)
                 // Use time since last point was added, not time since last mousemove
-                const movementSpeedPixels = timeSinceLastPoint > 0 ? pixelDistance / timeSinceLastPoint : 0;
-                
+                const movementSpeedPixels =
+                    timeSinceLastPoint > 0 ? pixelDistance / timeSinceLastPoint : 0;
+
                 // Adaptive threshold: when moving fast, use smaller threshold to capture more points
                 // When moving slow, use slightly larger threshold to avoid too many points
                 let threshold = 0.03 / 111320; // Default: 0.03 meters (3 cm) - very small
-                
+
                 // If moving very fast (more than 5 pixels per ms), use even smaller threshold
                 if (movementSpeedPixels > 5) {
                     threshold = 0.015 / 111320; // 0.015 meters (1.5 cm) for very fast movement
@@ -462,20 +466,21 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
                 } else {
                     threshold = 0.05 / 111320; // 0.05 meters (5 cm) for slow movement
                 }
-                
+
                 if (distance < threshold) {
                     return;
                 }
-                
+
                 // If distance is large (fast movement), interpolate intermediate points
                 // This ensures smooth curves even when moving quickly
-                if (distance > 0.2 / 111320) { // More than 0.2 meters (about 22 meters)
+                if (distance > 0.2 / 111320) {
+                    // More than 0.2 meters (about 22 meters)
                     // Calculate number of intermediate points needed (one point per 0.1 meters)
                     const numIntermediatePoints = Math.min(
                         Math.floor(distance / (0.1 / 111320)),
                         20 // Limit to 20 points max to avoid performance issues
                     );
-                    
+
                     if (numIntermediatePoints > 0) {
                         for (let i = 1; i <= numIntermediatePoints; i++) {
                             const t = i / (numIntermediatePoints + 1);
@@ -531,11 +536,11 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
                         // Button is still down, ignore this mouseup
                         return;
                     }
-                    
+
                     // Button is actually released, proceed with finalization
                     if (isDrawingRef.current && hasStartedDrawing) {
                         const mapRect = mapDiv.getBoundingClientRect();
-                        const isInBounds = 
+                        const isInBounds =
                             e.clientX >= mapRect.left &&
                             e.clientX <= mapRect.right &&
                             e.clientY >= mapRect.top &&
@@ -559,7 +564,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             } else {
                 // Button is already released globally, proceed immediately
                 const mapRect = mapDiv.getBoundingClientRect();
-                const isInBounds = 
+                const isInBounds =
                     e.clientX >= mapRect.left &&
                     e.clientX <= mapRect.right &&
                     e.clientY >= mapRect.top &&
@@ -591,8 +596,8 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             const mouseUpTime = Date.now();
             const timeDiff = mouseUpTime - mouseDownTime;
             const mouseMoveDistance = Math.sqrt(
-                Math.pow(e.clientX - mouseDownPosition.x, 2) + 
-                Math.pow(e.clientY - mouseDownPosition.y, 2)
+                Math.pow(e.clientX - mouseDownPosition.x, 2) +
+                    Math.pow(e.clientY - mouseDownPosition.y, 2)
             );
 
             // Very lenient check: Only ignore if it's a very quick tap (< 30ms and < 2 pixels)
@@ -622,7 +627,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
                     const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / mapRect.height);
                     const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / mapRect.width);
                     const finalPoint: Coordinate = { lat, lng };
-                    
+
                     // Only add if different from last point
                     const lastPoint = currentPathRef.current[currentPathRef.current.length - 1];
                     if (lastPoint) {
@@ -644,7 +649,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             if (currentPathRef.current.length >= 2) {
                 // Smooth and optimize the path
                 let optimizedPath = currentPathRef.current;
-                
+
                 // Remove only truly duplicate points (very small threshold)
                 optimizedPath = optimizedPath.filter((point, index, arr) => {
                     if (index === 0) return true;
@@ -686,23 +691,23 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
                 globalMouseButtonState = true;
             }
         };
-        
+
         const handleGlobalMouseUp = (e: MouseEvent) => {
             if (e.button === 0) {
                 globalMouseButtonState = false;
             }
         };
-        
+
         // Add global listeners to track mouse button state
         document.addEventListener('mousedown', handleGlobalMouseDown, true);
         document.addEventListener('mouseup', handleGlobalMouseUp, true);
-        
+
         // Add event listeners directly to map container (capture phase for better control)
         // Use capture phase with highest priority
         mapDiv.addEventListener('mousedown', handleMouseDown, true);
         mapDiv.addEventListener('mousemove', handleMouseMove, true);
         mapDiv.addEventListener('mouseup', handleMouseUp, true);
-        
+
         // Also listen for contextmenu to prevent right-click interference
         const handleContextMenu = (e: MouseEvent) => {
             if (isDrawingRef.current) {
@@ -712,7 +717,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             }
         };
         mapDiv.addEventListener('contextmenu', handleContextMenu, true);
-        
+
         // Store cleanup function
         const cleanupEventListeners = () => {
             if (mouseUpTimeoutId !== null) {
@@ -747,7 +752,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
                     const minPathLength = 2 / 111320;
                     if (totalPathLength >= minPathLength) {
                         let optimizedPath = currentPathRef.current;
-                        
+
                         optimizedPath = optimizedPath.filter((point, index, arr) => {
                             if (index === 0) return true;
                             const prev = arr[index - 1];
@@ -788,16 +793,7 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
             mapDiv.style.cursor = originalCursor;
             cleanup();
         };
-    }, [
-        map,
-        editMode,
-        isActive,
-        onCreated,
-        strokeColor,
-        strokeWeight,
-        pump,
-        mainPipes,
-    ]);
+    }, [map, editMode, isActive, onCreated, strokeColor, strokeWeight, pump, mainPipes]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -810,4 +806,3 @@ const FreehandPipeDrawingManager: React.FC<FreehandPipeDrawingManagerProps> = ({
 };
 
 export default FreehandPipeDrawingManager;
-

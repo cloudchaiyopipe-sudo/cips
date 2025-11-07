@@ -92,18 +92,18 @@ export const useZoneEditor = ({
             const latRange = bounds.north - bounds.south;
 
             if (lngRange === 0 || latRange === 0) {
-                return { 
-                    lat: (bounds.north + bounds.south) / 2, 
-                    lng: (bounds.east + bounds.west) / 2 
+                return {
+                    lat: (bounds.north + bounds.south) / 2,
+                    lng: (bounds.east + bounds.west) / 2,
                 };
             }
 
             const lat = bounds.north - (pixelY / mapHeight) * latRange;
             const lng = bounds.west + (pixelX / mapWidth) * lngRange;
 
-            return { 
-                lat: Math.max(bounds.south, Math.min(bounds.north, lat)), 
-                lng: Math.max(bounds.west, Math.min(bounds.east, lng)) 
+            return {
+                lat: Math.max(bounds.south, Math.min(bounds.north, lat)),
+                lng: Math.max(bounds.west, Math.min(bounds.east, lng)),
             };
         },
         [calculateMapBounds]
@@ -173,29 +173,30 @@ export const useZoneEditor = ({
             }
 
             let rect: DOMRect | null = null;
-            
+
             // ลองหาจาก target element ก่อน
             if (event.target && (event.target as Element).getBoundingClientRect) {
                 rect = (event.target as Element).getBoundingClientRect();
             }
-            
+
             // ถ้าไม่ได้ ลองหาจาก map container
             if (!rect) {
-                const mapContainer = document.querySelector('.map-container') || 
-                                   document.querySelector('[data-map-container]') ||
-                                   document.querySelector('.google-map-container');
+                const mapContainer =
+                    document.querySelector('.map-container') ||
+                    document.querySelector('[data-map-container]') ||
+                    document.querySelector('.google-map-container');
                 if (mapContainer) {
                     rect = mapContainer.getBoundingClientRect();
                 }
             }
-            
+
             // ถ้ายังไม่ได้ ใช้ viewport
             if (!rect) {
                 rect = {
                     left: 0,
                     top: 0,
                     width: window.innerWidth,
-                    height: window.innerHeight
+                    height: window.innerHeight,
                 } as DOMRect;
             }
 

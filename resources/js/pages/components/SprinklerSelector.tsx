@@ -104,14 +104,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
-
     const getMinValue = (value: any): number => {
         if (Array.isArray(value)) {
             return Math.min(value[0], value[1]);
         }
         return parseFloat(String(value)) || 0;
     };
-
 
     const getMaxValue = (value: any): number => {
         if (Array.isArray(value)) {
@@ -120,14 +118,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
-
     const isValueInRange = (value: any, target: number): boolean => {
         if (Array.isArray(value)) {
             return target >= value[0] && target <= value[1];
         }
         return Math.abs(value - target) < 0.01;
     };
-
 
     useEffect(() => {
         if (
@@ -180,7 +176,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             pressureBar: pressureBar,
                             radiusMeters: radiusMeters,
                         };
-
                     } else {
                         sprinklerConfig = {
                             flowRatePerMinute: 10.0,
@@ -300,7 +295,8 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 sprinklerConfig = {
                     flowRatePerMinute: fieldCropData.irrigationSettings.sprinkler_system?.flow ?? 0,
                     pressureBar: fieldCropData.irrigationSettings.sprinkler_system?.pressure ?? 0,
-                    radiusMeters: fieldCropData.irrigationSettings.sprinkler_system?.coverageRadius ?? 0,
+                    radiusMeters:
+                        fieldCropData.irrigationSettings.sprinkler_system?.coverageRadius ?? 0,
                 };
             } else {
                 sprinklerConfig = {
@@ -324,7 +320,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         pressureBar: pressureBar,
                         radiusMeters: radiusMeters,
                     };
-
                 } else {
                     sprinklerConfig = {
                         flowRatePerMinute: 10.0,
@@ -377,13 +372,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 onSprinklerChange(bestSprinkler);
             }
         }
-    }, [
-        projectMode,
-        selectedSprinkler,
-        analyzedSprinklers,
-        sortedSprinklers,
-        onSprinklerChange,
-    ]);
+    }, [projectMode, selectedSprinkler, analyzedSprinklers, sortedSprinklers, onSprinklerChange]);
 
     const formatRangeValue = (value: any) => {
         if (Array.isArray(value)) return `${value[0]}-${value[1]}`;
@@ -487,9 +476,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                     pressureBar: pressureBar,
                                     radiusMeters: radiusMeters,
                                 };
-
                             } else {
-
                                 sprinklerConfig = {
                                     flowRatePerMinute: 10.0,
                                     pressureBar: 2.0,
@@ -506,9 +493,14 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     } else if (projectMode === 'field-crop') {
                         if (fieldCropData && fieldCropData.irrigationSettings) {
                             sprinklerConfig = {
-                                flowRatePerMinute: fieldCropData.irrigationSettings.sprinkler_system?.flow ?? 0,
-                                pressureBar: fieldCropData.irrigationSettings.sprinkler_system?.pressure ?? 0,
-                                radiusMeters: fieldCropData.irrigationSettings.sprinkler_system?.coverageRadius ?? 0,
+                                flowRatePerMinute:
+                                    fieldCropData.irrigationSettings.sprinkler_system?.flow ?? 0,
+                                pressureBar:
+                                    fieldCropData.irrigationSettings.sprinkler_system?.pressure ??
+                                    0,
+                                radiusMeters:
+                                    fieldCropData.irrigationSettings.sprinkler_system
+                                        ?.coverageRadius ?? 0,
                             };
                         } else {
                             sprinklerConfig = {
@@ -713,7 +705,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </p>
                         </div>
                     )}
-
                 </div>
             )}
 

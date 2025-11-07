@@ -34,19 +34,19 @@ export interface IrrigationPositions {
 }
 
 export interface IrrigationSettings {
-    sprinkler_system?: { 
-        coverageRadius?: number; 
+    sprinkler_system?: {
+        coverageRadius?: number;
         overlap?: number;
         flow?: number;
         pressure?: number;
-        [key: string]: unknown 
+        [key: string]: unknown;
     };
-    pivot?: { 
-        coverageRadius?: number; 
+    pivot?: {
+        coverageRadius?: number;
         overlap?: number;
         flow?: number;
         pressure?: number;
-        [key: string]: unknown 
+        [key: string]: unknown;
     };
     [key: string]: unknown;
 }
@@ -130,7 +130,7 @@ export const FIELD_STYLING = {
         strokeColor: '#22C55E',
         strokeWeight: 2,
         strokeOpacity: 1,
-        zIndex: 1000
+        zIndex: 1000,
     },
     OBSTACLES: {
         water_source: { fill: '#3B82F6', stroke: '#1D4ED8' },
@@ -141,13 +141,13 @@ export const FIELD_STYLING = {
         fillOpacity: 0.4,
         strokeWeight: 2,
         strokeOpacity: 1,
-        zIndex: 1600
+        zIndex: 1600,
     },
     ZONES: {
         fillOpacity: 0.5,
         strokeWeight: 2,
         strokeOpacity: 0.9,
-        zIndex: 1500
+        zIndex: 1500,
     },
     IRRIGATION: {
         sprinklers: { fill: '#EF4444', stroke: '#DC2626' },
@@ -155,22 +155,22 @@ export const FIELD_STYLING = {
         fillOpacity: 0.8,
         strokeWeight: 2,
         strokeOpacity: 1,
-        zIndex: 1700
-    }
+        zIndex: 1700,
+    },
 } as const;
 
 // Default values
 export const DEFAULT_IRRIGATION_COUNTS = {
     sprinkler_system: 0,
-    pivot: 0
+    pivot: 0,
 };
 
 export const DEFAULT_IRRIGATION_POSITIONS: IrrigationPositions = {
     sprinklers: [],
-    pivots: []
+    pivots: [],
 };
 
 export const MAP_CONFIG = {
     DEFAULT_CENTER: { lat: 13.7563, lng: 100.5018 },
-    DEFAULT_ZOOM: 16
+    DEFAULT_ZOOM: 16,
 };

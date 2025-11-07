@@ -31,7 +31,7 @@ export default function NewHome() {
 
     // Always call usePage hook at the top level
     const page = usePage<NewHomeProps>();
-    
+
     // Defensive auth access with error handling
     let auth;
     try {
@@ -136,7 +136,8 @@ export default function NewHome() {
         } catch (error: unknown) {
             console.error('Error purchasing plan:', error);
             const errorMessage =
-                (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Error purchasing plan. Please try again.';
+                (error as { response?: { data?: { message?: string } } })?.response?.data
+                    ?.message || 'Error purchasing plan. Please try again.';
             alert(errorMessage);
         }
     };
@@ -172,7 +173,7 @@ export default function NewHome() {
     // Suppress unused variable warning for t (translation function)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _unused = t;
-    
+
     // Suppress unused function warning for handlePlanSelection
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _unusedHandler = handlePlanSelection;
@@ -195,7 +196,6 @@ export default function NewHome() {
     const handleCloseUpgradeModal = () => {
         setShowUpgradeModal(false);
     };
-
 
     // If user is super user, redirect to fields page
     if (user?.is_super_user) {
@@ -894,12 +894,8 @@ export default function NewHome() {
                             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
                                 <div className="text-center">
                                     <div className="mb-4 text-6xl">🎥</div>
-                                    <p className="font-medium text-gray-300">
-                                        Platform Demo Video
-                                    </p>
-                                    <p className="text-sm text-gray-400">
-                                        Video coming soon
-                                    </p>
+                                    <p className="font-medium text-gray-300">Platform Demo Video</p>
+                                    <p className="text-sm text-gray-400">Video coming soon</p>
                                 </div>
                             </div>
                         </div>

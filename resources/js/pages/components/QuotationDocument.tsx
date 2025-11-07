@@ -48,14 +48,14 @@ interface QuotationDocumentProps {
     projectMode: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenData: any;
     projectData: any;
-    greenhouseData?: any; 
+    greenhouseData?: any;
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: {
         [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any };
     };
-    sprinklerEquipmentSets?: { [zoneId: string]: any }; 
-    connectionEquipments?: { [zoneId: string]: any[] }; 
+    sprinklerEquipmentSets?: { [zoneId: string]: any };
+    connectionEquipments?: { [zoneId: string]: any[] };
     onClose: () => void;
 }
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
@@ -117,13 +117,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (totalItems <= 7) {
                 return totalItems;
             } else if (totalItems === 8) {
-                return 7; 
+                return 7;
             } else if (totalItems === 9) {
-                return 8; 
+                return 8;
             } else if (totalItems === 10) {
-                return 9; 
+                return 9;
             } else {
-                return 10; 
+                return 10;
             }
         } else if (effectivePage === totalPages - imagePageOffset) {
             const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
@@ -136,19 +136,19 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (itemsInThisPage <= 10) {
                 return itemsInThisPage;
             } else if (itemsInThisPage === 11) {
-                return 10; 
+                return 10;
             } else if (itemsInThisPage === 12) {
-                return 11; 
+                return 11;
             } else if (itemsInThisPage === 13) {
-                return 12; 
+                return 12;
             } else {
-                return 13; 
+                return 13;
             }
         }
     };
 
     const calculateTotalPages = (totalItems: number) => {
-        if (totalItems === 0) return hasProjectImagePage ? 1 : 0; 
+        if (totalItems === 0) return hasProjectImagePage ? 1 : 0;
 
         let firstPageItems;
         if (totalItems <= 7) {
@@ -175,13 +175,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 additionalPages += 1;
                 break;
             } else if (remainingItems === 11) {
-                additionalPages += 2; 
+                additionalPages += 2;
                 break;
             } else if (remainingItems === 12) {
-                additionalPages += 2; 
+                additionalPages += 2;
                 break;
             } else if (remainingItems === 13) {
-                additionalPages += 2; 
+                additionalPages += 2;
                 break;
             } else {
                 remainingItems -= 13;
@@ -207,8 +207,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 const categories = await response.json();
                 setEquipmentCategories(categories);
             }
-        } catch (error) {
-        }
+        } catch (error) {}
     };
 
     const loadEquipmentByCategory = async (categoryId: string) => {
@@ -440,7 +439,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         });
                     }
                 }
-
             });
 
             for (const [key, item] of equipmentMap.entries()) {

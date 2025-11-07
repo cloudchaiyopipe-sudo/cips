@@ -195,8 +195,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         }
 
         if (projectMode === 'horticulture') {
-            const horticulturePumpHead = maxPumpHeadForProjectMode !== undefined ? maxPumpHeadForProjectMode : 0;
-            
+            const horticulturePumpHead =
+                maxPumpHeadForProjectMode !== undefined ? maxPumpHeadForProjectMode : 0;
+
             const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
             if (!horticultureSystemDataStr) {
                 return {
@@ -394,7 +395,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         window.addEventListener('storage', handleStorageChange);
 
         let pollCount = 0;
-        const maxPollCount = 10; 
+        const maxPollCount = 10;
 
         const pollInterval = setInterval(() => {
             pollCount++;
@@ -434,7 +435,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         }
 
         let maxFlowLPM = 0;
-        
+
         if (zoneInputs && Object.keys(zoneInputs).length > 0) {
             const zoneFlows = Object.values(zoneInputs).map((zoneInput: any) => {
                 const flowLPM = zoneInput.waterPerTreeLiters || 0;
@@ -447,8 +448,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             const fcData = fieldCropData || getEnhancedFieldCropData();
             if (fcData && fcData.zoneSummaries) {
                 const zoneFlows = Object.values(fcData.zoneSummaries).map((zoneSummary: any) => {
-                    const sprinklerFlow = zoneSummary.sprinklerCount * (fcData.irrigationSettings?.sprinkler_system?.flow || 30);
-                    const pivotFlow = zoneSummary.pivotCount * (fcData.irrigationSettings?.pivot_system?.flow || 50);
+                    const sprinklerFlow =
+                        zoneSummary.sprinklerCount *
+                        (fcData.irrigationSettings?.sprinkler_system?.flow || 30);
+                    const pivotFlow =
+                        zoneSummary.pivotCount *
+                        (fcData.irrigationSettings?.pivot_system?.flow || 50);
                     const totalFlow = sprinklerFlow + pivotFlow;
                     return totalFlow;
                 });
@@ -621,24 +626,33 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         if (projectMode === 'horticulture') {
             // ใช้ค่าเดียวกันกับ CalculationSummary.tsx - horticulture mode
             let horticultureSprinklerHeadLoss = 2.5 * 10; // default fallback
-            
+
             try {
                 const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
                 if (horticultureSystemDataStr) {
                     const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
                     if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
-                        horticultureSprinklerHeadLoss = horticultureSystemData.sprinklerConfig.pressureBar * 10;
+                        horticultureSprinklerHeadLoss =
+                            horticultureSystemData.sprinklerConfig.pressureBar * 10;
                     }
                 }
             } catch (error) {
                 console.error('Error parsing horticulture system data:', error);
             }
-            
-            if (horticultureSprinklerHeadLoss === 2.5 * 10 && selectedSprinkler && selectedSprinkler.pressureBar) {
+
+            if (
+                horticultureSprinklerHeadLoss === 2.5 * 10 &&
+                selectedSprinkler &&
+                selectedSprinkler.pressureBar
+            ) {
                 let pressureBar = 2.5; // default fallback
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    pressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
@@ -646,28 +660,33 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 }
                 horticultureSprinklerHeadLoss = pressureBar * 10;
             }
-            
+
             let horticulturePipeHeadLoss = 0;
             try {
-                const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                const horticulturePipeCalculationsStr = localStorage.getItem(
+                    'horticulture_pipe_calculations'
+                );
                 if (horticulturePipeCalculationsStr) {
-                    const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                    const horticulturePipeCalculations = JSON.parse(
+                        horticulturePipeCalculationsStr
+                    );
                     const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
                     const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
-                    horticulturePipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    horticulturePipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing horticulture pipe calculations:', error);
             }
-            
+
             // ถ้าไม่เจอใน localStorage ให้ใช้ fallback
             if (horticulturePipeHeadLoss === 0) {
                 // ใช้ค่าจาก results หรือ fallback
                 horticulturePipeHeadLoss = results.headLoss?.total || 0;
             }
-            
+
             // เพิ่ม static head (ความสูงจากปั๊มไปจุดสูงสุด) จาก localStorage
             let staticHeadM = 0;
             try {
@@ -681,8 +700,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             } catch (error) {
                 console.warn('Error reading elevation difference from localStorage:', error);
             }
-            
-            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
+
+            const totalPumpHead =
+                horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
             return totalPumpHead;
         } else if (projectMode === 'garden') {
             // สำหรับ garden mode ให้ใช้ cachedMaxPumpHead หรือ fallback
@@ -690,17 +710,20 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         } else if (projectMode === 'greenhouse') {
             // ใช้ค่าเดียวกันกับ CalculationSummary.tsx - greenhouse mode
             try {
-                const greenhousePipeCalculationsStr = localStorage.getItem('greenhouse_pipe_calculations');
+                const greenhousePipeCalculationsStr = localStorage.getItem(
+                    'greenhouse_pipe_calculations'
+                );
                 if (greenhousePipeCalculationsStr) {
                     const pipeCalculations = JSON.parse(greenhousePipeCalculationsStr);
                     const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
                     const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
                     const totalPipeHeadLoss = branchHeadLoss + mainHeadLoss;
-                    
+
                     // หา sprinkler pressure จาก localStorage (เหมือน CalculationSummary.tsx)
                     let sprinklerPressureBar = 2.5; // default
                     try {
-                        const greenhouseSummaryDataStr = localStorage.getItem('greenhouseSummaryData');
+                        const greenhouseSummaryDataStr =
+                            localStorage.getItem('greenhouseSummaryData');
                         if (greenhouseSummaryDataStr) {
                             const greenhouseSummaryData = JSON.parse(greenhouseSummaryDataStr);
                             if (greenhouseSummaryData?.sprinklerPressure) {
@@ -710,19 +733,32 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     } catch (error) {
                         console.error('Error parsing greenhouse summary data:', error);
                     }
-                    
+
                     // ถ้าไม่เจอใน localStorage ให้ใช้ selectedSprinkler
-                    if (sprinklerPressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+                    if (
+                        sprinklerPressureBar === 2.5 &&
+                        selectedSprinkler &&
+                        selectedSprinkler.pressureBar
+                    ) {
                         if (Array.isArray(selectedSprinkler.pressureBar)) {
-                            sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            sprinklerPressureBar =
+                                (selectedSprinkler.pressureBar[0] +
+                                    selectedSprinkler.pressureBar[1]) /
+                                2;
+                        } else if (
+                            typeof selectedSprinkler.pressureBar === 'string' &&
+                            selectedSprinkler.pressureBar.includes('-')
+                        ) {
                             const parts = selectedSprinkler.pressureBar.split('-');
-                            sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                            sprinklerPressureBar =
+                                (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                         } else {
-                            sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                            sprinklerPressureBar = parseFloat(
+                                String(selectedSprinkler.pressureBar)
+                            );
                         }
                     }
-                    
+
                     const sprinklerHeadLoss = sprinklerPressureBar * 10;
                     return totalPipeHeadLoss + sprinklerHeadLoss;
                 }
@@ -733,53 +769,57 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         } else if (projectMode === 'field-crop') {
             // ใช้ค่าเดียวกันกับ CalculationSummary.tsx - field-crop mode
             let fieldCropSprinklerHeadLoss = 0;
-            
+
             if (fieldCropData && fieldCropData.irrigationSettings?.sprinkler_system?.pressure) {
-                fieldCropSprinklerHeadLoss = fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
-            }
-            else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                fieldCropSprinklerHeadLoss =
+                    fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
+            } else if (selectedSprinkler && selectedSprinkler.pressureBar) {
                 let pressureBar = 2.5; // default fallback
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    pressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
                     pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
                 }
                 fieldCropSprinklerHeadLoss = pressureBar * 10;
-            }
-            else {
+            } else {
                 fieldCropSprinklerHeadLoss = 2.5 * 10;
             }
-            
+
             let fieldCropPipeHeadLoss = 0;
             try {
-                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                const fieldCropPipeCalculationsStr = localStorage.getItem(
+                    'field_crop_pipe_calculations'
+                );
                 if (fieldCropPipeCalculationsStr) {
                     const fieldCropPipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
                     const branchHeadLoss = fieldCropPipeCalculations.branch?.headLoss || 0;
                     const secondaryHeadLoss = fieldCropPipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = fieldCropPipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = fieldCropPipeCalculations.emitter?.headLoss || 0;
-                    fieldCropPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    fieldCropPipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing field-crop pipe calculations:', error);
             }
-            
+
             const totalPumpHead = fieldCropPipeHeadLoss + fieldCropSprinklerHeadLoss;
             return totalPumpHead;
         }
         return 0;
     }, [projectMode, cachedMaxPumpHead, fieldCropData, selectedSprinkler, results.headLoss]);
 
-
     const getMaxPumpHeadFromAllZones = () => {
         const basePumpHead = calculatePumpHead();
-        return basePumpHead + (basePumpHead * 0.1); // เพิ่ม safety factor +10%
+        return basePumpHead + basePumpHead * 0.1; // เพิ่ม safety factor +10%
     };
-
 
     const checkPumpAdequacy = useCallback(
         (pump: any) => {
@@ -794,9 +834,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                       : projectMode === 'field-crop'
                         ? fieldCropRequirements.requiredFlowLPM
                         : horticultureReq.requiredFlowLPM;
-            
+
             const baseRequiredHeadM = calculatePumpHead();
-            const requiredHeadM = baseRequiredHeadM + (baseRequiredHeadM * 0.1); // เพิ่ม safety factor +10%
+            const requiredHeadM = baseRequiredHeadM + baseRequiredHeadM * 0.1; // เพิ่ม safety factor +10%
 
             const isFlowAdequate = maxFlow >= requiredFlowLPM;
             const isHeadAdequate = maxHead >= requiredHeadM;
@@ -818,20 +858,20 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             // ให้คะแนนตามความเหมาะสม: 4 = ดีที่สุด, 1 = แย่ที่สุด
             const scoreA =
                 adequacyA.isFlowAdequate && adequacyA.isHeadAdequate
-                    ? 4  // ทั้ง flow และ head เพียงพอ
+                    ? 4 // ทั้ง flow และ head เพียงพอ
                     : adequacyA.isFlowAdequate && !adequacyA.isHeadAdequate
-                      ? 3  // flow เพียงพอ แต่ head ไม่เพียงพอ
+                      ? 3 // flow เพียงพอ แต่ head ไม่เพียงพอ
                       : !adequacyA.isFlowAdequate && adequacyA.isHeadAdequate
-                        ? 2  // head เพียงพอ แต่ flow ไม่เพียงพอ
+                        ? 2 // head เพียงพอ แต่ flow ไม่เพียงพอ
                         : 1; // ทั้ง flow และ head ไม่เพียงพอ
 
             const scoreB =
                 adequacyB.isFlowAdequate && adequacyB.isHeadAdequate
-                    ? 4  // ทั้ง flow และ head เพียงพอ
+                    ? 4 // ทั้ง flow และ head เพียงพอ
                     : adequacyB.isFlowAdequate && !adequacyB.isHeadAdequate
-                      ? 3  // flow เพียงพอ แต่ head ไม่เพียงพอ
+                      ? 3 // flow เพียงพอ แต่ head ไม่เพียงพอ
                       : !adequacyB.isFlowAdequate && adequacyB.isHeadAdequate
-                        ? 2  // head เพียงพอ แต่ flow ไม่เพียงพอ
+                        ? 2 // head เพียงพอ แต่ flow ไม่เพียงพอ
                         : 1; // ทั้ง flow และ head ไม่เพียงพอ
 
             if (scoreA !== scoreB) {
@@ -849,11 +889,11 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         if (analyzedPumps.length > 0 && sortedPumps.length > 0 && !hasAutoSelected) {
             // Auto-select แค่ครั้งแรกเท่านั้น
             // หาปั๊มที่มีทั้ง flow และ head เพียงพอก่อน
-            const fullyAdequatePump = sortedPumps.find(pump => {
+            const fullyAdequatePump = sortedPumps.find((pump) => {
                 const adequacy = checkPumpAdequacy(pump);
                 return adequacy.isFlowAdequate && adequacy.isHeadAdequate;
             });
-            
+
             // ถ้าเจอปั๊มที่เหมาะสมทั้งคู่ ให้เลือกปั๊มนั้น
             if (fullyAdequatePump) {
                 onPumpChange(fullyAdequatePump);
@@ -862,7 +902,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 const bestPump = sortedPumps[0];
                 onPumpChange(bestPump);
             }
-            
+
             // ตั้งค่า flag ว่าได้ auto-select แล้ว
             setHasAutoSelected(true);
         }
@@ -875,7 +915,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     const getSelectionStatus = (pump: any) => {
         if (!pump) return null;
-        
+
         // ตรวจสอบว่า pump นี้เป็น currentPump หรือไม่
         const isCurrentPump = currentPump && pump.id === currentPump.id;
         const isAutoSelected = pump.id === autoSelectedPump?.id;
@@ -924,7 +964,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
         return (
             <div className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300">
-                
                 {t('ไม่มีรูปปั๊ม')}
             </div>
         );
@@ -995,7 +1034,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         <span className="font-bold text-orange-300">
                             {(() => {
                                 const basePumpHead = calculatePumpHead();
-                                return (basePumpHead + (basePumpHead * 0.1)).toFixed(1);
+                                return (basePumpHead + basePumpHead * 0.1).toFixed(1);
                             })()}{' '}
                             {t('เมตร')}
                         </span>
@@ -1020,7 +1059,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     }}
                     options={[
                         { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
-                        ...(() => { 
+                        ...(() => {
                             const pumpOptions = sortedPumps.map((pump) => {
                                 const group = getPumpGrouping(pump);
                                 const isAuto = pump.id === autoSelectedPump?.id; // ตรวจสอบกับ autoSelectedPump
@@ -1064,12 +1103,17 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                     isAutoSelected: isAuto,
                                     isSelected: isSelected,
                                     // แนะนำเฉพาะปั๊มที่ Flow และ Head เพียงพอ
-                                    isRecommended: adequacy.isFlowAdequate && adequacy.isHeadAdequate,
+                                    isRecommended:
+                                        adequacy.isFlowAdequate && adequacy.isHeadAdequate,
                                     // ดี: Flow และ Head เพียงพอ แต่ไม่ใช่ auto-selected
-                                    isGoodChoice: adequacy.isFlowAdequate && adequacy.isHeadAdequate && !isAuto, 
+                                    isGoodChoice:
+                                        adequacy.isFlowAdequate &&
+                                        adequacy.isHeadAdequate &&
+                                        !isAuto,
                                     // พอใช้: Flow หรือ Head เพียงพออย่างใดอย่างหนึ่ง
-                                    isUsable: (adequacy.isFlowAdequate || adequacy.isHeadAdequate) &&
-                                        !(adequacy.isFlowAdequate && adequacy.isHeadAdequate), 
+                                    isUsable:
+                                        (adequacy.isFlowAdequate || adequacy.isHeadAdequate) &&
+                                        !(adequacy.isFlowAdequate && adequacy.isHeadAdequate),
                                     isFlowAdequate: adequacy.isFlowAdequate,
                                     isHeadAdequate: adequacy.isHeadAdequate,
                                     flowRatio: adequacy.flowRatio,
@@ -1084,17 +1128,16 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                         return requiredFlow.toFixed(0);
                                     })()} LPM | Head: ${(pump.maxHead || 0).toFixed(1)}/${(() => {
                                         const baseHead = calculatePumpHead();
-                                        return (baseHead + (baseHead * 0.1)).toFixed(1);
+                                        return (baseHead + baseHead * 0.1).toFixed(1);
                                     })()} ม.`,
                                 };
                             });
 
-                            
                             return pumpOptions.sort((a, b) => {
                                 // 1. ปั๊มที่ถูกเลือกอยู่บนสุด
                                 if (a.isSelected && !b.isSelected) return -1;
                                 if (!a.isSelected && b.isSelected) return 1;
-                                
+
                                 // 2. ปั๊มที่แนะนำ (auto-selected) อยู่บนสุด
                                 if (a.isAutoSelected && !b.isAutoSelected) return -1;
                                 if (!a.isAutoSelected && b.isAutoSelected) return 1;
@@ -1323,7 +1366,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         <img
                             src={modalImage.src}
                             alt={modalImage.alt}
-                            className="max-h-[80vh] max-w-[80vw] rounded-lg shadow-2xl object-contain"
+                            className="max-h-[80vh] max-w-[80vw] rounded-lg object-contain shadow-2xl"
                             style={{ display: 'block', margin: '0 auto' }}
                         />
                         <div className="mt-2 text-center">

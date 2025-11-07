@@ -126,11 +126,11 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const fieldCropSystemDataRef = useRef(fieldCropSystemData);
     fieldCropSystemDataRef.current = fieldCropSystemData;
-    
+
     const inputRef = useRef(input);
     const onInputChangeRef = useRef(onInputChange);
     const activeZoneRef = useRef(activeZone);
-    
+
     useEffect(() => {
         inputRef.current = input;
         onInputChangeRef.current = onInputChange;
@@ -139,13 +139,16 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const isPointInZone = useCallback((point: any, zone: any): boolean => {
         if (!point.lat || !point.lng || !zone.coordinates) return false;
-        
+
         try {
             const zoneCoords = zone.coordinates;
             if (!Array.isArray(zoneCoords) || zoneCoords.length < 3) return false;
-            
-            let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-            
+
+            let minLat = Infinity,
+                maxLat = -Infinity,
+                minLng = Infinity,
+                maxLng = -Infinity;
+
             zoneCoords.forEach((coord: any) => {
                 let lat, lng;
                 if (Array.isArray(coord) && coord.length === 2) {
@@ -156,48 +159,58 @@ const InputForm: React.FC<InputFormProps> = ({
                 } else {
                     return;
                 }
-                
+
                 minLat = Math.min(minLat, lat);
                 maxLat = Math.max(maxLat, lat);
                 minLng = Math.min(minLng, lng);
                 maxLng = Math.max(maxLng, lng);
             });
-            
-            return point.lat >= minLat && point.lat <= maxLat && 
-                   point.lng >= minLng && point.lng <= maxLng;
+
+            return (
+                point.lat >= minLat &&
+                point.lat <= maxLat &&
+                point.lng >= minLng &&
+                point.lng <= maxLng
+            );
         } catch {
             return false;
         }
     }, []);
 
-    const calculateZoneIrrigationCounts = useCallback((zone: any, irrigationPoints: any[]): {
-        sprinkler: number;
-        pivot: number;
-        total: number;
-    } => {
-        if (!irrigationPoints || !Array.isArray(irrigationPoints)) {
-            return { sprinkler: 0, pivot: 0, total: 0 };
-        }
-
-        let sprinklerCount = 0;
-        let pivotCount = 0;
-
-        irrigationPoints.forEach((point) => {
-            if (isPointInZone(point, zone)) {
-                if (point.type === 'sprinkler') {
-                    sprinklerCount++;
-                } else if (point.type === 'pivot') {
-                    pivotCount++;
-                }
+    const calculateZoneIrrigationCounts = useCallback(
+        (
+            zone: any,
+            irrigationPoints: any[]
+        ): {
+            sprinkler: number;
+            pivot: number;
+            total: number;
+        } => {
+            if (!irrigationPoints || !Array.isArray(irrigationPoints)) {
+                return { sprinkler: 0, pivot: 0, total: 0 };
             }
-        });
 
-        return {
-            sprinkler: sprinklerCount,
-            pivot: pivotCount,
-            total: sprinklerCount + pivotCount,
-        };
-    }, [isPointInZone]);
+            let sprinklerCount = 0;
+            let pivotCount = 0;
+
+            irrigationPoints.forEach((point) => {
+                if (isPointInZone(point, zone)) {
+                    if (point.type === 'sprinkler') {
+                        sprinklerCount++;
+                    } else if (point.type === 'pivot') {
+                        pivotCount++;
+                    }
+                }
+            });
+
+            return {
+                sprinkler: sprinklerCount,
+                pivot: pivotCount,
+                total: sprinklerCount + pivotCount,
+            };
+        },
+        [isPointInZone]
+    );
 
     const fieldCropDebugInfo = useMemo(() => {
         return null;
@@ -213,11 +226,17 @@ const InputForm: React.FC<InputFormProps> = ({
             const selections = savedSelections ? JSON.parse(savedSelections) : {};
 
             let activeZoneData: any = null;
-            if (fieldCropSystemDataRef.current.zones && Array.isArray(fieldCropSystemDataRef.current.zones)) {
+            if (
+                fieldCropSystemDataRef.current.zones &&
+                Array.isArray(fieldCropSystemDataRef.current.zones)
+            ) {
                 activeZoneData = fieldCropSystemDataRef.current.zones.find(
                     (z: any) => z.id === activeZoneId
                 );
-            } else if (fieldCropSystemDataRef.current.zones?.info && Array.isArray(fieldCropSystemDataRef.current.zones.info)) {
+            } else if (
+                fieldCropSystemDataRef.current.zones?.info &&
+                Array.isArray(fieldCropSystemDataRef.current.zones.info)
+            ) {
                 activeZoneData = fieldCropSystemDataRef.current.zones.info.find(
                     (z: any) => z.id === activeZoneId
                 );
@@ -263,7 +282,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 }
             });
 
-
             categoriesToLoad.forEach((category) => {
                 fetchConnectionEquipments(category);
             });
@@ -282,21 +300,22 @@ const InputForm: React.FC<InputFormProps> = ({
 
         const equipments: ConnectionPointEquipment[] = [];
 
-        const filteredStats = activeZoneId && activeZoneId.trim() !== ''
-            ? connectionStats.filter((zoneStats) => zoneStats.zoneId === activeZoneId)
-            : [];
+        const filteredStats =
+            activeZoneId && activeZoneId.trim() !== ''
+                ? connectionStats.filter((zoneStats) => zoneStats.zoneId === activeZoneId)
+                : [];
 
         filteredStats.forEach((zoneStats) => {
             const connectionTypes = [
-                { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' }, 
-                { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' }, 
-                { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' }, 
-                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' }, 
+                { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' },
+                { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' },
+                { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' },
+                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' },
                 {
                     key: 'lateralToSubMainIntersection',
                     name: 'ตัดท่อย่อย-เมนรอง',
                     color: '#10B981',
-                }, 
+                },
             ];
 
             connectionTypes.forEach((type) => {
@@ -379,7 +398,7 @@ const InputForm: React.FC<InputFormProps> = ({
             );
             if (index !== -1) {
                 updated[index].category = category;
-                updated[index].equipment = null; 
+                updated[index].equipment = null;
 
                 const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
                 const selections = savedSelections ? JSON.parse(savedSelections) : {};
@@ -430,7 +449,7 @@ const InputForm: React.FC<InputFormProps> = ({
         }
         area = Math.abs(area) / 2;
 
-        const metersPerDegree = 111320; 
+        const metersPerDegree = 111320;
         return area * metersPerDegree * metersPerDegree;
     };
 
@@ -441,7 +460,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
         if (zoneAreaData?.coordinates && zoneAreaData.coordinates.length > 0) {
             const areaInSquareMeters = calculatePolygonArea(zoneAreaData.coordinates);
-            return areaInSquareMeters / 1600; 
+            return areaInSquareMeters / 1600;
         }
 
         return 0;
@@ -499,7 +518,7 @@ const InputForm: React.FC<InputFormProps> = ({
         if (connectionPointEquipments.length > 0) {
             fetchConnectionCategories();
         }
-    }, [connectionPointEquipments.length, fetchConnectionCategories]); 
+    }, [connectionPointEquipments.length, fetchConnectionCategories]);
 
     const onConnectionEquipmentsChangeRef = useRef(onConnectionEquipmentsChange);
     onConnectionEquipmentsChangeRef.current = onConnectionEquipmentsChange;
@@ -605,7 +624,9 @@ const InputForm: React.FC<InputFormProps> = ({
 
                             if (
                                 zoneWaterRequirement > 0 &&
-                                Math.abs(zoneWaterRequirement - inputRef.current.waterPerTreeLiters) > 0.01
+                                Math.abs(
+                                    zoneWaterRequirement - inputRef.current.waterPerTreeLiters
+                                ) > 0.01
                             ) {
                                 onInputChangeRef.current({
                                     ...inputRef.current,
@@ -625,15 +646,15 @@ const InputForm: React.FC<InputFormProps> = ({
                 if (greenhouseSystemDataStr) {
                     const systemData = JSON.parse(greenhouseSystemDataStr);
                     const plotPipeData = systemData.plotPipeData || [];
-                    
+
                     // หา plot ปัจจุบันจาก plotPipeData
                     const currentPlotPipeData = plotPipeData.find(
                         (plot: any) => plot.plotId === activeZone.id
                     );
-                    
+
                     if (currentPlotPipeData && currentPlotPipeData.totalFlowRate) {
                         const totalFlowRate = currentPlotPipeData.totalFlowRate;
-                        
+
                         setGardenWaterRequirement(totalFlowRate);
 
                         if (
@@ -663,10 +684,12 @@ const InputForm: React.FC<InputFormProps> = ({
                         if (currentZone) {
                             // Get irrigation settings from fieldCropData (same as in field-crop-summary.tsx)
                             // Try to get the same irrigationSettingsData that field-crop-summary.tsx uses
-                            const irrigationSettings = (fieldCropData as any).irrigationSettingsData || 
-                                                     fieldCropData.irrigationSettings || 
-                                                     fieldCropIrrigationSettings || {};
-                            
+                            const irrigationSettings =
+                                (fieldCropData as any).irrigationSettingsData ||
+                                fieldCropData.irrigationSettings ||
+                                fieldCropIrrigationSettings ||
+                                {};
+
                             // If still no data, try to get from localStorage directly
                             if (!irrigationSettings.sprinkler_system?.flow) {
                                 try {
@@ -674,7 +697,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                     if (localStorageData) {
                                         const parsed = JSON.parse(localStorageData);
                                         if (parsed.irrigationSettings?.sprinkler_system?.flow) {
-                                            irrigationSettings.sprinkler_system = parsed.irrigationSettings.sprinkler_system;
+                                            irrigationSettings.sprinkler_system =
+                                                parsed.irrigationSettings.sprinkler_system;
                                         }
                                     }
                                 } catch (error) {
@@ -685,18 +709,16 @@ const InputForm: React.FC<InputFormProps> = ({
                                 sprinkler: irrigationSettings.sprinkler_system?.flow || 10, // Use real value from field-crop-summary.tsx, fallback to 10
                                 pivot: irrigationSettings.pivot?.flow || 0,
                             };
-                            
 
                             // Use sprinklerCount and pivotCount from currentZone (they should be correct)
                             const sprinklerCount = currentZone.sprinklerCount || 0;
                             const pivotCount = currentZone.pivotCount || 0;
-                            
-                            
 
                             // Calculate zone total flow (same as in field-crop-summary.tsx)
                             // This matches the calculation: rows.reduce((s, r) => s + r.total, 0)
-                            const zoneTotal = sprinklerCount * flowPerUnit.sprinkler + pivotCount * flowPerUnit.pivot;
-
+                            const zoneTotal =
+                                sprinklerCount * flowPerUnit.sprinkler +
+                                pivotCount * flowPerUnit.pivot;
 
                             if (
                                 zoneTotal > 0 &&
@@ -714,7 +736,14 @@ const InputForm: React.FC<InputFormProps> = ({
                 console.error('Error calculating field crop water requirement:', error);
             }
         }
-    }, [projectMode, activeZone?.id, activeZone, fieldCropSystemData, fieldCropIrrigationSettings, calculateZoneIrrigationCounts]);
+    }, [
+        projectMode,
+        activeZone?.id,
+        activeZone,
+        fieldCropSystemData,
+        fieldCropIrrigationSettings,
+        calculateZoneIrrigationCounts,
+    ]);
 
     // Read elevation difference (tree - pump) computed on results page and set as static head (m)
     useEffect(() => {
@@ -848,16 +877,12 @@ const InputForm: React.FC<InputFormProps> = ({
             estimatedFlowLPM =
                 (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30);
         } else if (projectMode === 'field-crop') {
-
             estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters;
         } else {
-
             estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters;
         }
 
-
         const flowM3s = estimatedFlowLPM / 60000;
-
 
         const diameterM = 0.032;
         const pipeArea = Math.PI * Math.pow(diameterM / 2, 2);
@@ -1055,40 +1080,40 @@ const InputForm: React.FC<InputFormProps> = ({
         );
     };
 
+    const handleSprinklerGroupChange = useCallback(
+        (groupId: string) => {
+            const selectedGroupId = groupId
+                ? isNaN(parseInt(groupId))
+                    ? groupId
+                    : parseInt(groupId)
+                : null;
 
-    const handleSprinklerGroupChange = useCallback((groupId: string) => {
-        const selectedGroupId = groupId
-            ? isNaN(parseInt(groupId))
-                ? groupId
-                : parseInt(groupId)
-            : null;
+            if (selectedGroupId) {
+                const selectedGroup = sprinklerGroups.find((group) => group.id == selectedGroupId);
+                if (selectedGroup && selectedGroup.items && selectedGroup.items.length > 0) {
+                    setSelectedSprinklerItems(selectedGroup.items);
 
-        if (selectedGroupId) {
-            const selectedGroup = sprinklerGroups.find((group) => group.id == selectedGroupId);
-            if (selectedGroup && selectedGroup.items && selectedGroup.items.length > 0) {
-
-                setSelectedSprinklerItems(selectedGroup.items);
-
+                    onInputChangeRef.current({
+                        ...inputRef.current,
+                        sprinklerEquipmentSet: {
+                            selectedGroupId,
+                            selectedItems: selectedGroup.items,
+                        },
+                    });
+                }
+            } else {
+                setSelectedSprinklerItems([]);
                 onInputChangeRef.current({
                     ...inputRef.current,
                     sprinklerEquipmentSet: {
-                        selectedGroupId,
-                        selectedItems: selectedGroup.items,
+                        selectedGroupId: null,
+                        selectedItems: [],
                     },
                 });
             }
-        } else {
-            setSelectedSprinklerItems([]);
-            onInputChangeRef.current({
-                ...inputRef.current,
-                sprinklerEquipmentSet: {
-                    selectedGroupId: null,
-                    selectedItems: [],
-                },
-            });
-        }
-    }, [sprinklerGroups]);
-
+        },
+        [sprinklerGroups]
+    );
 
     const isPipeEquipment = (item: SprinklerSetItem): boolean => {
         const categoryName = item.equipment.category?.name?.toLowerCase();
@@ -1216,7 +1241,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                defaultValue={input.farmSizeRai.toFixed(2)} 
+                                defaultValue={input.farmSizeRai.toFixed(2)}
                                 onChange={(e) => {
                                     const value = parseFloat(e.target.value) || 0;
                                     updateInput('farmSizeRai', value);
@@ -1270,23 +1295,32 @@ const InputForm: React.FC<InputFormProps> = ({
                                 value={(() => {
                                     if (projectMode === 'greenhouse' && activeZone) {
                                         try {
-                                            const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
-                                            
+                                            const greenhouseSystemDataStr =
+                                                localStorage.getItem('greenhouseSystemData');
+
                                             if (greenhouseSystemDataStr) {
-                                                const systemData = JSON.parse(greenhouseSystemDataStr);
+                                                const systemData =
+                                                    JSON.parse(greenhouseSystemDataStr);
                                                 const plotPipeData = systemData.plotPipeData || [];
                                                 // ใช้ utility function ที่ยืดหยุ่น
-                                                const currentPlotPipeData = findMatchingPlotData(activeZone.id, plotPipeData) as any;
-                                                
-                                                
-                                                
-                                                if (currentPlotPipeData && currentPlotPipeData.totalFlowRate) {
+                                                const currentPlotPipeData = findMatchingPlotData(
+                                                    activeZone.id,
+                                                    plotPipeData
+                                                ) as any;
+
+                                                if (
+                                                    currentPlotPipeData &&
+                                                    currentPlotPipeData.totalFlowRate
+                                                ) {
                                                     // ใช้ค่าเดียวกับที่แสดงใน Flow Rate Section ของแต่ละโซน
                                                     return currentPlotPipeData.totalFlowRate;
                                                 }
                                             }
                                         } catch (error) {
-                                            console.error('Error getting greenhouse flow rate:', error);
+                                            console.error(
+                                                'Error getting greenhouse flow rate:',
+                                                error
+                                            );
                                         }
                                     }
                                     return input.waterPerTreeLiters;
@@ -1353,7 +1387,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                     step="0.1"
                                     value={input.staticHeadM}
                                     onChange={(e) => {
-                                        const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                        const value =
+                                            e.target.value === '' ? 0 : parseFloat(e.target.value);
                                         if (!isNaN(value)) {
                                             updateInput('staticHeadM', value);
                                         }
@@ -1526,7 +1561,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
                     <div className="rounded-lg bg-gray-700 p-3">
                         <h4 className="mb-2 text-sm font-medium text-yellow-300">
-                        🟡 {t('ท่อย่อย (Branch Pipe)')}
+                            🟡 {t('ท่อย่อย (Branch Pipe)')}
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1580,12 +1615,12 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
 
-                        {input.longestSecondaryPipeM > 0 ? (
-                    <div className="rounded-lg bg-gray-700 p-3">
+                    {input.longestSecondaryPipeM > 0 ? (
+                        <div className="rounded-lg bg-gray-700 p-3">
                             <>
-                                    <h4 className="mb-2 text-sm font-medium text-purple-300">
+                                <h4 className="mb-2 text-sm font-medium text-purple-300">
                                     🟣 {t('ท่อเมนรอง (Sub Main)')}
-                                    </h4>
+                                </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="mb-1 block text-sm">
@@ -1639,73 +1674,66 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </div>
                                 </div>
                             </>
-                    </div>
+                        </div>
+                    ) : null}
 
-                        ) : (
-                            null
-                        )}
-
-                        {input.longestMainPipeM > 0 ? (
-                            <div className="rounded-lg bg-gray-700 p-3">
-                                <h4 className="mb-2 text-sm font-medium text-red-300">
-                                    🔴 {t('ท่อเมนหลัก (Main)')}
-                                </h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="mb-1 block text-sm">
-                                            {t('ท่อเส้นที่ยาวที่สุด (ม.)')}
-                                        </label>
-                                        <input
-                                            type="number"
-                                            defaultValue={input.longestMainPipeM.toFixed(1)}
-                                            onChange={(e) => {
-                                                const value = parseFloat(e.target.value);
-                                                if (!isNaN(value)) {
-                                                    updateInput('longestMainPipeM', value);
-                                                }
-                                            }}
-                                            onBlur={(e) => {
-                                                const value = e.target.value;
-                                                if (value === '' || isNaN(parseFloat(value))) {
-                                                    e.target.value =
-                                                        input.longestMainPipeM.toFixed(1);
-                                                }
-                                            }}
-                                            step="0.1"
-                                            min="0"
-                                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="mb-1 block text-sm">
-                                            {t('ท่อรวมทั้งหมด (ม.)')}
-                                        </label>
-                                        <input
-                                            type="number"
-                                            defaultValue={input.totalMainPipeM.toFixed(1)}
-                                            onChange={(e) => {
-                                                const value = parseFloat(e.target.value);
-                                                if (!isNaN(value)) {
-                                                    updateInput('totalMainPipeM', value);
-                                                }
-                                            }}
-                                            onBlur={(e) => {
-                                                const value = e.target.value;
-                                                if (value === '' || isNaN(parseFloat(value))) {
-                                                    e.target.value =
-                                                        input.totalMainPipeM.toFixed(1);
-                                                }
-                                            }}
-                                            step="0.1"
-                                            min="0"
-                                            className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
-                                        />
-                                    </div>
+                    {input.longestMainPipeM > 0 ? (
+                        <div className="rounded-lg bg-gray-700 p-3">
+                            <h4 className="mb-2 text-sm font-medium text-red-300">
+                                🔴 {t('ท่อเมนหลัก (Main)')}
+                            </h4>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="mb-1 block text-sm">
+                                        {t('ท่อเส้นที่ยาวที่สุด (ม.)')}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        defaultValue={input.longestMainPipeM.toFixed(1)}
+                                        onChange={(e) => {
+                                            const value = parseFloat(e.target.value);
+                                            if (!isNaN(value)) {
+                                                updateInput('longestMainPipeM', value);
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            const value = e.target.value;
+                                            if (value === '' || isNaN(parseFloat(value))) {
+                                                e.target.value = input.longestMainPipeM.toFixed(1);
+                                            }
+                                        }}
+                                        step="0.1"
+                                        min="0"
+                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-sm">
+                                        {t('ท่อรวมทั้งหมด (ม.)')}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        defaultValue={input.totalMainPipeM.toFixed(1)}
+                                        onChange={(e) => {
+                                            const value = parseFloat(e.target.value);
+                                            if (!isNaN(value)) {
+                                                updateInput('totalMainPipeM', value);
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            const value = e.target.value;
+                                            if (value === '' || isNaN(parseFloat(value))) {
+                                                e.target.value = input.totalMainPipeM.toFixed(1);
+                                            }
+                                        }}
+                                        step="0.1"
+                                        min="0"
+                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-sm text-white focus:border-blue-400"
+                                    />
                                 </div>
                             </div>
-                        ) : (
-                            null
-                        )}
+                        </div>
+                    ) : null}
 
                     {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 ? (
                         <>
@@ -1975,9 +2003,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             })}
                         </div>
                     </div>
-                ) : (
-                    null
-                )}
+                ) : null}
             </div>
 
             {showAddItemModal && (

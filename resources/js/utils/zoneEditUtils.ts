@@ -41,7 +41,7 @@ export const createZoneControlPoints = (zone: IrrigationZone): ZoneControlPoint[
     zone.coordinates.forEach((coord, index) => {
         controlPoints.push({
             id: `control-${zone.id}-${index}`,
-            position: { lat: coord.lat, lng: coord.lng }, 
+            position: { lat: coord.lat, lng: coord.lng },
             index: index,
             isDraggable: true,
         });
@@ -123,7 +123,7 @@ const hasPolygonSelfIntersection = (coordinates: Coordinate[]): boolean => {
         for (let j = i + 1; j < n; j++) {
             const dist = Math.sqrt(
                 Math.pow(coordinates[i].lat - coordinates[j].lat, 2) +
-                Math.pow(coordinates[i].lng - coordinates[j].lng, 2)
+                    Math.pow(coordinates[i].lng - coordinates[j].lng, 2)
             );
             if (dist < 1e-8) {
                 return true;
@@ -158,8 +158,8 @@ const doLineSegmentsIntersect = (
 ): boolean => {
     const orientation = (p: Coordinate, q: Coordinate, r: Coordinate): number => {
         const val = (q.lng - p.lng) * (r.lat - q.lat) - (q.lat - p.lat) * (r.lng - q.lng);
-        if (Math.abs(val) < 1e-10) return 0; 
-        return val > 0 ? 1 : 2; 
+        if (Math.abs(val) < 1e-10) return 0;
+        return val > 0 ? 1 : 2;
     };
 
     const onSegment = (p: Coordinate, q: Coordinate, r: Coordinate): boolean => {
@@ -228,7 +228,7 @@ export const calculateDistanceToControlPoint = (
     point: Coordinate,
     controlPoint: ZoneControlPoint
 ): number => {
-    const R = 6371000; 
+    const R = 6371000;
     const dLat = ((controlPoint.position.lat - point.lat) * Math.PI) / 180;
     const dLng = ((controlPoint.position.lng - point.lng) * Math.PI) / 180;
     const a =
@@ -244,7 +244,7 @@ export const calculateDistanceToControlPoint = (
 export const findNearestControlPoint = (
     clickPoint: Coordinate,
     controlPoints: ZoneControlPoint[],
-    threshold: number = 20 
+    threshold: number = 20
 ): ZoneControlPoint | null => {
     let nearestPoint: ZoneControlPoint | null = null;
     let minDistance = threshold;
@@ -322,14 +322,14 @@ export const updateZoneControlPoints = (
             const newPosition = updatedCoordinates[draggedPointIndex];
             return {
                 id: controlPoint.id,
-                position: { lat: newPosition.lat, lng: newPosition.lng }, 
+                position: { lat: newPosition.lat, lng: newPosition.lng },
                 index: controlPoint.index,
                 isDraggable: controlPoint.isDraggable,
             };
         }
         return {
             id: controlPoint.id,
-            position: { lat: controlPoint.position.lat, lng: controlPoint.position.lng }, 
+            position: { lat: controlPoint.position.lat, lng: controlPoint.position.lng },
             index: controlPoint.index,
             isDraggable: controlPoint.isDraggable,
         };

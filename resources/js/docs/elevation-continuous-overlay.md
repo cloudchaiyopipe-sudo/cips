@@ -8,12 +8,13 @@
 ## การทำงาน
 
 ### 1. **Canvas-based Continuous Overlay**
+
 ```typescript
 class ElevationCanvasOverlay extends google.maps.OverlayView {
     private drawContinuousElevation() {
         // สร้าง grid 2px สำหรับความละเอียดสูง
         const gridSize = 2;
-        
+
         // วาดแต่ละ pixel ตามความสูง
         for (let y = 0; y < gridHeight; y++) {
             for (let x = 0; x < gridWidth; x++) {
@@ -27,6 +28,7 @@ class ElevationCanvasOverlay extends google.maps.OverlayView {
 ```
 
 ### 2. **Smooth Color Gradient**
+
 ```typescript
 private getElevationColor(normalizedElevation: number): string {
     // การไล่สีแบบต่อเนื่องเหมือนตัวอย่าง
@@ -42,6 +44,7 @@ private getElevationColor(normalizedElevation: number): string {
 ```
 
 ### 3. **High-Resolution Grid**
+
 - **Grid Size**: 2px สำหรับความละเอียดสูง
 - **Smooth Interpolation**: การไล่สีแบบต่อเนื่อง
 - **Pixel-level Rendering**: วาดแต่ละ pixel ตามความสูง

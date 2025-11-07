@@ -30,7 +30,7 @@ function FreeFooter() {
     // State
     const [mapLoaded, setMapLoaded] = useState(false);
     const mapRef = useRef<HTMLDivElement>(null);
-    
+
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());
 
@@ -43,10 +43,10 @@ function FreeFooter() {
 
         // Listen for storage changes (when language is changed in other components)
         window.addEventListener('storage', handleLanguageChange);
-        
+
         // Listen for custom language change event
         window.addEventListener('languageChanged', handleLanguageChange);
-        
+
         // Also check on focus (when user comes back to tab)
         window.addEventListener('focus', handleLanguageChange);
 
@@ -89,7 +89,7 @@ function FreeFooter() {
             // Kanok Products location coordinates
             const kanokLocation = {
                 lat: 13.6567, // Bang Bon District, Bangkok - Kanok Products Co., Ltd.
-                lng: 100.3956
+                lng: 100.3956,
             };
 
             const mapOptions: MapOptions = {
@@ -100,19 +100,19 @@ function FreeFooter() {
                     {
                         featureType: 'all',
                         elementType: 'geometry.fill',
-                        stylers: [{ color: '#2d3748' }]
+                        stylers: [{ color: '#2d3748' }],
                     },
                     {
                         featureType: 'water',
                         elementType: 'geometry',
-                        stylers: [{ color: '#1e3a8a' }]
+                        stylers: [{ color: '#1e3a8a' }],
                     },
                     {
                         featureType: 'road',
                         elementType: 'geometry',
-                        stylers: [{ color: '#374151' }]
-                    }
-                ]
+                        stylers: [{ color: '#374151' }],
+                    },
+                ],
             };
 
             const map = new window.google.maps.Map(mapRef.current, mapOptions);
@@ -123,15 +123,17 @@ function FreeFooter() {
                 map: map,
                 title: 'Kanok Products Co., Ltd.',
                 icon: {
-                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                    url:
+                        'data:image/svg+xml;charset=UTF-8,' +
+                        encodeURIComponent(`
                         <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="20" cy="20" r="18" fill="#10b981" stroke="#ffffff" stroke-width="2"/>
                             <text x="20" y="26" text-anchor="middle" fill="white" font-size="16" font-weight="bold">K</text>
                         </svg>
                     `),
                     scaledSize: new window.google.maps.Size(40, 40),
-                    anchor: new window.google.maps.Point(20, 20)
-                }
+                    anchor: new window.google.maps.Point(20, 20),
+                },
             };
 
             new window.google.maps.Marker(markerOptions);
@@ -152,9 +154,7 @@ function FreeFooter() {
                 {/* Kanok Products */}
                 <div className="space-y-1 md:space-y-2">
                     <h3 className="font-bold">{translations.kanokProducts}</h3>
-                    <p className="leading-relaxed text-slate-200">
-                        {translations.kanokAddress}
-                    </p>
+                    <p className="leading-relaxed text-slate-200">{translations.kanokAddress}</p>
                     <p>{translations.kanokPhone}</p>
                     <p className="text-slate-300">{translations.kanokWebsite}</p>
                 </div>
@@ -162,9 +162,7 @@ function FreeFooter() {
                 {/* Chaiyo Pipe & Fitting */}
                 <div className="space-y-1 md:space-y-2">
                     <h3 className="font-bold">{translations.chaiyoPipeFitting}</h3>
-                    <p className="leading-relaxed text-slate-200">
-                        {translations.chaiyoAddress}
-                    </p>
+                    <p className="leading-relaxed text-slate-200">{translations.chaiyoAddress}</p>
                     <p>{translations.chaiyoPhone}</p>
                     <p className="text-slate-300">{translations.chaiyoEmail}</p>
                 </div>
@@ -173,7 +171,7 @@ function FreeFooter() {
             {/* Map Section */}
             <div className="mx-auto mt-6 max-w-4xl overflow-hidden rounded-lg bg-slate-300 md:mt-8">
                 <div className="relative">
-                    <div 
+                    <div
                         ref={mapRef}
                         className="aspect-[2/1] w-full"
                         style={{ minHeight: '200px' }}
@@ -188,7 +186,9 @@ function FreeFooter() {
                                 >
                                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
                                 </svg>
-                                <p className="mt-2 text-sm text-slate-600">{translations.loadingMap}</p>
+                                <p className="mt-2 text-sm text-slate-600">
+                                    {translations.loadingMap}
+                                </p>
                             </div>
                         </div>
                     )}

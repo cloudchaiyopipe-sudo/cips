@@ -107,9 +107,9 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     selectedZone === 'all' ? undefined : selectedZone
                                 )
                             }
-                            className="group w-full md:w-1/2 rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-blue-300 hover:bg-blue-600"
+                            className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-blue-300 hover:bg-blue-600 md:w-1/2"
                         >
-                            <h3 className="mb-4 text-xl font-semibold text-white text-center">
+                            <h3 className="mb-4 text-center text-xl font-semibold text-white">
                                 {t('ลากผ่านท่อ Sub Main') || 'ลากผ่านท่อ Sub Main'}
                             </h3>
                             <div className="flex items-center gap-6">
@@ -117,7 +117,6 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     <FaRoute className="text-green-600" size={32} />
                                 </div>
                                 <div className="flex-1">
-
                                     <p className="text-sm text-gray-300">
                                         {t('ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน') ||
                                             'ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน'}
@@ -134,9 +133,9 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     selectedZone === 'all' ? undefined : selectedZone
                                 )
                             }
-                            className="group w-full md:w-1/2 rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-green-300 hover:bg-green-600"
+                            className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-green-300 hover:bg-green-600 md:w-1/2"
                         >
-                            <h3 className="mb-4 text-xl font-semibold text-white text-center">
+                            <h3 className="mb-4 text-center text-xl font-semibold text-white">
                                 {t('เริ่มจากท่อ Sub Main') || 'เริ่มจากท่อ Sub Main'}
                             </h3>
                             <div className="flex items-center gap-6">
@@ -144,11 +143,11 @@ const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
                                     <FaRoute className="text-yellow-600" size={32} />
                                 </div>
                                 <div className="flex-1">
-
                                     <p className="text-sm text-gray-300">
                                         {t(
                                             'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'
-                                        ) || 'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
+                                        ) ||
+                                            'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
                                     </p>
                                 </div>
                             </div>

@@ -42,9 +42,9 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
         const x = ((coord.lng - mapBounds.west) / lngRange) * mapWidth;
         const y = ((mapBounds.north - coord.lat) / latRange) * mapHeight;
 
-        return { 
-            x: Math.max(0, Math.min(mapWidth, x)), 
-            y: Math.max(0, Math.min(mapHeight, y)) 
+        return {
+            x: Math.max(0, Math.min(mapWidth, x)),
+            y: Math.max(0, Math.min(mapHeight, y)),
         };
     };
 

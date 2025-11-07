@@ -8,6 +8,7 @@
 ## การแก้ไข
 
 ### 1. เปลี่ยนจาก OverlayView เป็น Markers
+
 ```typescript
 // เก่า: ใช้ OverlayView ที่ซับซ้อน
 class ElevationOverlayView extends google.maps.OverlayView {
@@ -17,7 +18,8 @@ class ElevationOverlayView extends google.maps.OverlayView {
 // ใหม่: ใช้ Markers ธรรมดา
 const markers: google.maps.Marker[] = [];
 elevationData.forEach((point, index) => {
-    if (index % 2 === 0) { // Show every 2nd point
+    if (index % 2 === 0) {
+        // Show every 2nd point
         const marker = new google.maps.Marker({
             position: { lat: point.lat, lng: point.lng },
             map: map,
@@ -27,10 +29,10 @@ elevationData.forEach((point, index) => {
                 fillColor: color,
                 fillOpacity: 0.8,
                 strokeColor: '#FFFFFF',
-                strokeWeight: 2
+                strokeWeight: 2,
             },
             title: `ความสูง: ${point.elevation.toFixed(1)} เมตร`,
-            zIndex: 1000
+            zIndex: 1000,
         });
         markers.push(marker);
     }
@@ -38,17 +40,23 @@ elevationData.forEach((point, index) => {
 ```
 
 ### 2. ปรับปรุง Color Mapping
+
 ```typescript
 const getElevationColor = (normalizedElevation: number): string => {
-    if (normalizedElevation < 0.2) return '#0000FF'; // Blue - ต่ำ
-    else if (normalizedElevation < 0.4) return '#00FF00'; // Green - ปานกลาง
-    else if (normalizedElevation < 0.6) return '#FFFF00'; // Yellow - สูงปานกลาง
-    else if (normalizedElevation < 0.8) return '#FFA500'; // Orange - สูง
+    if (normalizedElevation < 0.2)
+        return '#0000FF'; // Blue - ต่ำ
+    else if (normalizedElevation < 0.4)
+        return '#00FF00'; // Green - ปานกลาง
+    else if (normalizedElevation < 0.6)
+        return '#FFFF00'; // Yellow - สูงปานกลาง
+    else if (normalizedElevation < 0.8)
+        return '#FFA500'; // Orange - สูง
     else return '#FF0000'; // Red - สูงมาก
 };
 ```
 
 ### 3. เพิ่ม Debug Information
+
 - Console logging สำหรับ debug
 - แสดงจำนวนจุดข้อมูล
 - แสดงความสูงต่ำสุด/สูงสุด

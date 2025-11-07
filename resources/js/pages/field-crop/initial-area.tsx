@@ -8,12 +8,12 @@ import EnhancedHorticultureSearchControl from '../../components/horticulture/Hor
 import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMeasurementOverlay';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
-import { 
-    FieldCropPageProps, 
-    Coordinate, 
-    PlantPoint, 
-    Obstacle, 
-    FIELD_STYLING 
+import {
+    FieldCropPageProps,
+    Coordinate,
+    PlantPoint,
+    Obstacle,
+    FIELD_STYLING,
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
 
@@ -186,21 +186,26 @@ export default function InitialArea(props: FieldCropPageProps) {
         plantSpacing: plantSpacingData,
     } = props;
     const { t, language } = useLanguage();
-    
+
     // Use standardized field data management
     const { fieldData, updateFieldData } = useFieldData(props);
-    
+
     const [selectedCrops, setSelectedCrops] = useState<string[]>(fieldData.selectedCrops);
     const [completed, setCompleted] = useState<number[]>([]);
     const activeStep = currentStep;
 
     // Map and Area States
     const [map, setMap] = useState<google.maps.Map | null>(null);
-    const [mapCenter, setMapCenter] = useState<[number, number]>([fieldData.mapCenter.lat, fieldData.mapCenter.lng]);
+    const [mapCenter, setMapCenter] = useState<[number, number]>([
+        fieldData.mapCenter.lat,
+        fieldData.mapCenter.lng,
+    ]);
     const [mapZoom, setMapZoom] = useState<number>(fieldData.mapZoom);
     const [mainArea, setMainArea] = useState<Coordinate[]>(fieldData.mainArea);
     const [areaRai, setAreaRai] = useState<number | null>(fieldData.areaRai);
-    const [perimeterMeters, setPerimeterMeters] = useState<number | null>(fieldData.perimeterMeters);
+    const [perimeterMeters, setPerimeterMeters] = useState<number | null>(
+        fieldData.perimeterMeters
+    );
     const [isMainAreaSet, setIsMainAreaSet] = useState<boolean>(fieldData.mainArea.length >= 3);
     const [isEditingMainArea, setIsEditingMainArea] = useState<boolean>(false);
 
@@ -218,9 +223,9 @@ export default function InitialArea(props: FieldCropPageProps) {
     const [isGeneratingPlants, setIsGeneratingPlants] = useState<boolean>(false);
     const [obstacles, setObstacles] = useState<Obstacle[]>(fieldData.obstacles);
     const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
-    const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'building' | 'rock' | 'other'>(
-        'water_source'
-    );
+    const [selectedObstacleType, setSelectedObstacleType] = useState<
+        'water_source' | 'building' | 'rock' | 'other'
+    >('water_source');
     const [selectedObstacleShape, setSelectedObstacleShape] = useState<string>('polygon');
     const [obstacleOverlays, setObstacleOverlays] = useState<google.maps.Polygon[]>([]);
     const [distanceOverlaysByObstacle, setDistanceOverlaysByObstacle] = useState<
@@ -233,7 +238,9 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Spacing States
     const [rowSpacing, setRowSpacing] = useState<Record<string, number>>(fieldData.rowSpacing);
-    const [plantSpacing, setPlantSpacing] = useState<Record<string, number>>(fieldData.plantSpacing);
+    const [plantSpacing, setPlantSpacing] = useState<Record<string, number>>(
+        fieldData.plantSpacing
+    );
     const [tempRowSpacing, setTempRowSpacing] = useState<Record<string, string>>({});
     const [tempPlantSpacing, setTempPlantSpacing] = useState<Record<string, string>>({});
     const [editingRowSpacingForCrop, setEditingRowSpacingForCrop] = useState<string | null>(null);
@@ -247,7 +254,9 @@ export default function InitialArea(props: FieldCropPageProps) {
     const mainAreaRef = useRef<Coordinate[]>(mainArea);
     const obstaclesRef = useRef<Obstacle[]>(obstacles);
     const drawnPolygonRef = useRef<google.maps.Polygon | null>(drawnPolygon);
-    const selectedObstacleTypeRef = useRef<'water_source' | 'building' | 'rock' | 'other'>(selectedObstacleType);
+    const selectedObstacleTypeRef = useRef<'water_source' | 'building' | 'rock' | 'other'>(
+        selectedObstacleType
+    );
     const isDrawingObstacleRef = useRef<boolean>(false);
     const obstacleOverlaysRef = useRef<google.maps.Polygon[]>([]);
     const distanceOverlaysByObstacleRef = useRef<
@@ -549,7 +558,6 @@ export default function InitialArea(props: FieldCropPageProps) {
         }
     }, []);
 
-
     // Enhanced function to clear all existing plant markers immediately
     const clearAllPlantMarkers = useCallback(() => {
         plantPointMarkersRef.current.forEach((marker) => marker.setMap(null));
@@ -844,7 +852,8 @@ export default function InitialArea(props: FieldCropPageProps) {
 
         const newObstacleOverlays: google.maps.Polygon[] = [];
         obstacles.forEach((obstacle) => {
-            const obstacleColors = FIELD_STYLING.OBSTACLES[obstacle.type] || FIELD_STYLING.OBSTACLES.default;
+            const obstacleColors =
+                FIELD_STYLING.OBSTACLES[obstacle.type] || FIELD_STYLING.OBSTACLES.default;
 
             const polygon = new google.maps.Polygon({
                 paths: [obstacle.coordinates],
@@ -943,7 +952,6 @@ export default function InitialArea(props: FieldCropPageProps) {
             const plantSpacingM = cropInfo.plantSpacing / 100;
             const bufferDistance = plantSpacingM * 0.3;
 
-
             const origin = computeCentroid(mainArea);
 
             const mainXY = mainArea.map((p) => toLocalXY(p, origin));
@@ -1038,7 +1046,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                 }
             }
 
-
             return { count: plantCount, rows: actualRows, columns: maxColumnsInAnyRow };
         },
         [
@@ -1104,7 +1111,6 @@ export default function InitialArea(props: FieldCropPageProps) {
                     mapZoom: mapZoom,
                 };
 
-
                 // Use standardized storage approach
                 updateFieldData(fieldDataToSave);
             } catch {
@@ -1166,7 +1172,6 @@ export default function InitialArea(props: FieldCropPageProps) {
             setRealPlantPoints([]); // No actual points stored
             setPlantPoints([]); // No display points
 
-
             // Save to localStorage immediately after calculation
             saveFieldDataToLocalStorage(result.count, result.rows, result.columns);
         } catch (error) {
@@ -1194,7 +1199,6 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Handle plant point generation
     const handleGeneratePlantPoints = useCallback(async () => {
-
         if (!isMainAreaSet || selectedCrops.length === 0) {
             alert(t('Please set main area and select crops first'));
             return;
@@ -1493,18 +1497,21 @@ export default function InitialArea(props: FieldCropPageProps) {
                     if (!stored) return false;
                     const data = JSON.parse(stored);
                     // Check if we have completed project data (zones, pipes, irrigation)
-                    return data.zones?.length > 0 || data.pipes?.length > 0 || 
-                           data.irrigationPositions?.sprinklers?.length > 0 || 
-                           data.irrigationPositions?.pivots?.length > 0;
+                    return (
+                        data.zones?.length > 0 ||
+                        data.pipes?.length > 0 ||
+                        data.irrigationPositions?.sprinklers?.length > 0 ||
+                        data.irrigationPositions?.pivots?.length > 0
+                    );
                 } catch {
                     return false;
                 }
             })();
-            
+
             if (!currentStepParamPresent && !hasCompletedProject) {
                 localStorage.removeItem('fieldCropData');
             }
-            
+
             // Only reset state if we don't have a completed project
             if (!hasCompletedProject) {
                 setMainArea([]);

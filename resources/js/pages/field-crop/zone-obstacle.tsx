@@ -10,13 +10,13 @@ import { getCropByValue } from './choose-crop';
 import { getTranslatedCropByValue } from './choose-crop';
 import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
-import { 
-    FieldCropPageProps, 
+import {
+    FieldCropPageProps,
     FieldData,
-    Coordinate, 
-    Zone, 
+    Coordinate,
+    Zone,
     FIELD_STYLING,
-    MAP_CONFIG
+    MAP_CONFIG,
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
 
@@ -208,7 +208,6 @@ const isPointInOrOnPolygon = (point: Coordinate, polygon: Coordinate[]): boolean
     return false;
 };
 
-
 const computeConvexHull = (points: Coordinate[]): Coordinate[] => {
     if (points.length < 3) return points;
 
@@ -252,7 +251,10 @@ const computeConvexHull = (points: Coordinate[]): Coordinate[] => {
 
 const getObstacleColors = (type: string) => {
     const obstacleType = type as keyof typeof FIELD_STYLING.OBSTACLES;
-    if (obstacleType in FIELD_STYLING.OBSTACLES && typeof FIELD_STYLING.OBSTACLES[obstacleType] === 'object') {
+    if (
+        obstacleType in FIELD_STYLING.OBSTACLES &&
+        typeof FIELD_STYLING.OBSTACLES[obstacleType] === 'object'
+    ) {
         return FIELD_STYLING.OBSTACLES[obstacleType] as { fill: string; stroke: string };
     }
     return FIELD_STYLING.OBSTACLES.default;
@@ -264,7 +266,7 @@ const getObstacleColors = (type: string) => {
 // ==================== MAIN COMPONENT ====================
 export default function ZoneObstacle(props: FieldCropPageProps) {
     const { t, language } = useLanguage();
-    
+
     // Use standardized field data management
     const { fieldData, updateFieldData } = useFieldData(props);
 
@@ -291,7 +293,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             return 6; // Original size
         }
     }, []);
-
 
     // Grouped editing state
     const [zoneEditingState, setZoneEditingState] = useState<ZoneEditingState>({
@@ -385,15 +386,12 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 ALGORITHM_CONFIG.DEFAULT_FLOW_RATES.pivot;
 
             const totalFlow =
-                sprinklersInZone.length * flowPerSprinkler +
-                pivotsInZone.length * flowPerPivot;
+                sprinklersInZone.length * flowPerSprinkler + pivotsInZone.length * flowPerPivot;
 
             return {
                 sprinklerCount: sprinklersInZone.length,
                 pivotCount: pivotsInZone.length,
-                totalEquipmentCount:
-                    sprinklersInZone.length +
-                    pivotsInZone.length,
+                totalEquipmentCount: sprinklersInZone.length + pivotsInZone.length,
                 flowPerSprinkler,
                 flowPerPivot,
                 totalFlow,
@@ -1202,9 +1200,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 setPointReductionMessage(`${removedCount} โซนถูกลบเนื่องจากถูกทับซ้อนทั้งหมด`);
                 setTimeout(() => setPointReductionMessage(null), 4000);
             } else if (modifiedCount > 0) {
-                setPointReductionMessage(
-                    `${modifiedCount} โซนถูกปรับรูปทรงเพื่อลบส่วนที่ทับซ้อน`
-                );
+                setPointReductionMessage(`${modifiedCount} โซนถูกปรับรูปทรงเพื่อลบส่วนที่ทับซ้อน`);
                 setTimeout(() => setPointReductionMessage(null), 4000);
             }
 
@@ -1479,8 +1475,9 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             });
 
             // Only fit bounds if we don't have a valid saved map position
-            const hasValidMapPosition = fieldData.mapCenter && 
-                fieldData.mapCenter.lat !== MAP_CONFIG.DEFAULT_CENTER.lat && 
+            const hasValidMapPosition =
+                fieldData.mapCenter &&
+                fieldData.mapCenter.lat !== MAP_CONFIG.DEFAULT_CENTER.lat &&
                 fieldData.mapCenter.lng !== MAP_CONFIG.DEFAULT_CENTER.lng &&
                 fieldData.mapZoom !== MAP_CONFIG.DEFAULT_ZOOM;
 
@@ -1566,10 +1563,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                     const updatedZones = [...fieldData.zones, newZone];
                     updateFieldData({ zones: updatedZones });
                     setTimeout(() => {
-                        const stats = calculateZoneStats(
-                            updatedZones,
-                            defaultWaterPerZone
-                        );
+                        const stats = calculateZoneStats(updatedZones, defaultWaterPerZone);
                         setZoneStats(stats);
                     }, 0);
 
@@ -1749,7 +1743,9 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
     };
 
     const handleZoneCropChange = (zoneId: string, cropValue: string) => {
-        const updatedZones = fieldData.zones.map((z) => (z.id === zoneId ? { ...z, cropType: cropValue } : z));
+        const updatedZones = fieldData.zones.map((z) =>
+            z.id === zoneId ? { ...z, cropType: cropValue } : z
+        );
         updateFieldData({ zones: updatedZones });
     };
 
@@ -1827,7 +1823,10 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             case 1: // Initial Area
                 return fieldData.mainArea.length >= 3;
             case 2: // Irrigation Generate
-                return fieldData.irrigationPositions.sprinklers.length > 0 || fieldData.irrigationPositions.pivots.length > 0;
+                return (
+                    fieldData.irrigationPositions.sprinklers.length > 0 ||
+                    fieldData.irrigationPositions.pivots.length > 0
+                );
             case 3: // Zone Obstacle
                 return fieldData.zones.some(
                     (zone) =>
@@ -1907,7 +1906,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         }
         // Update completed steps before navigating
         const updatedCompletedSteps = updateCompletedSteps();
-        
+
         const params = {
             crops: fieldData.selectedCrops.join(','),
             currentStep: step.id,
@@ -2044,7 +2043,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                             </div>
                                         </div>
                                     )}
-
 
                                     {/* Smart Zone Generation */}
                                     <div className="rounded-lg border border-white p-4">
@@ -2409,7 +2407,9 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                             zoneEditingState.currentEdit ===
                                                                             zone.id
                                                                                 ? t('Stop editing')
-                                                                                : t('Edit zone shape on map')
+                                                                                : t(
+                                                                                      'Edit zone shape on map'
+                                                                                  )
                                                                         }
                                                                     >
                                                                         {zoneEditingState.currentEdit ===
@@ -2574,7 +2574,9 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                                                             {
                                                                                                 irrigationInfo.totalFlow
                                                                                             }{' '}
-                                                                                            {t('L/min')}
+                                                                                            {t(
+                                                                                                'L/min'
+                                                                                            )}
                                                                                         </span>
                                                                                     </div>
                                                                                 </>
@@ -2766,7 +2768,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                         <span>Lng: {fieldData.mapCenter.lng.toFixed(4)}</span>
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>

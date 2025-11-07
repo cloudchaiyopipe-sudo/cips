@@ -27,10 +27,18 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
     const calculateDistance = (point1: Coordinate, point2: Coordinate): number => {
         // Check for invalid coordinates
-        if (!point1 || !point2 || 
-            typeof point1.lat !== 'number' || typeof point1.lng !== 'number' ||
-            typeof point2.lat !== 'number' || typeof point2.lng !== 'number' ||
-            isNaN(point1.lat) || isNaN(point1.lng) || isNaN(point2.lat) || isNaN(point2.lng)) {
+        if (
+            !point1 ||
+            !point2 ||
+            typeof point1.lat !== 'number' ||
+            typeof point1.lng !== 'number' ||
+            typeof point2.lat !== 'number' ||
+            typeof point2.lng !== 'number' ||
+            isNaN(point1.lat) ||
+            isNaN(point1.lng) ||
+            isNaN(point2.lat) ||
+            isNaN(point2.lng)
+        ) {
             console.warn('Invalid coordinates for distance calculation:', { point1, point2 });
             return 0;
         }
@@ -38,29 +46,35 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
         // Check for coordinates that are too far apart (likely error)
         const latDiff = Math.abs(point2.lat - point1.lat);
         const lngDiff = Math.abs(point2.lng - point1.lng);
-        
+
         if (latDiff > 1 || lngDiff > 1) {
-            console.warn('Coordinates too far apart, likely conversion error:', { 
-                point1, 
-                point2, 
-                latDiff, 
-                lngDiff 
+            console.warn('Coordinates too far apart, likely conversion error:', {
+                point1,
+                point2,
+                latDiff,
+                lngDiff,
             });
             return 0;
         }
 
         // Use Google Maps geometry library for accurate distance calculation
-        if (window.google?.maps?.geometry?.spherical && typeof window.google.maps.geometry.spherical.computeDistanceBetween === 'function') {
+        if (
+            window.google?.maps?.geometry?.spherical &&
+            typeof window.google.maps.geometry.spherical.computeDistanceBetween === 'function'
+        ) {
             try {
                 const latLng1 = new google.maps.LatLng(point1.lat, point1.lng);
                 const latLng2 = new google.maps.LatLng(point2.lat, point2.lng);
-                const distance = google.maps.geometry.spherical.computeDistanceBetween(latLng1, latLng2);
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                    latLng1,
+                    latLng2
+                );
                 return distance;
             } catch (error) {
                 console.warn('Error using Google Maps geometry library:', error);
             }
         }
-        
+
         // Fallback to Haversine formula if Google Maps geometry is not available
         const R = 6371000; // Earth's radius in meters
         const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
@@ -183,13 +197,12 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     if (bounds) {
                         const ne = bounds.getNorthEast();
                         const sw = bounds.getSouthWest();
-                        
+
                         // Calculate lat/lng from screen coordinates (corrected)
                         const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / clickRect.height);
                         const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / clickRect.width);
-                        
-                        const clickedPoint = { lat, lng };
 
+                        const clickedPoint = { lat, lng };
 
                         // Always start new measurement on click
                         setStartPoint(clickedPoint);
@@ -197,7 +210,7 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         setDistance(0);
                         setIsVisible(true);
                         startPointRef.current = clickedPoint;
-                        
+
                         // Clear previous line
                         if (polylineRef.current) {
                             polylineRef.current.setMap(null);
@@ -211,7 +224,8 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             };
 
             const rightClickListener = (e: MouseEvent) => {
-                if (e.button === 2) { // Right click
+                if (e.button === 2) {
+                    // Right click
                     e.preventDefault();
                     setStartPoint(null);
                     setCurrentPoint(null);
@@ -304,7 +318,7 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             // Listen for zoom changes
             const zoomChangeListener = map.addListener('zoom_changed', zoomListener);
             const boundsChangeListener = map.addListener('bounds_changed', zoomListener);
-            
+
             cleanupFunctionsRef.current.push(() => {
                 if (zoomChangeListener) {
                     google.maps.event.removeListener(zoomChangeListener);
@@ -337,11 +351,11 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
                         const ne = bounds.getNorthEast();
                         const sw = bounds.getSouthWest();
-                        
+
                         // Calculate lat/lng from screen coordinates with proper bounds (corrected)
                         const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / moveRect.height);
                         const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / moveRect.width);
-                        
+
                         const currentPoint = { lat, lng };
 
                         if (!startPointRef.current) return;
@@ -351,7 +365,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         // Update state for popup display
                         setCurrentPoint(currentPoint);
                         setDistance(distance);
-
 
                         // Draw line without label
                         const path = [
@@ -427,13 +440,11 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
     return (
         <>
             {isVisible && (
-                <div className="fixed top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 p-4 min-w-[200px]">
-                    <div className="flex items-center justify-between mb-2">
+                <div className="fixed right-4 top-4 z-[1000] min-w-[200px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                    <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                            <h3 className="font-semibold text-gray-800 text-sm">
-                                ระยะทาง
-                            </h3>
+                            <div className="h-3 w-3 animate-pulse rounded-full bg-green-500"></div>
+                            <h3 className="text-sm font-semibold text-gray-800">ระยะทาง</h3>
                         </div>
                         <button
                             onClick={() => {
@@ -447,33 +458,45 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                                     polylineRef.current = null;
                                 }
                             }}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                            className="text-gray-400 transition-colors hover:text-gray-600"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
                             </svg>
                         </button>
                     </div>
-                    
+
                     <div className="space-y-2">
                         <div className="text-2xl font-bold text-green-600">
                             {formatDistance(distance)}
                         </div>
-                        
+
                         {startPoint && currentPoint && (
-                            <div className="text-xs text-gray-500 space-y-1">
+                            <div className="space-y-1 text-xs text-gray-500">
                                 <div>
-                                    <span className="font-medium">จุดเริ่มต้น:</span><br/>
+                                    <span className="font-medium">จุดเริ่มต้น:</span>
+                                    <br />
                                     {startPoint.lat.toFixed(6)}, {startPoint.lng.toFixed(6)}
                                 </div>
                                 <div>
-                                    <span className="font-medium">จุดปัจจุบัน:</span><br/>
+                                    <span className="font-medium">จุดปัจจุบัน:</span>
+                                    <br />
                                     {currentPoint.lat.toFixed(6)}, {currentPoint.lng.toFixed(6)}
                                 </div>
                             </div>
                         )}
-                        
-                        <div className="text-xs text-gray-400 space-y-1">
+
+                        <div className="space-y-1 text-xs text-gray-400">
                             <div>• คลิกซ้าย: เริ่มการวัดระยะทางใหม่</div>
                             <div>• คลิกขวา: หยุดการวัดระยะทาง</div>
                             <div>• Double click: หยุดการวัดระยะทาง</div>

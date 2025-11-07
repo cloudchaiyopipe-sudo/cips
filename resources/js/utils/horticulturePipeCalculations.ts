@@ -161,7 +161,7 @@ export function calculateNewHeadLoss(
 
         const pressureLossResult = findPressureLoss(
             pipeType,
-            actualPressureClass, 
+            actualPressureClass,
             pipeSize,
             bestPipeInfo.waterFlowRate
         );
@@ -229,8 +229,8 @@ export function calculateSprinklerPressure(sprinkler: any): SprinklerPressureInf
         pressureBar = parseFloat(String(sprinkler.pressureBar));
     }
 
-    const headM = pressureBar * 10; 
-    const head20PercentM = headM * 0.2; 
+    const headM = pressureBar * 10;
+    const head20PercentM = headM * 0.2;
 
     return {
         pressureBar,
@@ -448,10 +448,10 @@ export function validatePipeSizeHierarchy(
         }
 
         case 'branch':
-        case 'emitter': {   
+        case 'emitter': {
             const hasLargerPipes = mainSize > 0 || secondarySize > 0;
-            const isSmallerThanLargerPipes = !hasLargerPipes || 
-                currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
+            const isSmallerThanLargerPipes =
+                !hasLargerPipes || currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
             return isSmallerThanLargerPipes;
         }
 
@@ -477,7 +477,7 @@ export function selectBestPipeByHeadLoss(
     bestPipeInfo: BestPipeInfo,
     selectedPipeType: string,
     selectedPipeSizes: SelectedPipeSizes,
-    head20Percent: number,
+    head20Percent: number
 ): any | null {
     if (!availablePipes.length || !bestPipeInfo) {
         return null;
@@ -493,7 +493,7 @@ export function selectBestPipeByHeadLoss(
     }
 
     let targetHeadLossValue: number;
-    let isMaxLimitMode = false; 
+    let isMaxLimitMode = false;
 
     switch (pipeType) {
         case 'main':
