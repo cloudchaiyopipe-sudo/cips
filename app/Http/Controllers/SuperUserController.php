@@ -73,6 +73,7 @@ class SuperUserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'is_super_user' => 'boolean',
+            'role' => 'required|in:user,sales,super_user',
         ]);
 
         $user = User::create([
@@ -80,6 +81,7 @@ class SuperUserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'is_super_user' => $validated['is_super_user'] ?? false,
+            'role' => $validated['role'],
         ]);
 
         return response()->json([
@@ -103,12 +105,14 @@ class SuperUserController extends Controller
             'email' => ['required', 'email', Rule::unique('users')->ignore($userId)],
             'password' => 'nullable|string|min:8',
             'is_super_user' => 'boolean',
+            'role' => 'required|in:user,sales,super_user',
         ]);
 
         $updateData = [
             'name' => $validated['name'],
             'email' => $validated['email'],
             'is_super_user' => $validated['is_super_user'] ?? false,
+            'role' => $validated['role'],
         ];
 
         if (!empty($validated['password'])) {

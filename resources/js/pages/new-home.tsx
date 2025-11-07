@@ -72,7 +72,7 @@ export default function NewHome() {
                     borderColor: 'border-blue-500',
                     icon: '⭐',
                     description: 'Advanced features with more tokens',
-                    price: '500 tokens/month',
+                    price: 'XXX tokens/month',
                     monthlyTokens: 500,
                     dailyTokens: 100,
                 };
@@ -84,7 +84,7 @@ export default function NewHome() {
                     borderColor: 'border-purple-500',
                     icon: '💎',
                     description: 'Premium features with maximum tokens',
-                    price: '1000 tokens/month',
+                    price: 'XXX tokens/month',
                     monthlyTokens: 1000,
                     dailyTokens: 200,
                 };
@@ -352,8 +352,8 @@ export default function NewHome() {
                         {/* Left Content */}
                         <div className="flex flex-col justify-center">
                             <h1 className="mb-6 text-4xl font-bold text-white lg:text-5xl">
-                                Smart Irrigation
-                                <span className="block text-blue-400">Management System</span>
+                                Chaiyo Irrigation
+                                <span className="block text-blue-400">Planning System</span>
                             </h1>
                             <p className="mb-8 text-lg text-gray-300">
                                 Transform your agricultural operations with our advanced irrigation
@@ -365,7 +365,7 @@ export default function NewHome() {
                                     onClick={handleTryFreePlan}
                                     className="rounded-lg bg-orange-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-orange-700"
                                 >
-                                    Try Free Plan
+                                    Mobile Mode
                                 </button>
                                 <button
                                     onClick={handleGoToAccount}
@@ -591,7 +591,7 @@ export default function NewHome() {
                                 onClick={handleTryFreePlan}
                                 className="mt-auto w-full rounded-lg bg-orange-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
                             >
-                                Try Free Plan
+                                Mobile Mode
                             </button>
                         </div>
 
@@ -610,7 +610,7 @@ export default function NewHome() {
                             </div>
 
                             <div className="mb-6">
-                                <div className="text-3xl font-bold text-white">500</div>
+                                <div className="text-3xl font-bold text-white">XXX</div>
                                 <div className="text-sm text-gray-400">tokens per month</div>
                             </div>
 
@@ -629,7 +629,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    500 tokens per month
+                                    XXX tokens per month
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg
@@ -730,7 +730,7 @@ export default function NewHome() {
                             </div>
 
                             <div className="mb-6">
-                                <div className="text-3xl font-bold text-white">1000</div>
+                                <div className="text-3xl font-bold text-white">XXX</div>
                                 <div className="text-sm text-gray-400">tokens per month</div>
                             </div>
 
@@ -969,8 +969,8 @@ export default function NewHome() {
                     months={selectedPlan.months}
                     tokenCost={
                         selectedPlan.type === 'pro'
-                            ? 500 * selectedPlan.months
-                            : 1000 * selectedPlan.months
+                            ? 0 * selectedPlan.months
+                            : 0 * selectedPlan.months
                     }
                     userTokens={user?.tokens || 0}
                     onSubmit={handleTokenPurchase}

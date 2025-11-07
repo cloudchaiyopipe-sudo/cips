@@ -90,22 +90,6 @@ const DeletePipePanel: React.FC<DeletePipePanelProps> = ({
                         </div>
                     </div>
                 )}
-
-                {/* Warning */}
-                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-                    <div className="mb-2 flex items-center gap-2">
-                        <FaInfoCircle className="text-yellow-600" size={14} />
-                        <span className="text-sm font-medium text-yellow-700">
-                            {t('คำเตือน') || 'คำเตือน'}
-                        </span>
-                    </div>
-                    <div className="space-y-1 text-xs text-yellow-700">
-                        <div>
-                            ⚠️ {t('การลบท่อจะไม่สามารถกู้คืนได้') || 'การลบท่อจะไม่สามารถกู้คืนได้'}
-                        </div>
-                        <div>⚠️ {t('ควรบันทึกโปรเจกต์ก่อนลบ') || 'ควรบันทึกโปรเจกต์ก่อนลบ'}</div>
-                    </div>
-                </div>
             </div>
 
             {/* Action Button */}

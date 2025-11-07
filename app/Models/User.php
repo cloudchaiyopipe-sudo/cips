@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'profile_photo_path',
         'is_super_user',
+        'role',
         'tier',
         'tier_expires_at',
         'monthly_tokens',
@@ -76,7 +77,23 @@ class User extends Authenticatable
      */
     public function isSuperUser(): bool
     {
-        return $this->is_super_user;
+        return $this->is_super_user || $this->role === 'super_user';
+    }
+
+    /**
+     * Check if the user is a sales user.
+     */
+    public function isSales(): bool
+    {
+        return $this->role === 'sales';
+    }
+
+    /**
+     * Check if the user is a regular user.
+     */
+    public function isRegularUser(): bool
+    {
+        return $this->role === 'user' || (!$this->is_super_user && !$this->isSales());
     }
 
     /**

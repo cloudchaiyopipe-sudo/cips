@@ -33,7 +33,7 @@ const ContinuousLateralPipePanel: React.FC<ContinuousLateralPipePanelProps> = ({
     if (!isVisible) return null;
 
     return (
-        <div className="fixed left-4 top-[120px] z-[1000] min-w-[320px] max-w-[350px] rounded-lg border border-gray-200 bg-white shadow-xl">
+        <div className="fixed left-4 top-[10px] z-[1000] min-w-[320px] max-w-[350px] rounded-lg border border-gray-200 bg-white shadow-xl">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50 p-4">
                 <div className="flex items-center gap-3">
@@ -203,24 +203,24 @@ const ContinuousLateralPipePanel: React.FC<ContinuousLateralPipePanelProps> = ({
                                     {t('วิธีใช้งาน') || 'วิธีใช้งาน'}
                                 </span>
                             </div>
-                            <div className="space-y-1 text-xs text-yellow-700">
-                                <div>
-                                    •{' '}
-                                    {t('คลิกเริ่มวาดที่ต้นไม้หรือท่อ Submain(สีม่วง)') ||
-                                        'คลิกเริ่มวาดที่ต้นไม้หรือท่อ Submain(สีม่วง)'}
-                                </div>
-                                <div>
-                                    •{' '}
-                                    {t('เมื่อคลิกเริ่มดสร็จ ให้ลากไปตามแนวต้นไม้') ||
-                                        'เมื่อคลิกเริ่มดสร็จ ให้ลากไปตามแนวต้นไม้'}
-                                </div>
-                                <div>
-                                    •{' '}
-                                    {t('คลิกขวาเพื่อเปลี่ยนทิศทางของท่อ') ||
-                                        'คลิกขวาเพื่อเปลี่ยนทิศทางของท่อ'}
-                                </div>
-                                <div>• {t('คลิกซ้ายเพื่อจบการวาด') || 'คลิกซ้ายเพื่อจบการวาด'}</div>
+                        <div className="space-y-1 text-xs text-yellow-700">
+                            <div>
+                                •{' '}
+                                {t('คลิกเริ่มวาดที่ต้นไม้หรือท่อ Submain(สีม่วง)') ||
+                                    'คลิกเริ่มวาดที่ต้นไม้หรือท่อ Submain(สีม่วง)'}
                             </div>
+                            <div>
+                                •{' '}
+                                {t('เมื่อคลิกเริ่มเสร็จ ให้ลากไปตามแนวต้นไม้') ||
+                                    'เมื่อคลิกเริ่มเสร็จ ให้ลากไปตามแนวต้นไม้'}
+                            </div>
+                            <div>
+                                •{' '}
+                                {t('คลิกขวาเพื่อเปลี่ยนทิศทางของท่อ') ||
+                                    'คลิกขวาเพื่อเปลี่ยนทิศทางของท่อ'}
+                            </div>
+                            <div>• {t('คลิกซ้ายเพื่อจบการวาด') || 'คลิกซ้ายเพื่อจบการวาด'}</div>
+                        </div>
                         </div>
                     </div>
 

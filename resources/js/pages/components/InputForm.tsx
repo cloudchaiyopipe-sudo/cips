@@ -7,6 +7,7 @@ import {
     SprinklerSetGroup,
     SprinklerSetItem,
 } from '../types/interfaces';
+import { findMatchingPlotData } from '../../utils/greenhouseZoneMapping';
 import { formatNumber } from '../utils/calculations';
 import { Zone, PlantData } from '../../utils/horticultureUtils';
 import {
@@ -34,8 +35,9 @@ interface InputFormProps {
     };
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
-    greenhouseData?: any; // เพิ่มสำหรับ greenhouse projectMode
-    fieldCropSystemData?: any; // เพิ่มสำหรับ field-crop projectMode
+    greenhouseData?: any;
+    fieldCropSystemData?: any;
+    fieldCropIrrigationSettings?: any;
 }
 
 interface BranchPipeStats {
@@ -61,7 +63,6 @@ const hasCategory = (plantData: PlantData): plantData is PlantDataWithCategory =
     return 'category' in plantData;
 };
 
-// Interface สำหรับอุปกรณ์จุดเชื่อมต่อ
 interface ConnectionPointEquipment {
     zoneId: string;
     zoneName: string;
@@ -78,7 +79,6 @@ interface ConnectionPointEquipment {
     equipment: any | null;
 }
 
-// Interface สำหรับหมวดหมู่อุปกรณ์
 interface EquipmentCategory {
     id: number;
     name: string;
@@ -98,6 +98,7 @@ const InputForm: React.FC<InputFormProps> = ({
     onConnectionEquipmentsChange,
     greenhouseData,
     fieldCropSystemData,
+    fieldCropIrrigationSettings,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
@@ -113,7 +114,6 @@ const InputForm: React.FC<InputFormProps> = ({
     const [selectedEquipment, setSelectedEquipment] = useState<number | null>(null);
     const [loadingEquipments, setLoadingEquipments] = useState(false);
 
-    // State สำหรับจัดการอุปกรณ์จุดเชื่อมต่อ
     const [connectionPointEquipments, setConnectionPointEquipments] = useState<
         ConnectionPointEquipment[]
     >([]);
@@ -124,44 +124,105 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const { t } = useLanguage();
 
-    // ใช้ useRef เพื่อเก็บ reference ของ fieldCropSystemData
     const fieldCropSystemDataRef = useRef(fieldCropSystemData);
     fieldCropSystemDataRef.current = fieldCropSystemData;
+    
+    const inputRef = useRef(input);
+    const onInputChangeRef = useRef(onInputChange);
+    const activeZoneRef = useRef(activeZone);
+    
+    useEffect(() => {
+        inputRef.current = input;
+        onInputChangeRef.current = onInputChange;
+        activeZoneRef.current = activeZone;
+    });
 
-    // Debug logging for field-crop mode (ใช้ useMemo เพื่อป้องกัน infinite loop)
-    const fieldCropDebugInfo = useMemo(() => {
-        if (projectMode === 'field-crop') {
-            console.log('🔍 InputForm field-crop debug:');
-            console.log('- input.totalTrees:', input.totalTrees);
-            console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
-            console.log('- activeZone:', activeZone);
-            console.log('- fieldCropSystemData:', fieldCropSystemData);
+    const isPointInZone = useCallback((point: any, zone: any): boolean => {
+        if (!point.lat || !point.lng || !zone.coordinates) return false;
+        
+        try {
+            const zoneCoords = zone.coordinates;
+            if (!Array.isArray(zoneCoords) || zoneCoords.length < 3) return false;
+            
+            let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+            
+            zoneCoords.forEach((coord: any) => {
+                let lat, lng;
+                if (Array.isArray(coord) && coord.length === 2) {
+                    [lng, lat] = coord;
+                } else if (coord.lat !== undefined && coord.lng !== undefined) {
+                    lat = coord.lat;
+                    lng = coord.lng;
+                } else {
+                    return;
+                }
+                
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+                minLng = Math.min(minLng, lng);
+                maxLng = Math.max(maxLng, lng);
+            });
+            
+            return point.lat >= minLat && point.lat <= maxLat && 
+                   point.lng >= minLng && point.lng <= maxLng;
+        } catch {
+            return false;
         }
-        return null;
-    }, [projectMode, input.totalTrees, input.waterPerTreeLiters, activeZone, fieldCropSystemData]);
+    }, []);
 
-    // ฟังก์ชันสำหรับจัดการข้อมูล connection points
+    const calculateZoneIrrigationCounts = useCallback((zone: any, irrigationPoints: any[]): {
+        sprinkler: number;
+        pivot: number;
+        total: number;
+    } => {
+        if (!irrigationPoints || !Array.isArray(irrigationPoints)) {
+            return { sprinkler: 0, pivot: 0, total: 0 };
+        }
+
+        let sprinklerCount = 0;
+        let pivotCount = 0;
+
+        irrigationPoints.forEach((point) => {
+            if (isPointInZone(point, zone)) {
+                if (point.type === 'sprinkler') {
+                    sprinklerCount++;
+                } else if (point.type === 'pivot') {
+                    pivotCount++;
+                }
+            }
+        });
+
+        return {
+            sprinkler: sprinklerCount,
+            pivot: pivotCount,
+            total: sprinklerCount + pivotCount,
+        };
+    }, [isPointInZone]);
+
+    const fieldCropDebugInfo = useMemo(() => {
+        return null;
+    }, []);
+
     const initializeConnectionPointEquipments = useCallback(() => {
-        console.log('🔍 initializeConnectionPointEquipments called for projectMode:', projectMode);
         const activeZoneId = activeZone?.id;
 
-        // สำหรับ field-crop mode ให้ใช้ fieldCropSystemData
         if (projectMode === 'field-crop' && fieldCropSystemDataRef.current) {
-            console.log('🔍 Field-crop mode: fieldCropSystemData found');
             const equipments: ConnectionPointEquipment[] = [];
 
-            // โหลดการเลือกอุปกรณ์ที่เก็บไว้
             const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
             const selections = savedSelections ? JSON.parse(savedSelections) : {};
 
-            // หาโซนที่ active
-            const activeZoneData = fieldCropSystemDataRef.current.zones?.find(
-                (z: any) => z.id === activeZoneId
-            );
-            console.log('🔍 Active zone data:', activeZoneData);
-            console.log('🔍 Active zone connection points:', activeZoneData?.connectionPoints);
+            let activeZoneData: any = null;
+            if (fieldCropSystemDataRef.current.zones && Array.isArray(fieldCropSystemDataRef.current.zones)) {
+                activeZoneData = fieldCropSystemDataRef.current.zones.find(
+                    (z: any) => z.id === activeZoneId
+                );
+            } else if (fieldCropSystemDataRef.current.zones?.info && Array.isArray(fieldCropSystemDataRef.current.zones.info)) {
+                activeZoneData = fieldCropSystemDataRef.current.zones.info.find(
+                    (z: any) => z.id === activeZoneId
+                );
+            }
             if (activeZoneData && activeZoneData.connectionPoints) {
-                // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ
                 const connectionTypes = [
                     { key: 'junction', name: 'จุดเชื่อมต่อ', color: '#FFD700' },
                     { key: 'crossing', name: 'จุดข้ามท่อ', color: '#4CAF50' },
@@ -193,10 +254,8 @@ const InputForm: React.FC<InputFormProps> = ({
                 });
             }
 
-            console.log('🔍 Field-crop equipments created:', equipments);
             setConnectionPointEquipments(equipments);
 
-            // Load equipment options for any category that already has selected equipment
             const categoriesToLoad = new Set<string>();
             equipments.forEach((eq) => {
                 if (eq.category && eq.equipment) {
@@ -204,48 +263,40 @@ const InputForm: React.FC<InputFormProps> = ({
                 }
             });
 
-            console.log('🔍 Categories to load for field-crop:', Array.from(categoriesToLoad));
 
-            // Load equipment for each category that has selected equipment
             categoriesToLoad.forEach((category) => {
                 fetchConnectionEquipments(category);
             });
 
             return;
         } else if (projectMode === 'field-crop') {
-            console.log('❌ Field-crop mode but no fieldCropSystemData or no active zone');
-            console.log('- fieldCropSystemDataRef.current:', fieldCropSystemDataRef.current);
-            console.log('- activeZoneId:', activeZoneId);
+            return;
         }
 
-        // สำหรับ horticulture mode (เดิม)
         if (!connectionStats || connectionStats.length === 0) {
             return;
         }
 
-        // โหลดการเลือกอุปกรณ์ที่เก็บไว้
         const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
         const selections = savedSelections ? JSON.parse(savedSelections) : {};
 
         const equipments: ConnectionPointEquipment[] = [];
 
-        // กรองเฉพาะโซนที่ active
-        const filteredStats = activeZoneId
+        const filteredStats = activeZoneId && activeZoneId.trim() !== ''
             ? connectionStats.filter((zoneStats) => zoneStats.zoneId === activeZoneId)
-            : connectionStats;
+            : [];
 
         filteredStats.forEach((zoneStats) => {
-            // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ (แก้ไขให้ตรงกับการแสดงผลในแผนที่)
             const connectionTypes = [
-                { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' }, // สีแดง - endToEndConnections
-                { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' }, // สีน้ำเงิน - mainToSubMainConnections + subMainToMainIntersections
-                { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' }, // สีม่วง - midConnections
-                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' }, // สีเหลือง - subMainToLateralConnections (ลบสีเขียวออกแล้ว)
+                { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' }, 
+                { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' }, 
+                { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' }, 
+                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' }, 
                 {
                     key: 'lateralToSubMainIntersection',
                     name: 'ตัดท่อย่อย-เมนรอง',
                     color: '#10B981',
-                }, // สีเขียว - lateralToSubMainIntersections
+                }, 
             ];
 
             connectionTypes.forEach((type) => {
@@ -271,7 +322,6 @@ const InputForm: React.FC<InputFormProps> = ({
 
         setConnectionPointEquipments(equipments);
 
-        // Load equipment options for any category that already has selected equipment
         const categoriesToLoad = new Set<string>();
         equipments.forEach((eq) => {
             if (eq.category && eq.equipment) {
@@ -279,20 +329,17 @@ const InputForm: React.FC<InputFormProps> = ({
             }
         });
 
-        // Load equipment for each category that has selected equipment
         categoriesToLoad.forEach((category) => {
             fetchConnectionEquipments(category);
         });
     }, [connectionStats, activeZone?.id, projectMode]);
 
-    // ฟังก์ชันโหลดหมวดหมู่อุปกรณ์ connection points
     const fetchConnectionCategories = useCallback(async () => {
         setLoadingConnectionCategories(true);
         try {
             const response = await fetch('/api/equipment-categories');
             if (response.ok) {
                 const categories = await response.json();
-                // กรองเฉพาะหมวดหมู่ที่ต้องการ
                 const filteredCategories = categories.filter(
                     (cat: any) =>
                         cat.name === 'agricultural_fittings' || cat.name === 'pvc_fittings'
@@ -306,7 +353,6 @@ const InputForm: React.FC<InputFormProps> = ({
         }
     }, []);
 
-    // ฟังก์ชันโหลดอุปกรณ์ในหมวดหมู่
     const fetchConnectionEquipments = async (categoryName: string) => {
         setLoadingConnectionEquipments(true);
         try {
@@ -322,7 +368,6 @@ const InputForm: React.FC<InputFormProps> = ({
         }
     };
 
-    // ฟังก์ชันอัปเดตหมวดหมู่ของอุปกรณ์
     const updateConnectionEquipmentCategory = (
         equipmentId: string,
         category: 'agricultural_fittings' | 'pvc_fittings'
@@ -334,9 +379,8 @@ const InputForm: React.FC<InputFormProps> = ({
             );
             if (index !== -1) {
                 updated[index].category = category;
-                updated[index].equipment = null; // รีเซ็ตอุปกรณ์เมื่อเปลี่ยนหมวดหมู่
+                updated[index].equipment = null; 
 
-                // บันทึกการเลือกหมวดหมู่
                 const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
                 const selections = savedSelections ? JSON.parse(savedSelections) : {};
                 selections[equipmentId] = { category, equipment: null };
@@ -348,11 +392,9 @@ const InputForm: React.FC<InputFormProps> = ({
             return updated;
         });
 
-        // โหลดอุปกรณ์ในหมวดหมู่ใหม่
         fetchConnectionEquipments(category);
     };
 
-    // ฟังก์ชันอัปเดตอุปกรณ์ที่เลือก
     const updateConnectionEquipment = (equipmentId: string, equipment: any) => {
         setConnectionPointEquipments((prev) => {
             const updated = [...prev];
@@ -362,7 +404,6 @@ const InputForm: React.FC<InputFormProps> = ({
             if (index !== -1) {
                 updated[index].equipment = equipment;
 
-                // บันทึกการเลือกอุปกรณ์
                 const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
                 const selections = savedSelections ? JSON.parse(savedSelections) : {};
                 if (!selections[equipmentId]) {
@@ -378,7 +419,6 @@ const InputForm: React.FC<InputFormProps> = ({
         });
     };
 
-    // ฟังก์ชันคำนวณพื้นที่โซนจาก coordinates (นำมาจาก HorticultureResultsPage.tsx)
     const calculatePolygonArea = (coords: { lat: number; lng: number }[]): number => {
         if (!coords || coords.length < 3) return 0;
 
@@ -390,12 +430,10 @@ const InputForm: React.FC<InputFormProps> = ({
         }
         area = Math.abs(area) / 2;
 
-        // แปลงจากองศา² เป็นตารางเมตร (โดยประมาณ)
-        const metersPerDegree = 111320; // ประมาณการ
+        const metersPerDegree = 111320; 
         return area * metersPerDegree * metersPerDegree;
     };
 
-    // ฟังก์ชันได้รับพื้นที่โซนในไร่
     const getZoneAreaInRai = (): number => {
         if (zoneAreaData?.areaInRai && zoneAreaData.areaInRai > 0) {
             return zoneAreaData.areaInRai;
@@ -403,7 +441,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
         if (zoneAreaData?.coordinates && zoneAreaData.coordinates.length > 0) {
             const areaInSquareMeters = calculatePolygonArea(zoneAreaData.coordinates);
-            return areaInSquareMeters / 1600; // แปลงเป็นไร่
+            return areaInSquareMeters / 1600; 
         }
 
         return 0;
@@ -453,30 +491,25 @@ const InputForm: React.FC<InputFormProps> = ({
         fetchPipeData();
     }, []);
 
-    // Initialize connection point equipments when connectionStats or activeZone changes
     useEffect(() => {
         initializeConnectionPointEquipments();
     }, [connectionStats, activeZone?.id, projectMode, initializeConnectionPointEquipments]);
 
-    // Load connection equipment categories (แยกออกจาก connection equipments)
     useEffect(() => {
         if (connectionPointEquipments.length > 0) {
             fetchConnectionCategories();
         }
-    }, [connectionPointEquipments.length, fetchConnectionCategories]); // เพิ่ม fetchConnectionCategories ใน dependencies
+    }, [connectionPointEquipments.length, fetchConnectionCategories]); 
 
-    // ใช้ useRef เพื่อเก็บ reference ของ callback function
     const onConnectionEquipmentsChangeRef = useRef(onConnectionEquipmentsChange);
     onConnectionEquipmentsChangeRef.current = onConnectionEquipmentsChange;
 
-    // ส่งข้อมูล connection equipments ไปยัง parent component (แยก useEffect)
     useEffect(() => {
         if (onConnectionEquipmentsChangeRef.current) {
             onConnectionEquipmentsChangeRef.current(connectionPointEquipments);
         }
     }, [connectionPointEquipments]);
 
-    // Load sprinkler equipment groups from SprinklerSET
     useEffect(() => {
         const fetchSprinklerGroups = async () => {
             setLoadingSprinklerGroups(true);
@@ -485,7 +518,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 if (response.ok) {
                     const data = await response.json();
                     if (Array.isArray(data) && data.length > 0) {
-                        // Get all groups from the first SprinklerSET (assuming there's only one)
                         const sprinklerSet = data[0];
                         if (sprinklerSet && sprinklerSet.groups) {
                             setSprinklerGroups(sprinklerSet.groups);
@@ -499,7 +531,6 @@ const InputForm: React.FC<InputFormProps> = ({
                     setSprinklerGroups([]);
                 }
             } catch (error) {
-                console.error('Error loading sprinkler groups:', error);
                 setSprinklerGroups([]);
             } finally {
                 setLoadingSprinklerGroups(false);
@@ -508,16 +539,14 @@ const InputForm: React.FC<InputFormProps> = ({
         fetchSprinklerGroups();
     }, []);
 
-    // Sync sprinkler equipment sets when activeZone changes
     useEffect(() => {
-        if (activeZone && input.sprinklerEquipmentSet) {
-            setSelectedSprinklerItems(input.sprinklerEquipmentSet.selectedItems || []);
+        if (activeZoneRef.current && inputRef.current.sprinklerEquipmentSet) {
+            setSelectedSprinklerItems(inputRef.current.sprinklerEquipmentSet.selectedItems || []);
         } else {
             setSelectedSprinklerItems([]);
         }
-    }, [activeZone, input.sprinklerEquipmentSet]);
+    }, [activeZone?.id, input.sprinklerEquipmentSet?.selectedGroupId]);
 
-    // Load categories for adding new items
     useEffect(() => {
         const fetchCategories = async () => {
             try {
@@ -529,14 +558,12 @@ const InputForm: React.FC<InputFormProps> = ({
                     setCategories([]);
                 }
             } catch (error) {
-                console.error('Error loading categories:', error);
                 setCategories([]);
             }
         };
         fetchCategories();
     }, []);
 
-    // Load equipments by category
     const fetchEquipmentsByCategory = async (categoryId: number) => {
         setLoadingEquipments(true);
         try {
@@ -545,18 +572,15 @@ const InputForm: React.FC<InputFormProps> = ({
                 const data = await response.json();
                 setEquipments(Array.isArray(data) ? data : []);
             } else {
-                console.error('Failed to fetch equipments, status:', response.status);
                 setEquipments([]);
             }
         } catch (error) {
-            console.error('Error loading equipments:', error);
             setEquipments([]);
         } finally {
             setLoadingEquipments(false);
         }
     };
 
-    // Garden mode: ดึงข้อมูล water requirement จาก garden statistics (แยกแต่ละโซน)
     useEffect(() => {
         if (projectMode === 'garden' && activeZone) {
             try {
@@ -564,7 +588,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 if (gardenStatsStr) {
                     const gardenStats = JSON.parse(gardenStatsStr);
                     if (gardenStats.zones && gardenStats.zones.length > 0) {
-                        // หาข้อมูลของโซนปัจจุบัน
                         const currentZoneStats = gardenStats.zones.find(
                             (zone: any) => zone.zoneId === activeZone.id
                         );
@@ -580,13 +603,12 @@ const InputForm: React.FC<InputFormProps> = ({
 
                             setGardenWaterRequirement(zoneWaterRequirement);
 
-                            // Update input.waterPerTreeLiters with zone-specific value (only if significantly different)
                             if (
                                 zoneWaterRequirement > 0 &&
-                                Math.abs(zoneWaterRequirement - input.waterPerTreeLiters) > 0.01
+                                Math.abs(zoneWaterRequirement - inputRef.current.waterPerTreeLiters) > 0.01
                             ) {
-                                onInputChange({
-                                    ...input,
+                                onInputChangeRef.current({
+                                    ...inputRef.current,
                                     waterPerTreeLiters: zoneWaterRequirement,
                                 });
                             }
@@ -594,10 +616,123 @@ const InputForm: React.FC<InputFormProps> = ({
                     }
                 }
             } catch (error) {
-                console.error('Error loading garden zone statistics:', error);
+                console.error('Error calculating garden water requirement:', error);
+            }
+        } else if (projectMode === 'greenhouse' && activeZone) {
+            try {
+                // ดึงข้อมูลจาก localStorage ที่เก็บไว้จาก green-house-summary.tsx
+                const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
+                if (greenhouseSystemDataStr) {
+                    const systemData = JSON.parse(greenhouseSystemDataStr);
+                    const plotPipeData = systemData.plotPipeData || [];
+                    
+                    // หา plot ปัจจุบันจาก plotPipeData
+                    const currentPlotPipeData = plotPipeData.find(
+                        (plot: any) => plot.plotId === activeZone.id
+                    );
+                    
+                    if (currentPlotPipeData && currentPlotPipeData.totalFlowRate) {
+                        const totalFlowRate = currentPlotPipeData.totalFlowRate;
+                        
+                        setGardenWaterRequirement(totalFlowRate);
+
+                        if (
+                            totalFlowRate > 0 &&
+                            Math.abs(totalFlowRate - inputRef.current.waterPerTreeLiters) > 0.01
+                        ) {
+                            onInputChangeRef.current({
+                                ...inputRef.current,
+                                waterPerTreeLiters: totalFlowRate,
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing greenhouse data:', error);
+            }
+        } else if (projectMode === 'field-crop' && activeZone) {
+            try {
+                const fieldCropDataStr = localStorage.getItem('fieldCropData');
+                if (fieldCropDataStr) {
+                    const fieldCropData = JSON.parse(fieldCropDataStr);
+                    if (fieldCropData.zones?.info && Array.isArray(fieldCropData.zones.info)) {
+                        const currentZone = fieldCropData.zones.info.find(
+                            (zone: any) => zone.id === activeZone.id
+                        );
+
+                        if (currentZone) {
+                            // Get irrigation settings from fieldCropData (same as in field-crop-summary.tsx)
+                            // Try to get the same irrigationSettingsData that field-crop-summary.tsx uses
+                            const irrigationSettings = (fieldCropData as any).irrigationSettingsData || 
+                                                     fieldCropData.irrigationSettings || 
+                                                     fieldCropIrrigationSettings || {};
+                            
+                            // If still no data, try to get from localStorage directly
+                            if (!irrigationSettings.sprinkler_system?.flow) {
+                                try {
+                                    const localStorageData = localStorage.getItem('fieldCropData');
+                                    if (localStorageData) {
+                                        const parsed = JSON.parse(localStorageData);
+                                        if (parsed.irrigationSettings?.sprinkler_system?.flow) {
+                                            irrigationSettings.sprinkler_system = parsed.irrigationSettings.sprinkler_system;
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('Error parsing fieldCropData:', error);
+                                }
+                            }
+                            const flowPerUnit = {
+                                sprinkler: irrigationSettings.sprinkler_system?.flow || 10, // Use real value from field-crop-summary.tsx, fallback to 10
+                                pivot: irrigationSettings.pivot?.flow || 0,
+                            };
+                            
+
+                            // Use sprinklerCount and pivotCount from currentZone (they should be correct)
+                            const sprinklerCount = currentZone.sprinklerCount || 0;
+                            const pivotCount = currentZone.pivotCount || 0;
+                            
+                            
+
+                            // Calculate zone total flow (same as in field-crop-summary.tsx)
+                            // This matches the calculation: rows.reduce((s, r) => s + r.total, 0)
+                            const zoneTotal = sprinklerCount * flowPerUnit.sprinkler + pivotCount * flowPerUnit.pivot;
+
+
+                            if (
+                                zoneTotal > 0 &&
+                                Math.abs(zoneTotal - inputRef.current.waterPerTreeLiters) > 0.01
+                            ) {
+                                onInputChangeRef.current({
+                                    ...inputRef.current,
+                                    waterPerTreeLiters: zoneTotal,
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error calculating field crop water requirement:', error);
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectMode, activeZone?.id, activeZone, fieldCropSystemData, fieldCropIrrigationSettings, calculateZoneIrrigationCounts]);
+
+    // Read elevation difference (tree - pump) computed on results page and set as static head (m)
+    useEffect(() => {
+        if (projectMode !== 'horticulture') return;
+        try {
+            const stored = localStorage.getItem('horticulture_elevation_diff_m');
+            if (stored !== null) {
+                const value = parseFloat(stored);
+                if (isFinite(value)) {
+                    if (Math.abs(value - inputRef.current.staticHeadM) > 0.01) {
+                        onInputChangeRef.current({
+                            ...inputRef.current,
+                            staticHeadM: value,
+                        });
+                    }
+                }
+            }
+        } catch {}
     }, [projectMode, activeZone?.id]);
 
     const isMultiZone = input.numberOfZones > 1;
@@ -625,6 +760,9 @@ const InputForm: React.FC<InputFormProps> = ({
                 validatedValue = Math.max(1, Math.min(300, value));
                 break;
             case 'staticHeadM':
+                // อนุญาตให้เป็นค่าติดลบได้ (สำหรับ elevation difference)
+                validatedValue = value;
+                break;
             case 'pressureHeadM':
                 validatedValue = Math.max(0, value);
                 break;
@@ -651,8 +789,17 @@ const InputForm: React.FC<InputFormProps> = ({
             ? formatNumber(validatedValue, 3)
             : Math.round(validatedValue);
 
-        onInputChange({
-            ...input,
+        // บันทึกค่า staticHeadM ที่แก้ไขกลับไปใน localStorage เพื่อให้ค่าคงที่ทุกโซน
+        if (field === 'staticHeadM' && projectMode === 'horticulture') {
+            try {
+                localStorage.setItem('horticulture_elevation_diff_m', String(formattedValue));
+            } catch (error) {
+                console.warn('Error saving elevation difference to localStorage:', error);
+            }
+        }
+
+        onInputChangeRef.current({
+            ...inputRef.current,
             [field]: formattedValue,
         });
     };
@@ -697,24 +844,21 @@ const InputForm: React.FC<InputFormProps> = ({
     const calculateEstimatedVelocity = (input: IrrigationInput): number => {
         let estimatedFlowLPM: number;
 
-        // Fix: Correct calculation for different project modes
         if (projectMode === 'greenhouse' || projectMode === 'garden') {
-            // waterPerTreeLiters is per irrigation session, convert to LPM
             estimatedFlowLPM =
                 (input.totalTrees * input.waterPerTreeLiters) / (input.irrigationTimeMinutes || 30);
         } else if (projectMode === 'field-crop') {
-            // For field crop, waterPerTreeLiters should be flow rate per minute
-            // If it's per session, need to convert to per minute
-            estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters; // Assuming it's already LPM per tree
+
+            estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters;
         } else {
-            // Horticulture mode: waterPerTreeLiters is now in LPM (liters per minute)
+
             estimatedFlowLPM = input.totalTrees * input.waterPerTreeLiters;
         }
 
-        // Convert LPM to m³/s for velocity calculation
+
         const flowM3s = estimatedFlowLPM / 60000;
 
-        // Use a standard 32mm pipe diameter for estimation
+
         const diameterM = 0.032;
         const pipeArea = Math.PI * Math.pow(diameterM / 2, 2);
 
@@ -753,7 +897,6 @@ const InputForm: React.FC<InputFormProps> = ({
                 sprinklerName: selectedSprinkler.productCode,
             };
         } catch (error) {
-            console.error('Error calculating sprinkler pressure:', error);
             return null;
         }
     };
@@ -817,7 +960,6 @@ const InputForm: React.FC<InputFormProps> = ({
 
             return zoneStats;
         } catch (error) {
-            console.error('Error calculating branch pipe stats:', error);
             return null;
         }
     };
@@ -858,14 +1000,12 @@ const InputForm: React.FC<InputFormProps> = ({
             case 'field-crop':
             case 'horticulture':
             default:
-                return t('ไร่'); // Fix: All project modes now use rai consistently
+                return t('ไร่');
         }
     };
 
     const getAreaConversionFactor = () => {
-        // Fix: All project modes now store farmSizeRai in rai units
-        // No conversion needed for display - all are already in rai
-        return 1; // Always 1 since farmSizeRai is now consistently in rai
+        return 1;
     };
 
     const getWaterSourceLabel = () => {
@@ -884,9 +1024,9 @@ const InputForm: React.FC<InputFormProps> = ({
     const getWaterPerItemLabel = () => {
         switch (projectMode) {
             case 'field-crop':
-                return t('น้ำต่อหัวฉีด (ลิตร/นาที)');
+                return t('ต้องการน้ำ (ลิตร/นาที)');
             case 'greenhouse':
-                return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
+                return t('ความต้องการน้ำ (ลิตร/นาที)');
             case 'garden':
                 return t('ต้องการน้ำ (ลิตร/นาที)');
             case 'horticulture':
@@ -915,8 +1055,8 @@ const InputForm: React.FC<InputFormProps> = ({
         );
     };
 
-    // Functions for managing sprinkler equipment groups
-    const handleSprinklerGroupChange = (groupId: string) => {
+
+    const handleSprinklerGroupChange = useCallback((groupId: string) => {
         const selectedGroupId = groupId
             ? isNaN(parseInt(groupId))
                 ? groupId
@@ -926,11 +1066,11 @@ const InputForm: React.FC<InputFormProps> = ({
         if (selectedGroupId) {
             const selectedGroup = sprinklerGroups.find((group) => group.id == selectedGroupId);
             if (selectedGroup && selectedGroup.items && selectedGroup.items.length > 0) {
-                // Get items from the selected group
+
                 setSelectedSprinklerItems(selectedGroup.items);
 
-                onInputChange({
-                    ...input,
+                onInputChangeRef.current({
+                    ...inputRef.current,
                     sprinklerEquipmentSet: {
                         selectedGroupId,
                         selectedItems: selectedGroup.items,
@@ -939,17 +1079,17 @@ const InputForm: React.FC<InputFormProps> = ({
             }
         } else {
             setSelectedSprinklerItems([]);
-            onInputChange({
-                ...input,
+            onInputChangeRef.current({
+                ...inputRef.current,
                 sprinklerEquipmentSet: {
                     selectedGroupId: null,
                     selectedItems: [],
                 },
             });
         }
-    };
+    }, [sprinklerGroups]);
 
-    // Helper function to check if equipment is pipe category
+
     const isPipeEquipment = (item: SprinklerSetItem): boolean => {
         const categoryName = item.equipment.category?.name?.toLowerCase();
         return categoryName === 'pipe' || categoryName?.includes('pipe') || false;
@@ -966,10 +1106,10 @@ const InputForm: React.FC<InputFormProps> = ({
         };
 
         setSelectedSprinklerItems(updatedItems);
-        onInputChange({
-            ...input,
+        onInputChangeRef.current({
+            ...inputRef.current,
             sprinklerEquipmentSet: {
-                selectedGroupId: input.sprinklerEquipmentSet?.selectedGroupId || null,
+                selectedGroupId: inputRef.current.sprinklerEquipmentSet?.selectedGroupId || null,
                 selectedItems: updatedItems,
             },
         });
@@ -1008,7 +1148,7 @@ const InputForm: React.FC<InputFormProps> = ({
             selectedCategoryData?.name?.toLowerCase().includes('pipe');
 
         const newItem: SprinklerSetItem = {
-            id: Date.now(), // temporary ID
+            id: Date.now(),
             group_id:
                 typeof input.sprinklerEquipmentSet?.selectedGroupId === 'string'
                     ? parseInt(input.sprinklerEquipmentSet.selectedGroupId)
@@ -1027,7 +1167,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     display_name: selectedCategoryData?.display_name || '',
                 },
             },
-            quantity: isPipe ? 1.0 : 1, // Default 1.0 for pipe, 1 for others
+            quantity: isPipe ? 1.0 : 1,
             unit_price: selectedEquipmentData.price || 0,
             total_price: selectedEquipmentData.price || 0,
             sort_order: selectedSprinklerItems.length,
@@ -1035,10 +1175,10 @@ const InputForm: React.FC<InputFormProps> = ({
 
         const updatedItems = [...selectedSprinklerItems, newItem];
         setSelectedSprinklerItems(updatedItems);
-        onInputChange({
-            ...input,
+        onInputChangeRef.current({
+            ...inputRef.current,
             sprinklerEquipmentSet: {
-                selectedGroupId: input.sprinklerEquipmentSet?.selectedGroupId || null,
+                selectedGroupId: inputRef.current.sprinklerEquipmentSet?.selectedGroupId || null,
                 selectedItems: updatedItems,
             },
         });
@@ -1049,10 +1189,10 @@ const InputForm: React.FC<InputFormProps> = ({
     const removeSprinklerItem = (itemIndex: number) => {
         const updatedItems = selectedSprinklerItems.filter((_, index) => index !== itemIndex);
         setSelectedSprinklerItems(updatedItems);
-        onInputChange({
-            ...input,
+        onInputChangeRef.current({
+            ...inputRef.current,
             sprinklerEquipmentSet: {
-                selectedGroupId: input.sprinklerEquipmentSet?.selectedGroupId || null,
+                selectedGroupId: inputRef.current.sprinklerEquipmentSet?.selectedGroupId || null,
                 selectedItems: updatedItems,
             },
         });
@@ -1076,15 +1216,15 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                defaultValue={input.farmSizeRai.toFixed(2)} // Fix: Always display rai since all modes store in rai
+                                defaultValue={input.farmSizeRai.toFixed(2)} 
                                 onChange={(e) => {
                                     const value = parseFloat(e.target.value) || 0;
-                                    updateInput('farmSizeRai', value); // Fix: Direct assignment since value is already in rai
+                                    updateInput('farmSizeRai', value);
                                 }}
                                 onBlur={(e) => {
                                     const value = e.target.value;
                                     if (value === '' || isNaN(parseFloat(value))) {
-                                        e.target.value = input.farmSizeRai.toFixed(2); // Fix: Always show rai
+                                        e.target.value = input.farmSizeRai.toFixed(2);
                                     }
                                 }}
                                 step="0.1"
@@ -1100,23 +1240,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                 {t('ตร.ม.')})
                             </p>
                         </div>
-
-                        {/* แสดงข้อมูลพื้นที่โซน (ถ้ามี)
-                        {zoneAreaData && (
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-green-400">
-                                    {t('พื้นที่โซน')}: {zoneAreaData.zoneName}
-                                </label>
-                                <div className="rounded border border-green-500 bg-green-900/20 p-2">
-                                    <div className="text-lg font-bold text-green-400">
-                                        {getZoneAreaInRai() > 0 ? `${getZoneAreaInRai().toFixed(2)} ${t('ไร่')}` : t('ไม่ระบุ')}
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                        ({(getZoneAreaInRai() * 1600).toFixed(2)} {t('ตร.ม.')})
-                                    </div>
-                                </div>
-                            </div>
-                        )} */}
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
@@ -1144,10 +1267,32 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                value={input.waterPerTreeLiters}
+                                value={(() => {
+                                    if (projectMode === 'greenhouse' && activeZone) {
+                                        try {
+                                            const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
+                                            
+                                            if (greenhouseSystemDataStr) {
+                                                const systemData = JSON.parse(greenhouseSystemDataStr);
+                                                const plotPipeData = systemData.plotPipeData || [];
+                                                // ใช้ utility function ที่ยืดหยุ่น
+                                                const currentPlotPipeData = findMatchingPlotData(activeZone.id, plotPipeData) as any;
+                                                
+                                                
+                                                
+                                                if (currentPlotPipeData && currentPlotPipeData.totalFlowRate) {
+                                                    // ใช้ค่าเดียวกับที่แสดงใน Flow Rate Section ของแต่ละโซน
+                                                    return currentPlotPipeData.totalFlowRate;
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error('Error getting greenhouse flow rate:', error);
+                                        }
+                                    }
+                                    return input.waterPerTreeLiters;
+                                })()}
                                 onChange={(e) => {
                                     const value = e.target.value;
-                                    // Allow empty string for controlled input
                                     if (value === '') {
                                         updateInput('waterPerTreeLiters', 0);
                                     } else {
@@ -1165,25 +1310,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
                         </div>
-
-                        {/* <div>
-                            <label className="mb-2 block text-sm font-medium">
-                                {t('เวลารดน้ำ (นาที/ครั้ง)')}
-                            </label>
-                            <input
-                                type="number"
-                                step="1"
-                                defaultValue={input.irrigationTimeMinutes}
-                                onChange={(e) => {
-                                    const value = parseInt(e.target.value);
-                                    if (!isNaN(value)) {
-                                        updateInput('irrigationTimeMinutes', value);
-                                    }
-                                }}
-                                onBlur={(e) => updateInputOnBlur('irrigationTimeMinutes', e.target.value)}
-                                className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
-                            />
-                        </div> */}
                     </div>
 
                     <div className="rounded-lg bg-gray-700 p-2">
@@ -1225,9 +1351,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                 <input
                                     type="number"
                                     step="0.1"
-                                    defaultValue={input.staticHeadM.toFixed(1)}
+                                    value={input.staticHeadM}
                                     onChange={(e) => {
-                                        const value = parseFloat(e.target.value);
+                                        const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                         if (!isNaN(value)) {
                                             updateInput('staticHeadM', value);
                                         }
@@ -1235,12 +1361,16 @@ const InputForm: React.FC<InputFormProps> = ({
                                     onBlur={(e) => {
                                         const value = e.target.value;
                                         if (value === '' || isNaN(parseFloat(value))) {
-                                            e.target.value = input.staticHeadM.toFixed(1);
+                                            updateInput('staticHeadM', 0);
                                         }
                                     }}
-                                    min="0"
                                     className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                                 />
+                                <p className="mt-1 text-xs text-gray-400">
+                                    {input.staticHeadM < 0
+                                        ? t('(ค่าติดลบหมายถึงปั๊มอยู่สูงกว่าต้นไม้)')
+                                        : ''}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -1273,7 +1403,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </select>
                             </div>
 
-                            {/* Display selected equipment items */}
                             {selectedSprinklerItems.length > 0 && (
                                 <div className="mt-4">
                                     <div className="mb-3 flex items-center justify-between">
@@ -1396,8 +1525,8 @@ const InputForm: React.FC<InputFormProps> = ({
                     <h3 className="text-lg font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
 
                     <div className="rounded-lg bg-gray-700 p-3">
-                        <h4 className="mb-2 text-sm font-medium text-purple-300">
-                            🔹 {t('ท่อย่อย (Branch Pipe)')}
+                        <h4 className="mb-2 text-sm font-medium text-yellow-300">
+                        🟡 {t('ท่อย่อย (Branch Pipe)')}
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1451,12 +1580,12 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
 
-                    <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestSecondaryPipeM > 0 ? (
+                    <div className="rounded-lg bg-gray-700 p-3">
                             <>
-                                <h4 className="mb-2 text-sm font-medium text-orange-300">
-                                    🔸 {t('ท่อเมนรอง (Secondary)')}
-                                </h4>
+                                    <h4 className="mb-2 text-sm font-medium text-purple-300">
+                                    🟣 {t('ท่อเมนรอง (Sub Main)')}
+                                    </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="mb-1 block text-sm">
@@ -1510,31 +1639,16 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </div>
                                 </div>
                             </>
-                        ) : (
-                            <div className="flex items-center justify-between">
-                                <div className="text-center text-gray-400">
-                                    <div className="mb-1 text-2xl">➖</div>
-                                    <p className="text-sm">{t('ไม่ใช้ท่อเมนรอง')}</p>
-                                </div>
-                                {(projectMode === 'horticulture' ||
-                                    projectMode === 'field-crop' ||
-                                    projectMode === 'greenhouse') && (
-                                    <button
-                                        onClick={() => updateInput('longestSecondaryPipeM', 50)}
-                                        className="text-sm text-blue-400 hover:text-blue-300"
-                                    >
-                                        + {t('เพิ่มท่อเมนรอง')}
-                                    </button>
-                                )}
-                            </div>
-                        )}
                     </div>
 
-                    <div className="rounded-lg bg-gray-700 p-3">
+                        ) : (
+                            null
+                        )}
+
                         {input.longestMainPipeM > 0 ? (
-                            <>
-                                <h4 className="mb-2 text-sm font-medium text-cyan-300">
-                                    🔷 {t('ท่อเมนหลัก')} (Main)
+                            <div className="rounded-lg bg-gray-700 p-3">
+                                <h4 className="mb-2 text-sm font-medium text-red-300">
+                                    🔴 {t('ท่อเมนหลัก (Main)')}
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
@@ -1588,26 +1702,10 @@ const InputForm: React.FC<InputFormProps> = ({
                                         />
                                     </div>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex items-center justify-between">
-                                <div className="text-center text-gray-400">
-                                    <div className="mb-1 text-2xl">➖</div>
-                                    <p className="text-sm">{t('ไม่ใช้ท่อเมนหลัก')}</p>
-                                </div>
-                                {(projectMode === 'horticulture' ||
-                                    projectMode === 'field-crop' ||
-                                    projectMode === 'greenhouse') && (
-                                    <button
-                                        onClick={() => updateInput('longestMainPipeM', 100)}
-                                        className="text-sm text-blue-400 hover:text-blue-300"
-                                    >
-                                        + {t('เพิ่มท่อเมนหลัก')}
-                                    </button>
-                                )}
                             </div>
+                        ) : (
+                            null
                         )}
-                    </div>
 
                     {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 ? (
                         <>
@@ -1748,13 +1846,11 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 {equipment.category ? (
                                                     <SearchableDropdown
                                                         options={connectionEquipments.map((eq) => {
-                                                            // สร้าง label ที่แสดงชื่อ, รหัส, และคุณสมบัติ
                                                             let label = eq.name || eq.product_code;
                                                             if (eq.name && eq.product_code) {
                                                                 label = `${eq.name} (${eq.product_code})`;
                                                             }
 
-                                                            // เพิ่มคุณสมบัติที่สำคัญ
                                                             const attributes: string[] = [];
                                                             if (eq.main_pipe_inch)
                                                                 attributes.push(
@@ -1778,7 +1874,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                             }
 
                                                             return {
-                                                                value: String(eq.id), // Convert to string to match localStorage
+                                                                value: String(eq.id),
                                                                 label: label,
                                                                 productCode: eq.product_code,
                                                                 price: eq.price,
@@ -1816,11 +1912,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* แสดงข้อมูลอุปกรณ์ที่เลือก */}
                                         {equipment.equipment && (
                                             <div className="mt-2 rounded bg-gray-500 p-2">
                                                 <div className="flex gap-3">
-                                                    {/* รูปภาพอุปกรณ์ */}
                                                     {equipment.equipment.image ? (
                                                         <div className="flex-shrink-0">
                                                             <img
@@ -1842,7 +1936,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                                         </div>
                                                     )}
 
-                                                    {/* ข้อมูลอุปกรณ์ */}
                                                     <div className="flex-1 text-xs text-gray-200">
                                                         <div className="flex justify-between">
                                                             <span>{t('รหัสสินค้า')}:</span>
@@ -1883,18 +1976,10 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-lg bg-gray-700 p-4">
-                        <div className="text-center text-gray-400">
-                            <p className="text-sm">🔗 {t('ไม่มีข้อมูลจุดเชื่อมต่อ')}</p>
-                            <p className="mt-1 text-xs">
-                                {t('กรุณาสร้างโปรเจกต์ที่มีท่อและจุดเชื่อมต่อก่อน')}
-                            </p>
-                        </div>
-                    </div>
+                    null
                 )}
             </div>
 
-            {/* Add Item Modal */}
             {showAddItemModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="w-full max-w-md rounded-lg bg-gray-800 p-6 shadow-xl">
@@ -1903,7 +1988,6 @@ const InputForm: React.FC<InputFormProps> = ({
                         </h3>
 
                         <div className="space-y-4">
-                            {/* Category Selection */}
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-300">
                                     {t('เลือกหมวดหมู่')}
@@ -1924,7 +2008,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </select>
                             </div>
 
-                            {/* Equipment Selection */}
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-300">
                                     {t('เลือกสินค้า')}
@@ -1938,13 +2021,11 @@ const InputForm: React.FC<InputFormProps> = ({
                                 ) : (
                                     (() => {
                                         const mappedOptions = equipments.map((eq) => {
-                                            // สร้าง label ที่แสดงชื่อ, รหัส, และคุณสมบัติ
                                             let label = eq.name || eq.product_code;
                                             if (eq.name && eq.product_code) {
                                                 label = `${eq.name} (${eq.product_code})`;
                                             }
 
-                                            // เพิ่มคุณสมบัติที่สำคัญ
                                             const attributes: string[] = [];
                                             if (eq.brand) attributes.push(`ยี่ห้อ: ${eq.brand}`);
                                             if (eq.waterVolumeLitersPerMinute)
@@ -1994,7 +2075,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                             };
                                         });
 
-                                        // ถ้าไม่มีข้อมูลให้แสดงข้อความ
                                         if (mappedOptions.length === 0) {
                                             return (
                                                 <div className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-sm text-gray-400">
@@ -2023,7 +2103,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                 )}
                             </div>
 
-                            {/* Selected Equipment Preview */}
                             {selectedEquipment && (
                                 <div className="rounded border border-gray-600 bg-gray-700 p-3">
                                     {(() => {
@@ -2054,7 +2133,6 @@ const InputForm: React.FC<InputFormProps> = ({
                             )}
                         </div>
 
-                        {/* Modal Actions */}
                         <div className="mt-6 flex justify-end space-x-3">
                             <button
                                 type="button"

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Horticulture-specific pipe calculation utilities
 import { getPipeData, getPipeDataWithSmartSize } from '../pages/components/PipeFrictionLoss';
 import { PressureLossCorrectionFactorTableData } from '../pages/components/PressureLossCorrectionFactorTable';
 
@@ -62,7 +61,6 @@ export function findPressureLoss(
     };
 } | null {
     try {
-        // Use smart pipe data selection with size matching
         const smartPipeResult = getPipeDataWithSmartSize(pipeType, pressureClass, pipeSize);
 
         if (!smartPipeResult || !smartPipeResult.data) {
@@ -73,10 +71,8 @@ export function findPressureLoss(
 
         const sizeData = pipeData[selectedSize];
 
-        // หา flow ที่ใกล้เคียงที่มากกว่า
         let selectedFlow = sizeData.find((data) => data.flow >= flowRate);
 
-        // ถ้าไม่เจอ ให้ใช้ค่าสูงสุด
         if (!selectedFlow) {
             selectedFlow = sizeData[sizeData.length - 1];
         }
@@ -91,7 +87,6 @@ export function findPressureLoss(
             },
         };
     } catch (error) {
-        console.error('Error finding pressure loss:', error);
         return null;
     }
 }
@@ -105,7 +100,6 @@ export function findCorrectionFactor(outletCount: number): {
     correctionFactor: number;
     actualOutletCount: number;
 } {
-    // หาจำนวนทางออกที่ใกล้เคียงที่น้อยกว่า
     let selectedEntry = PressureLossCorrectionFactorTableData[0];
 
     for (const entry of PressureLossCorrectionFactorTableData) {
@@ -137,14 +131,11 @@ export function calculateNewHeadLoss(
     pipeSize: string
 ): PipeCalculationResult | null {
     try {
-        // ตรวจสอบว่าต้องใช้ PN สูงสุดหรือไม่
         let actualPressureClass = pressureClass;
         let pressureNote = '';
 
-        // ลองหาข้อมูลท่อก่อน
         let pipeData = getPipeData(pipeType, pressureClass);
         if (!pipeData) {
-            // ถ้าไม่พบข้อมูลท่อ ให้ลองใช้ PN สูงสุด
             if (pipeType.toUpperCase() === 'PE') {
                 actualPressureClass = 'PN6.3';
                 pipeData = getPipeData(pipeType, actualPressureClass);
@@ -168,10 +159,9 @@ export function calculateNewHeadLoss(
             }
         }
 
-        // หาค่า X (pressureLoss)
         const pressureLossResult = findPressureLoss(
             pipeType,
-            actualPressureClass, // ใช้ actualPressureClass แทน pressureClass
+            actualPressureClass, 
             pipeSize,
             bestPipeInfo.waterFlowRate
         );
@@ -180,16 +170,13 @@ export function calculateNewHeadLoss(
             return null;
         }
 
-        // หาค่า Y (correctionFactor)
         const correctionResult = findCorrectionFactor(bestPipeInfo.count);
 
-        // คำนวณ head loss: (X/10) * ความยาวท่อ * Y
         const headLoss =
             (pressureLossResult.pressureLoss / 10) *
             bestPipeInfo.length *
             correctionResult.correctionFactor;
 
-        // สร้างรายละเอียดการคำนวณ
         const sizeNote =
             pressureLossResult.sizeInfo && !pressureLossResult.sizeInfo.isExactSizeMatch
                 ? ` (ใช้ ${pressureLossResult.actualSize} แทน ${pipeSize})`
@@ -217,7 +204,6 @@ export function calculateNewHeadLoss(
             sizeInfo: pressureLossResult.sizeInfo,
         };
     } catch (error) {
-        console.error('Error calculating head loss:', error);
         return null;
     }
 }
@@ -234,7 +220,6 @@ export function calculateSprinklerPressure(sprinkler: any): SprinklerPressureInf
 
     let pressureBar: number;
 
-    // จัดการกับข้อมูลแรงดันที่อาจเป็น array หรือ string
     if (Array.isArray(sprinkler.pressureBar)) {
         pressureBar = (sprinkler.pressureBar[0] + sprinkler.pressureBar[1]) / 2;
     } else if (typeof sprinkler.pressureBar === 'string' && sprinkler.pressureBar.includes('-')) {
@@ -244,8 +229,8 @@ export function calculateSprinklerPressure(sprinkler: any): SprinklerPressureInf
         pressureBar = parseFloat(String(sprinkler.pressureBar));
     }
 
-    const headM = pressureBar * 10; // แปลงจากบาร์เป็นเมตร
-    const head20PercentM = headM * 0.2; // 20% ของ Head
+    const headM = pressureBar * 10; 
+    const head20PercentM = headM * 0.2; 
 
     return {
         pressureBar,
@@ -269,7 +254,13 @@ export function validatePipeSelection(
     selectedPipes: { [key: string]: any } = {}
 ): { isValid: boolean; reason?: string } {
     try {
-        // เงื่อนไขพื้นฐาน: แรงดันท่อต้องไม่ต่ำกว่าแรงดันหัวฉีด
+        if (typeof pipe.pn !== 'number' || typeof sprinklerPressure.pressureBar !== 'number') {
+            return {
+                isValid: false,
+                reason: 'ข้อมูลแรงดันไม่ถูกต้อง',
+            };
+        }
+
         if (pipe.pn < sprinklerPressure.pressureBar) {
             return {
                 isValid: false,
@@ -277,17 +268,16 @@ export function validatePipeSelection(
             };
         }
 
-        // เงื่อนไขสำหรับท่อย่อยและท่อย่อยแยก
         if (pipeType === 'branch' || pipeType === 'emitter') {
-            if (pipe.sizeMM > 32) {
+            const sizeMM = pipe.sizeMM || (pipe.sizeInch ? parseFloat(pipe.sizeInch) * 25.4 : 0);
+            if (sizeMM > 32) {
                 return {
                     isValid: false,
-                    reason: `ท่อ${pipeType === 'branch' ? 'ย่อย' : 'ย่อยแยก'}ต้องมีขนาด ≤ 32mm (ขนาดปัจจุบัน: ${pipe.sizeMM}mm)`,
+                    reason: `ท่อ${pipeType === 'branch' ? 'ย่อย' : 'ย่อยแยก'}ต้องมีขนาด ≤ 32mm (ขนาดปัจจุบัน: ${sizeMM}mm)`,
                 };
             }
         }
 
-        // เงื่อนไขสำหรับท่อเมนรองและท่อเมนหลัก
         if (pipeType === 'secondary' || pipeType === 'main') {
             const branchPipe = selectedPipes.branch;
             if (branchPipe && pipe.sizeMM <= branchPipe.sizeMM) {
@@ -310,7 +300,6 @@ export function validatePipeSelection(
 
         return { isValid: true };
     } catch (error) {
-        console.error('Error validating pipe selection:', error);
         return {
             isValid: false,
             reason: 'เกิดข้อผิดพลาดในการตรวจสอบ',
@@ -335,7 +324,6 @@ export function selectBestPipe(
     selectedPipes: { [key: string]: any } = {}
 ): any | null {
     try {
-        // กรองท่อที่ผ่านเงื่อนไข
         const validPipes = pipes.filter((pipe) => {
             const validation = validatePipeSelection(
                 pipe,
@@ -350,7 +338,6 @@ export function selectBestPipe(
             return null;
         }
 
-        // คำนวณ head loss สำหรับแต่ละท่อ
         const pipesWithCalculation = validPipes.map((pipe) => {
             const calculation = calculateNewHeadLoss(
                 bestPipeInfo,
@@ -368,33 +355,24 @@ export function selectBestPipe(
             };
         });
 
-        // เรียงลำดับตามเงื่อนไข:
-        // 1. ไม่มี warning
-        // 2. PN และ sizeMM น้อยที่สุด
-        // 3. ราคาน้อยที่สุด
         const sortedPipes = pipesWithCalculation.sort((a, b) => {
-            // เงื่อนไขที่ 1: ไม่มี warning
             if (a.hasWarning !== b.hasWarning) {
                 return a.hasWarning ? 1 : -1;
             }
 
-            // เงื่อนไขที่ 2: PN น้อยที่สุด
             if (a.pn !== b.pn) {
                 return a.pn - b.pn;
             }
 
-            // เงื่อนไขที่ 3: sizeMM น้อยที่สุด
             if (a.sizeMM !== b.sizeMM) {
                 return a.sizeMM - b.sizeMM;
             }
 
-            // เงื่อนไขที่ 4: ราคาน้อยที่สุด
             return (a.price || 0) - (b.price || 0);
         });
 
         return sortedPipes[0];
     } catch (error) {
-        console.error('Error selecting best pipe:', error);
         return null;
     }
 }
@@ -416,14 +394,12 @@ export function createCalculationSummary(
         totalHeadLoss: 0,
     };
 
-    // รวมค่า head loss
     Object.values(calculations).forEach((calc) => {
         if (calc) {
             summary.totalHeadLoss += calc.headLoss;
         }
     });
 
-    // ตรวจสอบ warnings
     const mainCalc = calculations.main;
     const branchSecondaryTotal =
         (calculations.branch?.headLoss || 0) + (calculations.secondary?.headLoss || 0);
@@ -462,26 +438,21 @@ export function validatePipeSizeHierarchy(
 
     switch (pipeType) {
         case 'main': {
-            // ท่อเมนต้องใหญ่กว่าท่อทุกประเภท
-            return currentSizeMM > Math.max(secondarySize, branchSize, emitterSize);
+            return currentSizeMM >= Math.max(secondarySize, branchSize, emitterSize);
         }
 
         case 'secondary': {
-            // ท่อเมนรองต้องเล็กกว่าท่อเมน แต่ใหญ่กว่าท่อย่อย
-            const isSmaller = mainSize === 0 || currentSizeMM < mainSize;
-            const isLarger = currentSizeMM > Math.max(branchSize, emitterSize);
+            const isSmaller = mainSize === 0 || currentSizeMM <= mainSize;
+            const isLarger = currentSizeMM >= Math.max(branchSize, emitterSize);
             return isSmaller && isLarger;
         }
 
         case 'branch':
-        case 'emitter': {
-            // ท่อย่อยและท่อย่อยแยกต้องไม่เกิน 32mm และเล็กกว่าท่อเมน/เมนรอง
-            const maxAllowed = 32;
-            const isBelowLimit = currentSizeMM <= maxAllowed;
-            const isSmaller2 =
-                currentSizeMM <
-                Math.max(mainSize || Number.MAX_VALUE, secondarySize || Number.MAX_VALUE);
-            return isBelowLimit && (mainSize === 0 && secondarySize === 0 ? true : isSmaller2);
+        case 'emitter': {   
+            const hasLargerPipes = mainSize > 0 || secondarySize > 0;
+            const isSmallerThanLargerPipes = !hasLargerPipes || 
+                currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
+            return isSmallerThanLargerPipes;
         }
 
         default:
@@ -507,62 +478,42 @@ export function selectBestPipeByHeadLoss(
     selectedPipeType: string,
     selectedPipeSizes: SelectedPipeSizes,
     head20Percent: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _targetHeadLoss?: number // keep for backward compatibility but will be ignored
 ): any | null {
     if (!availablePipes.length || !bestPipeInfo) {
         return null;
     }
 
-    // กรองท่อที่เป็นไปตามลำดับชั้น
     const validPipes = availablePipes.filter((pipe) => {
         return validatePipeSizeHierarchy(pipeType, pipe.sizeMM, selectedPipeSizes);
     });
 
     if (!validPipes.length) {
-        // ถ้าไม่มีท่อที่ตรงตามลำดับชั้น ให้เลือกท่อที่เล็กที่สุดที่เป็นไปได้
-        const fallbackPipes = availablePipes.filter((pipe) => {
-            // สำหรับ branch ต้องไม่เกิน 50mm, emitter ต้องไม่เกิน branch size
-            if (pipeType === 'branch') {
-                return pipe.sizeMM <= 50;
-            }
-            if (pipeType === 'emitter') {
-                return pipe.sizeMM <= 32;
-            }
-            return true;
-        });
-
-        return fallbackPipes.length > 0
-            ? fallbackPipes.reduce((smallest, current) =>
-                  current.sizeMM < smallest.sizeMM ? current : smallest
-              )
-            : null;
+        // ถ้าไม่มีท่อที่ผ่าน hierarchy validation ให้ return null
+        return null;
     }
 
-    // กำหนด target headLoss ตาม pipe type
     let targetHeadLossValue: number;
-    let isMaxLimitMode = false; // true = ต้อง ≤ target, false = ใกล้เคียง target ที่สุด
+    let isMaxLimitMode = false; 
 
     switch (pipeType) {
         case 'main':
             targetHeadLossValue = head20Percent;
-            isMaxLimitMode = true; // main pipe ต้อง ≤ head20Percent
+            isMaxLimitMode = true; // ห้ามเกิน head20Percent และให้เลือกตัวที่ใกล้เคียงที่สุด
             break;
         case 'secondary':
-            targetHeadLossValue = head20Percent * 0.6; // 60% ของ head20Percent
-            isMaxLimitMode = false; // หาที่ใกล้เคียงที่สุด
+            targetHeadLossValue = head20Percent * 0.6; // ใกล้เคียง 60% ของ head20Percent
+            isMaxLimitMode = true; // ห้ามเกิน head20Percent
             break;
         case 'branch':
         case 'emitter':
-            targetHeadLossValue = head20Percent * 0.4; // 40% ของ head20Percent
-            isMaxLimitMode = false; // หาที่ใกล้เคียงที่สุด
+            targetHeadLossValue = head20Percent * 0.4; // ใกล้เคียง 40% ของ head20Percent
+            isMaxLimitMode = true; // ห้ามเกิน head20Percent
             break;
         default:
             targetHeadLossValue = head20Percent * 0.4;
-            isMaxLimitMode = false;
+            isMaxLimitMode = true;
     }
 
-    // คำนวณ Head Loss สำหรับแต่ละท่อและสร้าง candidate list
     const candidates: Array<{ pipe: any; headLoss: number; calculation: any }> = [];
 
     for (const pipe of validPipes) {
@@ -575,7 +526,7 @@ export function selectBestPipeByHeadLoss(
             `${pipe.sizeMM}mm`
         );
 
-        if (calculation && calculation.headLoss > 0) {
+        if (calculation && calculation.headLoss >= 0) {
             candidates.push({
                 pipe,
                 headLoss: calculation.headLoss,
@@ -588,26 +539,31 @@ export function selectBestPipeByHeadLoss(
         return null;
     }
 
-    // เลือกท่อตามเกณฑ์ที่กำหนด
     let bestCandidates: Array<{ pipe: any; headLoss: number; calculation: any }>;
 
     if (isMaxLimitMode) {
-        // สำหรับ main pipe: เลือกท่อที่ headLoss ≤ target
-        const validCandidates = candidates.filter((c) => c.headLoss <= targetHeadLossValue);
+        // ห้ามเกิน head20Percent สำหรับทุกประเภท
+        const maxAllowed = pipeType === 'main' ? head20Percent : head20Percent;
+        const validCandidates = candidates.filter((c) => c.headLoss <= maxAllowed);
 
         if (validCandidates.length > 0) {
-            bestCandidates = validCandidates;
-        } else {
-            // ถ้าไม่มีท่อที่ ≤ target ให้เลือกที่ใกล้เคียง target ที่สุด
+            // เลือกที่ใกล้เคียง targetHeadLossValue มากที่สุด
             const minDiff = Math.min(
-                ...candidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
+                ...validCandidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
+            );
+            bestCandidates = validCandidates.filter(
+                (c) => Math.abs(c.headLoss - targetHeadLossValue) === minDiff
+            );
+        } else {
+            // ถ้าไม่มีท่อที่ผ่านเกณฑ์ maxAllowed ให้เลือกที่ใกล้เคียง head20Percent มากที่สุด
+            const minDiff = Math.min(
+                ...candidates.map((c) => Math.abs(c.headLoss - head20Percent))
             );
             bestCandidates = candidates.filter(
-                (c) => Math.abs(c.headLoss - targetHeadLossValue) === minDiff
+                (c) => Math.abs(c.headLoss - head20Percent) === minDiff
             );
         }
     } else {
-        // สำหรับ secondary/branch/emitter: เลือกท่อที่ใกล้เคียง target ที่สุด
         const minDiff = Math.min(
             ...candidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
         );
@@ -616,18 +572,16 @@ export function selectBestPipeByHeadLoss(
         );
     }
 
-    // จาก bestCandidates เรียงลำดับตาม: ราคาถูกสุด → ขนาดเล็กสุด
     bestCandidates.sort((a, b) => {
-        // 1. ราคาถูกสุด
-        if (a.pipe.price !== b.pipe.price) {
-            return a.pipe.price - b.pipe.price;
+        const priceA = a.pipe.price || 0;
+        const priceB = b.pipe.price || 0;
+        if (priceA !== priceB) {
+            return priceA - priceB;
         }
-        // 2. ขนาดเล็กสุด
         return a.pipe.sizeMM - b.pipe.sizeMM;
     });
 
     const bestPipe = bestCandidates[0]?.pipe || null;
 
-    // ถ้าไม่พบท่อที่เหมาะสม ให้เลือกท่อแรก
     return bestPipe || validPipes[0];
 }

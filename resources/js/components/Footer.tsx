@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Phone, Mail, Globe, Award, Users, Package, Clock } from 'lucide-react';
+import { MapPin, Phone, Globe, Award, Users, Package, Clock } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 const Footer: React.FC = () => {
     const { t } = useLanguage();
@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
         <footer id="contact-footer" className="bg-black text-gray-300">
             {/* Main Footer Content */}
             <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                     {/* Company Info - Kanok Product */}
                     <div className="space-y-4">
                         <h3 className="mb-4 text-xl font-bold text-white">
@@ -38,31 +38,6 @@ const Footer: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Company Info - Chaiyo */}
-                    <div className="min-w-0 space-y-4">
-                        <h3 className="mb-4 whitespace-nowrap text-xl font-bold text-white">
-                            {t('บจก.ไชโยไปป์แอนด์ฟิตติ้ง')}
-                        </h3>
-                        <div className="space-y-3">
-                            <div className="flex items-start space-x-3">
-                                <MapPin className="mt-1 h-5 w-5 flex-shrink-0 text-blue-400" />
-                                <p className="text-sm">
-                                    {t(
-                                        '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000'
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                                <Phone className="h-5 w-5 text-green-400" />
-                                <p className="text-sm">{t('034-441-841')}</p>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                                <Mail className="h-5 w-5 text-red-400" />
-                                <p className="text-sm">{t('info@chaiyopipe.com')}</p>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Products & Services */}
                     <div className="space-y-4">
                         <h3 className="mb-4 text-xl font-bold text-white">
@@ -83,7 +58,7 @@ const Footer: React.FC = () => {
                             </li>
                             <li className="flex items-center space-x-2">
                                 <Package className="h-4 w-4 text-orange-400" />
-                                <span>{t('ระบบน้ำหยดและมิสติ้ง')}</span>
+                                <span>{t('ระบบน้ำหยด')}</span>
                             </li>
                             <li className="flex items-center space-x-2">
                                 <Package className="h-4 w-4 text-orange-400" />

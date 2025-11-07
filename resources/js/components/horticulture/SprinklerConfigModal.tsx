@@ -1,5 +1,3 @@
-// SprinklerConfigModal.tsx - Modal for configuring sprinkler properties
-
 import React, { useState, useEffect } from 'react';
 import {
     SprinklerFormData,
@@ -32,7 +30,6 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
 
-    // โหลดข้อมูลที่มีอยู่เมื่อเปิด modal
     useEffect(() => {
         if (isOpen) {
             const existingConfig = loadSprinklerConfig();
@@ -43,7 +40,6 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                     radiusMeters: existingConfig.radiusMeters.toString(),
                 });
             } else {
-                // ใช้ค่าเริ่มต้น
                 setFormData({
                     flowRatePerMinute: DEFAULT_SPRINKLER_CONFIG.flowRatePerMinute.toString(),
                     pressureBar: DEFAULT_SPRINKLER_CONFIG.pressureBar.toString(),
@@ -60,7 +56,6 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
             [field]: value,
         }));
 
-        // ลบ error ของฟิลด์นี้เมื่อมีการแก้ไข
         if (errors[field]) {
             setErrors((prev) => {
                 const newErrors = { ...prev };
@@ -87,7 +82,6 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                 radiusMeters: parseFloat(formData.radiusMeters),
             };
 
-            // บันทึกลง localStorage
             const saved = saveSprinklerConfig(config);
 
             if (saved) {
@@ -115,7 +109,6 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
             <div className="mx-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-gray-800 shadow-2xl">
-                {/* Header */}
                 <div className="flex items-center justify-between border-b border-white p-6">
                     <div>
                         <h2 className="text-2xl font-bold text-white">🚿 ตั้งค่าหัวฉีดน้ำ</h2>
@@ -144,7 +137,6 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                     </button>
                 </div>
 
-                {/* Content */}
                 <div className="space-y-6 p-6">
                     {errors.general && (
                         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-white">

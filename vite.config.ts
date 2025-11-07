@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import cesium from 'vite-plugin-cesium';
 
 export default defineConfig(({ command, mode }) => {
     // โหลด environment variables
@@ -30,19 +31,11 @@ export default defineConfig(({ command, mode }) => {
                 refresh: true,
             }),
             react(),
+            cesium(),
         ],
         
         // Environment variables configuration
         envPrefix: ['VITE_'],
-        
-        // Define global constants - ปรับปรุงให้ใช้ environment variables ที่โหลดมา
-        define: {
-            // Make sure Google Maps API key is available
-            'process.env.REACT_APP_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
-            'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
-            // เพิ่ม fallback
-            'globalThis.GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
-        },
         
         // Development server configuration
         server: {
@@ -76,6 +69,17 @@ export default defineConfig(({ command, mode }) => {
             },
         },
         
+        // Define global constants - ปรับปรุงให้ใช้ environment variables ที่โหลดมา
+        define: {
+            // Make sure Google Maps API key is available
+            'process.env.REACT_APP_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
+            'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
+            // เพิ่ม fallback
+            'globalThis.GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
+            // Cesium base URL - vite-plugin-cesium will copy assets to public/cesium/
+            'CESIUM_BASE_URL': JSON.stringify('/cesium/'),
+        },
+        
         // Optimization
         optimizeDeps: {
             include: [
@@ -95,6 +99,7 @@ export default defineConfig(({ command, mode }) => {
                 'leaflet-routing-machine',
                 'lucide-react',
                 'react-markdown',
+                'cesium',
             ],
             exclude: [
                 // Exclude Google Maps from pre-bundling to avoid issues

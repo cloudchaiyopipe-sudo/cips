@@ -1497,7 +1497,15 @@ class FarmController extends Controller
                     'total_plants' => $request->total_plants,
                     'total_area' => $request->total_area,
                     'total_water_need' => $request->total_water_need,
-                    'area_type' => $request->area_type
+                    'area_type' => $request->area_type,
+                    'status' => 'finished',
+                    'is_completed' => true,
+                    'project_data' => $request->project_data ?? null,
+                    'project_stats' => $request->project_stats ?? null,
+                    'garden_data' => $request->garden_data ?? null,
+                    'garden_stats' => $request->garden_stats ?? null,
+                    'field_crop_data' => $request->field_crop_data ?? null,
+                    'greenhouse_data' => $request->greenhouse_data ?? null
                 ]);
 
                 // Save layers
@@ -1562,6 +1570,15 @@ class FarmController extends Controller
                     }
                 }
 
+                // Create or find "Finished" folder and assign field to it
+                $finishedFolder = \App\Models\Folder::firstOrCreate(
+                    ['name' => 'Finished', 'user_id' => auth()->id()],
+                    ['description' => 'Completed projects']
+                );
+                
+                // Assign field to Finished folder
+                $field->update(['folder_id' => $finishedFolder->id]);
+
                 // Commit transaction
                 \DB::commit();
 
@@ -1569,13 +1586,15 @@ class FarmController extends Controller
                     'field_id' => $field->id,
                     'field_name' => $field->name,
                     'total_plants' => $field->total_plants,
-                    'total_pipes' => count($request->pipes ?? [])
+                    'total_pipes' => count($request->pipes ?? []),
+                    'folder_id' => $finishedFolder->id
                 ]);
 
                 return response()->json([
                     'success' => true,
                     'field_id' => $field->id,
-                    'message' => 'Field saved successfully'
+                    'folder_id' => $finishedFolder->id,
+                    'message' => 'Field saved successfully and moved to Finished folder'
                 ]);
 
             } catch (\Exception $e) {

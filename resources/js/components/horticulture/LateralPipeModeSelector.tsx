@@ -1,4 +1,3 @@
-// components/horticulture/LateralPipeModeSelector.tsx
 import React from 'react';
 import { FaWater, FaTimes } from 'react-icons/fa';
 

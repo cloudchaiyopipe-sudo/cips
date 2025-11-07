@@ -118,7 +118,7 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                             <p className="text-sm text-gray-600">
                                 หากมีข้อสงสัยเกี่ยวกับเงื่อนไขการใช้บริการ กรุณาติดต่อ:
                                 <br />
-                                <strong>บริษัท กนกส์โปรดักส์ จำกัด</strong>
+                                <strong>บริษัท กนกโปรดักส์ จำกัด</strong>
                                 <br />
                                 โทรศัพท์: 02-451-1111 กด 2<br />
                                 <strong>เวลาทำการ:</strong> จันทร์-เสาร์ 8:00-17:00 น.

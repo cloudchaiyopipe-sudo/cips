@@ -106,7 +106,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const animationFrameRef = useRef<number>();
+    const animationFrameRef = useRef<number | null>(null);
 
     const [viewport, setViewport] = useState<ViewportState>({
         zoom: 1,

@@ -6,30 +6,30 @@ interface Option {
     value: string | number;
     label: string;
     disabled?: boolean;
-    searchableText?: string; // Additional text to search in
-    // New properties for enhanced display
+    searchableText?: string;
+
     image?: string;
     productCode?: string;
     name?: string;
     brand?: string;
     price?: number;
-    unit?: string; // For price unit like "บาท", "บาท/ม้วน", etc.
-    description?: string; // คำอธิบายสินค้า
-    // New properties for recommendation
+    unit?: string;
+    description?: string;
+
     isRecommended?: boolean;
     isGoodChoice?: boolean;
     isUsable?: boolean;
     isAutoSelected?: boolean;
-    // New properties for calculation results
-    headLoss?: number; // ค่า head loss ที่คำนวณได้
-    calculationDetails?: string; // รายละเอียดการคำนวณ
-    hasWarning?: boolean; // มี warning หรือไม่
-    // New properties for pump adequacy
-    isFlowAdequate?: boolean; // Flow เพียงพอหรือไม่
-    isHeadAdequate?: boolean; // Head เพียงพอหรือไม่
-    flowRatio?: number; // อัตราส่วน Flow (ปั๊ม/ที่ต้องการ)
-    headRatio?: number; // อัตราส่วน Head (ปั๊ม/ที่ต้องการ)
-    isSelected?: boolean; // รายการที่เลือกอยู่
+
+    headLoss?: number;
+    calculationDetails?: string;
+    hasWarning?: boolean;
+
+    isFlowAdequate?: boolean;
+    isHeadAdequate?: boolean;
+    flowRatio?: number;
+    headRatio?: number;
+    isSelected?: boolean;
 }
 
 interface SearchableDropdownProps {
@@ -59,7 +59,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     const dropdownRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Filter options based on search term
+
     const filteredOptions = options.filter((option) => {
         const searchText = searchTerm.toLowerCase();
         const labelMatch = option.label.toLowerCase().includes(searchText);
@@ -69,11 +69,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         return labelMatch || searchableTextMatch;
     });
 
-    // Get selected option label
+
     const selectedOption = options.find((option) => String(option.value) === String(value));
     const displayValue = selectedOption ? selectedOption.label : '';
 
-    // Close dropdown when clicking outside
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -87,7 +87,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Handle keyboard navigation
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (disabled) return;
 
@@ -153,13 +153,13 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         }
     };
 
-    // Get recommendation symbol and text
+
     const getRecommendationInfo = (option: Option) => {
         if (option.isRecommended)
             return { symbol: '⭐', text: t('แนะนำ'), color: 'text-yellow-300' };
         if (option.isGoodChoice) return { symbol: '✅', text: t('ดี'), color: 'text-green-300' };
         if (option.isUsable) return { symbol: '⚡', text: t('พอใช้'), color: 'text-orange-300' };
-        // Check if any recommendation property is defined
+
         if (
             option.isRecommended !== undefined ||
             option.isGoodChoice !== undefined ||
@@ -167,16 +167,14 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         ) {
             return { symbol: '⚠️', text: t('ไม่เหมาะสม'), color: 'text-red-300' };
         }
-        // Return null if no recommendation properties are defined
+
         return null;
     };
 
-    // Render option with enhanced display
     const renderOption = (option: Option, index: number) => {
         const isHighlighted = index === highlightedIndex;
         const isSelected = String(option.value) === String(value);
 
-        // Check if this option has enhanced data
         const hasEnhancedData =
             option.image ||
             option.productCode ||
@@ -192,18 +190,17 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 <div
                     key={option.value}
                     onClick={() => handleOptionClick(option.value)}
-                    className={`cursor-pointer px-3 py-3 text-sm transition-colors ${
-                        isHighlighted
-                            ? 'bg-blue-600 text-white'
-                            : isSelected
-                              ? 'bg-gray-700 text-blue-300'
-                              : option.disabled
+                    className={`cursor-pointer px-3 py-3 text-sm transition-colors ${isHighlighted
+                        ? 'bg-blue-600 text-white'
+                        : isSelected
+                            ? 'bg-gray-700 text-blue-300'
+                            : option.disabled
                                 ? 'cursor-not-allowed text-gray-500'
                                 : 'text-white hover:bg-gray-600 hover:text-white'
-                    }`}
+                        }`}
                 >
                     <div className="flex items-center space-x-3">
-                        {/* Image */}
+
                         <div className="flex-shrink-0">
                             {option.image ? (
                                 <img
@@ -221,18 +218,18 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                             )}
                         </div>
 
-                        {/* Product Information */}
+
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center space-x-2">
-                                {/* Auto-selection indicator */}
+
                                 {option.isAutoSelected && <span className="text-sm">🤖</span>}
 
-                                {/* Recommendation symbol */}
+
 
                                 <span className="font-medium text-white">{option.label}</span>
                             </div>
 
-                            {/* Description */}
+
                             {option.description && (
                                 <div className="mt-1 truncate text-xs text-gray-300">
                                     {option.description}
@@ -245,16 +242,15 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                         <span className="text-yellow-300">{option.brand}</span>
                                     )}
 
-                                    {/* Head Loss calculation display */}
+
                                     {option.headLoss !== undefined && (
                                         <div className="mt-1 rounded px-2 py-1">
                                             <div className="flex items-center justify-end text-xs">
                                                 <span
-                                                    className={`font-bold ${
-                                                        option.hasWarning
-                                                            ? 'text-green-400'
-                                                            : 'text-green-400'
-                                                    }`}
+                                                    className={`font-bold ${option.hasWarning
+                                                        ? 'text-green-400'
+                                                        : 'text-green-400'
+                                                        }`}
                                                 >
                                                     Head Loss: {option.headLoss.toFixed(3)} ม.
                                                     {option.hasWarning && ' ⚠️'}
@@ -268,51 +264,49 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                         </div>
                                     )}
 
-                                    {/* Recommendation text - only show if recommendation exists */}
+
                                     {recommendation && (
                                         <span className={`${recommendation.color}`}>
                                             {recommendation.symbol} {recommendation.text}
                                         </span>
                                     )}
 
-                                    {/* Flow and Head Adequacy Status */}
+
                                     {(option.isFlowAdequate !== undefined ||
                                         option.isHeadAdequate !== undefined) && (
-                                        <div className="flex items-center space-x-2">
-                                            {option.isFlowAdequate !== undefined && (
-                                                <span
-                                                    className={`rounded px-1 py-0.5 text-xs ${
-                                                        option.isFlowAdequate
+                                            <div className="flex items-center space-x-2">
+                                                {option.isFlowAdequate !== undefined && (
+                                                    <span
+                                                        className={`rounded px-1 py-0.5 text-xs ${option.isFlowAdequate
                                                             ? 'bg-green-700 text-green-200'
                                                             : 'bg-red-700 text-red-200'
-                                                    }`}
-                                                >
-                                                    Flow:{option.isFlowAdequate ? '✅' : '❌'}
-                                                    {option.flowRatio && (
-                                                        <span className="ml-1 text-gray-200">
-                                                            ({option.flowRatio.toFixed(1)}x)
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            )}
-                                            {option.isHeadAdequate !== undefined && (
-                                                <span
-                                                    className={`rounded px-1 py-0.5 text-xs ${
-                                                        option.isHeadAdequate
+                                                            }`}
+                                                    >
+                                                        Flow:{option.isFlowAdequate ? '✅' : '❌'}
+                                                        {option.flowRatio && (
+                                                            <span className="ml-1 text-gray-200">
+                                                                ({option.flowRatio.toFixed(1)}x)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )}
+                                                {option.isHeadAdequate !== undefined && (
+                                                    <span
+                                                        className={`rounded px-1 py-0.5 text-xs ${option.isHeadAdequate
                                                             ? 'bg-green-700 text-green-200'
                                                             : 'bg-red-700 text-red-200'
-                                                    }`}
-                                                >
-                                                    Head:{option.isHeadAdequate ? '✅' : '❌'}
-                                                    {option.headRatio && (
-                                                        <span className="ml-1 text-gray-200">
-                                                            ({option.headRatio.toFixed(1)}x)
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
+                                                            }`}
+                                                    >
+                                                        Head:{option.isHeadAdequate ? '✅' : '❌'}
+                                                        {option.headRatio && (
+                                                            <span className="ml-1 text-gray-200">
+                                                                ({option.headRatio.toFixed(1)}x)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                 </div>
 
                                 {option.price && (
@@ -332,20 +326,19 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             );
         }
 
-        // Fallback to simple text display with enhanced info
+
         return (
             <div
                 key={option.value}
                 onClick={() => handleOptionClick(option.value)}
-                className={`cursor-pointer px-3 py-3 text-sm transition-colors ${
-                    isHighlighted
-                        ? 'bg-blue-600 text-white'
-                        : isSelected
-                          ? 'bg-gray-700 text-blue-300'
-                          : option.disabled
+                className={`cursor-pointer px-3 py-3 text-sm transition-colors ${isHighlighted
+                    ? 'bg-blue-600 text-white'
+                    : isSelected
+                        ? 'bg-gray-700 text-blue-300'
+                        : option.disabled
                             ? 'cursor-not-allowed text-gray-500'
                             : 'text-white hover:bg-gray-600 hover:text-white'
-                }`}
+                    }`}
             >
                 <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
@@ -389,15 +382,13 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     onKeyDown={handleKeyDown}
                     placeholder={isOpen ? searchPlaceholder : placeholder}
                     disabled={disabled}
-                    className={`w-full rounded border border-gray-500 bg-gray-600 p-2 pr-10 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none ${
-                        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'
-                    }`}
+                    className={`w-full rounded border border-gray-500 bg-gray-600 p-2 pr-10 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'
+                        }`}
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                     <svg
-                        className={`h-5 w-5 text-gray-400 transition-transform ${
-                            isOpen ? 'rotate-180' : ''
-                        }`}
+                        className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''
+                            }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"

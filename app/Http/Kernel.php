@@ -68,5 +68,7 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'consume.tokens' => \App\Http\Middleware\ConsumeTokens::class,
         'handle.appearance' => \App\Http\Middleware\HandleAppearance::class,
+        'sales.role' => \App\Http\Middleware\SalesRoleMiddleware::class,
+        'restrict.sales' => \App\Http\Middleware\RestrictSalesAccess::class,
     ];
 }

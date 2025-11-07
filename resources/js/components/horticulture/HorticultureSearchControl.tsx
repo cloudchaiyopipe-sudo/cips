@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
@@ -16,10 +15,7 @@ import {
 import {
     universalSearch,
     detectCoordinatePattern,
-    formatCoordinatesDisplay,
-    createMapsUrlFromCoordinates,
     SearchResult as PlacesSearchResult,
-    SearchError,
 } from '../../utils/placesApiUtils';
 
 interface SearchResult {
@@ -100,7 +96,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [showCategories, setShowCategories] = useState(false);
     const [isCoordinateSearch, setIsCoordinateSearch] = useState(false);
-    const [lastSearchType, setLastSearchType] = useState<'text' | 'coordinate'>('text');
+    const [, setLastSearchType] = useState<'text' | 'coordinate'>('text');
 
     useEffect(() => {
         const stored = localStorage.getItem('recentMapSearches');
@@ -159,6 +155,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 document.body.removeChild(mapDiv);
             };
         } catch (error) {
+            console.error('Failed to initialize search system:', error);
             setError('ไม่สามารถเริ่มต้นระบบค้นหาได้');
         }
     }, [isGoogleMapsReady]);
@@ -276,13 +273,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return '฿'.repeat(priceLevel);
     };
 
-    const formatDistance = (meters: number): string => {
-        if (meters < 1000) {
-            return `${Math.round(meters)} ม.`;
-        }
-        return `${(meters / 1000).toFixed(1)} กม.`;
-    };
-
     const searchWithPredictions = useCallback(async (query: string) => {
         if (!autocompleteServiceRef.current || query.length < 2) {
             setAutocompletePredictions([]);
@@ -300,47 +290,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 setAutocompletePredictions(predictions.slice(0, 5));
             } else {
                 setAutocompletePredictions([]);
-            }
-        });
-    }, []);
-
-    const performTextSearch = useCallback(async (query: string) => {
-        if (!searchServiceRef.current || !query.trim()) return;
-
-        setIsLoading(true);
-        setError(null);
-
-        const request: google.maps.places.TextSearchRequest = {
-            query: query,
-            language: 'th',
-        };
-
-        searchServiceRef.current.textSearch(request, (results, status) => {
-            setIsLoading(false);
-
-            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                const detailedResults = results.slice(0, 10).map((place) => ({
-                    place_id: place.place_id || '',
-                    name: place.name || '',
-                    formatted_address: place.formatted_address || place.vicinity || '',
-                    geometry: place.geometry!,
-                    types: place.types || [],
-                    rating: place.rating,
-                    user_ratings_total: place.user_ratings_total,
-                    photos: place.photos,
-                    opening_hours: place.opening_hours,
-                    price_level: place.price_level,
-                    business_status: place.business_status,
-                    vicinity: place.vicinity,
-                }));
-
-                setSearchResults(detailedResults);
-                setShowResults(true);
-            } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                setSearchResults([]);
-                setError('ไม่พบผลการค้นหา');
-            } else {
-                setError('เกิดข้อผิดพลาดในการค้นหา');
             }
         });
     }, []);
@@ -465,13 +414,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 return;
             }
 
-            // ตรวจสอบว่าเป็นพิกัดหรือไม่
             const isCoordinate = detectCoordinatePattern(value);
             setIsCoordinateSearch(isCoordinate);
 
             if (isCoordinate) {
-                // ถ้าเป็นพิกัด ไม่ต้องทำ autocomplete
-                setAutocompletePredictions([]);
 
                 searchTimeoutRef.current = setTimeout(async () => {
                     setIsLoading(true);
@@ -483,7 +429,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setError(result.error.message);
                             setSearchResults([]);
                         } else {
-                            // แปลง PlacesSearchResult เป็น SearchResult interface ของ component
                             const convertedResults: SearchResult[] = result.results.map(
                                 (place: PlacesSearchResult) => ({
                                     place_id: place.place_id,
@@ -502,6 +447,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowResults(true);
                         }
                     } catch (err) {
+                        console.error('Error in search:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -509,7 +455,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     }
                 }, 300);
             } else {
-                // ถ้าเป็นข้อความธรรมดา ให้ทำ autocomplete และค้นหาแบบเดิม
                 searchWithPredictions(value);
 
                 searchTimeoutRef.current = setTimeout(async () => {
@@ -522,7 +467,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setError(result.error.message);
                             setSearchResults([]);
                         } else {
-                            // แปลง PlacesSearchResult เป็น SearchResult interface ของ component
                             const convertedResults: SearchResult[] = result.results.map(
                                 (place: PlacesSearchResult) => ({
                                     place_id: place.place_id,
@@ -541,6 +485,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowResults(true);
                         }
                     } catch (err) {
+                        console.error('Error in search:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -656,14 +601,14 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         if (!photos || photos.length === 0) return null;
         try {
             return photos[0].getUrl({ maxWidth: 100, maxHeight: 100 });
-        } catch (e) {
+        } catch {
             return null;
         }
     };
 
     if (!isGoogleMapsReady) {
         return (
-            <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
+            <div className="enhanced-search-container absolute left-4 top-4 z-[0] w-[420px] max-w-[calc(100vw-2rem)]">
                 <div className="rounded-lg border border-gray-600 bg-gray-900/95 p-3 text-sm text-white shadow-xl backdrop-blur">
                     <div className="flex items-center gap-2">
                         <FaSpinner className="h-4 w-4 animate-spin text-gray-400" />
@@ -675,7 +620,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     }
 
     return (
-        <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
+        <div className="enhanced-search-container absolute left-4 top-4 z-[0] w-[350px] max-w-[calc(100vw-2rem)]">
             <div className="relative">
                 <div className="relative">
                     <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400" />
@@ -723,7 +668,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     </button>
                 </div>
 
-                {/* Categories Dropdown */}
                 {showCategories && (
                     <div className="absolute mt-2 w-full rounded-lg border border-gray-600 bg-gray-900 shadow-xl">
                         <div className="p-3">
@@ -753,7 +697,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     </div>
                 )}
 
-                {/* Error Message */}
                 {error && (
                     <div className="mt-2 rounded-lg border border-red-600 bg-red-900 p-3 text-sm text-red-200 shadow-xl">
                         <div className="flex items-center gap-2">
@@ -769,16 +712,14 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     </div>
                 )}
 
-                {/* Search Results */}
                 {showResults && (
                     <div className="absolute mt-2 max-h-[500px] w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-2xl">
-                        {/* Recent Searches */}
                         {!searchQuery && recentSearches.length > 0 && (
                             <div className="border-b border-gray-200 p-3">
                                 <h3 className="mb-2 text-sm font-semibold text-gray-700">
                                     ค้นหาล่าสุด
                                 </h3>
-                                {recentSearches.map((recent, index) => (
+                                {recentSearches.map((recent) => (
                                     <div
                                         key={recent.place_id}
                                         onClick={() => handleRecentSearchSelect(recent)}

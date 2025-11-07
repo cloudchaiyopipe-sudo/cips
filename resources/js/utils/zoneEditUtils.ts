@@ -1,5 +1,3 @@
-// zoneEditUtils.ts - Zone Editing Utilities for Automatic Zones
-
 import { Coordinate, PlantLocation, IrrigationZone } from './irrigationZoneUtils';
 import { isPointInPolygon } from './horticultureUtils';
 
@@ -25,7 +23,6 @@ export interface ZoneEditResult {
     wasModified: boolean;
 }
 
-// Helper function สำหรับ deep copy IrrigationZone
 export const deepCopyZone = (zone: IrrigationZone): IrrigationZone => {
     return {
         id: zone.id,
@@ -38,15 +35,13 @@ export const deepCopyZone = (zone: IrrigationZone): IrrigationZone => {
     };
 };
 
-// สร้างจุดควบคุมรอบโซนที่เลือก (แสดงเฉพาะจุดยอด)
 export const createZoneControlPoints = (zone: IrrigationZone): ZoneControlPoint[] => {
     const controlPoints: ZoneControlPoint[] = [];
 
-    // สร้างจุดควบคุมที่จุดยอดของ polygon เท่านั้น - ใช้ deep copy เพื่อหลีกเลี่ยง reference sharing
     zone.coordinates.forEach((coord, index) => {
         controlPoints.push({
             id: `control-${zone.id}-${index}`,
-            position: { lat: coord.lat, lng: coord.lng }, // deep copy แทน spread operator
+            position: { lat: coord.lat, lng: coord.lng }, 
             index: index,
             isDraggable: true,
         });
@@ -55,18 +50,14 @@ export const createZoneControlPoints = (zone: IrrigationZone): ZoneControlPoint[
     return controlPoints;
 };
 
-// ตรวจสอบว่าจุดอยู่ในพื้นที่หลักหรือไม่
 export const isPointWithinMainArea = (point: Coordinate, mainArea: Coordinate[]): boolean => {
     return isPointInPolygon(point, mainArea);
 };
 
-// ตรวจสอบว่าพอลิกอนทั้งหมดอยู่ในพื้นที่หลักหรือไม่
 export const isPolygonWithinMainArea = (polygon: Coordinate[], mainArea: Coordinate[]): boolean => {
-    // ตรวจสอบทุกจุดในพอลิกอน
     return polygon.every((point) => isPointWithinMainArea(point, mainArea));
 };
 
-// อัปเดตพิกัดโซนเมื่อลากจุดควบคุม (ปรับปรุงให้มีความยืดหยุ่นมากขึ้น)
 export const updateZoneCoordinatesOnDrag = (
     zone: IrrigationZone,
     controlPointIndex: number,
@@ -77,7 +68,6 @@ export const updateZoneCoordinatesOnDrag = (
     isValid: boolean;
     errorMessage?: string;
 } => {
-    // 🔧 แก้ไข: ตรวจสอบว่าโซนมี coordinates หรือไม่
     if (!zone.coordinates || zone.coordinates.length < 3) {
         return {
             updatedCoordinates: zone.coordinates || [],
@@ -86,7 +76,6 @@ export const updateZoneCoordinatesOnDrag = (
         };
     }
 
-    // ตรวจสอบว่า controlPointIndex ถูกต้องหรือไม่
     if (controlPointIndex < 0 || controlPointIndex >= zone.coordinates.length) {
         return {
             updatedCoordinates: zone.coordinates,
@@ -95,7 +84,6 @@ export const updateZoneCoordinatesOnDrag = (
         };
     }
 
-    // สร้าง deep copy ของ coordinates เพื่อหลีกเลี่ยง reference sharing
     const newCoordinates = zone.coordinates.map((coord, index) => {
         if (index === controlPointIndex) {
             return { lat: newPosition.lat, lng: newPosition.lng };
@@ -103,14 +91,11 @@ export const updateZoneCoordinatesOnDrag = (
         return { lat: coord.lat, lng: coord.lng };
     });
 
-    // 🔧 แก้ไข: เปลี่ยนจากการห้ามออกนอกพื้นที่หลักเป็นการเตือน
     const isWithinMainArea = isPointWithinMainArea(newPosition, mainArea);
     if (!isWithinMainArea) {
-        // ให้เป็น warning แทนการห้าม
         console.warn('⚠️ Control point moved outside main area, but allowing for flexibility');
     }
 
-    // ตรวจสอบว่าพอลิกอนใหม่ยังคงเป็นรูปที่ถูกต้อง
     if (newCoordinates.length < 3) {
         return {
             updatedCoordinates: zone.coordinates,
@@ -119,9 +104,7 @@ export const updateZoneCoordinatesOnDrag = (
         };
     }
 
-    // 🔧 แก้ไข: ลดความเข้มงวดในการตรวจสอบ self-intersection
     if (hasPolygonSelfIntersection(newCoordinates)) {
-        // ให้เป็น warning แทนการห้าม แต่ยังคงอนุญาตให้แก้ไขได้
         console.warn('⚠️ Zone has self-intersection, but allowing edit to continue');
     }
 
@@ -131,17 +114,28 @@ export const updateZoneCoordinatesOnDrag = (
     };
 };
 
-// ตรวจสอบการตัดกันเองของพอลิกอน
 const hasPolygonSelfIntersection = (coordinates: Coordinate[]): boolean => {
     const n = coordinates.length;
     if (n < 4) return false;
+
+    // ตรวจสอบจุดซ้ำกันก่อน
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            const dist = Math.sqrt(
+                Math.pow(coordinates[i].lat - coordinates[j].lat, 2) +
+                Math.pow(coordinates[i].lng - coordinates[j].lng, 2)
+            );
+            if (dist < 1e-8) {
+                return true;
+            }
+        }
+    }
 
     for (let i = 0; i < n; i++) {
         const line1Start = coordinates[i];
         const line1End = coordinates[(i + 1) % n];
 
         for (let j = i + 2; j < n; j++) {
-            // ข้ามเส้นที่ติดกัน
             if (j === (i - 1 + n) % n || j === (i + 1) % n) continue;
 
             const line2Start = coordinates[j];
@@ -156,7 +150,6 @@ const hasPolygonSelfIntersection = (coordinates: Coordinate[]): boolean => {
     return false;
 };
 
-// ตรวจสอบการตัดกันของเส้นสองเส้น
 const doLineSegmentsIntersect = (
     p1: Coordinate,
     q1: Coordinate,
@@ -165,8 +158,8 @@ const doLineSegmentsIntersect = (
 ): boolean => {
     const orientation = (p: Coordinate, q: Coordinate, r: Coordinate): number => {
         const val = (q.lng - p.lng) * (r.lat - q.lat) - (q.lat - p.lat) * (r.lng - q.lng);
-        if (Math.abs(val) < 1e-10) return 0; // Collinear
-        return val > 0 ? 1 : 2; // Clockwise or Counterclockwise
+        if (Math.abs(val) < 1e-10) return 0; 
+        return val > 0 ? 1 : 2; 
     };
 
     const onSegment = (p: Coordinate, q: Coordinate, r: Coordinate): boolean => {
@@ -183,10 +176,8 @@ const doLineSegmentsIntersect = (
     const o3 = orientation(p2, q2, p1);
     const o4 = orientation(p2, q2, q1);
 
-    // กรณีทั่วไป
     if (o1 !== o2 && o3 !== o4) return true;
 
-    // กรณีพิเศษ
     if (o1 === 0 && onSegment(p1, p2, q1)) return true;
     if (o2 === 0 && onSegment(p1, q2, q1)) return true;
     if (o3 === 0 && onSegment(p2, p1, q2)) return true;
@@ -195,7 +186,6 @@ const doLineSegmentsIntersect = (
     return false;
 };
 
-// หาต้นไม้ที่อยู่ในโซนที่แก้ไขแล้ว
 export const findPlantsInEditedZone = (
     updatedCoordinates: Coordinate[],
     allPlants: PlantLocation[]
@@ -203,12 +193,10 @@ export const findPlantsInEditedZone = (
     return allPlants.filter((plant) => isPointInPolygon(plant.position, updatedCoordinates));
 };
 
-// คำนวณความต้องการน้ำรวมของต้นไม้ในโซน
 export const calculateZoneWaterNeed = (plants: PlantLocation[]): number => {
     return plants.reduce((total, plant) => total + plant.plantData.waterNeed, 0);
 };
 
-// สร้างโซนใหม่หลังจากการแก้ไข
 export const createUpdatedZone = (
     originalZone: IrrigationZone,
     newCoordinates: Coordinate[],
@@ -224,7 +212,6 @@ export const createUpdatedZone = (
     };
 };
 
-// ตรวจสอบว่าจุดคลิกอยู่ในโซนไหน
 export const findZoneByPoint = (
     point: Coordinate,
     zones: IrrigationZone[]
@@ -237,12 +224,11 @@ export const findZoneByPoint = (
     return null;
 };
 
-// คำนวณระยะห่างระหว่างจุดกับจุดควบคุม
 export const calculateDistanceToControlPoint = (
     point: Coordinate,
     controlPoint: ZoneControlPoint
 ): number => {
-    const R = 6371000; // Earth's radius in meters
+    const R = 6371000; 
     const dLat = ((controlPoint.position.lat - point.lat) * Math.PI) / 180;
     const dLng = ((controlPoint.position.lng - point.lng) * Math.PI) / 180;
     const a =
@@ -255,11 +241,10 @@ export const calculateDistanceToControlPoint = (
     return R * c;
 };
 
-// หาจุดควบคุมที่ใกล้ที่สุดกับตำแหน่งคลิก
 export const findNearestControlPoint = (
     clickPoint: Coordinate,
     controlPoints: ZoneControlPoint[],
-    threshold: number = 20 // เมตร
+    threshold: number = 20 
 ): ZoneControlPoint | null => {
     let nearestPoint: ZoneControlPoint | null = null;
     let minDistance = threshold;
@@ -275,7 +260,6 @@ export const findNearestControlPoint = (
     return nearestPoint;
 };
 
-// สร้าง initial state สำหรับการแก้ไขโซน
 export const createInitialZoneEditState = (): ZoneEditState => {
     return {
         isEditing: false,
@@ -287,12 +271,10 @@ export const createInitialZoneEditState = (): ZoneEditState => {
     };
 };
 
-// เริ่มต้นการแก้ไขโซน
 export const startZoneEditing = (
     zone: IrrigationZone,
     currentState: ZoneEditState
 ): ZoneEditState => {
-    // สร้าง deep copy ของ zone เพื่อหลีกเลี่ยง reference sharing
     const editingZone = deepCopyZone(zone);
     const controlPoints = createZoneControlPoints(editingZone);
 
@@ -307,12 +289,10 @@ export const startZoneEditing = (
     };
 };
 
-// หยุดการแก้ไขโซน
 export const stopZoneEditing = (): ZoneEditState => {
     return createInitialZoneEditState();
 };
 
-// เริ่มการลากจุดควบคุม
 export const startDragging = (
     controlPoint: ZoneControlPoint,
     currentState: ZoneEditState
@@ -324,7 +304,6 @@ export const startDragging = (
     };
 };
 
-// หยุดการลากจุดควบคุม
 export const stopDragging = (currentState: ZoneEditState): ZoneEditState => {
     return {
         ...currentState,
@@ -333,34 +312,28 @@ export const stopDragging = (currentState: ZoneEditState): ZoneEditState => {
     };
 };
 
-// อัปเดตตำแหน่ง control points โดยไม่สร้างใหม่ทั้งหมด (เฉพาะจุดยอดเท่านั้น)
 export const updateZoneControlPoints = (
     controlPoints: ZoneControlPoint[],
     updatedCoordinates: Coordinate[],
     draggedPointIndex: number
-    // zone?: IrrigationZone
 ): ZoneControlPoint[] => {
-    // สร้าง deep copy ของทุก control point
     return controlPoints.map((controlPoint) => {
-        // อัปเดตเฉพาะจุดที่ถูกลาก
         if (controlPoint.index === draggedPointIndex) {
             const newPosition = updatedCoordinates[draggedPointIndex];
             return {
                 id: controlPoint.id,
-                position: { lat: newPosition.lat, lng: newPosition.lng }, // deep copy
+                position: { lat: newPosition.lat, lng: newPosition.lng }, 
                 index: controlPoint.index,
                 isDraggable: controlPoint.isDraggable,
             };
         }
-        // คืนค่าจุดอื่น ๆ โดยไม่เปลี่ยนแปลง - แต่เป็น deep copy
         return {
             id: controlPoint.id,
-            position: { lat: controlPoint.position.lat, lng: controlPoint.position.lng }, // deep copy
+            position: { lat: controlPoint.position.lat, lng: controlPoint.position.lng }, 
             index: controlPoint.index,
             isDraggable: controlPoint.isDraggable,
         };
     });
 };
 
-// ส่งออกฟังก์ชันที่จำเป็น
 export { isPointInPolygon } from './horticultureUtils';

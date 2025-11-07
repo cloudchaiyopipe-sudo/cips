@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Token management utilities for the frontend
  */
@@ -134,9 +135,6 @@ export const handleTokenConsumption = async (
     const remainingTokens = response.headers.get('X-Remaining-Tokens');
 
     if (tokensConsumed && remainingTokens) {
-        console.log(
-            `Consumed ${tokensConsumed} tokens for ${operation}. Remaining: ${remainingTokens}`
-        );
 
         // You can dispatch a custom event here to update the navbar token display
         window.dispatchEvent(

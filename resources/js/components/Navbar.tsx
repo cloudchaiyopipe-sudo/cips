@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
@@ -63,7 +64,6 @@ const Navbar: React.FC = () => {
     // Function to refresh CSRF token
     const refreshCsrfToken = async () => {
         try {
-            console.log('Refreshing CSRF token...');
             const response = await axios.get('/csrf-token');
             if (response.data.token) {
                 axios.defaults.headers.common['X-CSRF-TOKEN'] = response.data.token;
@@ -71,7 +71,6 @@ const Navbar: React.FC = () => {
                 if (metaTag) {
                     metaTag.setAttribute('content', response.data.token);
                 }
-                console.log('CSRF token refreshed successfully');
                 return response.data.token;
             }
         } catch (error) {
@@ -83,9 +82,7 @@ const Navbar: React.FC = () => {
     // Test authentication function
     const testAuth = async () => {
         try {
-            console.log('Testing authentication...');
             const response = await axios.get('/api/test-auth');
-            console.log('Auth test response:', response.data);
             return response.data;
         } catch (error: any) {
             console.error('Auth test failed:', error);
@@ -101,29 +98,14 @@ const Navbar: React.FC = () => {
         notes: string;
     }) => {
         try {
-            console.log('Submitting token purchase request:', purchaseData);
-            console.log(
-                'CSRF Token before refresh:',
-                document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-            );
-
-            // Refresh CSRF token first
             await refreshCsrfToken();
 
-            console.log(
-                'CSRF Token after refresh:',
-                document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-            );
-            console.log('Axios defaults:', axios.defaults.headers.common);
-
-            // Test authentication first
             const authTest = await testAuth();
             if (!authTest || !authTest.success) {
                 alert('Authentication failed. Please refresh the page and try again.');
                 return;
             }
 
-            // Create FormData for file upload
             const formData = new FormData();
             formData.append('tokens', purchaseData.tokens.toString());
             formData.append('amount', purchaseData.amount.toString());
@@ -137,7 +119,6 @@ const Navbar: React.FC = () => {
                     'Content-Type': 'multipart/form-data',
                 },
             });
-            console.log('Token purchase response:', response.data);
 
             if (response.data.success) {
                 alert(
@@ -155,13 +136,10 @@ const Navbar: React.FC = () => {
             console.error('Error response:', error.response?.data);
             console.error('Error status:', error.response?.status);
 
-            // If it's a CSRF token mismatch, try refreshing and retrying once
             if (error.response?.status === 419 || error.response?.data?.message?.includes('CSRF')) {
-                console.log('CSRF token mismatch detected, refreshing token and retrying...');
                 try {
                     await refreshCsrfToken();
 
-                    // Recreate FormData for retry
                     const retryFormData = new FormData();
                     retryFormData.append('tokens', purchaseData.tokens.toString());
                     retryFormData.append('amount', purchaseData.amount.toString());
@@ -179,7 +157,6 @@ const Navbar: React.FC = () => {
                             },
                         }
                     );
-                    console.log('Retry token purchase response:', retryResponse.data);
 
                     if (retryResponse.data.success) {
                         alert(
@@ -200,17 +177,6 @@ const Navbar: React.FC = () => {
         }
     };
 
-    // ฟังก์ชันสำหรับเลื่อนไปยัง Footer
-    // const scrollToFooter = () => {
-    //     const footerElement = document.getElementById('contact-footer');
-    //     if (footerElement) {
-    //         footerElement.scrollIntoView({
-    //             behavior: 'smooth',
-    //             block: 'start'
-    //         });
-    //     }
-    // };
-
     return (
         <>
             <nav className="border-b border-gray-700 bg-gray-800 shadow-lg">
@@ -220,86 +186,86 @@ const Navbar: React.FC = () => {
                         <div className="flex items-center">
                             <Link
                                 href="/"
-                                className="flex items-center space-x-3 text-white transition-colors hover:text-green-300"
+                                className="flex items-center space-x-2 text-white transition-colors hover:text-green-300 sm:space-x-3"
                             >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white sm:h-10 sm:w-10">
                                     <img
                                         src="/images/chaiyo-logo.png"
                                         alt="logo"
                                         className="rounded-lg"
                                     />
                                 </div>
-                                <div>
-                                    <h1 className="text-xl font-bold">
+                                <div className="hidden sm:block">
+                                    <h1 className="text-lg font-bold sm:text-xl">
                                         {t('Chaiyo Irrigation Planning System')}
                                     </h1>
-                                    <p className="text-sm">
+                                    <p className="text-xs sm:text-sm">
                                         {t(
                                             'บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด'
                                         )}
                                     </p>
                                 </div>
+                                <div className="block sm:hidden">
+                                    <h1 className="text-xl font-bold">
+                                        {t('CIPS')}
+                                    </h1>
+                                </div>
                             </Link>
                         </div>
 
                         {/* Right side - Language Switcher and User Avatar */}
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2 sm:space-x-4">
                             {/* Super User Dashboard Link */}
                             {auth?.user?.is_super_user && (
                                 <Link
                                     href="/super/dashboard"
-                                    className="flex items-center rounded-lg bg-yellow-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+                                    className="hidden items-center rounded-lg bg-yellow-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-yellow-700 sm:flex sm:px-3 sm:text-sm"
                                 >
-                                    <span className="text-lg">👑</span>
-                                    {t('Super Dashboard')}
+                                    <span className="text-sm sm:text-lg">👑</span>
+                                    <span className="hidden sm:inline">{t('Super Dashboard')}</span>
                                 </Link>
                             )}
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 sm:gap-3">
                                 <FloatingAiChat
                                     isOpen={showFloatingAiChat}
                                     onClose={() => setShowFloatingAiChat(false)}
                                     onMinimize={() => setIsAiChatMinimized(!isAiChatMinimized)}
                                     isMinimized={isAiChatMinimized}
                                 />
-                                {/* <button
-                                    onClick={() => setShowFloatingAiChat(true)}
-                                    className="rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 text-sm font-medium text-white transition-all hover:from-green-600 hover:to-blue-600"
-                                >
-                                    🤖 {t('AI ช่วยเหลือ')}
-                                </button> */}
                                 {auth?.user?.is_super_user && (
                                     <button
                                         onClick={() => (window.location.href = '/equipment-crud')}
-                                        className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+                                        className="hidden rounded-lg bg-gray-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-700 sm:block sm:px-4 sm:py-2 sm:text-sm"
                                     >
-                                        ⚙️ {t('จัดการอุปกรณ์')}
+                                        <span className="sm:hidden">⚙️</span>
+                                        <span className="hidden sm:inline">⚙️ {t('จัดการอุปกรณ์')}</span>
                                     </button>
                                 )}
                             </div>
 
                             {/* Token Display for Non-Admin Users */}
                             {auth?.user && !auth.user.is_super_user && (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 sm:gap-2">
                                     {loadingTokens ? (
-                                        <div className="flex items-center gap-2 rounded-lg bg-gray-700 px-3 py-1 text-sm text-white">
-                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                                            Loading...
+                                        <div className="flex items-center gap-1 rounded-lg bg-gray-700 px-2 py-1 text-xs text-white sm:gap-2 sm:px-3 sm:text-sm">
+                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent sm:h-4 sm:w-4"></div>
+                                            <span className="hidden sm:inline">Loading...</span>
                                         </div>
                                     ) : tokenStatus ? (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1 sm:gap-2">
                                             <button
                                                 onClick={() => setShowTokenPricingModal(true)}
-                                                className="flex cursor-pointer items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                                                className="flex cursor-pointer items-center gap-1 rounded-lg bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 sm:px-3 sm:text-sm"
                                                 title="Click to view token pricing and usage"
                                             >
-                                                <span className="text-lg">🪙</span>
+                                                <span className="text-sm sm:text-lg">🪙</span>
                                                 <span>{tokenStatus.current_tokens}</span>
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-1 rounded-lg bg-gray-600 px-3 py-1 text-sm text-white">
-                                            <span className="text-lg">🪙</span>
+                                        <div className="flex items-center gap-1 rounded-lg bg-gray-600 px-2 py-1 text-xs text-white sm:px-3 sm:text-sm">
+                                            <span className="text-sm sm:text-lg">🪙</span>
                                             <span>--</span>
                                         </div>
                                     )}
@@ -309,7 +275,7 @@ const Navbar: React.FC = () => {
 
                             {/* User Avatar - Only show if authenticated */}
                             {auth?.user && (
-                                <UserAvatar user={auth.user} size="md" className="ml-2" />
+                                <UserAvatar user={auth.user} size="sm" className="ml-1 sm:ml-2 sm:size-md" />
                             )}
                         </div>
                     </div>
@@ -355,12 +321,12 @@ const Navbar: React.FC = () => {
                                 {/* Starter Package */}
                                 <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center transition-colors hover:border-blue-500">
                                     <div className="mb-4">
-                                        <div className="text-3xl font-bold text-blue-400">10</div>
+                                        <div className="text-3xl font-bold text-blue-400">XXX</div>
                                         <div className="text-sm text-gray-400">Tokens</div>
                                     </div>
                                     <div className="mb-4">
-                                        <div className="text-2xl font-bold text-white">฿50</div>
-                                        <div className="text-sm text-gray-400">฿5 per token</div>
+                                        <div className="text-2xl font-bold text-white">฿XXX</div>
+                                        <div className="text-sm text-gray-400">฿XXX per token</div>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -381,13 +347,13 @@ const Navbar: React.FC = () => {
                                         </span>
                                     </div>
                                     <div className="mb-4">
-                                        <div className="text-3xl font-bold text-green-400">50</div>
+                                        <div className="text-3xl font-bold text-green-400">XXX</div>
                                         <div className="text-sm text-gray-400">Tokens</div>
                                     </div>
                                     <div className="mb-4">
-                                        <div className="text-2xl font-bold text-white">฿200</div>
-                                        <div className="text-sm text-gray-400">฿4 per token</div>
-                                        <div className="text-xs text-green-400">Save ฿50</div>
+                                        <div className="text-2xl font-bold text-white">฿XXX</div>
+                                        <div className="text-sm text-gray-400">฿XXX per token</div>
+                                        <div className="text-xs text-green-400">Save ฿XXX</div>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -404,14 +370,14 @@ const Navbar: React.FC = () => {
                                 <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center transition-colors hover:border-purple-500">
                                     <div className="mb-4">
                                         <div className="text-3xl font-bold text-purple-400">
-                                            100
+                                            XXX
                                         </div>
                                         <div className="text-sm text-gray-400">Tokens</div>
                                     </div>
                                     <div className="mb-4">
-                                        <div className="text-2xl font-bold text-white">฿350</div>
-                                        <div className="text-sm text-gray-400">฿3.5 per token</div>
-                                        <div className="text-xs text-purple-400">Save ฿150</div>
+                                        <div className="text-2xl font-bold text-white">฿XXX</div>
+                                        <div className="text-sm text-gray-400">฿XXX per token</div>
+                                        <div className="text-xs text-purple-400">Save ฿XXX</div>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -428,14 +394,14 @@ const Navbar: React.FC = () => {
                             {/* Enterprise Package */}
                             <div className="mt-6 rounded-lg border border-yellow-500 bg-gray-800 p-6 text-center">
                                 <div className="mb-4">
-                                    <div className="text-3xl font-bold text-yellow-400">500</div>
+                                    <div className="text-3xl font-bold text-yellow-400">XXX</div>
                                     <div className="text-sm text-gray-400">Tokens</div>
                                 </div>
                                 <div className="mb-4">
-                                    <div className="text-2xl font-bold text-white">฿1,500</div>
-                                    <div className="text-sm text-gray-400">฿3 per token</div>
+                                    <div className="text-2xl font-bold text-white">฿XXX</div>
+                                    <div className="text-sm text-gray-400">฿XXX per token</div>
                                     <div className="text-xs text-yellow-400">
-                                        Best Value - Save ฿1,000
+                                        Best Value - Save ฿XXX
                                     </div>
                                 </div>
                                 <button

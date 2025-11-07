@@ -302,7 +302,6 @@ export default function GreenhouseSummary() {
             // Capture canvas image and save to localStorage
             if (canvasRef.current) {
                 try {
-                    console.log('Capturing canvas image...');
                     const canvas = await html2canvas(canvasRef.current, {
                         backgroundColor: '#000000',
                         useCORS: true,
@@ -310,7 +309,6 @@ export default function GreenhouseSummary() {
                     const image = canvas.toDataURL('image/png');
 
                     localStorage.setItem('projectMapImage', image);
-                    console.log('✅ Image saved to localStorage successfully.');
                 } catch (error) {
                     console.error('Error capturing canvas image:', error);
                     alert(t('เกิดข้อผิดพลาดในการสร้างภาพแผนผัง'));
@@ -341,6 +339,14 @@ export default function GreenhouseSummary() {
                     updatedAt: new Date().toISOString(),
                 })
             );
+
+            // สร้าง dynamic zone mapping สำหรับการจับคู่ activeZoneId กับ plotPipeData
+            const { createDynamicZoneMapping } = await import('../../utils/greenhouseZoneMapping');
+            // ใช้ plotPipeData ที่เป็น array จาก summaryData
+            const activeZoneIds = summaryData.shapes
+                .filter(shape => shape.type === 'plot')
+                .map((shape, index) => `plot-${Date.now()}-${index}`); // สร้าง dynamic ID
+            createDynamicZoneMapping(activeZoneIds, [plotPipeData]); // wrap ใน array
 
             // Set project type for the product page
             localStorage.setItem('projectType', 'greenhouse');
@@ -427,30 +433,10 @@ export default function GreenhouseSummary() {
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
-                console.log('Summary: Loaded data from localStorage:', parsedData);
-                console.log('Summary: Irrigation elements:', parsedData.irrigationElements);
-                console.log(
-                    'Summary: Irrigation elements length:',
-                    parsedData.irrigationElements?.length || 'undefined'
-                );
-                console.log('Summary: Keys in parsedData:', Object.keys(parsedData));
-
-                // Check if irrigationElements exists and is an array
-                if (parsedData.irrigationElements) {
-                    console.log(
-                        'irrigationElements is array:',
-                        Array.isArray(parsedData.irrigationElements)
-                    );
-                    console.log('irrigationElements type:', typeof parsedData.irrigationElements);
-                } else {
-                    console.log('irrigationElements is missing or falsy');
-                }
 
                 setSummaryData(parsedData);
             } catch (error) {
                 console.error('Error parsing saved data:', error);
-
-                // Fallback to URL parameters
                 if (crops || shapesParam) {
                     const newData: GreenhouseSummaryData = {
                         selectedCrops: crops ? crops.split(',') : [],
@@ -641,11 +627,6 @@ export default function GreenhouseSummary() {
 
     // Calculate cumulative pipe lengths for each plot (Enhanced version)
     const calculatePipeInPlots = () => {
-        console.log('=== calculatePipeInPlots START ===');
-        console.log('summaryData:', summaryData);
-        console.log('summaryData?.irrigationElements:', summaryData?.irrigationElements);
-        console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
-
         if (!summaryData?.shapes || !summaryData?.irrigationElements) {
             return [];
         }
@@ -826,16 +807,6 @@ export default function GreenhouseSummary() {
 
                 plotPipeData.hasPipes = true;
 
-                console.log(
-                    `📊 ${plotPipeData.plotName} - ความยาวท่อที่เกี่ยวข้อง (เมตร):`,
-                    relatedPipeLengthsInMeters
-                );
-                console.log(
-                    `📊 ${plotPipeData.plotName} - ท่อที่ยาวที่สุด: ${maxSubPipeLength.toFixed(2)} เมตร`
-                );
-                console.log(
-                    `📊 ${plotPipeData.plotName} - ความยาวรวม: ${totalSubLengthInPlot.toFixed(2)} เมตร`
-                );
             }
 
             // คำนวณจำนวน emitters ในแปลงนี้
@@ -973,14 +944,6 @@ export default function GreenhouseSummary() {
                     }
                 });
 
-                // แสดงข้อมูลท่อที่เกี่ยวข้องกับแปลง
-                console.log(
-                    `🌱 ${plotPipeData.plotName} - จำนวนท่อที่เกี่ยวข้อง: ${relatedSubPipes.length} เส้น`
-                );
-                console.log(
-                    `📏 ${plotPipeData.plotName} - ความยาวท่อแต่ละเส้น (pixels):`,
-                    relatedPipeLengths
-                );
                 console.log(
                     `🏆 ${plotPipeData.plotName} - ท่อที่ยาวที่สุด: เส้นที่ ${longestPipeIndex + 1} (${longestSubLengthPx.toFixed(2)} pixels)`
                 );
@@ -998,9 +961,6 @@ export default function GreenhouseSummary() {
                     return distanceToPlot <= baseTolerance * 2;
                 }).length;
 
-                console.log(
-                    `🚿 ${plotPipeData.plotName} - สปริงเกลอร์ในแปลง: ${sprinklersInPlot} ตัว`
-                );
                 console.log(
                     `🚿 ${plotPipeData.plotName} - สปริงเกลอร์ใกล้ขอบแปลง: ${sprinklersNearEdge} ตัว`
                 );
@@ -1150,37 +1110,7 @@ export default function GreenhouseSummary() {
                         }
                     }
 
-                    // แสดงข้อมูลสปริงเกลอร์และจุดน้ำหยดในท่อย่อยนี้
-                    console.log(`💧 ${plotPipeData.plotName} - ท่อย่อยเส้นที่ ${idx + 1}:`);
-                    console.log(`   📏 ความยาว: ${relatedPipeLengths[idx].toFixed(2)} pixels`);
-                    console.log(`   🚿 จำนวนสปริงเกลอร์: ${sprCount} ตัว`);
-                    console.log(`   💧 จำนวนจุดน้ำหยด: ${dripCount} จุด`);
-                    console.log(`   🎯 Tolerance ที่ใช้: ${bestTolerance.toFixed(2)} pixels`);
-
-                    // Debug: ตรวจสอบปัญหาสำหรับแปลงปลูก 2
                     if (plotPipeData.plotName.includes('2') && sprCount === 0) {
-                        console.log(
-                            `🔍 DEBUG - ${plotPipeData.plotName} ท่อย่อย ${idx + 1} ไม่เจอสปริงเกลอร์:`,
-                            {
-                                totalSprinklers: sprinklers.length,
-                                sprinklersInPlot: sprinklers.filter((spr) => {
-                                    const p = spr.points[0];
-                                    return p && isPointInPolygon(p, plot.points);
-                                }).length,
-                                sprinklersNearEdge: sprinklers.filter((spr) => {
-                                    const p = spr.points[0];
-                                    if (!p) return false;
-                                    const distanceToPlot = distancePointToPolygon(p, plot.points);
-                                    return distanceToPlot <= baseTolerance * 2;
-                                }).length,
-                                toleranceLevels: toleranceLevels,
-                                bestTolerance: bestTolerance,
-                                subPipePoints: sp.points.length,
-                                plotPoints: plot.points.length,
-                                baseTolerance: baseTolerance,
-                            }
-                        );
-
                         // ตรวจสอบสปริงเกลอร์ที่ใกล้ที่สุด (รวมสปริงเกลอร์ที่อยู่ขอบแปลง)
                         interface ClosestSprinkler {
                             id: string;
@@ -1230,22 +1160,7 @@ export default function GreenhouseSummary() {
                         });
 
                         if (closestSprinkler) {
-                            console.log(`🔍 สปริงเกลอร์ที่ใกล้ที่สุด:`, closestSprinkler);
-
                             // ถ้าสปริงเกลอร์ที่ใกล้ที่สุดอยู่ไม่ไกลเกินไป ให้ลองใช้ tolerance ที่ใหญ่ขึ้น
-                            if (
-                                closestSprinkler &&
-                                (closestSprinkler as ClosestSprinkler).distance <=
-                                    baseTolerance * 10
-                            ) {
-                                console.log(
-                                    `💡 แนะนำ: ลองใช้ tolerance = ${(closestSprinkler as ClosestSprinkler).distance + 5} เพื่อเจอสปริงเกลอร์นี้`
-                                );
-                            }
-                        } else {
-                            console.log(
-                                `❌ ไม่พบสปริงเกลอร์ใดๆ ในแปลงปลูก ${plotPipeData.plotName}`
-                            );
                         }
                     }
 
@@ -1783,16 +1698,6 @@ export default function GreenhouseSummary() {
 
     // Enhanced Calculate irrigation equipment from irrigationElements
     const calculateIrrigationMetrics = () => {
-        console.log('=== calculateIrrigationMetrics START ===');
-        console.log('summaryData in calculateIrrigationMetrics:', summaryData);
-        console.log(
-            'summaryData?.irrigationElements in calculateIrrigationMetrics:',
-            summaryData?.irrigationElements
-        );
-        console.log('irrigationElements exists?', !!summaryData?.irrigationElements);
-        console.log('irrigationElements is array?', Array.isArray(summaryData?.irrigationElements));
-        console.log('irrigationElements length:', summaryData?.irrigationElements?.length);
-
         if (!summaryData?.irrigationElements || summaryData.irrigationElements.length === 0) {
             return {
                 maxMainPipeLength: 0,
@@ -2558,7 +2463,6 @@ export default function GreenhouseSummary() {
         window.print();
     };
 
-    // Add to window object for potential debugging or future use
     if (typeof window !== 'undefined') {
         (window as Window & { debugHandlePrint?: () => void }).debugHandlePrint = handlePrint;
     }
@@ -2749,8 +2653,8 @@ export default function GreenhouseSummary() {
                 <div className="pt-16"></div>
 
                 <div className="border-b border-gray-700 bg-gray-800">
-                    <div className="container mx-auto px-4 py-6">
-                        <div className="mx-auto max-w-7xl">
+                    <div className="mx-auto px-4 py-6">
+                        <div className="mx-auto">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="flex-1">
                                     <button
@@ -2808,8 +2712,8 @@ export default function GreenhouseSummary() {
                     </div>
                 </div>
 
-                <div className="container mx-auto px-4 py-6">
-                    <div className="mx-auto max-w-7xl">
+                <div className="mx-auto px-4 py-6">
+                    <div className="mx-auto">
                         <div className="rounded-lg bg-gray-800 p-8 text-center">
                             <div className="mb-4 text-6xl">🏠</div>
                             <h2 className="mb-4 text-2xl font-bold text-yellow-400">
@@ -2866,8 +2770,8 @@ export default function GreenhouseSummary() {
 
             {/* Enhanced Header Section with Action Buttons */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="mx-auto max-w-7xl">
+                <div className="mx-auto px-4 py-4">
+                    <div className="mx-auto">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <button
@@ -3047,8 +2951,8 @@ export default function GreenhouseSummary() {
             </div>
 
             {/* Rest of the existing content remains the same... */}
-            <div className="container mx-auto px-4 py-4 print:px-0 print:py-0">
-                <div className="mx-auto max-w-7xl">
+            <div className="mx-auto px-4 py-4 print:px-0 print:py-0">
+                <div className="mx-auto">
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-1 print:gap-4">
                         <div className="print:page-break-after-avoid space-y-4 print:space-y-4">
                             <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-4">
@@ -3332,21 +3236,6 @@ export default function GreenhouseSummary() {
                                                     const totalSprinklers = elements.filter(
                                                         (e) => e.type === 'sprinkler'
                                                     ).length;
-
-                                                    // Debug: ตรวจสอบการนับสปริงเกลอร์ทั้งหมด
-                                                    console.log(
-                                                        '🔍 Total sprinkler count calculation:',
-                                                        {
-                                                            totalSprinklers,
-                                                            plotBreakdown: plotPipeData.map(
-                                                                (plot) => ({
-                                                                    plotName: plot.plotName,
-                                                                    sprinklerCount:
-                                                                        plot.sprinklerCount,
-                                                                })
-                                                            ),
-                                                        }
-                                                    );
                                                     const sprinklerFlowRate =
                                                         summaryData?.sprinklerFlowRate || 10;
                                                     const dripEmitterFlowRate =
@@ -5347,7 +5236,8 @@ export default function GreenhouseSummary() {
                                                 const calculatedFlowRate =
                                                     plotPipe?.totalFlowRate || 0;
                                                 const totalFlowRate = calculatedFlowRate.toFixed(1);
-
+                                                
+                                                
                                                 // Debug: ตรวจสอบการคำนวณอัตราการไหลในแต่ละแปลง
                                                 console.log(
                                                     `🔍 ${plotWater.plotName} flow rate calculation:`,
@@ -5553,12 +5443,10 @@ export default function GreenhouseSummary() {
                                                                                     {t('ท่อเมน')}
                                                                                 </td>
                                                                                 <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
-                                                                                    {(
-                                                                                        plotPipe?.totalFlowRate ||
-                                                                                        0
-                                                                                    ).toFixed(
-                                                                                        2
-                                                                                    )}{' '}
+                                                                                    {(() => {
+                                                                                        const mainFlowRate = plotPipe?.totalFlowRate || 0;
+                                                                                        return mainFlowRate.toFixed(2);
+                                                                                    })()}{' '}
                                                                                     {t('L/min')}
                                                                                 </td>
                                                                                 <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">

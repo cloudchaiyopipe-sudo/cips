@@ -19,10 +19,24 @@ use App\Http\Controllers\FarmController; // เพิ่มบรรทัดน
 */
 
 Route::get('/', function () {
+    $user = auth()->user();
+    
+    // If user is sales, redirect to equipment-crud
+    if ($user && $user->role === 'sales') {
+        return redirect()->route('equipment-crud');
+    }
+    
     return Inertia::render('new-home');
 })->middleware(['auth', 'verified'])->name('home');
 
 Route::get('/fields', function () {
+    $user = auth()->user();
+    
+    // If user is sales, redirect to equipment-crud
+    if ($user && $user->role === 'sales') {
+        return redirect()->route('equipment-crud');
+    }
+    
     return Inertia::render('home');
 })->middleware(['auth', 'verified'])->name('fields');
 
@@ -32,6 +46,11 @@ Route::get('/test', function () {
 })->name('test');
 
 Route::get('/profile', [ProfileController::class, 'show'])->middleware(['auth', 'verified'])->name('profile');
+
+// Equipment CRUD Route - Accessible by sales users
+Route::get('equipment-crud', function () {
+    return Inertia::render('equipment-crud');
+})->middleware(['auth', 'verified'])->name('equipment-crud');
 
 // Test route to check if web routes are working
 Route::get('/test-web', function () {
@@ -348,6 +367,14 @@ Route::get('/fields-api', function () {
                     $realArea = $projectStats['totalAreaInRai'] ?? $projectStats['totalArea'] ?? 0;
                     $realWaterNeed = $projectStats['totalWaterNeedPerSession'] ?? $projectStats['totalWaterNeed'] ?? 0;
                     $realPlants = $projectStats['totalPlants'] ?? 0;
+                    
+                    // Check if data is in results object
+                    if (isset($projectStats['results'])) {
+                        $results = $projectStats['results'];
+                        $realArea = $results['totalArea'] ?? $realArea;
+                        $realWaterNeed = $results['totalWaterRequiredLPM'] ?? $realWaterNeed;
+                        $realPlants = $results['totalSprinklers'] ?? $realPlants;
+                    }
                 } elseif ($projectData) {
                     // Fallback to project_data if project_stats is not available
                     if (isset($projectData['plants']) && is_array($projectData['plants'])) {
@@ -361,6 +388,21 @@ Route::get('/fields-api', function () {
                 // Convert area to ไร่ if it's in square meters
                 if ($realArea > 1000) { // If it's likely in square meters
                     $realArea = $realArea / 1600; // Convert to ไร่ (1 ไร่ = 1600 ตร.ม.)
+                }
+                
+                // Also check if we have total_area from the field itself
+                if ($field->total_area && $field->total_area > 0) {
+                    $realArea = $field->total_area / 1600; // Convert to ไร่
+                }
+                
+                // Also check if we have total_water_need from the field itself
+                if ($field->total_water_need && $field->total_water_need > 0) {
+                    $realWaterNeed = $field->total_water_need;
+                }
+                
+                // Also check if we have total_plants from the field itself
+                if ($field->total_plants && $field->total_plants > 0) {
+                    $realPlants = $field->total_plants;
                 }
                 
                 return [
@@ -476,13 +518,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         })->name('results');
     });
 
+    // Khok Nong Na Irrigation System Routes
+    Route::prefix('khok-nong-na')->name('khok-nong-na.')->group(function () {
+        Route::get('/', function () {
+            return Inertia::render('KhokNongNaPage');
+        })->name('index');
+        
+        Route::get('planner', function () {
+            return Inertia::render('KhokNongNaPage');
+        })->name('planner');
+        
+        Route::get('results', function () {
+            return Inertia::render('KhokNongNaPage');
+        })->name('results');
+    });
+
     // Equipment & Product Page Routes
     Route::get('product', function () {
         return Inertia::render('product');
     })->name('product');
-    Route::get('equipment-crud', function () {
-        return Inertia::render('equipment-crud');
-    })->name('equipment-crud');
     
     // Field Crop Management Route
     Route::get('field-crop', function () {
@@ -495,6 +549,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'irrigation' => $irrigation
         ]);
     })->name('field-crop');
+
+    // Khok Nong Na Management Route
+    Route::get('khok-nong-na', function () {
+        return Inertia::render('KhokNongNaPage');
+    })->name('khok-nong-na');
 
     // Field Map Route
     Route::get('field-map', function () {
@@ -558,7 +617,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('greenhouse-crop');
 
-     // Area Input Method Route
+     // Area Input Method Route - Sales users cannot access
      Route::get('area-input-method', function () {
         $crops = request()->query('crops');
         return Inertia::render('green-house/area-input', [
@@ -566,7 +625,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('area-input-method');
 
-    // Greenhouse Planner Route
+    // Greenhouse Planner Route - Sales users cannot access
     Route::get('greenhouse-planner', function () {
         $crops = request()->query('crops');
         $method = request()->query('method');
@@ -576,7 +635,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('greenhouse-planner');
 
-    // Greenhouse Map Route
+    // Greenhouse Map Route - Sales users cannot access
     Route::get('choose-irrigation', function () {
         $crops = request()->query('crops');
         return Inertia::render('green-house/choose-irrigation', [
@@ -584,7 +643,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('choose-irrigation');
 
-    // Greenhouse Import Route
+    // Greenhouse Import Route - Sales users cannot access
     Route::get('greenhouse-import', function () {
         $crops = request()->query('crops');
         $method = request()->query('method');
@@ -594,7 +653,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('greenhouse-import');
 
-    // Greenhouse Map Route
+    // Greenhouse Map Route - Sales users cannot access
     Route::get('greenhouse-map', function () {
         $crops = request()->query('crops');
         $shapes = request()->query('shapes');
@@ -609,7 +668,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('greenhouse-map');
 
-    // Greenhouse Summary Route
+    // Greenhouse Summary Route - Sales users cannot access
     Route::get('green-house-summary', function () {
         $crops = request()->query('crops');
         $shapes = request()->query('shapes');
@@ -624,7 +683,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('green-house-summary');
 
-    // Field Crop Summary Route
+    // Field Crop Summary Route - Sales users cannot access
     Route::get('field-crop-summary', function () {
         return Inertia::render('field-crop/field-crop-summary', [
             'crops' => request()->query('crops'),
@@ -633,7 +692,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('field-crop-summary');
     
-    // Field Crop Summary Route with POST data
+    // Field Crop Summary Route with POST data - Sales users cannot access
     Route::post('field-crop-summary', function () {
         return Inertia::render('field-crop/field-crop-summary', [
             'summary' => request()->input('summary'),
@@ -658,7 +717,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('field-crop-summary.post');
 
-    // Farm-related API calls that might be using web sessions
+    // Farm-related API calls that might be using web sessions - Sales users cannot access
     Route::get('/api/plant-types', [FarmController::class, 'getPlantTypes']);
     Route::post('/api/get-elevation', [FarmController::class, 'getElevation']);
     Route::post('/api/plant-points/add', [FarmController::class, 'addPlantPoint'])->name('plant-points.add');
@@ -667,7 +726,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // =======================================================
 
-    // Field Management Routes
+    // Field Management Routes - Sales users cannot access
     Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
     Route::post('/api/fields', [FarmController::class, 'createField'])->name('create-field');
     Route::get('/api/fields', [FarmController::class, 'getFields'])->name('get-fields');
@@ -677,22 +736,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Alternative delete route using POST with _method=DELETE for better CSRF compatibility
     Route::post('/api/fields/{fieldId}', [FarmController::class, 'deleteField'])->name('delete-field-post');
     
-    // Folder Management Routes
+    // Folder Management Routes - Sales users cannot access
     Route::get('/api/folders', [FarmController::class, 'getFolders'])->name('get-folders');
     Route::post('/api/folders', [FarmController::class, 'createFolder'])->name('create-folder');
     Route::put('/api/folders/{folderId}', [FarmController::class, 'updateFolder'])->name('update-folder');
     Route::delete('/api/folders/{folderId}', [FarmController::class, 'deleteFolder'])->name('delete-folder');
     
-    // Field Status Management
+    // Field Status Management - Sales users cannot access
     Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
     Route::put('/api/fields/{fieldId}/data', [FarmController::class, 'updateFieldData'])->name('update-field-data');
     Route::put('/api/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder'])->name('update-field-folder');
     
-    // Field Image Management
+    // Field Image Management - Sales users cannot access
     Route::put('/api/fields/{fieldId}/image', [FarmController::class, 'updateFieldImage'])->name('update-field-image');
     Route::get('/api/fields/{fieldId}/image', [FarmController::class, 'getFieldImage'])->name('get-field-image');
     
-    // Profile Photo Routes
+    // Profile Photo Routes - Sales users can access
     Route::post('/api/profile-photo/upload', [ProfilePhotoController::class, 'upload'])->name('profile-photo.upload');
     Route::delete('/api/profile-photo/delete', [ProfilePhotoController::class, 'delete'])->name('profile-photo.delete');
   
@@ -713,7 +772,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/folders/{folderId}', [SuperUserController::class, 'deleteFolder'])->name('delete-folder');
     });
 
-    // Free Plan Routes
+    // Free Plan Routes - Sales users cannot access
     Route::get('/free-plan', function () {
         return Inertia::render('free-plan/freeHome');
     })->name('free-plan');
@@ -722,27 +781,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/chooseCrop');
     })->name('free-plan.choose-crop');
 
-    // Free Plan Map Route
+    // Free Plan Map Route - Sales users cannot access
     Route::get('/free-plan/map', function () {
         return Inertia::render('free-plan/freeMap');
     })->name('free-plan.map');
 
-    // Free Plan Summary Route
+    // Free Plan Summary Route - Sales users cannot access
     Route::get('/free-plan/summary', function () {
         return Inertia::render('free-plan/freeSummary');
     })->name('free-plan.summary');
 
-    // Free Plan Product Route
+    // Free Plan Product Route - Sales users cannot access
     Route::get('/free-plan/product', function () {
         return Inertia::render('free-plan/freeProduct');
     })->name('free-plan.product');
 
-    // Free Plan Account/Profile Route
+    // Free Plan Account/Profile Route - Sales users cannot access
     Route::get('/free-plan/account', function () {
         return Inertia::render('free-plan/acCount');
     })->name('free-plan.account');
 
-    // Free Plan Upgrade Pro Route
+    // Free Plan Upgrade Pro Route - Sales users cannot access
     Route::get('/free-plan/upgradePro', function () {
         return Inertia::render('free-plan/upgradePro');
     })->name('free-plan.upgradePro');
@@ -752,7 +811,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/components/paymentQR');
     })->name('free-plan.payment-qr');
 
-    // Free Plan Advertisement Management Route
+    // Free Plan Advertisement Management Route - Sales users cannot access
     Route::get('/free-plan/ads', function () {
         return Inertia::render('free-plan/components/ads');
     })->name('free-plan.ads');

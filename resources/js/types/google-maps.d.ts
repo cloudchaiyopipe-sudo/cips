@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // types/google-maps.d.ts - อัปเดตเพื่อรองรับ Places API
 declare global {
     interface Window {
@@ -12,6 +13,9 @@ declare global {
                 };
                 Polygon: any;
                 Marker: any;
+                marker: {
+                    AdvancedMarkerElement: any;
+                };
                 Polyline: any;
                 Circle: any;
                 LatLng: any;
@@ -42,6 +46,7 @@ declare global {
                 TransitLayer: any;
                 BicyclingLayer: any;
                 ElevationService: any;
+                ElevationStatus: any;
                 Geocoder: any;
                 InfoWindow: any;
                 OverlayView: any;
@@ -88,7 +93,7 @@ declare global {
                     };
                 };
                 event: {
-                    addListener: (instance: any, eventName: string, handler: Function) => any;
+                    addListener: (instance: any, eventName: string, handler: (...args: any[]) => void) => any;
                     removeListener: (listener: any) => void;
                     clearListeners: (instance: any, eventName?: string) => void;
                     clearInstanceListeners: (instance: any) => void;
@@ -558,6 +563,7 @@ declare module '@googlemaps/react-wrapper' {
         | 'visualization'
         | 'localContext'
         | 'marker'
+        | 'elevation'
         | string;
     export enum Status {
         LOADING = 'LOADING',

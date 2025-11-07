@@ -241,7 +241,7 @@ export default function PrivacyModal({ isOpen, onClose }: PrivacyModalProps) {
                             <div className="text-sm text-gray-600">
                                 <strong>เจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO)</strong>
                                 <br />
-                                บริษัท กนกส์โปรดักส์ จำกัด
+                                บริษัท กนกโปรดักส์ จำกัด
                                 <br />
                                 โทรศัพท์: 02-451-1111 กด 2<br />
                                 <strong>เวลาทำการ:</strong> จันทร์-เสาร์ 8:00-17:00 น.

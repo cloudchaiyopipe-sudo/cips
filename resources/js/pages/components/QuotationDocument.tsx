@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// resources\js\pages\components\QuotationDocument.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { CalculationResults, QuotationData, QuotationDataCustomer } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -49,14 +48,14 @@ interface QuotationDocumentProps {
     projectMode: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenData: any;
     projectData: any;
-    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
+    greenhouseData?: any; 
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: {
         [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any };
     };
-    sprinklerEquipmentSets?: { [zoneId: string]: any }; // เพิ่มสำหรับ Sprinkler Equipment Sets
-    connectionEquipments?: { [zoneId: string]: any[] }; // เพิ่มสำหรับ Connection Equipments
+    sprinklerEquipmentSets?: { [zoneId: string]: any }; 
+    connectionEquipments?: { [zoneId: string]: any[] }; 
     onClose: () => void;
 }
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
@@ -115,25 +114,21 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
 
         if (effectivePage === 1) {
-            // หน้าแรก: แสดง 7 รายการ
             if (totalItems <= 7) {
                 return totalItems;
             } else if (totalItems === 8) {
-                return 7; // รายการที่ 8 ไปหน้าถัดไป
+                return 7; 
             } else if (totalItems === 9) {
-                return 8; // รายการที่ 9 ไปหน้าถัดไป
+                return 8; 
             } else if (totalItems === 10) {
-                return 9; // รายการที่ 10 ไปหน้าถัดไป
+                return 9; 
             } else {
-                return 10; // มากกว่า 10 รายการ แสดง 10 รายการ
+                return 10; 
             }
         } else if (effectivePage === totalPages - imagePageOffset) {
-            // หน้าสุดท้าย: แสดงรายการที่เหลือ
             const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
             return totalItems - firstPageItems;
         } else {
-            // หน้าอุปกรณ์อื่นๆ (หน้า 2+): แสดง 10 รายการ
-            // คำนวณจำนวนรายการที่เหลือในหน้านี้
             const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
             const remainingItems = totalItems - firstPageItems;
             const itemsInThisPage = remainingItems - (effectivePage - 2) * 13;
@@ -141,21 +136,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (itemsInThisPage <= 10) {
                 return itemsInThisPage;
             } else if (itemsInThisPage === 11) {
-                return 10; // รายการที่ 11 ไปหน้าถัดไป
+                return 10; 
             } else if (itemsInThisPage === 12) {
-                return 11; // รายการที่ 12 ไปหน้าถัดไป
+                return 11; 
             } else if (itemsInThisPage === 13) {
-                return 12; // รายการที่ 13 ไปหน้าถัดไป
+                return 12; 
             } else {
-                return 13; // มากกว่า 13 รายการ แสดง 13 รายการ
+                return 13; 
             }
         }
     };
 
     const calculateTotalPages = (totalItems: number) => {
-        if (totalItems === 0) return hasProjectImagePage ? 1 : 0; // ถ้าไม่มี items แต่มีรูป ให้แสดง 1 หน้า
+        if (totalItems === 0) return hasProjectImagePage ? 1 : 0; 
 
-        // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
         let firstPageItems;
         if (totalItems <= 7) {
             firstPageItems = totalItems;
@@ -169,31 +163,27 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             firstPageItems = 10;
         }
 
-        // ถ้ารายการทั้งหมดพอดีกับหน้าแรก
         if (firstPageItems === totalItems) {
             return 1 + (hasProjectImagePage ? 1 : 0);
         }
 
-        // คำนวณหน้าถัดไป
         let remainingItems = totalItems - firstPageItems;
         let additionalPages = 0;
 
-        // คำนวณจำนวนหน้าตามกฎใหม่
         while (remainingItems > 0) {
             if (remainingItems <= 10) {
                 additionalPages += 1;
                 break;
             } else if (remainingItems === 11) {
-                additionalPages += 2; // หน้าแสดง 10 รายการ + หน้าแสดง 1 รายการ
+                additionalPages += 2; 
                 break;
             } else if (remainingItems === 12) {
-                additionalPages += 2; // หน้าแสดง 11 รายการ + หน้าแสดง 1 รายการ
+                additionalPages += 2; 
                 break;
             } else if (remainingItems === 13) {
-                additionalPages += 2; // หน้าแสดง 12 รายการ + หน้าแสดง 1 รายการ
+                additionalPages += 2; 
                 break;
             } else {
-                // มากกว่า 13 รายการ แสดง 13 รายการในหน้านี้
                 remainingItems -= 13;
                 additionalPages += 1;
             }
@@ -218,7 +208,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 setEquipmentCategories(categories);
             }
         } catch (error) {
-            console.error('Failed to load equipment categories:', error);
         }
     };
 
@@ -247,7 +236,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 setEquipmentList(equipments);
             }
         } catch (error) {
-            console.error('Failed to load equipment:', error);
         } finally {
             setIsLoadingEquipment(false);
         }
@@ -374,7 +362,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             isGreenhouseMode && greenhouseData.summary?.plotStats?.length > 1;
 
         if (isGreenhouseMultiPlot) {
-            // Handle greenhouse multi-plot mode
             const totalPlantsInAllPlots = greenhouseData.summary.plotStats.reduce(
                 (sum: number, plot: any) => sum + (plot.production?.totalPlants || 0),
                 0
@@ -387,7 +374,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 const zonePipes = selectedPipes[plot.plotId] || {};
 
                 if (zoneSprinkler) {
-                    // คำนวณจำนวนหัวฉีดสำหรับแปลงนี้
                     let sprinklerQuantity = plot.equipmentCount?.sprinklers || 0;
                     if (sprinklerQuantity === 0) {
                         const totalPlants = plot.production?.totalPlants || 0;
@@ -424,7 +410,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     }
                 }
 
-                // Handle pipes for greenhouse
                 const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
                 if (branchPipe) {
                     const pipeKey = `branch_${branchPipe.id}`;
@@ -456,11 +441,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     }
                 }
 
-                // Greenhouse ไม่มีท่อเมนรอง - ข้าม secondary pipe
-                // (ไม่ต้องคำนวณท่อเมนรองสำหรับ greenhouse)
             });
 
-            // Add equipment to initial items
             for (const [key, item] of equipmentMap.entries()) {
                 if (item.zones && item.zones.length > 1) {
                     item.description += ` (ใช้ใน ${item.zones.length} แปลง)`;
@@ -767,7 +749,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             });
         }
 
-        // เพิ่มอุปกรณ์จาก Sprinkler Equipment Sets
         Object.entries(sprinklerEquipmentSets).forEach(([zoneId, equipmentSet]) => {
             if (
                 equipmentSet &&
@@ -793,7 +774,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
         });
 
-        // เพิ่มอุปกรณ์เชื่อมต่อท่อ
         Object.entries(connectionEquipments).forEach(([zoneId, equipments]) => {
             if (equipments && equipments.length > 0) {
                 equipments.forEach((equipment: any) => {
@@ -817,19 +797,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
         setItems(initialItems);
         if (hasProjectImagePage && initialItems.length > 0) {
-            // ถ้ามีรูปและมี items ให้เริ่มที่หน้ารูป (หน้า 1)
             setCurrentPage(1);
         } else if (hasProjectImagePage && initialItems.length === 0) {
-            // ถ้ามีรูปแต่ไม่มี items ให้แสดงหน้ารูปเท่านั้น
             setCurrentPage(1);
         } else if (!hasProjectImagePage && initialItems.length > 0) {
-            // ถ้าไม่มีรูปแต่มี items ให้เริ่มที่หน้าแรกของอุปกรณ์
             setCurrentPage(1);
         } else {
-            // ไม่มีรูปและไม่มี items
             setCurrentPage(1);
         }
-        //  setCurrentPage(hasProjectImagePage ? 1 : 1);
     }, [
         show,
         selectedSprinkler,
@@ -898,7 +873,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         if (effectivePage === 1) {
             return items.slice(0, itemsPerPage);
         } else {
-            // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
             let firstPageItems;
             if (items.length <= 7) {
                 firstPageItems = items.length;
@@ -1155,7 +1129,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (page === 1 + imagePageOffset) {
                 pageItems = currentItems.slice(0, itemsPerPage);
             } else {
-                // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
                 let firstPageItems;
                 if (currentItems.length <= 7) {
                     firstPageItems = currentItems.length;
@@ -1413,7 +1386,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
         const effectivePage = currentPage - imagePageOffset;
 
-        // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
         let firstPageItems;
         if (items.length <= 7) {
             firstPageItems = items.length;
@@ -1987,11 +1959,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                 {showEquipmentSelector && <EquipmentSelector />}
 
-                {/* Render project image page or equipment page */}
                 {isImagePage ? (
                     renderProjectImagePage()
                 ) : items.length === 0 ? (
-                    // แสดงเมื่อไม่มีรายการอุปกรณ์
                     <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
                         <div className="print-page flex min-h-full flex-col">
                             {/* header */}
