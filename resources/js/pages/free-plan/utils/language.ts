@@ -233,6 +233,83 @@ export interface LanguageTranslations {
   waterPressureProduct: string;
   powerProduct: string;
   headProduct: string;
+  
+  // FreeProduct page additional translations
+  usingSettingsFromSummary: string;
+  calculatedUsing5StepMethod: string;
+  basedOnZone: string;
+  plantDensity: string;
+  plantsPerRai: string;
+  fiveStepCalculationProcess: string;
+  showDetails: string;
+  hideDetails: string;
+  convertWaterVolumeToDepth: string;
+  calculateIrrigationRate: string;
+  designSprinklerLayout: string;
+  calculateFlowRatePerSprinkler: string;
+  selectPressureFromCatalog: string;
+  finalSprinklerSpecifications: string;
+  preset: string;
+  calculated: string;
+  allZones: string;
+  singleZoneHighestFlow: string;
+  calculatedBasedOnHighestFlowRateZone: string;
+  systemOverview: string;
+  totalZones: string;
+  flowPerSprinkler: string;
+  zoneDetails: string;
+  zoneFlowRate: string;
+  pipeLength: string;
+  longestPipe: string;
+  outletsLabel: string;
+  pipeTypeRecommendations: string;
+  selectedPlantInformation: string;
+  irrigationTime: string;
+  waterNeedPerSessionLabel: string;
+  totalWaterVolume: string;
+  coverageAreaPerSprinkler: string;
+  flowRateLPH: string;
+  flowRateLPMResult: string;
+  requiredPressure: string;
+  pressureCategory: string;
+  optimalRadius: string;
+  sprinklerSpacing: string;
+  totalSprinklersCalculated: string;
+  sprinklers: string;
+  coverage: string;
+  flowRatePerHour: string;
+  coveragePerSprinkler: string;
+  highestFlowZoneDetails: string;
+  zoneName: string;
+  plantsInZone: string;
+  calculationDetails: string;
+  step1SystemFlowRate: string;
+  step2TotalDynamicHead: string;
+  step3PumpPower: string;
+  systemFlowRate: string;
+  frictionLosses: string;
+  minorLosses: string;
+  pressureRequirement: string;
+  hydraulicPower: string;
+  pumpEfficiency: string;
+  brakePower: string;
+  requiredPower: string;
+  staticHead: string;
+  mainPipeLabel2: string;
+  subMainPipeLabel2: string;
+  lateralPipeLabel2: string;
+  totalFrictionLoss: string;
+  checkoutModalTitle: string;
+  checkoutModalMessage: string;
+  addFriendOnLine: string;
+  scanQRCodeToContact: string;
+  orAddFriendAtLineId: string;
+  close: string;
+  savePlanImage: string;
+  waterDepthResult: string;
+  requiredIrrigationRate: string;
+  areaLabel: string;
+  flowRateLabel: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -469,7 +546,84 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     flowRatePerSprinkler: "Flow Rate per Sprinkler",
     waterPressureProduct: "Water Pressure",
     powerProduct: "Power",
-    headProduct: "Head"
+    headProduct: "Head",
+    
+    // FreeProduct page additional translations
+    usingSettingsFromSummary: "Using settings from Summary page",
+    calculatedUsing5StepMethod: "Calculated using 5-step method from water volume",
+    basedOnZone: "Based on Zone:",
+    plantDensity: "Plant Density:",
+    plantsPerRai: "plants/rai",
+    fiveStepCalculationProcess: "5-Step Calculation Process",
+    showDetails: "Show Details",
+    hideDetails: "Hide Details",
+    convertWaterVolumeToDepth: "Convert Water Volume to Depth",
+    calculateIrrigationRate: "Calculate Irrigation Rate",
+    designSprinklerLayout: "Design Sprinkler Layout",
+    calculateFlowRatePerSprinkler: "Calculate Flow Rate per Sprinkler",
+    selectPressureFromCatalog: "Select Pressure from Catalog",
+    finalSprinklerSpecifications: "Final Sprinkler Specifications",
+    preset: "Preset",
+    calculated: "Calculated",
+    allZones: "All Zones",
+    singleZoneHighestFlow: "Single Zone (Highest Flow)",
+    calculatedBasedOnHighestFlowRateZone: "Calculated based on highest flow rate zone:",
+    systemOverview: "System Overview:",
+    totalZones: "Total Zones:",
+    flowPerSprinkler: "Flow per Sprinkler:",
+    zoneDetails: "Zone Details:",
+    zoneFlowRate: "Zone Flow Rate:",
+    pipeLength: "Pipe Length:",
+    longestPipe: "Longest Pipe:",
+    outletsLabel: "Outlets:",
+    pipeTypeRecommendations: "Pipe Type Recommendations:",
+    selectedPlantInformation: "Selected Plant Information",
+    irrigationTime: "Irrigation Time",
+    waterNeedPerSessionLabel: "Water Need per Session",
+    totalWaterVolume: "Total Water Volume",
+    coverageAreaPerSprinkler: "Coverage Area per Sprinkler",
+    flowRateLPH: "Flow Rate (LPH)",
+    flowRateLPMResult: "Flow Rate (LPM) - Result",
+    requiredPressure: "Required Pressure",
+    pressureCategory: "Pressure Category",
+    optimalRadius: "Optimal Radius",
+    sprinklerSpacing: "Sprinkler Spacing",
+    totalSprinklersCalculated: "Total Sprinklers (Calculated)",
+    sprinklers: "sprinklers",
+    coverage: "Coverage:",
+    flowRatePerHour: "Flow Rate per Hour:",
+    coveragePerSprinkler: "Coverage per Sprinkler:",
+    highestFlowZoneDetails: "Highest Flow Zone Details:",
+    zoneName: "Zone Name:",
+    plantsInZone: "Plants in Zone:",
+    calculationDetails: "Calculation Details:",
+    step1SystemFlowRate: "Step 1: System Flow Rate",
+    step2TotalDynamicHead: "Step 2: Total Dynamic Head (TDH)",
+    step3PumpPower: "Step 3: Pump Power",
+    systemFlowRate: "System Flow Rate:",
+    frictionLosses: "Friction Losses:",
+    minorLosses: "Minor Losses:",
+    pressureRequirement: "Pressure Requirement:",
+    hydraulicPower: "Hydraulic Power:",
+    pumpEfficiency: "Pump Efficiency:",
+    brakePower: "Brake Power:",
+    requiredPower: "Required Power:",
+    staticHead: "Static Head:",
+    mainPipeLabel2: "Main Pipe",
+    subMainPipeLabel2: "SubMain Pipe",
+    lateralPipeLabel2: "Lateral Pipe",
+    totalFrictionLoss: "Total Friction Loss:",
+    checkoutModalTitle: "Notification",
+    checkoutModalMessage: "This is only a preliminary calculation. Please contact the installation team for maximum benefits and save the plan image.",
+    addFriendOnLine: "Add Friend on LINE",
+    scanQRCodeToContact: "Scan QR Code to contact installation team",
+    orAddFriendAtLineId: "or add friend at LINE ID:",
+    close: "Close",
+    savePlanImage: "Save Plan Image",
+    waterDepthResult: "Water Depth (Result)",
+    requiredIrrigationRate: "Required Irrigation Rate",
+    areaLabel: "Area",
+    flowRateLabel: "Flow Rate:"
   },
   TH: {
     // FreeHome page
@@ -704,7 +858,84 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     flowRatePerSprinkler: "อัตราการไหลต่อสปริงเกลอร์",
     waterPressureProduct: "ความดันน้ำ",
     powerProduct: "กำลัง",
-    headProduct: "หัว"
+    headProduct: "หัว",
+    
+    // FreeProduct page additional translations
+    usingSettingsFromSummary: "ใช้การตั้งค่าจากหน้าสรุป",
+    calculatedUsing5StepMethod: "คำนวณโดยใช้วิธี 5 ขั้นตอนจากปริมาณน้ำ",
+    basedOnZone: "อิงจากโซน:",
+    plantDensity: "ความหนาแน่นพืช:",
+    plantsPerRai: "พืช/ไร่",
+    fiveStepCalculationProcess: "กระบวนการคำนวณ 5 ขั้นตอน",
+    showDetails: "แสดงรายละเอียด",
+    hideDetails: "ซ่อนรายละเอียด",
+    convertWaterVolumeToDepth: "แปลงปริมาณน้ำเป็นความลึก",
+    calculateIrrigationRate: "คำนวณอัตราการให้น้ำ",
+    designSprinklerLayout: "ออกแบบการจัดวางสปริงเกลอร์",
+    calculateFlowRatePerSprinkler: "คำนวณอัตราการไหลต่อสปริงเกลอร์",
+    selectPressureFromCatalog: "เลือกแรงดันจากแคตตาล็อก",
+    finalSprinklerSpecifications: "ข้อมูลจำเพาะสปริงเกลอร์สุดท้าย",
+    preset: "ค่าที่ตั้งไว้",
+    calculated: "คำนวณ",
+    allZones: "ทุกโซน",
+    singleZoneHighestFlow: "โซนเดียว (อัตราการไหลสูงสุด)",
+    calculatedBasedOnHighestFlowRateZone: "คำนวณจากโซนที่มีอัตราการไหลสูงสุด:",
+    systemOverview: "ภาพรวมระบบ:",
+    totalZones: "โซนทั้งหมด:",
+    flowPerSprinkler: "การไหลต่อสปริงเกลอร์:",
+    zoneDetails: "รายละเอียดโซน:",
+    zoneFlowRate: "อัตราการไหลโซน:",
+    pipeLength: "ความยาวท่อ:",
+    longestPipe: "ท่อยาวที่สุด:",
+    outletsLabel: "จุดจ่าย:",
+    pipeTypeRecommendations: "คำแนะนำประเภทท่อ:",
+    selectedPlantInformation: "ข้อมูลพืชที่เลือก",
+    irrigationTime: "เวลาน้ำ",
+    waterNeedPerSessionLabel: "ความต้องการน้ำต่อรอบ",
+    totalWaterVolume: "ปริมาณน้ำทั้งหมด",
+    coverageAreaPerSprinkler: "พื้นที่ครอบคลุมต่อสปริงเกลอร์",
+    flowRateLPH: "อัตราการไหล (ลิตร/ชั่วโมง)",
+    flowRateLPMResult: "อัตราการไหล (ลิตร/นาที) - ผลลัพธ์",
+    requiredPressure: "แรงดันที่ต้องการ",
+    pressureCategory: "หมวดหมู่แรงดัน",
+    optimalRadius: "รัศมีที่เหมาะสม",
+    sprinklerSpacing: "ระยะห่างสปริงเกลอร์",
+    totalSprinklersCalculated: "สปริงเกลอร์ทั้งหมด (คำนวณ)",
+    sprinklers: "สปริงเกลอร์",
+    coverage: "พื้นที่ครอบคลุม:",
+    flowRatePerHour: "อัตราการไหลต่อชั่วโมง:",
+    coveragePerSprinkler: "พื้นที่ครอบคลุมต่อสปริงเกลอร์:",
+    highestFlowZoneDetails: "รายละเอียดโซนอัตราการไหลสูงสุด:",
+    zoneName: "ชื่อโซน:",
+    plantsInZone: "พืชในโซน:",
+    calculationDetails: "รายละเอียดการคำนวณ:",
+    step1SystemFlowRate: "ขั้นตอนที่ 1: อัตราการไหลของระบบ",
+    step2TotalDynamicHead: "ขั้นตอนที่ 2: หัวแรงดันรวม (TDH)",
+    step3PumpPower: "ขั้นตอนที่ 3: กำลังปั๊ม",
+    systemFlowRate: "อัตราการไหลของระบบ:",
+    frictionLosses: "การสูญเสียแรงเสียดทาน:",
+    minorLosses: "การสูญเสียย่อย:",
+    pressureRequirement: "ความต้องการแรงดัน:",
+    hydraulicPower: "กำลังไฮดรอลิก:",
+    pumpEfficiency: "ประสิทธิภาพปั๊ม:",
+    brakePower: "กำลังเบรก:",
+    requiredPower: "กำลังที่ต้องการ:",
+    staticHead: "หัวสถิต:",
+    mainPipeLabel2: "ท่อหลัก",
+    subMainPipeLabel2: "ท่อรอง",
+    lateralPipeLabel2: "ท่อแขนง",
+    totalFrictionLoss: "การสูญเสียแรงเสียดทานรวม:",
+    checkoutModalTitle: "แจ้งเตือน",
+    checkoutModalMessage: "นี่เป็นเพียงการคำนวณเบื้องต้น กรุณาติดต่อทีมติดตั้งเพื่อได้รับประโยชน์สูงสุดและเซฟภาพแบบแปลนไว้",
+    addFriendOnLine: "เพิ่มเพื่อนใน LINE",
+    scanQRCodeToContact: "สแกน QR Code เพื่อติดต่อทีมติดตั้ง",
+    orAddFriendAtLineId: "หรือเพิ่มเพื่อนที่ LINE ID:",
+    close: "ปิด",
+    savePlanImage: "บันทึกภาพแปลน",
+    waterDepthResult: "ความลึกน้ำ (ผลลัพธ์)",
+    requiredIrrigationRate: "อัตราการให้น้ำที่ต้องการ",
+    areaLabel: "พื้นที่",
+    flowRateLabel: "อัตราการไหล:"
   }
 };
 

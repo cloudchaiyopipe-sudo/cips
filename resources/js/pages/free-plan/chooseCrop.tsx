@@ -126,7 +126,7 @@ function ChooseCrop() {
             <div className="flex min-h-[calc(100vh-80px)] flex-col">
                 
                 {/* Header Section */}
-                <div className="flex items-center justify-between px-4 py-6 md:px-6">
+                <div className="sticky top-0 z-10 flex items-center justify-between bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700 px-4 py-6 md:px-6">
                     <h1 className="text-xl font-bold text-white md:text-2xl">
                         {translations.selectCropTypes}
                     </h1>
@@ -151,7 +151,7 @@ function ChooseCrop() {
                 </div>
 
                 {/* Search and Filter Section */}
-                <div className="px-4 pb-6 md:px-6">
+                <div className="sticky top-[73px] z-10 bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700 px-4 pb-6 md:px-6">
                     <div className="flex gap-3">
                         <div className="relative flex-1">
                             <input

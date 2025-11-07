@@ -1537,8 +1537,39 @@ function FreeMap() {
         }
     }, [mapInitialized, zones, plantPoints, mainPipes, subMainPipes, lateralPipes, drawnShapes, translations, createZoneCenterMarker]);
     const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setProjectName(e.target.value);
+        const newName = e.target.value.trim();
+        const oldName = projectName; // Store old name before updating
+        
+        setProjectName(newName);
+        // Save project name to localStorage
+        localStorage.setItem('projectName', newName);
+        
+        // Update saved project name if it exists and oldName is not empty
+        if (oldName && oldName.trim() && newName) {
+            try {
+                const savedProjects = localStorage.getItem('freePlanProjects');
+                if (savedProjects) {
+                    const projects = JSON.parse(savedProjects);
+                    const projectIndex = projects.findIndex((p: { projectName: string }) => p.projectName === oldName.trim());
+                    if (projectIndex >= 0) {
+                        projects[projectIndex].projectName = newName;
+                        localStorage.setItem('freePlanProjects', JSON.stringify(projects));
+                        console.log('✅ Updated project name in saved projects:', oldName.trim(), '→', newName);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating saved project name:', error);
+            }
+        }
     };
+    
+    // Load project name from localStorage on mount
+    useEffect(() => {
+        const savedProjectName = localStorage.getItem('projectName');
+        if (savedProjectName) {
+            setProjectName(savedProjectName);
+        }
+    }, []);
     const handleBack = () => router.visit('/free-plan/choose-crop');
     const handleReset = () => {
         // Clear all overlays from the map first
@@ -2209,8 +2240,147 @@ function FreeMap() {
     */
 
 
-    // Function to create Voronoi cell boundary
-    const createVoronoiCell = (plantsInZone: Array<{ position: { lat: number; lng: number } }>, zoneCenter: { lat: number; lng: number }) => {
+    // Function to check if point is inside drawn area
+    const isPointInDrawnArea = (point: { lat: number; lng: number }, shapeData: { bounds?: { north: number; south: number; east: number; west: number }; center?: { lat: number; lng: number }; radius?: number; path?: Array<{ lat: number; lng: number }> }, shapeType: string): boolean => {
+        if (shapeType === window.google.maps.drawing.OverlayType.RECTANGLE && shapeData.bounds) {
+            const bounds = shapeData.bounds;
+            return point.lat >= bounds.south && point.lat <= bounds.north && 
+                   point.lng >= bounds.west && point.lng <= bounds.east;
+        } else if (shapeType === window.google.maps.drawing.OverlayType.CIRCLE && shapeData.center && shapeData.radius) {
+            const distance = getDistanceFromLatLonInMeters(point, shapeData.center);
+            return distance <= shapeData.radius;
+        } else if (shapeType === window.google.maps.drawing.OverlayType.POLYGON && shapeData.path) {
+            return isPointInPolygon(point, shapeData.path);
+        }
+        return true;
+    };
+
+    // Function to clip polygon to bounds (Sutherland-Hodgman algorithm simplified for rectangles)
+    const clipPolygonToBounds = (polygon: Array<{ lat: number; lng: number }>, bounds: { north: number; south: number; east: number; west: number }): Array<{ lat: number; lng: number }> => {
+        // Clip against each edge of the bounds
+        let input = [...polygon];
+        
+        // Clip against west edge
+        let output: Array<{ lat: number; lng: number }> = [];
+        for (let i = 0; i < input.length; i++) {
+            const p1 = input[i];
+            const p2 = input[(i + 1) % input.length];
+            
+            if (p1.lng >= bounds.west) {
+                if (p2.lng >= bounds.west) {
+                    output.push(p2);
+                } else {
+                    // Intersection with west edge
+                    const t = (bounds.west - p1.lng) / (p2.lng - p1.lng);
+                    const lat = p1.lat + t * (p2.lat - p1.lat);
+                    output.push({ lat, lng: bounds.west });
+                }
+            } else {
+                if (p2.lng >= bounds.west) {
+                    const t = (bounds.west - p1.lng) / (p2.lng - p1.lng);
+                    const lat = p1.lat + t * (p2.lat - p1.lat);
+                    output.push({ lat, lng: bounds.west });
+                    output.push(p2);
+                }
+            }
+        }
+        input = output;
+        output = [];
+        
+        // Clip against east edge
+        for (let i = 0; i < input.length; i++) {
+            const p1 = input[i];
+            const p2 = input[(i + 1) % input.length];
+            
+            if (p1.lng <= bounds.east) {
+                if (p2.lng <= bounds.east) {
+                    output.push(p2);
+                } else {
+                    const t = (bounds.east - p1.lng) / (p2.lng - p1.lng);
+                    const lat = p1.lat + t * (p2.lat - p1.lat);
+                    output.push({ lat, lng: bounds.east });
+                }
+            } else {
+                if (p2.lng <= bounds.east) {
+                    const t = (bounds.east - p1.lng) / (p2.lng - p1.lng);
+                    const lat = p1.lat + t * (p2.lat - p1.lat);
+                    output.push({ lat, lng: bounds.east });
+                    output.push(p2);
+                }
+            }
+        }
+        input = output;
+        output = [];
+        
+        // Clip against south edge
+        for (let i = 0; i < input.length; i++) {
+            const p1 = input[i];
+            const p2 = input[(i + 1) % input.length];
+            
+            if (p1.lat >= bounds.south) {
+                if (p2.lat >= bounds.south) {
+                    output.push(p2);
+                } else {
+                    const t = (bounds.south - p1.lat) / (p2.lat - p1.lat);
+                    const lng = p1.lng + t * (p2.lng - p1.lng);
+                    output.push({ lat: bounds.south, lng });
+                }
+            } else {
+                if (p2.lat >= bounds.south) {
+                    const t = (bounds.south - p1.lat) / (p2.lat - p1.lat);
+                    const lng = p1.lng + t * (p2.lng - p1.lng);
+                    output.push({ lat: bounds.south, lng });
+                    output.push(p2);
+                }
+            }
+        }
+        input = output;
+        output = [];
+        
+        // Clip against north edge
+        for (let i = 0; i < input.length; i++) {
+            const p1 = input[i];
+            const p2 = input[(i + 1) % input.length];
+            
+            if (p1.lat <= bounds.north) {
+                if (p2.lat <= bounds.north) {
+                    output.push(p2);
+                } else {
+                    const t = (bounds.north - p1.lat) / (p2.lat - p1.lat);
+                    const lng = p1.lng + t * (p2.lng - p1.lng);
+                    output.push({ lat: bounds.north, lng });
+                }
+            } else {
+                if (p2.lat <= bounds.north) {
+                    const t = (bounds.north - p1.lat) / (p2.lat - p1.lat);
+                    const lng = p1.lng + t * (p2.lng - p1.lng);
+                    output.push({ lat: bounds.north, lng });
+                    output.push(p2);
+                }
+            }
+        }
+        
+        return output.length >= 3 ? output : polygon; // Return original if clipping failed
+    };
+
+    // Function to create Voronoi cell boundary with proper convex hull
+    const createVoronoiCell = (
+        plantsInZone: Array<{ position: { lat: number; lng: number } }>, 
+        zoneCenter: { lat: number; lng: number },
+        shapeData?: { bounds?: { north: number; south: number; east: number; west: number }; center?: { lat: number; lng: number }; radius?: number; path?: Array<{ lat: number; lng: number }> },
+        shapeType?: string
+    ) => {
+        if (plantsInZone.length === 0) {
+            // If no plants, return a small square around center
+            const buffer = 0.0001;
+            return [
+                { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng + buffer },
+                { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng - buffer },
+                { lat: zoneCenter.lat - buffer, lng: zoneCenter.lng - buffer },
+                { lat: zoneCenter.lat - buffer, lng: zoneCenter.lng + buffer }
+            ];
+        }
+        
         // Create a convex hull around the plants in this zone
         const points = plantsInZone.map(plant => ({ lat: plant.position.lat, lng: plant.position.lng }));
         
@@ -2218,11 +2388,82 @@ function FreeMap() {
         points.push({ lat: zoneCenter.lat, lng: zoneCenter.lng });
         
         // Create convex hull
-        const hull = createConvexHull(points);
+        let hull = createConvexHull(points);
         
-        // If hull is too small, create a buffer around the plants
+        // If hull is too small, expand it slightly
         if (hull.length < 3) {
             const buffer = 0.0001; // Small buffer in degrees
+            return [
+                { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng + buffer },
+                { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng - buffer },
+                { lat: zoneCenter.lat - buffer, lng: zoneCenter.lng - buffer },
+                { lat: zoneCenter.lat - buffer, lng: zoneCenter.lng + buffer }
+            ];
+        }
+        
+        // Clip hull to drawn area bounds if shape data is provided
+        if (shapeData && shapeType) {
+            // For rectangles, clip to bounds
+            if (shapeType === window.google.maps.drawing.OverlayType.RECTANGLE && shapeData.bounds) {
+                hull = clipPolygonToBounds(hull, shapeData.bounds);
+            } 
+            // For polygons and circles, filter points that are outside
+            else if (shapeType === window.google.maps.drawing.OverlayType.POLYGON || 
+                     shapeType === window.google.maps.drawing.OverlayType.CIRCLE) {
+                // Filter hull points to only include those inside the drawn area
+                hull = hull.filter(point => isPointInDrawnArea(point, shapeData, shapeType));
+                
+                // If too many points removed, use bounds clipping as fallback
+                if (hull.length < 3 && shapeData.bounds) {
+                    // Get bounds from polygon path if available
+                    let bounds = shapeData.bounds;
+                    if (shapeType === window.google.maps.drawing.OverlayType.POLYGON && shapeData.path) {
+                        const lats = shapeData.path.map(p => p.lat);
+                        const lngs = shapeData.path.map(p => p.lng);
+                        bounds = {
+                            north: Math.max(...lats),
+                            south: Math.min(...lats),
+                            east: Math.max(...lngs),
+                            west: Math.min(...lngs)
+                        };
+                    } else if (shapeType === window.google.maps.drawing.OverlayType.CIRCLE && shapeData.center && shapeData.radius) {
+                        const radiusDeg = shapeData.radius / 111000;
+                        bounds = {
+                            north: shapeData.center.lat + radiusDeg,
+                            south: shapeData.center.lat - radiusDeg,
+                            east: shapeData.center.lng + radiusDeg,
+                            west: shapeData.center.lng - radiusDeg
+                        };
+                    }
+                    
+                    // Recreate hull from original points and clip
+                    hull = createConvexHull(points);
+                    hull = clipPolygonToBounds(hull, bounds);
+                    
+                    // Final filter to ensure all points are inside
+                    hull = hull.filter(point => isPointInDrawnArea(point, shapeData, shapeType));
+                }
+                
+                // If still too few points, recreate from plants only inside area
+                if (hull.length < 3) {
+                    const validPlants = plantsInZone.filter(plant => 
+                        isPointInDrawnArea(plant.position, shapeData, shapeType)
+                    );
+                    if (validPlants.length > 0) {
+                        const validPoints = validPlants.map(plant => ({ 
+                            lat: plant.position.lat, 
+                            lng: plant.position.lng 
+                        }));
+                        validPoints.push({ lat: zoneCenter.lat, lng: zoneCenter.lng });
+                        hull = createConvexHull(validPoints);
+                    }
+                }
+            }
+        }
+        
+        // Ensure minimum 3 points for a valid polygon
+        if (hull.length < 3) {
+            const buffer = 0.0001;
             return [
                 { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng + buffer },
                 { lat: zoneCenter.lat + buffer, lng: zoneCenter.lng - buffer },
@@ -2363,7 +2604,13 @@ function FreeMap() {
             if (plantsInZone.length === 0) continue;
 
             // Create Voronoi cell boundary using convex hull of plants in this zone
-            const zoneCoordinates = createVoronoiCell(plantsInZone, { lat: zoneCenter.position.lat, lng: zoneCenter.position.lng });
+            // Pass shape data to clip hull to drawn area boundaries
+            const zoneCoordinates = createVoronoiCell(
+                plantsInZone, 
+                { lat: zoneCenter.position.lat, lng: zoneCenter.position.lng },
+                shape.data,
+                shape.type
+            );
 
             // Calculate bounds from coordinates
             const lats = zoneCoordinates.map(coord => coord.lat);
@@ -3206,8 +3453,6 @@ function FreeMap() {
         zones.forEach((zone, index) => {
             console.log(`🔍 Processing zone ${index + 1}:`, zone);
             
-            let pipePath: Array<{ lat: number; lng: number }> = [];
-            
             // Find plant points in this zone to determine the actual tree boundaries
             const zonePlantPoints = plantPoints.filter(point => 
                 point.position.lat >= zone.bounds.south && 
@@ -3216,56 +3461,201 @@ function FreeMap() {
                 point.position.lng <= zone.bounds.east
             );
 
-            if (zonePlantPoints.length > 0) {
-                // Find the westernmost and easternmost plant points in this zone
-                const zoneLngs = zonePlantPoints.map(point => point.position.lng);
-                const westernmostLng = Math.min(...zoneLngs);
-                const easternmostLng = Math.max(...zoneLngs);
+            if (zonePlantPoints.length === 0) {
+                console.log(`⚠️ No plant points found in zone ${index + 1}, skipping sub-main pipe`);
+                return;
+            }
+
+            // Calculate actual pipe boundaries that stay strictly within zone polygon
+            // For polygon zones, we need to find intersection points with zone boundaries
+            let westLng = zone.bounds.west;
+            let eastLng = zone.bounds.east;
+            
+            // If zone has coordinates (polygon), find actual intersection points
+            if (zone.coordinates && zone.coordinates.length > 0) {
+                const pipeLat = zone.center.lat;
                 
-                console.log(`🌳 Zone ${index + 1} has ${zonePlantPoints.length} plant points`);
-                console.log(`🌳 Westernmost tree at lng: ${westernmostLng.toFixed(6)}`);
-                console.log(`🌳 Easternmost tree at lng: ${easternmostLng.toFixed(6)}`);
+                // Find all intersection points where horizontal line at pipeLat intersects zone polygon edges
+                const intersections: Array<{ lat: number; lng: number }> = [];
                 
-                // Create horizontal sub-main pipe from westernmost to easternmost tree
-                pipePath = [
-                    { lat: zone.center.lat, lng: westernmostLng }, // Westernmost tree
-                    { lat: zone.center.lat, lng: easternmostLng }  // Easternmost tree
-                ];
+                // Check all edges of the polygon
+                for (let i = 0; i < zone.coordinates.length; i++) {
+                    const p1 = zone.coordinates[i];
+                    const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
+                    
+                    // Check if horizontal line at pipeLat intersects this edge
+                    const latMin = Math.min(p1.lat, p2.lat);
+                    const latMax = Math.max(p1.lat, p2.lat);
+                    
+                    if (pipeLat >= latMin && pipeLat <= latMax && latMin !== latMax) {
+                        // Calculate intersection point
+                        const t = (pipeLat - p1.lat) / (p2.lat - p1.lat);
+                        const intersectionLng = p1.lng + t * (p2.lng - p1.lng);
+                        
+                        // Verify intersection is within edge longitude bounds
+                        const lngMin = Math.min(p1.lng, p2.lng);
+                        const lngMax = Math.max(p1.lng, p2.lng);
+                        
+                        if (intersectionLng >= lngMin && intersectionLng <= lngMax) {
+                            intersections.push({ lat: pipeLat, lng: intersectionLng });
+                        }
+                    }
+                    
+                    // Also check if edge vertices are exactly at pipeLat
+                    if (Math.abs(p1.lat - pipeLat) < 0.000001) {
+                        intersections.push(p1);
+                    }
+                    if (Math.abs(p2.lat - pipeLat) < 0.000001) {
+                        intersections.push(p2);
+                    }
+                }
+                
+                // Remove duplicate intersections (within tolerance)
+                const uniqueIntersections: Array<{ lat: number; lng: number }> = [];
+                intersections.forEach(intersection => {
+                    const isDuplicate = uniqueIntersections.some(existing => 
+                        Math.abs(existing.lng - intersection.lng) < 0.000001
+                    );
+                    if (!isDuplicate) {
+                        uniqueIntersections.push(intersection);
+                    }
+                });
+                
+                // Find westernmost and easternmost intersection points
+                if (uniqueIntersections.length >= 2) {
+                    const lngs = uniqueIntersections.map(i => i.lng);
+                    westLng = Math.min(...lngs);
+                    eastLng = Math.max(...lngs);
+                } else if (uniqueIntersections.length === 1) {
+                    // Only one intersection (edge case), use bounds as fallback
+                    westLng = Math.max(zone.bounds.west, uniqueIntersections[0].lng - 0.0001);
+                    eastLng = Math.min(zone.bounds.east, uniqueIntersections[0].lng + 0.0001);
+                } else {
+                    // No intersections found, use bounds but ensure we're conservative
+                    westLng = zone.bounds.west;
+                    eastLng = zone.bounds.east;
+                }
             } else {
-                // Fallback to zone bounds if no plant points found
-                console.log(`⚠️ No plant points found in zone ${index + 1}, using zone bounds`);
-                pipePath = [
-                    { lat: zone.center.lat, lng: zone.bounds.west },
-                    { lat: zone.center.lat, lng: zone.bounds.east }
-                ];
+                // For rectangle zones, use bounds directly
+                westLng = zone.bounds.west;
+                eastLng = zone.bounds.east;
             }
             
-            console.log(`📏 Sub-main pipe path:`, pipePath);
+            // Final safety check: ensure pipe doesn't exceed zone bounds
+            westLng = Math.max(westLng, zone.bounds.west);
+            eastLng = Math.min(eastLng, zone.bounds.east);
             
-            // Only create pipe if we have a valid path
-            if (pipePath.length >= 2) {
-                // Create polyline for sub-main pipe
-                const polyline = new window.google.maps.Polyline({
-                    path: pipePath,
-                    geodesic: true,
-                    strokeColor: '#8B5CF6', // Purple color for sub-main pipes
-                    strokeOpacity: 0.8,
-                    strokeWeight: 3, // Slightly thinner than main pipes
-                    zIndex: 1100 // Between main pipes and zones
-                });
+            console.log(`🌳 Zone ${index + 1} has ${zonePlantPoints.length} plant points`);
+            console.log(`🌳 Zone bounds: west=${zone.bounds.west.toFixed(6)}, east=${zone.bounds.east.toFixed(6)}`);
+            console.log(`🌳 Sub-main pipe bounds: west=${westLng.toFixed(6)}, east=${eastLng.toFixed(6)}`);
+            
+            // Create horizontal sub-main pipe within zone boundaries
+            // This ensures the pipe never exceeds zone boundaries
+            const pipePath = [
+                { lat: zone.center.lat, lng: westLng }, // Western boundary (within zone)
+                { lat: zone.center.lat, lng: eastLng }  // Eastern boundary (within zone)
+            ];
+            
+            console.log(`📍 Sub-main pipe path (strictly within zone polygon):`, pipePath);
+            
+            // Create polyline for sub-main pipe
+            const polyline = new window.google.maps.Polyline({
+                path: pipePath,
+                geodesic: true,
+                strokeColor: '#8B5CF6', // Purple color for sub-main pipes
+                strokeOpacity: 0.8,
+                strokeWeight: 3, // Slightly thinner than main pipes
+                zIndex: 1100 // Between main pipes and zones
+            });
 
-                // Add to map
-                polyline.setMap(map);
-                console.log(`✅ Created sub-main pipe for zone ${zone.id}`);
+            // Add to map
+            polyline.setMap(map);
+            console.log(`✅ Created sub-main pipe for zone ${zone.id}`);
 
-                newSubMainPipes.push({
-                    id: Date.now() + zone.id,
-                    path: pipePath,
-                    overlay: polyline,
-                    zoneId: zone.id
-                });
+            newSubMainPipes.push({
+                id: Date.now() + zone.id,
+                path: pipePath,
+                overlay: polyline,
+                zoneId: zone.id
+            });
+
+            // Check if sub-main pipe needs to be connected to main pipe (zone center)
+            // Find the closest point on sub-main pipe to zone center
+            const zoneCenter = zone.center;
+            const geometry = window.google?.maps?.geometry;
+            
+            // Calculate distance from zone center to both endpoints of sub-main pipe
+            let closestPointOnSubMain: { lat: number; lng: number };
+            
+            // Check if zone center's longitude is within sub-main pipe range
+            if (zoneCenter.lng >= westLng && zoneCenter.lng <= eastLng) {
+                // Zone center is directly on the sub-main pipe line - use it as connection point
+                closestPointOnSubMain = { lat: zoneCenter.lat, lng: zoneCenter.lng };
+                console.log(`📍 Zone center is on sub-main pipe, using zone center as connection point`);
             } else {
-                console.log(`⚠️ Skipping zone ${zone.id} - insufficient pipe path points`);
+                // Zone center is outside sub-main pipe range - find closest endpoint
+                const westEndpoint = { lat: zone.center.lat, lng: westLng };
+                const eastEndpoint = { lat: zone.center.lat, lng: eastLng };
+                
+                let distToWest = 0;
+                let distToEast = 0;
+                
+                if (geometry?.spherical) {
+                    const centerLatLng = new window.google.maps.LatLng(zoneCenter.lat, zoneCenter.lng);
+                    const westLatLng = new window.google.maps.LatLng(westEndpoint.lat, westEndpoint.lng);
+                    const eastLatLng = new window.google.maps.LatLng(eastEndpoint.lat, eastEndpoint.lng);
+                    
+                    distToWest = geometry.spherical.computeDistanceBetween(centerLatLng, westLatLng);
+                    distToEast = geometry.spherical.computeDistanceBetween(centerLatLng, eastLatLng);
+                } else {
+                    // Fallback: use simple distance calculation
+                    distToWest = Math.hypot(zoneCenter.lat - westEndpoint.lat, zoneCenter.lng - westEndpoint.lng);
+                    distToEast = Math.hypot(zoneCenter.lat - eastEndpoint.lat, zoneCenter.lng - eastEndpoint.lng);
+                }
+                
+                // Choose the closest endpoint
+                closestPointOnSubMain = distToWest < distToEast ? westEndpoint : eastEndpoint;
+                console.log(`📍 Zone center is outside sub-main pipe, closest endpoint: ${distToWest < distToEast ? 'west' : 'east'}`);
+            }
+            
+            // Check if connection point is different from zone center (needs connection)
+            const needsConnection = Math.abs(closestPointOnSubMain.lat - zoneCenter.lat) > 0.000001 || 
+                                   Math.abs(closestPointOnSubMain.lng - zoneCenter.lng) > 0.000001;
+            
+            if (needsConnection) {
+                // Create extended path that includes connection from zone center to closest point on sub-main pipe
+                // Build path: zone center -> closest point -> rest of sub-main pipe
+                let finalPath: Array<{ lat: number; lng: number }>;
+                
+                // Determine the order of points in the final path
+                if (closestPointOnSubMain.lng === westLng) {
+                    // Connection point is at west end - path: zone center -> west -> east
+                    finalPath = [
+                        zoneCenter,
+                        closestPointOnSubMain,
+                        { lat: zone.center.lat, lng: eastLng }
+                    ];
+                } else {
+                    // Connection point is at east end - path: zone center -> east -> west
+                    finalPath = [
+                        zoneCenter,
+                        closestPointOnSubMain,
+                        { lat: zone.center.lat, lng: westLng }
+                    ];
+                }
+                
+                // Update the sub-main pipe overlay with extended path
+                polyline.setPath(finalPath);
+                
+                // Update the stored path in the array
+                const pipeIndex = newSubMainPipes.findIndex(p => p.zoneId === zone.id);
+                if (pipeIndex >= 0) {
+                    newSubMainPipes[pipeIndex].path = finalPath;
+                }
+                
+                console.log(`✅ Created connection from zone center to sub-main pipe for zone ${zone.id}`);
+            } else {
+                console.log(`📍 Zone center is already connected to sub-main pipe for zone ${zone.id}`);
             }
         });
 
@@ -3314,7 +3704,7 @@ function FreeMap() {
         
         // Calculate dynamic tolerance based on zone width
         const zoneWidth = zoneBounds.east - zoneBounds.west;
-        const tolerance = Math.max(0.00005, zoneWidth * 0.05); // 5% of zone width, minimum 0.0005
+        const tolerance = Math.max(0.00002, zoneWidth * 0.05); // 5% of zone width, minimum 0.0005
         
         console.log(`📏 Zone width: ${zoneWidth.toFixed(6)}, tolerance: ${tolerance.toFixed(6)}`);
         
@@ -3351,6 +3741,128 @@ function FreeMap() {
 
         console.log(`✅ Total columns found: ${treeColumns.length}`);
         return treeColumns;
+    };
+
+    // Helper function: Calculate distance from a point to a line segment
+    const distanceToLineSegment = (
+        point: { lat: number; lng: number },
+        segmentStart: { lat: number; lng: number },
+        segmentEnd: { lat: number; lng: number },
+        geometry?: { spherical?: { computeDistanceBetween: (from: google.maps.LatLng, to: google.maps.LatLng) => number } }
+    ): number => {
+        // Calculate parameter t (0 to 1 means point is on segment)
+        const A = point.lat - segmentStart.lat;
+        const B = point.lng - segmentStart.lng;
+        const C = segmentEnd.lat - segmentStart.lat;
+        const D = segmentEnd.lng - segmentStart.lng;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        // If segment has zero length, calculate distance to start point
+        if (lenSq === 0) {
+            if (geometry?.spherical) {
+                const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                const startLatLng = new window.google.maps.LatLng(segmentStart.lat, segmentStart.lng);
+                return geometry.spherical.computeDistanceBetween(pointLatLng, startLatLng);
+            }
+            return Math.sqrt(A * A + B * B) * 111000; // Convert to meters (rough approximation)
+        }
+        
+        // Calculate parameter t (clamped to [0, 1])
+        const t = Math.max(0, Math.min(1, dot / lenSq));
+        
+        // Calculate closest point on segment
+        const closestPoint = {
+            lat: segmentStart.lat + t * C,
+            lng: segmentStart.lng + t * D
+        };
+        
+        // Calculate distance from point to closest point on segment
+        if (geometry?.spherical) {
+            const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+            const closestLatLng = new window.google.maps.LatLng(closestPoint.lat, closestPoint.lng);
+            return geometry.spherical.computeDistanceBetween(pointLatLng, closestLatLng);
+        }
+        
+        // Fallback: use simple distance calculation
+        const dist = Math.sqrt(
+            Math.pow(point.lat - closestPoint.lat, 2) + 
+            Math.pow(point.lng - closestPoint.lng, 2)
+        );
+        return dist * 111000; // Convert to meters (rough approximation)
+    };
+
+    // Helper function: Find the closest point on a line segment to a given point
+    const closestPointOnLineSegment = (
+        point: { lat: number; lng: number },
+        segmentStart: { lat: number; lng: number },
+        segmentEnd: { lat: number; lng: number }
+    ): { lat: number; lng: number } => {
+        const A = point.lat - segmentStart.lat;
+        const B = point.lng - segmentStart.lng;
+        const C = segmentEnd.lat - segmentStart.lat;
+        const D = segmentEnd.lng - segmentStart.lng;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        // If segment has zero length, return start point
+        if (lenSq === 0) {
+            return segmentStart;
+        }
+        
+        // Calculate parameter t (clamped to [0, 1])
+        const t = Math.max(0, Math.min(1, dot / lenSq));
+        
+        // Return closest point on segment
+        return {
+            lat: segmentStart.lat + t * C,
+            lng: segmentStart.lng + t * D
+        };
+    };
+
+    // Helper function: Get intersection latitude on polyline at a given longitude
+    // Returns the latitude where the polyline intersects a vertical line at the given longitude
+    // Returns null if no intersection is found
+    const getIntersectionLatOnPolyline = (
+        polylinePath: Array<{ lat: number; lng: number }>,
+        targetLng: number,
+        tolerance: number = 0.00001
+    ): number | null => {
+        if (!polylinePath || polylinePath.length < 2) {
+            return null;
+        }
+
+        // Check each segment of the polyline
+        for (let i = 0; i < polylinePath.length - 1; i++) {
+            const segStart = polylinePath[i];
+            const segEnd = polylinePath[i + 1];
+            
+            // Check if this segment crosses the vertical line at targetLng
+            const lngMin = Math.min(segStart.lng, segEnd.lng);
+            const lngMax = Math.max(segStart.lng, segEnd.lng);
+            
+            // Check intersection with tolerance
+            if (targetLng >= (lngMin - tolerance) && targetLng <= (lngMax + tolerance) && Math.abs(lngMax - lngMin) > tolerance) {
+                // Calculate intersection point
+                const t = (targetLng - segStart.lng) / (segEnd.lng - segStart.lng);
+                const intersectionLat = segStart.lat + t * (segEnd.lat - segStart.lat);
+                
+                return intersectionLat;
+            }
+            
+            // Also check if segment endpoints are close to targetLng
+            if (Math.abs(segStart.lng - targetLng) < tolerance) {
+                return segStart.lat;
+            }
+            if (Math.abs(segEnd.lng - targetLng) < tolerance) {
+                return segEnd.lat;
+            }
+        }
+        
+        // No intersection found
+        return null;
     };
 
     // Function to generate lateral pipes perpendicular to sub-main pipes
@@ -3430,38 +3942,367 @@ function FreeMap() {
                     const northernmostLat = Math.max(...columnLats);
                     const southernmostLat = Math.min(...columnLats);
                     
-                    // Connection point on sub-main pipe
-                    const connectionPoint = { lat: subMainLat, lng: columnLng };
+                    // Calculate actual pipe boundaries that stay strictly within zone polygon
+                    // For polygon zones, we need to find intersection points with zone boundaries
+                    let topLat = northernmostLat;
+                    let bottomLat = southernmostLat;
                     
-                    // Determine pipe path based on plant positions relative to sub-main pipe
+                    // If zone has coordinates (polygon), find actual intersection points
+                    if (zone.coordinates && zone.coordinates.length > 0) {
+                        // Find all intersection points where vertical line at columnLng intersects zone polygon edges
+                        const intersections: Array<{ lat: number; lng: number }> = [];
+                        
+                        // Check all edges of the polygon
+                        for (let i = 0; i < zone.coordinates.length; i++) {
+                            const p1 = zone.coordinates[i];
+                            const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
+                            
+                            // Check if vertical line at columnLng intersects this edge
+                            const lngMin = Math.min(p1.lng, p2.lng);
+                            const lngMax = Math.max(p1.lng, p2.lng);
+                            
+                            if (columnLng >= lngMin && columnLng <= lngMax && lngMin !== lngMax) {
+                                // Calculate intersection point
+                                const t = (columnLng - p1.lng) / (p2.lng - p1.lng);
+                                const intersectionLat = p1.lat + t * (p2.lat - p1.lat);
+                                
+                                // Verify intersection is within edge latitude bounds
+                                const latMin = Math.min(p1.lat, p2.lat);
+                                const latMax = Math.max(p1.lat, p2.lat);
+                                
+                                if (intersectionLat >= latMin && intersectionLat <= latMax) {
+                                    intersections.push({ lat: intersectionLat, lng: columnLng });
+                                }
+                            }
+                            
+                            // Also check if edge vertices are exactly at columnLng
+                            if (Math.abs(p1.lng - columnLng) < 0.000001) {
+                                intersections.push(p1);
+                            }
+                            if (Math.abs(p2.lng - columnLng) < 0.000001) {
+                                intersections.push(p2);
+                            }
+                        }
+                        
+                        // Remove duplicate intersections (within tolerance)
+                        const uniqueIntersections: Array<{ lat: number; lng: number }> = [];
+                        intersections.forEach(intersection => {
+                            const isDuplicate = uniqueIntersections.some(existing => 
+                                Math.abs(existing.lat - intersection.lat) < 0.000001
+                            );
+                            if (!isDuplicate) {
+                                uniqueIntersections.push(intersection);
+                            }
+                        });
+                        
+                        // Find northernmost and southernmost intersection points
+                        // These are the ONLY valid boundaries - they are guaranteed to be within polygon
+                        if (uniqueIntersections.length >= 2) {
+                            const lats = uniqueIntersections.map(i => i.lat);
+                            const intersectionNorth = Math.max(...lats);
+                            const intersectionSouth = Math.min(...lats);
+                            
+                            // Use intersections as strict boundaries (these are polygon boundaries)
+                            // Only extend to plants if they are within the intersection range
+                            topLat = intersectionNorth;
+                            bottomLat = intersectionSouth;
+                            
+                            // Only extend to plant positions if they are within intersection range
+                            if (northernmostLat <= intersectionNorth && northernmostLat >= intersectionSouth) {
+                                topLat = northernmostLat;
+                            }
+                            if (southernmostLat >= intersectionSouth && southernmostLat <= intersectionNorth) {
+                                bottomLat = southernmostLat;
+                            }
+                            
+                            // Final clamp to zone bounds for safety
+                            topLat = Math.min(topLat, zone.bounds.north);
+                            bottomLat = Math.max(bottomLat, zone.bounds.south);
+                        } else if (uniqueIntersections.length === 1) {
+                            // Only one intersection - use it and extend to plant positions with bounds as fallback
+                            const singleIntersection = uniqueIntersections[0];
+                            console.log(`⚠️ Column ${columnIndex + 1} has only one intersection, using fallback bounds`);
+                            
+                            // Use intersection as anchor, extend to plants within zone bounds
+                            topLat = Math.min(Math.max(northernmostLat, singleIntersection.lat), zone.bounds.north);
+                            bottomLat = Math.max(Math.min(southernmostLat, singleIntersection.lat), zone.bounds.south);
+                            
+                            // Ensure we have a valid range
+                            if (topLat <= bottomLat) {
+                                // Use bounds as fallback
+                                topLat = Math.min(northernmostLat, zone.bounds.north);
+                                bottomLat = Math.max(southernmostLat, zone.bounds.south);
+                            }
+                        } else {
+                            // No intersections found - use plant positions with zone bounds as fallback
+                            console.log(`⚠️ Column ${columnIndex + 1} does not intersect zone boundary, using fallback bounds`);
+                            topLat = Math.min(northernmostLat, zone.bounds.north);
+                            bottomLat = Math.max(southernmostLat, zone.bounds.south);
+                        }
+                    } else {
+                        // For rectangle zones, use bounds directly
+                        topLat = Math.min(northernmostLat, zone.bounds.north);
+                        bottomLat = Math.max(southernmostLat, zone.bounds.south);
+                    }
+                    
+                    // Final safety check: ensure pipe doesn't exceed zone bounds
+                    topLat = Math.min(topLat, zone.bounds.north);
+                    bottomLat = Math.max(bottomLat, zone.bounds.south);
+                    
+                    // Ensure topLat is greater than bottomLat
+                    if (topLat <= bottomLat) {
+                        // Try to fix by using a minimum height
+                        const minHeight = 0.0001; // Approximately 10 meters
+                        const centerLat = (topLat + bottomLat) / 2;
+                        topLat = centerLat + minHeight / 2;
+                        bottomLat = centerLat - minHeight / 2;
+                        
+                        // Final check - if still invalid, use plant positions directly
+                        if (topLat <= bottomLat) {
+                            console.log(`⚠️ Invalid pipe bounds for column ${columnIndex + 1}, using plant positions directly`);
+                            topLat = Math.max(northernmostLat, zone.bounds.south + minHeight);
+                            bottomLat = Math.min(southernmostLat, zone.bounds.north - minHeight);
+                        }
+                        
+                        // If still invalid, skip
+                        if (topLat <= bottomLat) {
+                            console.log(`⚠️ Cannot create valid pipe bounds for column ${columnIndex + 1}, skipping lateral pipe`);
+                            return; // Skip this column
+                        }
+                    }
+                    
+                    // Define lateral pipe endpoints
+                    const lateralTopPoint = { lat: topLat, lng: columnLng };
+                    const lateralBottomPoint = { lat: bottomLat, lng: columnLng };
+                    
+                    // Use new helper function to find intersection latitude on sub-main pipe
+                    const latTolerance = 0.00001; // Approximately 1 meter
+                    const actualIntersectionLat = getIntersectionLatOnPolyline(zoneSubMainPipe.path, columnLng);
+                    
+                    // Determine pipe path
                     let pipePath: Array<{ lat: number; lng: number }>;
                     
-                    if (northernmostLat > subMainLat && southernmostLat < subMainLat) {
-                        // Plants on both sides of sub-main pipe
-                        pipePath = [
-                            { lat: northernmostLat, lng: columnLng }, // Top plant
-                            connectionPoint,                           // Connection to sub-main
-                            { lat: southernmostLat, lng: columnLng }  // Bottom plant
-                        ];
-                        console.log(`📏 Lateral pipe crosses sub-main (plants on both sides)`);
-                    } else if (northernmostLat <= subMainLat) {
-                        // All plants below sub-main pipe
-                        pipePath = [
-                            connectionPoint,                           // Connection to sub-main
-                            { lat: southernmostLat, lng: columnLng }  // Bottom plant
-                        ];
-                        console.log(`📏 Lateral pipe extends downward from sub-main`);
+                    if (actualIntersectionLat !== null) {
+                        // Found intersection - check if it's within lateral pipe range
+                        if (actualIntersectionLat >= (bottomLat - latTolerance) && actualIntersectionLat <= (topLat + latTolerance)) {
+                            // Sub-main pipe intersects the vertical line - create vertical connection
+                            const intersectionPoint = { lat: actualIntersectionLat, lng: columnLng };
+                            console.log(`📍 Sub-main pipe intersects lateral pipe at (${actualIntersectionLat.toFixed(6)}, ${columnLng.toFixed(6)})`);
+                            
+                            if (topLat > actualIntersectionLat && bottomLat < actualIntersectionLat) {
+                                // Plants on both sides of sub-main pipe
+                                pipePath = [
+                                    lateralTopPoint,
+                                    intersectionPoint,
+                                    lateralBottomPoint
+                                ];
+                                console.log(`📏 Lateral pipe crosses sub-main (plants on both sides)`);
+                            } else if (topLat <= actualIntersectionLat) {
+                                // All plants below sub-main pipe
+                                pipePath = [
+                                    intersectionPoint,
+                                    lateralBottomPoint
+                                ];
+                                console.log(`📏 Lateral pipe extends downward from sub-main`);
+                            } else {
+                                // All plants above sub-main pipe
+                                pipePath = [
+                                    intersectionPoint,
+                                    lateralTopPoint
+                                ];
+                                console.log(`📏 Lateral pipe extends upward from sub-main`);
+                            }
+                        } else {
+                            // Intersection found but outside lateral pipe range - use diagonal connection
+                            console.log(`📍 Intersection found but outside lateral pipe range, using diagonal connection`);
+                            // Fall through to diagonal connection logic below
+                            const geometry = window.google?.maps?.geometry;
+                            
+                            // Find which endpoint of lateral pipe is closest to sub-main pipe
+                            let closestLateralEndpoint: { lat: number; lng: number };
+                            let farthestLateralEndpoint: { lat: number; lng: number };
+                            
+                            // Calculate distances from both endpoints to sub-main pipe
+                            let minDistTop = Number.POSITIVE_INFINITY;
+                            let minDistBottom = Number.POSITIVE_INFINITY;
+                            let closestPointOnSubMainTop: { lat: number; lng: number } | null = null;
+                            let closestPointOnSubMainBottom: { lat: number; lng: number } | null = null;
+                            
+                            // Check all segments of sub-main pipe
+                            for (let i = 0; i < zoneSubMainPipe.path.length - 1; i++) {
+                                const segStart = zoneSubMainPipe.path[i];
+                                const segEnd = zoneSubMainPipe.path[i + 1];
+                                
+                                // Calculate distance from top endpoint to this segment
+                                const distTop = distanceToLineSegment(lateralTopPoint, segStart, segEnd, geometry);
+                                if (distTop < minDistTop) {
+                                    minDistTop = distTop;
+                                    closestPointOnSubMainTop = closestPointOnLineSegment(lateralTopPoint, segStart, segEnd);
+                                }
+                                
+                                // Calculate distance from bottom endpoint to this segment
+                                const distBottom = distanceToLineSegment(lateralBottomPoint, segStart, segEnd, geometry);
+                                if (distBottom < minDistBottom) {
+                                    minDistBottom = distBottom;
+                                    closestPointOnSubMainBottom = closestPointOnLineSegment(lateralBottomPoint, segStart, segEnd);
+                                }
+                            }
+                            
+                            // Determine which endpoint is closer to sub-main pipe
+                            if (minDistTop < minDistBottom) {
+                                closestLateralEndpoint = lateralTopPoint;
+                                farthestLateralEndpoint = lateralBottomPoint;
+                            } else {
+                                closestLateralEndpoint = lateralBottomPoint;
+                                farthestLateralEndpoint = lateralTopPoint;
+                            }
+                            
+                            // Ensure we have valid connection points
+                            if (!closestPointOnSubMainTop || !closestPointOnSubMainBottom) {
+                                console.log(`⚠️ Failed to find connection point on sub-main pipe for column ${columnIndex + 1}, skipping`);
+                                return; // Skip this column
+                            }
+                            
+                            const closestPointOnSubMain = minDistTop < minDistBottom 
+                                ? closestPointOnSubMainTop 
+                                : closestPointOnSubMainBottom;
+                            
+                            console.log(`📍 Closest endpoint: ${minDistTop < minDistBottom ? 'top' : 'bottom'}, distance: ${Math.min(minDistTop, minDistBottom).toFixed(2)}m`);
+                            console.log(`📍 Connection point on sub-main: (${closestPointOnSubMain.lat.toFixed(6)}, ${closestPointOnSubMain.lng.toFixed(6)})`);
+                            
+                            // Build path: farthest endpoint -> closest endpoint -> connection point on sub-main
+                            pipePath = [
+                                farthestLateralEndpoint,
+                                closestLateralEndpoint,
+                                closestPointOnSubMain
+                            ];
+                            
+                            console.log(`📏 Lateral pipe with diagonal connection: ${farthestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> ${closestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> sub-main`);
+                        }
                     } else {
-                        // All plants above sub-main pipe
+                        // No intersection found - sub-main pipe does NOT intersect - use diagonal connection
+                        console.log(`📍 Sub-main pipe does NOT intersect lateral pipe, creating diagonal connection`);
+                        
+                        const geometry = window.google?.maps?.geometry;
+                        
+                        // Find which endpoint of lateral pipe is closest to sub-main pipe
+                        let closestLateralEndpoint: { lat: number; lng: number };
+                        let farthestLateralEndpoint: { lat: number; lng: number };
+                        
+                        // Calculate distances from both endpoints to sub-main pipe
+                        let minDistTop = Number.POSITIVE_INFINITY;
+                        let minDistBottom = Number.POSITIVE_INFINITY;
+                        let closestPointOnSubMainTop: { lat: number; lng: number } | null = null;
+                        let closestPointOnSubMainBottom: { lat: number; lng: number } | null = null;
+                        
+                        // Check all segments of sub-main pipe
+                        for (let i = 0; i < zoneSubMainPipe.path.length - 1; i++) {
+                            const segStart = zoneSubMainPipe.path[i];
+                            const segEnd = zoneSubMainPipe.path[i + 1];
+                            
+                            // Calculate distance from top endpoint to this segment
+                            const distTop = distanceToLineSegment(lateralTopPoint, segStart, segEnd, geometry);
+                            if (distTop < minDistTop) {
+                                minDistTop = distTop;
+                                closestPointOnSubMainTop = closestPointOnLineSegment(lateralTopPoint, segStart, segEnd);
+                            }
+                            
+                            // Calculate distance from bottom endpoint to this segment
+                            const distBottom = distanceToLineSegment(lateralBottomPoint, segStart, segEnd, geometry);
+                            if (distBottom < minDistBottom) {
+                                minDistBottom = distBottom;
+                                closestPointOnSubMainBottom = closestPointOnLineSegment(lateralBottomPoint, segStart, segEnd);
+                            }
+                        }
+                        
+                        // Determine which endpoint is closer to sub-main pipe
+                        if (minDistTop < minDistBottom) {
+                            closestLateralEndpoint = lateralTopPoint;
+                            farthestLateralEndpoint = lateralBottomPoint;
+                        } else {
+                            closestLateralEndpoint = lateralBottomPoint;
+                            farthestLateralEndpoint = lateralTopPoint;
+                        }
+                        
+                        // Ensure we have valid connection points
+                        if (!closestPointOnSubMainTop || !closestPointOnSubMainBottom) {
+                            console.log(`⚠️ Failed to find connection point on sub-main pipe for column ${columnIndex + 1}, skipping`);
+                            return; // Skip this column
+                        }
+                        
+                        const closestPointOnSubMain = minDistTop < minDistBottom 
+                            ? closestPointOnSubMainTop 
+                            : closestPointOnSubMainBottom;
+                        
+                        console.log(`📍 Closest endpoint: ${minDistTop < minDistBottom ? 'top' : 'bottom'}, distance: ${Math.min(minDistTop, minDistBottom).toFixed(2)}m`);
+                        console.log(`📍 Connection point on sub-main: (${closestPointOnSubMain.lat.toFixed(6)}, ${closestPointOnSubMain.lng.toFixed(6)})`);
+                        
+                        // Build path: farthest endpoint -> closest endpoint -> connection point on sub-main
                         pipePath = [
-                            connectionPoint,                           // Connection to sub-main
-                            { lat: northernmostLat, lng: columnLng }  // Top plant
+                            farthestLateralEndpoint,
+                            closestLateralEndpoint,
+                            closestPointOnSubMain
                         ];
-                        console.log(`📏 Lateral pipe extends upward from sub-main`);
+                        
+                        console.log(`📏 Lateral pipe with diagonal connection: ${farthestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> ${closestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> sub-main`);
+                    }
+                    
+                    // Final verification: ensure lateral pipe endpoints are within zone bounds (with tolerance)
+                    // Note: connection point on sub-main may be outside zone bounds (that's OK)
+                    const boundsTolerance = 0.00005; // Approximately 5 meters tolerance
+                    const lateralEndpointsValid = pipePath.slice(0, -1).every(point => 
+                        point.lat >= (zone.bounds.south - boundsTolerance) && 
+                        point.lat <= (zone.bounds.north + boundsTolerance) && 
+                        point.lng >= (zone.bounds.west - boundsTolerance) && 
+                        point.lng <= (zone.bounds.east + boundsTolerance)
+                    );
+                    
+                    if (!lateralEndpointsValid) {
+                        // Try to clamp endpoints to valid bounds instead of skipping
+                        console.log(`⚠️ Lateral pipe endpoints exceed zone bounds for column ${columnIndex + 1}, clamping to bounds`);
+                        console.log(`   Original pipe path:`, pipePath);
+                        
+                        // Clamp lateral endpoints to zone bounds
+                        const clampedPath = pipePath.map((point, idx) => {
+                            if (idx < pipePath.length - 1) {
+                                // Clamp lateral endpoints
+                                return {
+                                    lat: Math.max(zone.bounds.south, Math.min(zone.bounds.north, point.lat)),
+                                    lng: Math.max(zone.bounds.west, Math.min(zone.bounds.east, point.lng))
+                                };
+                            } else {
+                                // Keep connection point as is (may be outside bounds)
+                                return point;
+                            }
+                        });
+                        
+                        // Verify clamped path is still valid
+                        const clampedEndpointsValid = clampedPath.slice(0, -1).every(point => 
+                            point.lat >= zone.bounds.south && 
+                            point.lat <= zone.bounds.north && 
+                            point.lng >= zone.bounds.west && 
+                            point.lng <= zone.bounds.east
+                        );
+                        
+                        if (!clampedEndpointsValid) {
+                            console.log(`⚠️ Cannot clamp lateral pipe endpoints for column ${columnIndex + 1}, skipping`);
+                            return; // Skip this column
+                        }
+                        
+                        pipePath = clampedPath;
+                        console.log(`   Clamped pipe path:`, pipePath);
+                    }
+                    
+                    // Verify that connection point is valid (not NaN or Infinity)
+                    const connectionPoint = pipePath[pipePath.length - 1];
+                    if (!isFinite(connectionPoint.lat) || !isFinite(connectionPoint.lng)) {
+                        console.log(`⚠️ Invalid connection point for column ${columnIndex + 1}, skipping`);
+                        return; // Skip this column
                     }
                     
                     console.log(`📏 Creating lateral pipe ${columnIndex + 1}/${treeColumns.length} for zone ${zone.id}`);
                     console.log(`📏 Column ${columnIndex + 1} has ${column.length} trees at lng: ${columnLng.toFixed(6)}`);
+                    console.log(`📏 Lateral pipe bounds: top=${topLat.toFixed(6)}, bottom=${bottomLat.toFixed(6)}`);
                     console.log(`📏 Lateral pipe path:`, pipePath);
                     
                     // Create polyline for lateral pipe
@@ -3490,6 +4331,273 @@ function FreeMap() {
                 console.log(`🔍 Verification: Expected ${treeColumns.length} lateral pipes, created ${newLateralPipes.filter(pipe => pipe.zoneId === zone.id).length}`);
                 
                 console.log(`✅ Zone ${zone.id}: Created ${treeColumns.length} lateral pipes`);
+                
+                // Find trees that are not connected to any lateral pipe
+                const zoneLateralPipes = newLateralPipes.filter(pipe => pipe.zoneId === zone.id);
+                const zonePlantPoints = plantPoints.filter(point => 
+                    point.position.lat >= zone.bounds.south && 
+                    point.position.lat <= zone.bounds.north && 
+                    point.position.lng >= zone.bounds.west && 
+                    point.position.lng <= zone.bounds.east
+                );
+                
+                // Helper function to check if a point is on a line segment
+                const isPointOnLineSegment = (
+                    point: { lat: number; lng: number },
+                    segmentStart: { lat: number; lng: number },
+                    segmentEnd: { lat: number; lng: number },
+                    tolerance: number = 0.00002
+                ): boolean => {
+                    // Calculate distance from point to line segment
+                    const A = point.lat - segmentStart.lat;
+                    const B = point.lng - segmentStart.lng;
+                    const C = segmentEnd.lat - segmentStart.lat;
+                    const D = segmentEnd.lng - segmentStart.lng;
+                    
+                    const dot = A * C + B * D;
+                    const lenSq = C * C + D * D;
+                    
+                    // If segment has zero length, just check distance to point
+                    if (lenSq === 0) {
+                        const dist = Math.sqrt(A * A + B * B);
+                        return dist < tolerance;
+                    }
+                    
+                    // Calculate parameter t (0 to 1 means point is on segment)
+                    const t = dot / lenSq;
+                    
+                    // If t is outside [0, 1], point is not on segment
+                    if (t < 0 || t > 1) {
+                        return false;
+                    }
+                    
+                    // Calculate closest point on segment
+                    const closestPoint = {
+                        lat: segmentStart.lat + t * C,
+                        lng: segmentStart.lng + t * D
+                    };
+                    
+                    // Calculate distance from point to closest point on segment
+                    const dist = Math.sqrt(
+                        Math.pow(point.lat - closestPoint.lat, 2) + 
+                        Math.pow(point.lng - closestPoint.lng, 2)
+                    );
+                    
+                    return dist < tolerance;
+                };
+                
+                // Find trees that are not connected to any lateral pipe
+                const tolerance = 0.00002; // Approximately 2 meters
+                const unconnectedTrees = zonePlantPoints.filter(plantPoint => {
+                    const isConnected = zoneLateralPipes.some(pipe => {
+                        // Check if tree is on any segment of this lateral pipe path
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            const segmentStart = pipe.path[i];
+                            const segmentEnd = pipe.path[i + 1];
+                            
+                            if (isPointOnLineSegment(plantPoint.position, segmentStart, segmentEnd, tolerance)) {
+                                return true; // Tree is on this pipe segment
+                            }
+                        }
+                        
+                        // Also check if tree is exactly at any endpoint
+                        return pipe.path.some(pipePoint => 
+                            Math.abs(pipePoint.lng - plantPoint.position.lng) < tolerance &&
+                            Math.abs(pipePoint.lat - plantPoint.position.lat) < tolerance
+                        );
+                    });
+                    
+                    return !isConnected;
+                });
+                
+                console.log(`🔍 Found ${unconnectedTrees.length} unconnected trees in zone ${zone.id}`);
+                
+                // Group unconnected trees by longitude (columns)
+                const unconnectedTreeColumns: Array<Array<{ id: number; position: { lat: number; lng: number } }>> = [];
+                const columnTolerance = 0.00005; // 5% of typical zone width or minimum 0.00005
+                
+                unconnectedTrees.forEach(tree => {
+                    const lng = tree.position.lng;
+                    let foundColumn = false;
+                    
+                    // Check if this tree belongs to an existing column
+                    for (let i = 0; i < unconnectedTreeColumns.length; i++) {
+                        const columnLng = unconnectedTreeColumns[i][0].position.lng;
+                        if (Math.abs(lng - columnLng) <= columnTolerance) {
+                            unconnectedTreeColumns[i].push(tree);
+                            foundColumn = true;
+                            break;
+                        }
+                    }
+                    
+                    // If no existing column found, create a new one
+                    if (!foundColumn) {
+                        unconnectedTreeColumns.push([tree]);
+                    }
+                });
+                
+                // Sort each column by latitude (top to bottom)
+                unconnectedTreeColumns.forEach(column => {
+                    column.sort((a, b) => b.position.lat - a.position.lat); // Sort descending (north to south)
+                });
+                
+                console.log(`🔍 Found ${unconnectedTreeColumns.length} unconnected tree columns in zone ${zone.id}`);
+                
+                // Create lateral pipes for unconnected tree columns
+                unconnectedTreeColumns.forEach((column, columnIndex) => {
+                    if (column.length === 0) return;
+                    
+                    const columnLng = column[0].position.lng;
+                    
+                    // Find the northernmost and southernmost trees in this column
+                    const columnLats = column.map(tree => tree.position.lat);
+                    const northernmostLat = Math.max(...columnLats);
+                    const southernmostLat = Math.min(...columnLats);
+                    
+                    // Calculate pipe boundaries that stay strictly within zone polygon
+                    let topLat = northernmostLat;
+                    let bottomLat = southernmostLat;
+                    
+                    // If zone has coordinates (polygon), find actual intersection points
+                    if (zone.coordinates && zone.coordinates.length > 0) {
+                        // Find all intersection points where vertical line at columnLng intersects zone polygon edges
+                        const intersections: Array<{ lat: number; lng: number }> = [];
+                        
+                        // Check all edges of the polygon
+                        for (let i = 0; i < zone.coordinates.length; i++) {
+                            const p1 = zone.coordinates[i];
+                            const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
+                            
+                            // Check if vertical line at columnLng intersects this edge
+                            const lngMin = Math.min(p1.lng, p2.lng);
+                            const lngMax = Math.max(p1.lng, p2.lng);
+                            
+                            if (columnLng >= lngMin && columnLng <= lngMax && lngMin !== lngMax) {
+                                // Calculate intersection point
+                                const t = (columnLng - p1.lng) / (p2.lng - p1.lng);
+                                const intersectionLat = p1.lat + t * (p2.lat - p1.lat);
+                                
+                                // Verify intersection is within edge latitude bounds
+                                const latMin = Math.min(p1.lat, p2.lat);
+                                const latMax = Math.max(p1.lat, p2.lat);
+                                
+                                if (intersectionLat >= latMin && intersectionLat <= latMax) {
+                                    intersections.push({ lat: intersectionLat, lng: columnLng });
+                                }
+                            }
+                            
+                            // Also check if edge vertices are exactly at columnLng
+                            if (Math.abs(p1.lng - columnLng) < 0.000001) {
+                                intersections.push(p1);
+                            }
+                            if (Math.abs(p2.lng - columnLng) < 0.000001) {
+                                intersections.push(p2);
+                            }
+                        }
+                        
+                        // Remove duplicate intersections
+                        const uniqueIntersections: Array<{ lat: number; lng: number }> = [];
+                        intersections.forEach(intersection => {
+                            const isDuplicate = uniqueIntersections.some(existing => 
+                                Math.abs(existing.lat - intersection.lat) < 0.000001
+                            );
+                            if (!isDuplicate) {
+                                uniqueIntersections.push(intersection);
+                            }
+                        });
+                        
+                        // Find northernmost and southernmost intersection points
+                        if (uniqueIntersections.length >= 2) {
+                            const lats = uniqueIntersections.map(i => i.lat);
+                            const intersectionNorth = Math.max(...lats);
+                            const intersectionSouth = Math.min(...lats);
+                            
+                            // Use intersections as strict boundaries
+                            topLat = intersectionNorth;
+                            bottomLat = intersectionSouth;
+                            
+                            // Only extend to plant positions if they are within intersection range
+                            if (northernmostLat <= intersectionNorth && northernmostLat >= intersectionSouth) {
+                                topLat = northernmostLat;
+                            }
+                            if (southernmostLat >= intersectionSouth && southernmostLat <= intersectionNorth) {
+                                bottomLat = southernmostLat;
+                            }
+                            
+                            // Final clamp to zone bounds
+                            topLat = Math.min(topLat, zone.bounds.north);
+                            bottomLat = Math.max(bottomLat, zone.bounds.south);
+                        } else if (uniqueIntersections.length === 1) {
+                            // Only one intersection - skip this column
+                            console.log(`⚠️ Unconnected column ${columnIndex + 1} has only one intersection, skipping`);
+                            return;
+                        } else {
+                            // No intersections - skip this column
+                            console.log(`⚠️ Unconnected column ${columnIndex + 1} does not intersect zone boundary, skipping`);
+                            return;
+                        }
+                    } else {
+                        // For rectangle zones, use bounds directly
+                        topLat = Math.min(northernmostLat, zone.bounds.north);
+                        bottomLat = Math.max(southernmostLat, zone.bounds.south);
+                    }
+                    
+                    // Final safety check
+                    topLat = Math.min(topLat, zone.bounds.north);
+                    bottomLat = Math.max(bottomLat, zone.bounds.south);
+                    
+                    // Ensure topLat is greater than bottomLat
+                    if (topLat <= bottomLat) {
+                        console.log(`⚠️ Invalid pipe bounds for unconnected column ${columnIndex + 1}, skipping`);
+                        return;
+                    }
+                    
+                    // Create pipe path from top to bottom
+                    const pipePath = [
+                        { lat: topLat, lng: columnLng },    // Top boundary (within zone)
+                        { lat: bottomLat, lng: columnLng }  // Bottom boundary (within zone)
+                    ];
+                    
+                    // Final verification: ensure all points are within zone bounds
+                    const allPointsValid = pipePath.every(point => 
+                        point.lat >= zone.bounds.south && 
+                        point.lat <= zone.bounds.north && 
+                        point.lng >= zone.bounds.west && 
+                        point.lng <= zone.bounds.east
+                    );
+                    
+                    if (!allPointsValid) {
+                        console.log(`⚠️ Unconnected lateral pipe exceeds zone bounds, skipping`);
+                        return;
+                    }
+                    
+                    console.log(`📏 Creating lateral pipe for unconnected column ${columnIndex + 1}/${unconnectedTreeColumns.length}`);
+                    console.log(`📏 Column has ${column.length} trees at lng: ${columnLng.toFixed(6)}`);
+                    console.log(`📏 Pipe bounds: top=${topLat.toFixed(6)}, bottom=${bottomLat.toFixed(6)}`);
+                    
+                    // Create polyline for lateral pipe
+                    const polyline = new window.google.maps.Polyline({
+                        path: pipePath,
+                        geodesic: true,
+                        strokeColor: '#FCD34D', // Yellow color for lateral pipes
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        zIndex: 1000
+                    });
+                    
+                    // Add to map
+                    polyline.setMap(map);
+                    console.log(`✅ Successfully created lateral pipe for unconnected column ${columnIndex + 1}`);
+                    
+                    newLateralPipes.push({
+                        id: Date.now() + zone.id + columnIndex + 10000, // Use higher ID to distinguish
+                        path: pipePath,
+                        overlay: polyline,
+                        zoneId: zone.id
+                    });
+                });
+                
+                console.log(`✅ Zone ${zone.id}: Created ${treeColumns.length} main lateral pipes + ${unconnectedTreeColumns.length} additional pipes for unconnected trees`);
             } else {
                 console.log(`❌ Zone ${zone.id} has no tree columns - no lateral pipes created`);
             }

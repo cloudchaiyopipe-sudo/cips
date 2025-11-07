@@ -91,7 +91,7 @@ export default defineConfig(({ command, mode }) => {
                 'leaflet-image',
                 'leaflet-geosearch',
                 'leaflet-kml',
-                'leaflet-markercluster',
+                'leaflet.markercluster',
                 'leaflet-routing-machine',
                 'lucide-react',
                 'react-markdown',

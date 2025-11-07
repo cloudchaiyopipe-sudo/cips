@@ -1,5 +1,5 @@
 // 1. Import
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { useState, useEffect } from 'react';
 import { getTranslations } from './utils/language';
@@ -32,7 +32,9 @@ function UpgradePro() {
     }, []);
 
     const handleBack = () => window.history.back();
-    const handleUpgrade = () => alert('Upgrade to Pro (demo)');
+    const handleUpgrade = () => {
+        router.visit('/free-plan/payment-qr');
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">

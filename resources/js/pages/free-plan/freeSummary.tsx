@@ -594,8 +594,82 @@ function FreeSummary() {
 
     // Handlers
     const handleSave = () => {
-        // Placeholder: save data to storage/server in Pro version
-        alert('Saved (demo)');
+        try {
+            // Get project name from localStorage or use default
+            const savedProjectName = localStorage.getItem('projectName') || 'Untitled Project';
+            
+            // Collect all project data
+            const projectData = {
+                id: Date.now(),
+                projectName: savedProjectName,
+                savedAt: new Date().toISOString(),
+                // Map data
+                drawnShapes: localStorage.getItem('drawnShapes') ? JSON.parse(localStorage.getItem('drawnShapes') || '[]') : [],
+                waterSources: localStorage.getItem('waterSources') ? JSON.parse(localStorage.getItem('waterSources') || '[]') : [],
+                pumps: localStorage.getItem('pumps') ? JSON.parse(localStorage.getItem('pumps') || '[]') : [],
+                zones: localStorage.getItem('zones') ? JSON.parse(localStorage.getItem('zones') || '[]') : [],
+                plantPoints: localStorage.getItem('plantPoints') ? JSON.parse(localStorage.getItem('plantPoints') || '[]') : [],
+                mainPipes: localStorage.getItem('mainPipes') ? JSON.parse(localStorage.getItem('mainPipes') || '[]') : [],
+                subMainPipes: localStorage.getItem('subMainPipes') ? JSON.parse(localStorage.getItem('subMainPipes') || '[]') : [],
+                lateralPipes: localStorage.getItem('lateralPipes') ? JSON.parse(localStorage.getItem('lateralPipes') || '[]') : [],
+                // Config data
+                selectedPlantData: localStorage.getItem('selectedPlantData') ? JSON.parse(localStorage.getItem('selectedPlantData') || 'null') : null,
+                flowRateConfig: localStorage.getItem('flowRateConfig') ? JSON.parse(localStorage.getItem('flowRateConfig') || '{}') : null,
+                mapStepProgress: localStorage.getItem('mapStepProgress') ? JSON.parse(localStorage.getItem('mapStepProgress') || '{}') : null,
+                freeMapView: localStorage.getItem('freeMapView') ? JSON.parse(localStorage.getItem('freeMapView') || '{}') : null,
+                projectMapImage: localStorage.getItem('projectMapImage') || null,
+                // Summary data
+                freePlanSummary: summaryData ? {
+                    ...summaryData,
+                    savedAt: new Date().toISOString()
+                } : null
+            };
+
+            // Get existing saved projects
+            const savedProjects = localStorage.getItem('freePlanProjects');
+            const projects = savedProjects ? JSON.parse(savedProjects) : [];
+            
+            // Check if project with same name exists, update it, otherwise add new
+            const existingIndex = projects.findIndex((p: { projectName: string }) => p.projectName === savedProjectName);
+            if (existingIndex >= 0) {
+                // Update existing project
+                projects[existingIndex] = projectData;
+                alert('บันทึกโปรเจคสำเร็จ!');
+            } else {
+                // Adding new project - check if we've reached the limit of 2 projects
+                let deletedProjectName = null;
+                if (projects.length >= 2) {
+                    // Sort projects by savedAt (oldest first)
+                    const sortedProjects = [...projects].sort((a: { savedAt: string }, b: { savedAt: string }) => {
+                        return new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime();
+                    });
+                    
+                    // Remove the oldest project
+                    const oldestProjectName = sortedProjects[0].projectName;
+                    const oldestIndex = projects.findIndex((p: { projectName: string }) => p.projectName === oldestProjectName);
+                    if (oldestIndex >= 0) {
+                        projects.splice(oldestIndex, 1);
+                        deletedProjectName = oldestProjectName;
+                    }
+                }
+                
+                // Add new project
+                projects.push(projectData);
+                
+                // Show alert message
+                if (deletedProjectName) {
+                    alert(`โปรเจค "${deletedProjectName}" ถูกลบออกเนื่องจากจำกัดไว้เพียง 2 โปรเจคเท่านั้น\n\nบันทึกโปรเจค "${savedProjectName}" สำเร็จ!`);
+                } else {
+                    alert('บันทึกโปรเจคสำเร็จ!');
+                }
+            }
+
+            // Save to localStorage
+            localStorage.setItem('freePlanProjects', JSON.stringify(projects));
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึกโปรเจค');
+        }
     };
 
     const handleEdit = () => {

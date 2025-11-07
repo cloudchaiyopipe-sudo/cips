@@ -1,13 +1,18 @@
 // 1. Import
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
+import QRCodeSVG from 'react-qr-code';
 import FreeNav from './components/freeNav';
-import { calculatePipeRecommendations, PipeRecommendations } from './utils/pipeSelection';
+import { calculatePipeRecommendations, calculatePipeRecommendationsWithTypes, PipeRecommendations, PipeTypeRecommendations } from './utils/pipeSelection';
 import { calculatePumpRequirements, PumpRecommendation } from './utils/pumpSelection';
 import { getTranslations } from './utils/language';
 
 // 2. Component
 function FreeProduct() {
+    // LINE Official Account ID - สามารถแก้ไขได้ที่นี่
+    const LINE_ID = '@fang.nitipoom';
+    const LINE_FRIEND_URL = `https://line.me/R/ti/p/${LINE_ID}`;
+    
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<unknown>(null);
@@ -32,6 +37,8 @@ function FreeProduct() {
     const [selectedPumpZoneId, setSelectedPumpZoneId] = useState<'all' | 'single' | null>(null);
     const [showPumpZoneDropdown, setShowPumpZoneDropdown] = useState(false);
     const [showCalculationDetails, setShowCalculationDetails] = useState(false);
+    const [showPumpCalculationDetails, setShowPumpCalculationDetails] = useState(false);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [sprinklerSpecs, setSprinklerSpecs] = useState<{
         flowRatePerMin: number;
         waterPressure: number;
@@ -78,6 +85,7 @@ function FreeProduct() {
         };
     } | null>(null);
     const [pipeRecommendations, setPipeRecommendations] = useState<PipeRecommendations | null>(null);
+    const [pipeTypeRecommendations, setPipeTypeRecommendations] = useState<PipeTypeRecommendations | null>(null);
     const [pumpRecommendations, setPumpRecommendations] = useState<PumpRecommendation | null>(null);
     const [summaryData, setSummaryData] = useState<{
         area?: { totalRai?: number; byZone?: Array<{ zoneId: number; areaRai: number }> };
@@ -107,6 +115,140 @@ function FreeProduct() {
         };
     } | null>(null);
     const [translations, setTranslations] = useState(getTranslations());
+    const [longestPipes, setLongestPipes] = useState<{ 
+        [zoneId: number]: { 
+            longestMain: number; 
+            longestSubMain: number; 
+            longestLateral: number 
+        } 
+    }>({});
+
+    // Function to calculate distance between two points
+    const calculateDistance = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }) => {
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = point1.lat * Math.PI / 180;
+        const φ2 = point2.lat * Math.PI / 180;
+        const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
+        const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c; // Distance in meters
+    };
+
+    // Function to calculate longest pipe lengths and flow rates for each zone
+    const calculateLongestPipes = useCallback(() => {
+        const longestPipesData: { 
+            [zoneId: number]: { 
+                longestMain: number; 
+                longestSubMain: number; 
+                longestLateral: number;
+                // Flow rates for longest pipes
+                lateralLongestFlowRate?: number; // Flow rate ที่ lateral ที่ยาวที่สุดรับ
+                subMainLongestFlowRate?: number; // Flow rate รวมที่ subMain ที่ยาวที่สุดรับ
+                mainLongestFlowRate?: number; // Flow rate รวมที่ main ที่ยาวที่สุดรับ
+            } 
+        } = {};
+
+        // Get pipe data from localStorage
+        const mainPipes = localStorage.getItem('mainPipes');
+        const subMainPipes = localStorage.getItem('subMainPipes');
+        const lateralPipes = localStorage.getItem('lateralPipes');
+
+        if (mainPipes) {
+            try {
+                const mainPipesData = JSON.parse(mainPipes);
+                mainPipesData.forEach((pipe: { zoneId?: number; fromPump: { lat: number; lng: number }; toZoneCenter: { lat: number; lng: number } }) => {
+                    if (pipe.zoneId !== undefined) {
+                        if (!longestPipesData[pipe.zoneId]) {
+                            longestPipesData[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                        }
+                        const length = calculateDistance(pipe.fromPump, pipe.toZoneCenter);
+                        if (length > longestPipesData[pipe.zoneId].longestMain) {
+                            longestPipesData[pipe.zoneId].longestMain = length;
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error parsing main pipes:', error);
+            }
+        }
+
+        if (subMainPipes) {
+            try {
+                const subMainPipesData = JSON.parse(subMainPipes);
+                subMainPipesData.forEach((pipe: { zoneId?: number; path: Array<{ lat: number; lng: number }> }) => {
+                    if (pipe.zoneId !== undefined) {
+                        if (!longestPipesData[pipe.zoneId]) {
+                            longestPipesData[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                        }
+                        let totalLength = 0;
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
+                        }
+                        if (totalLength > longestPipesData[pipe.zoneId].longestSubMain) {
+                            longestPipesData[pipe.zoneId].longestSubMain = totalLength;
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error parsing sub-main pipes:', error);
+            }
+        }
+
+        if (lateralPipes) {
+            try {
+                const lateralPipesData = JSON.parse(lateralPipes);
+                lateralPipesData.forEach((pipe: { zoneId?: number; path: Array<{ lat: number; lng: number }> }) => {
+                    if (pipe.zoneId !== undefined) {
+                        if (!longestPipesData[pipe.zoneId]) {
+                            longestPipesData[pipe.zoneId] = { longestMain: 0, longestSubMain: 0, longestLateral: 0 };
+                        }
+                        let totalLength = 0;
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            totalLength += calculateDistance(pipe.path[i], pipe.path[i + 1]);
+                        }
+                        if (totalLength > longestPipesData[pipe.zoneId].longestLateral) {
+                            longestPipesData[pipe.zoneId].longestLateral = totalLength;
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error parsing lateral pipes:', error);
+            }
+        }
+
+        return longestPipesData;
+    }, []);
+
+    // Function to calculate flow rates for longest pipes
+    const calculateLongestPipeFlowRates = useCallback((
+        zoneId: number,
+        lateralFlowRatePerSprinkler: number,
+        zoneData: {
+            lateralOutlets?: number; // จำนวน sprinklers ใน lateral ที่ยาวที่สุด
+            subMainOutlets?: number; // จำนวน lateral ที่เชื่อมกับ subMain ที่ยาวที่สุด
+            mainOutlets?: number; // จำนวน subMain ที่เชื่อมกับ main ที่ยาวที่สุด
+        }
+    ) => {
+        // 1. Lateral ที่ยาวที่สุด: รับ flow rate จาก sprinklers ใน lateral line นั้น
+        const lateralLongestFlowRate = lateralFlowRatePerSprinkler * (zoneData.lateralOutlets || 1);
+        
+        // 2. SubMain ที่ยาวที่สุด: รับ flow rate รวมจาก lateral ทั้งหมดที่เชื่อมกับมัน
+        const subMainLongestFlowRate = lateralLongestFlowRate * (zoneData.subMainOutlets || 1);
+        
+        // 3. Main ที่ยาวที่สุด: รับ flow rate รวมจาก subMain ทั้งหมดที่เชื่อมกับมัน
+        const mainLongestFlowRate = subMainLongestFlowRate * (zoneData.mainOutlets || 1);
+
+        return {
+            lateralLongestFlowRate,
+            subMainLongestFlowRate,
+            mainLongestFlowRate
+        };
+    }, []);
 
     // Listen for language changes from localStorage
     useEffect(() => {
@@ -131,7 +273,13 @@ function FreeProduct() {
     }, []);
 
     const handleBack = () => router.visit('/free-plan/summary');
-    const handleCheckout = () => alert('Use price data from database (demo)');
+    const handleCheckout = () => {
+        setShowCheckoutModal(true);
+    };
+
+    const handleCloseCheckoutModal = () => {
+        setShowCheckoutModal(false);
+    };
 
     // Function to find zone with highest flow rate
     const findHighestFlowRateZone = (zones: Array<{ 
@@ -396,44 +544,191 @@ function FreeProduct() {
 
                 // Calculate pipe and pump recommendations
                 const totalFlowRate = (summaryData?.plants?.total || 0) * flowRateConfig.flowRatePerMin;
-                const avgZoneFlowRate = zonesWithData.length > 0 ? 
-                    zonesWithData.reduce((sum, zone) => sum + (zone.lpm || 0), 0) / zonesWithData.length : 0;
-                const avgSprinklerFlowRate = flowRateConfig.flowRatePerMin;
+                
+                // ใช้ flow rate ของ zone แรก (หรือ zone ที่เลือกไว้) สำหรับการคำนวณท่อ
+                const selectedZoneForInit = zonesWithData[0] || null;
+                const zoneFlowRateForPipes = selectedZoneForInit?.lpm || 0;
+                const lateralFlowRate = flowRateConfig.flowRatePerMin;
 
+                // Calculate average lengths and outlets from all zones
+                const avgMainLength = zonesWithData.length > 0 ?
+                    zonesWithData.reduce((sum, zone) => sum + (zone.mainMeters || 0), 0) / zonesWithData.length : 50;
+                const avgSubMainLength = zonesWithData.length > 0 ?
+                    zonesWithData.reduce((sum, zone) => sum + (zone.subMainMeters || 0), 0) / zonesWithData.length : 30;
+                const avgLateralLength = zonesWithData.length > 0 ?
+                    zonesWithData.reduce((sum, zone) => sum + (zone.lateralMeters || 0), 0) / zonesWithData.length : 20;
+                const avgMainOutlets = zonesWithData.length > 0 ?
+                    zonesWithData.reduce((sum, zone) => sum + (zone.mainOutlets || 1), 0) / zonesWithData.length : 1;
+                const avgSubMainOutlets = zonesWithData.length > 0 ?
+                    zonesWithData.reduce((sum, zone) => sum + (zone.subMainOutlets || 1), 0) / zonesWithData.length : 1;
+                const avgLateralOutlets = zonesWithData.length > 0 ?
+                    zonesWithData.reduce((sum, zone) => sum + (zone.lateralOutlets || 1), 0) / zonesWithData.length : 1;
+
+                // ใช้ longest pipes ที่คำนวณไว้แล้ว
+                const longestPipesData = calculateLongestPipes();
+                const firstZoneId = zonesWithData[0]?.id;
+                const mainLongestLength = longestPipesData[firstZoneId]?.longestMain || avgMainLength;
+                const subMainLongestLength = longestPipesData[firstZoneId]?.longestSubMain || avgSubMainLength;
+                const lateralLongestLength = longestPipesData[firstZoneId]?.longestLateral || avgLateralLength;
+                
                 const pipeRecs = calculatePipeRecommendations(
-                    totalFlowRate,
-                    avgZoneFlowRate,
-                    avgSprinklerFlowRate
+                    zoneFlowRateForPipes,
+                    lateralFlowRate,
+                    flowRateConfig.waterPressure, // แรงดันน้ำในหน่วย Bar
+                    {
+                        mainLongestLength: mainLongestLength,
+                        subMainLongestLength: subMainLongestLength,
+                        lateralLongestLength: lateralLongestLength,
+                        mainOutlets: Math.round(avgMainOutlets),
+                        subMainOutlets: Math.round(avgSubMainOutlets),
+                        lateralOutlets: Math.round(avgLateralOutlets)
+                    }
                 );
                 setPipeRecommendations(pipeRecs);
+                
+                // คำนวณ flow rates สำหรับท่อที่ยาวที่สุดแต่ละประเภท
+                const flowRates = calculateLongestPipeFlowRates(
+                    firstZoneId,
+                    lateralFlowRate,
+                    {
+                        lateralOutlets: Math.round(avgLateralOutlets),
+                        subMainOutlets: Math.round(avgSubMainOutlets),
+                        mainOutlets: Math.round(avgMainOutlets)
+                    }
+                );
+                
+                // คำนวณทั้ง PE และ PVC
+                const pipeTypeRecs = calculatePipeRecommendationsWithTypes(
+                    zoneFlowRateForPipes,
+                    lateralFlowRate,
+                    flowRateConfig.waterPressure, // แรงดันน้ำในหน่วย Bar
+                    {
+                        mainLongestLength: mainLongestLength,
+                        subMainLongestLength: subMainLongestLength,
+                        lateralLongestLength: lateralLongestLength,
+                        mainOutlets: Math.round(avgMainOutlets),
+                        subMainOutlets: Math.round(avgSubMainOutlets),
+                        lateralOutlets: Math.round(avgLateralOutlets),
+                        // Flow rates สำหรับท่อที่ยาวที่สุด
+                        lateralLongestFlowRate: flowRates.lateralLongestFlowRate,
+                        subMainLongestFlowRate: flowRates.subMainLongestFlowRate,
+                        mainLongestFlowRate: flowRates.mainLongestFlowRate
+                    }
+                );
+                setPipeTypeRecommendations(pipeTypeRecs);
 
+                // คำนวณ pressure loss จากท่อแยกตาม PE และ PVC
                 const pumpRecs = calculatePumpRequirements(
                     totalFlowRate,
-                    flowRateConfig.waterPressure
+                    flowRateConfig.waterPressure,
+                    {
+                        pe: {
+                            mainLoss: pipeTypeRecs.main.pe?.pressureLoss ?? 0,
+                            subMainLoss: pipeTypeRecs.subMain.pe?.pressureLoss ?? 0,
+                            lateralLoss: pipeTypeRecs.lateral.pe?.pressureLoss ?? 0
+                        },
+                        pvc: {
+                            mainLoss: pipeTypeRecs.main.pvc?.pressureLoss ?? 0,
+                            subMainLoss: pipeTypeRecs.subMain.pvc?.pressureLoss ?? 0,
+                            lateralLoss: pipeTypeRecs.lateral.pvc?.pressureLoss ?? 0
+                        }
+                    },
+                    0, // staticHead (สามารถเพิ่มในอนาคต)
+                    0.05 // minorLossFactor = 5%
                 );
                 setPumpRecommendations(pumpRecs);
+
+                // Calculate longest pipes for each zone
+                const longestPipesDataFinal = calculateLongestPipes();
+                console.log('📏 Calculated longest pipes:', longestPipesDataFinal);
+                setLongestPipes(longestPipesDataFinal);
             } catch (error) {
                 console.error('Error loading zones:', error);
             }
         }
-    }, [calculateOptimalSprinklerSpecs]);
+    }, [calculateOptimalSprinklerSpecs, calculateLongestPipes, calculateLongestPipeFlowRates]);
 
-    // Update recommendations when sprinkler mode changes
+    // Update recommendations when sprinkler mode changes or zone selection changes
     useEffect(() => {
         const currentSpecs = sprinklerMode === 'preset' ? sprinklerSpecs : calculatedSprinklerSpecs;
-        if (!currentSpecs) return;
+        if (!currentSpecs || zones.length === 0) return;
 
         const totalFlowRate = currentSpecs.totalLPM;
-        const avgZoneFlowRate = zones.length > 0 ? 
-            zones.reduce((sum, zone) => sum + (zone.lpm || 0), 0) / zones.length : 0;
-        const avgSprinklerFlowRate = currentSpecs.flowRatePerMin;
+        
+        // Get selected zone data for pipe calculation - ใช้ flow rate ของ zone ที่เลือก
+        const selectedZoneForPipes = selectedPipeZoneId ? zones.find(z => z.id === selectedPipeZoneId) : zones[0];
+        const zoneId = selectedPipeZoneId || zones[0]?.id;
+        
+        // ใช้ flow rate ของ zone ที่เลือกสำหรับ main และ subMain pipe
+        const zoneFlowRate = selectedZoneForPipes?.lpm || 0;
+        // ใช้ flow rate ต่อ sprinkler สำหรับ lateral pipe
+        const lateralFlowRate = currentSpecs.flowRatePerMin;
+        
+        // ใช้ความยาวท่อที่ยาวที่สุด (ต้องใช้ longest pipes)
+        const mainLongestLength = longestPipes[zoneId]?.longestMain || 
+            selectedZoneForPipes?.mainMeters || 
+            zones.reduce((sum, zone) => sum + (zone.mainMeters || 0), 0) / zones.length || 50;
+        const subMainLongestLength = longestPipes[zoneId]?.longestSubMain || 
+            selectedZoneForPipes?.subMainMeters || 
+            zones.reduce((sum, zone) => sum + (zone.subMainMeters || 0), 0) / zones.length || 30;
+        const lateralLongestLength = longestPipes[zoneId]?.longestLateral || 
+            selectedZoneForPipes?.lateralMeters || 
+            zones.reduce((sum, zone) => sum + (zone.lateralMeters || 0), 0) / zones.length || 20;
+        const mainOutlets = selectedZoneForPipes?.mainOutlets || 
+            Math.round(zones.reduce((sum, zone) => sum + (zone.mainOutlets || 1), 0) / zones.length) || 1;
+        const subMainOutlets = selectedZoneForPipes?.subMainOutlets || 
+            Math.round(zones.reduce((sum, zone) => sum + (zone.subMainOutlets || 1), 0) / zones.length) || 1;
+        const lateralOutlets = selectedZoneForPipes?.lateralOutlets || 
+            Math.round(zones.reduce((sum, zone) => sum + (zone.lateralOutlets || 1), 0) / zones.length) || 1;
+
+        // ใช้ water pressure จาก current specs
+        const waterPressure = currentSpecs.waterPressure;
+
+        // คำนวณ flow rates สำหรับท่อที่ยาวที่สุดแต่ละประเภท
+        const flowRates = calculateLongestPipeFlowRates(
+            zoneId,
+            lateralFlowRate,
+            {
+                lateralOutlets: lateralOutlets,
+                subMainOutlets: subMainOutlets,
+                mainOutlets: mainOutlets
+            }
+        );
 
         const pipeRecs = calculatePipeRecommendations(
-            totalFlowRate,
-            avgZoneFlowRate,
-            avgSprinklerFlowRate
+            zoneFlowRate,
+            lateralFlowRate,
+            waterPressure, // แรงดันน้ำในหน่วย Bar
+            {
+                mainLongestLength: mainLongestLength,
+                subMainLongestLength: subMainLongestLength,
+                lateralLongestLength: lateralLongestLength,
+                mainOutlets: mainOutlets,
+                subMainOutlets: subMainOutlets,
+                lateralOutlets: lateralOutlets
+            }
         );
         setPipeRecommendations(pipeRecs);
+        
+        // คำนวณทั้ง PE และ PVC
+        const pipeTypeRecs = calculatePipeRecommendationsWithTypes(
+            zoneFlowRate,
+            lateralFlowRate,
+            waterPressure, // แรงดันน้ำในหน่วย Bar
+            {
+                mainLongestLength: mainLongestLength,
+                subMainLongestLength: subMainLongestLength,
+                lateralLongestLength: lateralLongestLength,
+                mainOutlets: mainOutlets,
+                subMainOutlets: subMainOutlets,
+                lateralOutlets: lateralOutlets,
+                // Flow rates สำหรับท่อที่ยาวที่สุด
+                lateralLongestFlowRate: flowRates.lateralLongestFlowRate,
+                subMainLongestFlowRate: flowRates.subMainLongestFlowRate,
+                mainLongestFlowRate: flowRates.mainLongestFlowRate
+            }
+        );
+        setPipeTypeRecommendations(pipeTypeRecs);
 
         // Calculate pump requirements based on selected mode
         let pumpFlowRate = totalFlowRate;
@@ -442,12 +737,27 @@ function FreeProduct() {
             pumpFlowRate = highestFlowZone ? (highestFlowZone.lpm || 0) : totalFlowRate;
         }
 
+        // คำนวณ pressure loss จากท่อแยกตาม PE และ PVC
         const pumpRecs = calculatePumpRequirements(
             pumpFlowRate,
-            currentSpecs.waterPressure
+            currentSpecs.waterPressure,
+            {
+                pe: {
+                    mainLoss: pipeTypeRecommendations?.main?.pe?.pressureLoss ?? 0,
+                    subMainLoss: pipeTypeRecommendations?.subMain?.pe?.pressureLoss ?? 0,
+                    lateralLoss: pipeTypeRecommendations?.lateral?.pe?.pressureLoss ?? 0
+                },
+                pvc: {
+                    mainLoss: pipeTypeRecommendations?.main?.pvc?.pressureLoss ?? 0,
+                    subMainLoss: pipeTypeRecommendations?.subMain?.pvc?.pressureLoss ?? 0,
+                    lateralLoss: pipeTypeRecommendations?.lateral?.pvc?.pressureLoss ?? 0
+                }
+            },
+            0, // staticHead (สามารถเพิ่มในอนาคต)
+            0.05 // minorLossFactor = 5%
         );
         setPumpRecommendations(pumpRecs);
-    }, [sprinklerMode, sprinklerSpecs, calculatedSprinklerSpecs, zones, selectedPumpZoneId, calculateOptimalSprinklerSpecs]);
+    }, [sprinklerMode, sprinklerSpecs, calculatedSprinklerSpecs, zones, selectedPumpZoneId, selectedPipeZoneId, longestPipes, pipeTypeRecommendations, calculateOptimalSprinklerSpecs, calculateLongestPipeFlowRates]);
 
     // Load Google Maps and render an interactive, read-only map like freeMap
     useEffect(() => {
@@ -880,11 +1190,11 @@ function FreeProduct() {
                                         <span className="text-emerald-400 font-semibold">{selectedZone.plants || 0}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>{translations.flowRate}</span>
+                                        <span>{translations.flowRateLabel}</span>
                                         <span className="text-blue-400 font-semibold">{Math.round(selectedZone.lpm || 0)} LPM</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span>Water Need per Session:</span>
+                                        <span>{translations.waterNeedPerSessionLabel}:</span>
                                         <span className="text-cyan-400 font-semibold">
                                             {summaryData?.selectedPlant 
                                                 ? Math.round((selectedZone.plants || 0) * summaryData.selectedPlant.waterNeed)
@@ -896,8 +1206,11 @@ function FreeProduct() {
                                         <span>{translations.mainPipe}</span>
                                         <div className="text-right">
                                             <div className="text-red-400 font-semibold">{selectedZone.mainMeters?.toFixed(1) || '0.0'} m</div>
+                                            {longestPipes[selectedZoneId]?.longestMain > 0 && (
+                                                <div className="text-xs text-red-300">{translations.longestPipe}: {longestPipes[selectedZoneId].longestMain.toFixed(1)} m</div>
+                                            )}
                                             {selectedZone.mainOutlets !== undefined && selectedZone.mainOutlets > 0 && (
-                                                <div className="text-xs text-red-300">{selectedZone.mainOutlets} outlets</div>
+                                                <div className="text-xs text-red-300">{selectedZone.mainOutlets} {translations.outletsLabel.toLowerCase()}</div>
                                             )}
                                         </div>
                                     </div>
@@ -905,8 +1218,11 @@ function FreeProduct() {
                                         <span>{translations.subMainPipe}</span>
                                         <div className="text-right">
                                             <div className="text-purple-400 font-semibold">{selectedZone.subMainMeters?.toFixed(1) || '0.0'} m</div>
+                                            {longestPipes[selectedZoneId]?.longestSubMain > 0 && (
+                                                <div className="text-xs text-purple-300">{translations.longestPipe}: {longestPipes[selectedZoneId].longestSubMain.toFixed(1)} m</div>
+                                            )}
                                             {selectedZone.subMainOutlets !== undefined && selectedZone.subMainOutlets > 0 && (
-                                                <div className="text-xs text-purple-300">{selectedZone.subMainOutlets} outlets</div>
+                                                <div className="text-xs text-purple-300">{selectedZone.subMainOutlets} {translations.outletsLabel.toLowerCase()}</div>
                                             )}
                                         </div>
                                     </div>
@@ -914,8 +1230,11 @@ function FreeProduct() {
                                         <span>{translations.lateralPipe}</span>
                                         <div className="text-right">
                                             <div className="text-yellow-400 font-semibold">{selectedZone.lateralMeters?.toFixed(1) || '0.0'} m</div>
+                                            {longestPipes[selectedZoneId]?.longestLateral > 0 && (
+                                                <div className="text-xs text-yellow-300">{translations.longestPipe}: {longestPipes[selectedZoneId].longestLateral.toFixed(1)} m</div>
+                                            )}
                                             {selectedZone.lateralOutlets !== undefined && selectedZone.lateralOutlets > 0 && (
-                                                <div className="text-xs text-yellow-300">{selectedZone.lateralOutlets} outlets</div>
+                                                <div className="text-xs text-yellow-300">{selectedZone.lateralOutlets} {translations.outletsLabel.toLowerCase()}</div>
                                             )}
                                         </div>
                                     </div>
@@ -939,7 +1258,7 @@ function FreeProduct() {
                                             : 'bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50'
                                     }`}
                                 >
-                                    Preset
+                                    {translations.preset}
                                 </button>
                                 <button
                                     onClick={() => setSprinklerMode('calculated')}
@@ -949,7 +1268,7 @@ function FreeProduct() {
                                             : 'bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50'
                                     }`}
                                 >
-                                    Calculated
+                                    {translations.calculated}
                                 </button>
                             </div>
                         </div>
@@ -959,7 +1278,7 @@ function FreeProduct() {
                                 {/* Mode Indicator */}
                                 <div className="flex items-center gap-2 text-xs text-emerald-400">
                                     <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                    <span>Using settings from Summary page</span>
+                                    <span>{translations.usingSettingsFromSummary}</span>
                                 </div>
                                 
                                 {/* Basic Specifications */}
@@ -982,11 +1301,11 @@ function FreeProduct() {
                                 <div className="pt-2 border-t border-emerald-800/50">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-emerald-300">Total Plants:</span>
+                                            <span className="text-emerald-300">{translations.totalPlants}:</span>
                                             <span className="font-semibold text-emerald-400">{summaryData?.plants?.total || 0}</span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-emerald-300">Total Zones:</span>
+                                            <span className="text-emerald-300">{translations.totalZones}</span>
                                             <span className="font-semibold text-emerald-400">{zones.length}</span>
                                         </div>
                                     </div>
@@ -1007,11 +1326,11 @@ function FreeProduct() {
                                 <div className="pt-2 border-t border-emerald-800/50">
                                     <div className="text-xs text-emerald-300">
                                         <div className="flex items-center justify-between mb-1">
-                                            <span>Flow Rate per Hour:</span>
+                                            <span>{translations.flowRatePerHour}</span>
                                             <span className="font-semibold">{Math.round(sprinklerSpecs.totalLPM * 60)} LPH</span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span>Coverage per Sprinkler:</span>
+                                            <span>{translations.coveragePerSprinkler}</span>
                                             <span className="font-semibold">{(Math.PI * Math.pow(sprinklerSpecs.radius, 2)).toFixed(1)} m²</span>
                                         </div>
                                     </div>
@@ -1026,13 +1345,13 @@ function FreeProduct() {
                                     {/* Mode Indicator */}
                                     <div className="flex items-center gap-2 text-xs text-emerald-400">
                                         <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                        <span>Calculated using 5-step method from water volume</span>
+                                        <span>{translations.calculatedUsing5StepMethod}</span>
                                     </div>
                                     
                                     {/* Zone Information */}
                                     {calculatedSprinklerSpecs.calculationDetails?.zoneInfo && (
                                         <div className="rounded bg-emerald-800/30 p-3">
-                                            <div className="text-xs text-emerald-300 mb-2 font-medium">Based on Zone: {calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneName}</div>
+                                            <div className="text-xs text-emerald-300 mb-2 font-medium">{translations.basedOnZone} {calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneName}</div>
                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                 <div className="flex justify-between">
                                                     <span>Area:</span>
@@ -1047,7 +1366,7 @@ function FreeProduct() {
                                                     <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneLPM} LPM</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span>Water Need per Session:</span>
+                                                    <span>{translations.waterNeedPerSessionLabel}:</span>
                                                     <span className="text-cyan-400 font-semibold">
                                                         {summaryData?.selectedPlant 
                                                             ? Math.round(calculatedSprinklerSpecs.calculationDetails.zoneInfo.zonePlants * summaryData.selectedPlant.waterNeed)
@@ -1056,8 +1375,8 @@ function FreeProduct() {
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span>Plant Density:</span>
-                                                    <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.step3.plantDensity} plants/rai</span>
+                                                    <span>{translations.plantDensity}</span>
+                                                    <span className="text-emerald-400 font-semibold">{calculatedSprinklerSpecs.calculationDetails.step3.plantDensity} {translations.plantsPerRai}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1065,12 +1384,12 @@ function FreeProduct() {
 
                                     {/* Calculation Details Toggle */}
                                     <div className="flex items-center justify-between">
-                                        <div className="text-sm font-medium text-emerald-300">5-Step Calculation Process</div>
+                                        <div className="text-sm font-medium text-emerald-300">{translations.fiveStepCalculationProcess}</div>
                                         <button
                                             onClick={() => setShowCalculationDetails(!showCalculationDetails)}
                                             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-800/50 text-emerald-300 hover:bg-emerald-700/50 transition-colors text-xs"
                                         >
-                                            <span>{showCalculationDetails ? 'Hide Details' : 'Show Details'}</span>
+                                            <span>{showCalculationDetails ? translations.hideDetails : translations.showDetails}</span>
                                             <span className={`transition-transform duration-200 ${showCalculationDetails ? 'rotate-180' : ''}`}>▼</span>
                                         </button>
                                     </div>
@@ -1084,22 +1403,22 @@ function FreeProduct() {
                                             <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">1</div>
-                                                    <div className="text-sm font-medium text-emerald-400">Convert Water Volume to Depth</div>
+                                                    <div className="text-sm font-medium text-emerald-400">{translations.convertWaterVolumeToDepth}</div>
                                                 </div>
                                                 <div className="space-y-3">
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                         <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                            <div className="text-xs text-emerald-300 mb-1">Irrigation Time</div>
+                                                            <div className="text-xs text-emerald-300 mb-1">{translations.irrigationTime}</div>
                                                             <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.irrigationTimeMinutes} min</div>
                                                         </div>
                                                         <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                            <div className="text-xs text-emerald-300 mb-1">Area</div>
+                                                            <div className="text-xs text-emerald-300 mb-1">{translations.area}</div>
                                                             <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(1)} m²</div>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                         <div className="bg-cyan-900/30 rounded-lg p-3 border border-cyan-700/30">
-                                                            <div className="text-xs text-cyan-300 mb-1">Water Need per Session</div>
+                                                            <div className="text-xs text-cyan-300 mb-1">{translations.waterNeedPerSessionLabel}</div>
                                                             <div className="text-sm font-bold text-cyan-400">
                                                                 {summaryData?.selectedPlant 
                                                                     ? Math.round(calculatedSprinklerSpecs.calculationDetails.zoneInfo.zonePlants * summaryData.selectedPlant.waterNeed)
@@ -1108,12 +1427,12 @@ function FreeProduct() {
                                                             </div>
                                                         </div>
                                                         <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                            <div className="text-xs text-emerald-300 mb-1">Total Water Volume</div>
+                                                            <div className="text-xs text-emerald-300 mb-1">{translations.totalWaterVolume}</div>
                                                             <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.totalWaterVolumeLiters} L</div>
                                                         </div>
                                                     </div>
                                                     <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
-                                                        <div className="text-xs text-emerald-300 mb-1">Water Depth (Result)</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.waterDepthResult}</div>
                                                         <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step1.waterDepthMm} mm</div>
                                                     </div>
                                                 </div>
@@ -1125,10 +1444,10 @@ function FreeProduct() {
                                             <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">2</div>
-                                                    <div className="text-sm font-medium text-emerald-400">Calculate Irrigation Rate</div>
+                                                    <div className="text-sm font-medium text-emerald-400">{translations.calculateIrrigationRate}</div>
                                                 </div>
                                                 <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
-                                                    <div className="text-xs text-emerald-300 mb-1">Required Irrigation Rate</div>
+                                                    <div className="text-xs text-emerald-300 mb-1">{translations.requiredIrrigationRate}</div>
                                                     <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step2.irrigationRateMmPerHour} mm/hour</div>
                                                 </div>
                                             </div>
@@ -1139,27 +1458,27 @@ function FreeProduct() {
                                             <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">3</div>
-                                                    <div className="text-sm font-medium text-emerald-400">Design Sprinkler Layout</div>
+                                                    <div className="text-sm font-medium text-emerald-400">{translations.designSprinklerLayout}</div>
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                        <div className="text-xs text-emerald-300 mb-1">Optimal Radius</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.optimalRadius}</div>
                                                         <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.optimalRadius} m</div>
                                                     </div>
                                                     <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                        <div className="text-xs text-emerald-300 mb-1">Sprinkler Spacing</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.sprinklerSpacing}</div>
                                                         <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.sprinklerSpacing} m</div>
                                                     </div>
                                                     <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
-                                                        <div className="text-xs text-emerald-300 mb-1">Total Sprinklers (Calculated)</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.totalSprinklersCalculated}</div>
                                                         <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.totalSprinklers}</div>
                                                         <div className="text-xs text-emerald-500 mt-1">
                                                             Area ÷ Coverage = {calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(0)} ÷ {calculatedSprinklerSpecs.calculationDetails.step4.sprinklerCoverageArea} = {calculatedSprinklerSpecs.calculationDetails.step3.totalSprinklers}
                                                         </div>
                                                     </div>
                                                     <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                        <div className="text-xs text-emerald-300 mb-1">Plant Density</div>
-                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.plantDensity} plants/rai</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.plantDensity}</div>
+                                                        <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step3.plantDensity} {translations.plantsPerRai}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1170,22 +1489,22 @@ function FreeProduct() {
                                             <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">4</div>
-                                                    <div className="text-sm font-medium text-emerald-400">Calculate Flow Rate per Sprinkler</div>
+                                                    <div className="text-sm font-medium text-emerald-400">{translations.calculateFlowRatePerSprinkler}</div>
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                     <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
-                                                        <div className="text-xs text-emerald-300 mb-1">Coverage Area per Sprinkler</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.coverageAreaPerSprinkler}</div>
                                                         <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step4.sprinklerCoverageArea} m²</div>
                                                         <div className="text-xs text-emerald-500 mt-1">
                                                             π × r² = π × {calculatedSprinklerSpecs.calculationDetails.step3.optimalRadius}²
                                                         </div>
                                                     </div>
                                                     <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                        <div className="text-xs text-emerald-300 mb-1">Flow Rate (LPH)</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.flowRateLPH}</div>
                                                         <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step4.sprinklerFlowRateLPH} LPH</div>
                                                     </div>
                                                     <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
-                                                        <div className="text-xs text-emerald-300 mb-1">Flow Rate (LPM) - Result</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.flowRateLPMResult}</div>
                                                         <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step4.sprinklerFlowRateLPM} LPM</div>
                                                     </div>
                                                 </div>
@@ -1197,15 +1516,15 @@ function FreeProduct() {
                                             <div className="rounded-lg bg-emerald-800/20 p-4 border border-emerald-700/30">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-white">5</div>
-                                                    <div className="text-sm font-medium text-emerald-400">Select Pressure from Catalog</div>
+                                                    <div className="text-sm font-medium text-emerald-400">{translations.selectPressureFromCatalog}</div>
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div className="bg-emerald-600/20 rounded-lg p-3 border border-emerald-500/30">
-                                                        <div className="text-xs text-emerald-300 mb-1">Required Pressure</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.requiredPressure}</div>
                                                         <div className="text-lg font-bold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step5.requiredPressure} Bar</div>
                                                     </div>
                                                     <div className="bg-emerald-900/30 rounded-lg p-3">
-                                                        <div className="text-xs text-emerald-300 mb-1">Pressure Category</div>
+                                                        <div className="text-xs text-emerald-300 mb-1">{translations.pressureCategory}</div>
                                                         <div className="text-sm font-semibold text-emerald-400">{calculatedSprinklerSpecs.calculationDetails.step5.pressureCategory}</div>
                                                     </div>
                                                 </div>
@@ -1218,7 +1537,7 @@ function FreeProduct() {
                                     <div className="pt-4 border-t border-emerald-800/50">
                                         <div className="flex items-center gap-2 mb-4">
                                             <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                                            <div className="text-lg font-semibold text-emerald-300">Final Sprinkler Specifications</div>
+                                            <div className="text-lg font-semibold text-emerald-300">{translations.finalSprinklerSpecifications}</div>
                                         </div>
                                         
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1310,6 +1629,81 @@ function FreeProduct() {
                                     <div className="text-xs text-rose-300">
                                         {pipeRecommendations?.main.reason}
                                     </div>
+                                    
+                                    {/* Pipe Type Recommendations - PE and PVC */}
+                                    {pipeTypeRecommendations?.main && (
+                                        <div className="pt-2 border-t border-rose-800/50">
+                                            <div className="text-xs text-rose-300 mb-2 font-medium">Pipe Type Recommendations:</div>
+                                            <div className="space-y-3">
+                                                {/* PE Recommendation */}
+                                                {pipeTypeRecommendations.main.pe && (
+                                                    <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                        <div className="text-xs font-medium text-blue-300 mb-1">PE (Polyethylene)</div>
+                                                        <div className="space-y-1 text-xs text-slate-300">
+                                                            <div className="flex justify-between">
+                                                                <span>Size:</span>
+                                                                <span className="text-blue-400 font-semibold">
+                                                                    {pipeTypeRecommendations.main.pe.sizeMM}mm ({pipeTypeRecommendations.main.pe.sizeInch})
+                                                                </span>
+                                                            </div>
+                                                            {pipeTypeRecommendations.main.pe.calculationDetails && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Type:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.main.pe.calculationDetails.selectedPipeType}</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.main.pe.pressureLoss !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Pressure Loss:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.main.pe.pressureLoss.toFixed(2)} m</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.main.pe.hf !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>HF:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.main.pe.hf.toFixed(3)} m/100m</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* PVC Recommendation */}
+                                                {pipeTypeRecommendations.main.pvc && (
+                                                    <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                        <div className="text-xs font-medium text-green-300 mb-1">PVC (Polyvinyl Chloride)</div>
+                                                        <div className="space-y-1 text-xs text-slate-300">
+                                                            <div className="flex justify-between">
+                                                                <span>Size:</span>
+                                                                <span className="text-green-400 font-semibold">
+                                                                    {pipeTypeRecommendations.main.pvc.sizeMM}mm ({pipeTypeRecommendations.main.pvc.sizeInch})
+                                                                </span>
+                                                            </div>
+                                                            {pipeTypeRecommendations.main.pvc.calculationDetails && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Type:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.main.pvc.calculationDetails.selectedPipeType}</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.main.pvc.pressureLoss !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Pressure Loss:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.main.pvc.pressureLoss.toFixed(2)} m</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.main.pvc.hf !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>HF:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.main.pvc.hf.toFixed(3)} m/100m</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <div className="pt-2 border-t border-rose-800/50">
                                         <div className="text-xs text-rose-300 mb-2">Zone Details:</div>
                                         <div className="space-y-1 text-xs text-slate-300">
@@ -1321,6 +1715,12 @@ function FreeProduct() {
                                                 <span>Pipe Length:</span>
                                                 <span className="text-rose-400 font-semibold">{selectedZone.mainMeters?.toFixed(1) || '0.0'} m</span>
                                             </div>
+                                            {longestPipes[selectedPipeZoneId]?.longestMain > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>Longest Pipe:</span>
+                                                    <span className="text-rose-400 font-semibold">{longestPipes[selectedPipeZoneId].longestMain.toFixed(1)} m</span>
+                                                </div>
+                                            )}
                                             {selectedZone.mainOutlets !== undefined && selectedZone.mainOutlets > 0 && (
                                                 <div className="flex justify-between">
                                                     <span>Outlets:</span>
@@ -1391,6 +1791,81 @@ function FreeProduct() {
                                     <div className="text-xs text-violet-300">
                                         {pipeRecommendations?.subMain.reason}
                                     </div>
+                                    
+                                    {/* Pipe Type Recommendations - PE and PVC */}
+                                    {pipeTypeRecommendations?.subMain && (
+                                        <div className="pt-2 border-t border-violet-800/50">
+                                            <div className="text-xs text-violet-300 mb-2 font-medium">Pipe Type Recommendations:</div>
+                                            <div className="space-y-3">
+                                                {/* PE Recommendation */}
+                                                {pipeTypeRecommendations.subMain.pe && (
+                                                    <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                        <div className="text-xs font-medium text-blue-300 mb-1">PE (Polyethylene)</div>
+                                                        <div className="space-y-1 text-xs text-slate-300">
+                                                            <div className="flex justify-between">
+                                                                <span>Size:</span>
+                                                                <span className="text-blue-400 font-semibold">
+                                                                    {pipeTypeRecommendations.subMain.pe.sizeMM}mm ({pipeTypeRecommendations.subMain.pe.sizeInch})
+                                                                </span>
+                                                            </div>
+                                                            {pipeTypeRecommendations.subMain.pe.calculationDetails && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Type:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.subMain.pe.calculationDetails.selectedPipeType}</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.subMain.pe.pressureLoss !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Pressure Loss:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.subMain.pe.pressureLoss.toFixed(2)} m</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.subMain.pe.hf !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>HF:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.subMain.pe.hf.toFixed(3)} m/100m</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* PVC Recommendation */}
+                                                {pipeTypeRecommendations.subMain.pvc && (
+                                                    <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                        <div className="text-xs font-medium text-green-300 mb-1">PVC (Polyvinyl Chloride)</div>
+                                                        <div className="space-y-1 text-xs text-slate-300">
+                                                            <div className="flex justify-between">
+                                                                <span>Size:</span>
+                                                                <span className="text-green-400 font-semibold">
+                                                                    {pipeTypeRecommendations.subMain.pvc.sizeMM}mm ({pipeTypeRecommendations.subMain.pvc.sizeInch})
+                                                                </span>
+                                                            </div>
+                                                            {pipeTypeRecommendations.subMain.pvc.calculationDetails && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Type:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.subMain.pvc.calculationDetails.selectedPipeType}</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.subMain.pvc.pressureLoss !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Pressure Loss:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.subMain.pvc.pressureLoss.toFixed(2)} m</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.subMain.pvc.hf !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>HF:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.subMain.pvc.hf.toFixed(3)} m/100m</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <div className="pt-2 border-t border-violet-800/50">
                                         <div className="text-xs text-violet-300 mb-2">Zone Details:</div>
                                         <div className="space-y-1 text-xs text-slate-300">
@@ -1402,6 +1877,12 @@ function FreeProduct() {
                                                 <span>Pipe Length:</span>
                                                 <span className="text-violet-400 font-semibold">{selectedZone.subMainMeters?.toFixed(1) || '0.0'} m</span>
                                             </div>
+                                            {longestPipes[selectedPipeZoneId]?.longestSubMain > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>Longest Pipe:</span>
+                                                    <span className="text-violet-400 font-semibold">{longestPipes[selectedPipeZoneId].longestSubMain.toFixed(1)} m</span>
+                                                </div>
+                                            )}
                                             {selectedZone.subMainOutlets !== undefined && selectedZone.subMainOutlets > 0 && (
                                                 <div className="flex justify-between">
                                                     <span>Outlets:</span>
@@ -1472,6 +1953,81 @@ function FreeProduct() {
                                     <div className="text-xs text-amber-300">
                                         {pipeRecommendations?.lateral.reason}
                                     </div>
+                                    
+                                    {/* Pipe Type Recommendations - PE and PVC */}
+                                    {pipeTypeRecommendations?.lateral && (
+                                        <div className="pt-2 border-t border-amber-800/50">
+                                            <div className="text-xs text-amber-300 mb-2 font-medium">Pipe Type Recommendations:</div>
+                                            <div className="space-y-3">
+                                                {/* PE Recommendation */}
+                                                {pipeTypeRecommendations.lateral.pe && (
+                                                    <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                        <div className="text-xs font-medium text-blue-300 mb-1">PE (Polyethylene)</div>
+                                                        <div className="space-y-1 text-xs text-slate-300">
+                                                            <div className="flex justify-between">
+                                                                <span>Size:</span>
+                                                                <span className="text-blue-400 font-semibold">
+                                                                    {pipeTypeRecommendations.lateral.pe.sizeMM}mm ({pipeTypeRecommendations.lateral.pe.sizeInch})
+                                                                </span>
+                                                            </div>
+                                                            {pipeTypeRecommendations.lateral.pe.calculationDetails && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Type:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.lateral.pe.calculationDetails.selectedPipeType}</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.lateral.pe.pressureLoss !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Pressure Loss:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.lateral.pe.pressureLoss.toFixed(2)} m</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.lateral.pe.hf !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>HF:</span>
+                                                                    <span className="text-blue-400 font-semibold">{pipeTypeRecommendations.lateral.pe.hf.toFixed(3)} m/100m</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* PVC Recommendation */}
+                                                {pipeTypeRecommendations.lateral.pvc && (
+                                                    <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                        <div className="text-xs font-medium text-green-300 mb-1">PVC (Polyvinyl Chloride)</div>
+                                                        <div className="space-y-1 text-xs text-slate-300">
+                                                            <div className="flex justify-between">
+                                                                <span>Size:</span>
+                                                                <span className="text-green-400 font-semibold">
+                                                                    {pipeTypeRecommendations.lateral.pvc.sizeMM}mm ({pipeTypeRecommendations.lateral.pvc.sizeInch})
+                                                                </span>
+                                                            </div>
+                                                            {pipeTypeRecommendations.lateral.pvc.calculationDetails && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Type:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.lateral.pvc.calculationDetails.selectedPipeType}</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.lateral.pvc.pressureLoss !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>Pressure Loss:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.lateral.pvc.pressureLoss.toFixed(2)} m</span>
+                                                                </div>
+                                                            )}
+                                                            {pipeTypeRecommendations.lateral.pvc.hf !== undefined && (
+                                                                <div className="flex justify-between">
+                                                                    <span>HF:</span>
+                                                                    <span className="text-green-400 font-semibold">{pipeTypeRecommendations.lateral.pvc.hf.toFixed(3)} m/100m</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <div className="pt-2 border-t border-amber-800/50">
                                         <div className="text-xs text-amber-300 mb-2">Zone Details:</div>
                                         <div className="space-y-1 text-xs text-slate-300">
@@ -1483,6 +2039,12 @@ function FreeProduct() {
                                                 <span>Pipe Length:</span>
                                                 <span className="text-amber-400 font-semibold">{selectedZone.lateralMeters?.toFixed(1) || '0.0'} m</span>
                                             </div>
+                                            {longestPipes[selectedPipeZoneId]?.longestLateral > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>Longest Pipe:</span>
+                                                    <span className="text-amber-400 font-semibold">{longestPipes[selectedPipeZoneId].longestLateral.toFixed(1)} m</span>
+                                                </div>
+                                            )}
                                             {selectedZone.lateralOutlets !== undefined && selectedZone.lateralOutlets > 0 && (
                                                 <div className="flex justify-between">
                                                     <span>Outlets:</span>
@@ -1512,8 +2074,8 @@ function FreeProduct() {
                                     className="rounded bg-sky-800 px-2 py-1 hover:bg-sky-700 flex items-center gap-1"
                                 >
                                     <span className="text-xs">
-                                        {selectedPumpZoneId === 'all' ? 'All Zones' : 
-                                         selectedPumpZoneId === 'single' ? 'Single Zone (Highest Flow)' : 'Select Mode'}
+                                        {selectedPumpZoneId === 'all' ? translations.allZones : 
+                                         selectedPumpZoneId === 'single' ? translations.singleZoneHighestFlow : translations.selectZone}
                                     </span>
                                     <span>{showPumpZoneDropdown ? '▴' : '▾'}</span>
                                 </button>
@@ -1530,7 +2092,7 @@ function FreeProduct() {
                                         >
                                             <div className="flex items-center gap-2">
                                                 <div className="h-3 w-3 rounded-full bg-sky-400"></div>
-                                                All Zones
+                                                {translations.allZones}
                                             </div>
                                         </button>
                                         <button
@@ -1544,7 +2106,7 @@ function FreeProduct() {
                                         >
                                             <div className="flex items-center gap-2">
                                                 <div className="h-3 w-3 rounded-full bg-orange-400"></div>
-                                                Single Zone (Highest Flow)
+                                                {translations.singleZoneHighestFlow}
                                             </div>
                                         </button>
                                     </div>
@@ -1583,22 +2145,202 @@ function FreeProduct() {
                                                 </div>
                                             </div>
                                             <div className="pt-2 border-t border-sky-800/50">
-                                                <div className="text-xs text-sky-300 mb-2">System Overview:</div>
+                                                <div className="text-xs text-sky-300 mb-2">{translations.systemOverview}</div>
                                                 <div className="space-y-1 text-xs text-slate-300">
                                                     <div className="flex justify-between">
-                                                        <span>Total Zones:</span>
+                                                        <span>{translations.totalZones}</span>
                                                         <span className="text-sky-400 font-semibold">{zones.length}</span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span>Total Flow Rate:</span>
+                                                        <span>{translations.totalFlowRateProduct}:</span>
                                                         <span className="text-sky-400 font-semibold">{Math.round((sprinklerMode === 'preset' ? sprinklerSpecs?.totalLPM : calculatedSprinklerSpecs?.totalLPM) || 0)} LPM</span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span>Water Pressure:</span>
+                                                        <span>{translations.waterPressureProduct}:</span>
                                                         <span className="text-sky-400 font-semibold">{(sprinklerMode === 'preset' ? sprinklerSpecs?.waterPressure : calculatedSprinklerSpecs?.waterPressure) || 0} Bar</span>
                                                     </div>
                                                 </div>
                                             </div>
+                                            {/* Pump Calculation Details */}
+                                            {pumpRecommendations?.calculationDetails && (
+                                                <div className="pt-2 border-t border-sky-800/50">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="text-xs text-sky-300 font-medium">{translations.calculationDetails}</div>
+                                                        <button
+                                                            onClick={() => setShowPumpCalculationDetails(!showPumpCalculationDetails)}
+                                                            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-800/50 text-sky-300 hover:bg-sky-700/50 transition-colors text-xs"
+                                                        >
+                                                            <span>{showPumpCalculationDetails ? translations.hideDetails : translations.showDetails}</span>
+                                                            <span className={`transition-transform duration-200 ${showPumpCalculationDetails ? 'rotate-180' : ''}`}>▼</span>
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* รายละเอียดที่ซ่อนไว้ */}
+                                                    {showPumpCalculationDetails && (
+                                                        <>
+                                                            {/* Step 1: System Flow Rate */}
+                                                            <div className="mb-3 rounded bg-sky-800/30 p-2 border border-sky-700/30">
+                                                                <div className="text-xs font-medium text-sky-300 mb-1">Step 1: System Flow Rate</div>
+                                                                <div className="text-xs text-slate-300">
+                                                                    System Flow Rate: <span className="font-semibold text-sky-400">{pumpRecommendations.calculationDetails.systemFlowRate} LPM</span>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {/* Step 2: TDH Calculation - แยก PE และ PVC */}
+                                                    <div className="mb-3 rounded bg-sky-800/30 p-2 border border-sky-700/30">
+                                                        <div className="text-xs font-medium text-sky-300 mb-3">Step 2: Total Dynamic Head (TDH)</div>
+                                                        <div className="space-y-3">
+                                                            {/* PE Calculation */}
+                                                            {pumpRecommendations.calculationDetails.pe && (
+                                                                <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                                    <div className="text-xs font-medium text-blue-300 mb-2">PE (Polyethylene)</div>
+                                                                    <div className="space-y-1 text-xs text-slate-300">
+                                                                        {pumpRecommendations.calculationDetails.pe.staticHead !== undefined && pumpRecommendations.calculationDetails.pe.staticHead > 0 && (
+                                                                            <div className="flex justify-between">
+                                                                                <span>Static Head:</span>
+                                                                                <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.staticHead} m</span>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="flex justify-between">
+                                                                            <span>Friction Losses:</span>
+                                                                            <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.frictionLosses.totalFrictionLoss.toFixed(2)} m</span>
+                                                                        </div>
+                                                                        <div className="ml-3 space-y-0.5 text-xs text-slate-400">
+                                                                            <div className="flex justify-between">
+                                                                                <span>• Main Pipe:</span>
+                                                                                <span>{pumpRecommendations.calculationDetails.pe.frictionLosses.mainLoss.toFixed(2)} m</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between">
+                                                                                <span>• SubMain Pipe:</span>
+                                                                                <span>{pumpRecommendations.calculationDetails.pe.frictionLosses.subMainLoss.toFixed(2)} m</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between">
+                                                                                <span>• Lateral Pipe:</span>
+                                                                                <span>{pumpRecommendations.calculationDetails.pe.frictionLosses.lateralLoss.toFixed(2)} m</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Minor Losses:</span>
+                                                                            <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.minorLosses.toFixed(2)} m</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Pressure Requirement:</span>
+                                                                            <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.pressureRequirement.toFixed(2)} m</span>
+                                                                        </div>
+                                                                        <div className="pt-1 border-t border-blue-700/50 flex justify-between">
+                                                                            <span className="font-medium">Total Dynamic Head (TDH):</span>
+                                                                            <span className="font-bold text-blue-400">{pumpRecommendations.calculationDetails.pe.totalDynamicHead.toFixed(2)} m</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* PVC Calculation */}
+                                                            {pumpRecommendations.calculationDetails.pvc && (
+                                                                <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                                    <div className="text-xs font-medium text-green-300 mb-2">PVC (Polyvinyl Chloride)</div>
+                                                                    <div className="space-y-1 text-xs text-slate-300">
+                                                                        {pumpRecommendations.calculationDetails.pvc.staticHead !== undefined && pumpRecommendations.calculationDetails.pvc.staticHead > 0 && (
+                                                                            <div className="flex justify-between">
+                                                                                <span>Static Head:</span>
+                                                                                <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.staticHead} m</span>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="flex justify-between">
+                                                                            <span>Friction Losses:</span>
+                                                                            <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.frictionLosses.totalFrictionLoss.toFixed(2)} m</span>
+                                                                        </div>
+                                                                        <div className="ml-3 space-y-0.5 text-xs text-slate-400">
+                                                                            <div className="flex justify-between">
+                                                                                <span>• Main Pipe:</span>
+                                                                                <span>{pumpRecommendations.calculationDetails.pvc.frictionLosses.mainLoss.toFixed(2)} m</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between">
+                                                                                <span>• SubMain Pipe:</span>
+                                                                                <span>{pumpRecommendations.calculationDetails.pvc.frictionLosses.subMainLoss.toFixed(2)} m</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between">
+                                                                                <span>• Lateral Pipe:</span>
+                                                                                <span>{pumpRecommendations.calculationDetails.pvc.frictionLosses.lateralLoss.toFixed(2)} m</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Minor Losses:</span>
+                                                                            <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.minorLosses.toFixed(2)} m</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Pressure Requirement:</span>
+                                                                            <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.pressureRequirement.toFixed(2)} m</span>
+                                                                        </div>
+                                                                        <div className="pt-1 border-t border-green-700/50 flex justify-between">
+                                                                            <span className="font-medium">Total Dynamic Head (TDH):</span>
+                                                                            <span className="font-bold text-green-400">{pumpRecommendations.calculationDetails.pvc.totalDynamicHead.toFixed(2)} m</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Step 3: Pump Power - แสดงทั้ง PE และ PVC */}
+                                                    <div className="mb-3 rounded bg-sky-800/30 p-2 border border-sky-700/30">
+                                                        <div className="text-xs font-medium text-sky-300 mb-3">Step 3: Pump Power</div>
+                                                        <div className="space-y-3">
+                                                            {/* PE Power */}
+                                                            {pumpRecommendations.calculationDetails.pe && (
+                                                                <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                                    <div className="text-xs font-medium text-blue-300 mb-2">PE (Polyethylene)</div>
+                                                                    <div className="space-y-1 text-xs text-slate-300">
+                                                                        <div className="flex justify-between">
+                                                                            <span>Hydraulic Power:</span>
+                                                                            <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.hydraulicPower.toFixed(3)} kW</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Pump Efficiency:</span>
+                                                                            <span className="text-blue-400 font-semibold">{(pumpRecommendations.calculationDetails.pe.efficiency * 100).toFixed(0)}%</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Brake Power:</span>
+                                                                            <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.brakePower.toFixed(3)} kW</span>
+                                                                        </div>
+                                                                        <div className="pt-1 border-t border-blue-700/50 flex justify-between">
+                                                                            <span className="font-medium">Required Power:</span>
+                                                                            <span className="font-bold text-blue-400">{pumpRecommendations.calculationDetails.pe.powerHP.toFixed(2)} HP</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* PVC Power */}
+                                                            {pumpRecommendations.calculationDetails.pvc && (
+                                                                <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                                    <div className="text-xs font-medium text-green-300 mb-2">PVC (Polyvinyl Chloride)</div>
+                                                                    <div className="space-y-1 text-xs text-slate-300">
+                                                                        <div className="flex justify-between">
+                                                                            <span>Hydraulic Power:</span>
+                                                                            <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.hydraulicPower.toFixed(3)} kW</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Pump Efficiency:</span>
+                                                                            <span className="text-green-400 font-semibold">{(pumpRecommendations.calculationDetails.pvc.efficiency * 100).toFixed(0)}%</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between">
+                                                                            <span>Brake Power:</span>
+                                                                            <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.brakePower.toFixed(3)} kW</span>
+                                                                        </div>
+                                                                        <div className="pt-1 border-t border-green-700/50 flex justify-between">
+                                                                            <span className="font-medium">Required Power:</span>
+                                                                            <span className="font-bold text-green-400">{pumpRecommendations.calculationDetails.pvc.powerHP.toFixed(2)} HP</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                         </>
                                     ) : selectedZone ? (
                                         // Single Zone View (Highest Flow Rate Zone)
@@ -1654,6 +2396,186 @@ function FreeProduct() {
                                                     </div>
                                                 </div>
                                             </div>
+                                            {/* Pump Calculation Details */}
+                                            {pumpRecommendations?.calculationDetails && (
+                                                <div className="pt-2 border-t border-sky-800/50">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="text-xs text-sky-300 font-medium">{translations.calculationDetails}</div>
+                                                        <button
+                                                            onClick={() => setShowPumpCalculationDetails(!showPumpCalculationDetails)}
+                                                            className="flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-800/50 text-sky-300 hover:bg-sky-700/50 transition-colors text-xs"
+                                                        >
+                                                            <span>{showPumpCalculationDetails ? translations.hideDetails : translations.showDetails}</span>
+                                                            <span className={`transition-transform duration-200 ${showPumpCalculationDetails ? 'rotate-180' : ''}`}>▼</span>
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* รายละเอียดที่ซ่อนไว้ */}
+                                                    {showPumpCalculationDetails && (
+                                                        <>
+                                                            {/* Step 1: System Flow Rate */}
+                                                            <div className="mb-3 rounded bg-sky-800/30 p-2 border border-sky-700/30">
+                                                                <div className="text-xs font-medium text-sky-300 mb-1">Step 1: System Flow Rate</div>
+                                                                <div className="text-xs text-slate-300">
+                                                                    System Flow Rate: <span className="font-semibold text-sky-400">{pumpRecommendations.calculationDetails.systemFlowRate} LPM</span>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {/* Step 2: TDH Calculation - แยก PE และ PVC */}
+                                                            <div className="mb-3 rounded bg-sky-800/30 p-2 border border-sky-700/30">
+                                                                <div className="text-xs font-medium text-sky-300 mb-3">Step 2: Total Dynamic Head (TDH)</div>
+                                                                <div className="space-y-3">
+                                                                    {/* PE Calculation */}
+                                                                    {pumpRecommendations.calculationDetails.pe && (
+                                                                        <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                                            <div className="text-xs font-medium text-blue-300 mb-2">PE (Polyethylene)</div>
+                                                                            <div className="space-y-1 text-xs text-slate-300">
+                                                                                {pumpRecommendations.calculationDetails.pe.staticHead !== undefined && pumpRecommendations.calculationDetails.pe.staticHead > 0 && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>Static Head:</span>
+                                                                                        <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.staticHead} m</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Friction Losses:</span>
+                                                                                    <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.frictionLosses.totalFrictionLoss.toFixed(2)} m</span>
+                                                                                </div>
+                                                                                <div className="ml-3 space-y-0.5 text-xs text-slate-400">
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>• Main Pipe:</span>
+                                                                                        <span>{pumpRecommendations.calculationDetails.pe.frictionLosses.mainLoss.toFixed(2)} m</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>• SubMain Pipe:</span>
+                                                                                        <span>{pumpRecommendations.calculationDetails.pe.frictionLosses.subMainLoss.toFixed(2)} m</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>• Lateral Pipe:</span>
+                                                                                        <span>{pumpRecommendations.calculationDetails.pe.frictionLosses.lateralLoss.toFixed(2)} m</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Minor Losses:</span>
+                                                                                    <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.minorLosses.toFixed(2)} m</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Pressure Requirement:</span>
+                                                                                    <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.pressureRequirement.toFixed(2)} m</span>
+                                                                                </div>
+                                                                                <div className="pt-1 border-t border-blue-700/50 flex justify-between">
+                                                                                    <span className="font-medium">Total Dynamic Head (TDH):</span>
+                                                                                    <span className="font-bold text-blue-400">{pumpRecommendations.calculationDetails.pe.totalDynamicHead.toFixed(2)} m</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* PVC Calculation */}
+                                                                    {pumpRecommendations.calculationDetails.pvc && (
+                                                                        <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                                            <div className="text-xs font-medium text-green-300 mb-2">PVC (Polyvinyl Chloride)</div>
+                                                                            <div className="space-y-1 text-xs text-slate-300">
+                                                                                {pumpRecommendations.calculationDetails.pvc.staticHead !== undefined && pumpRecommendations.calculationDetails.pvc.staticHead > 0 && (
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>Static Head:</span>
+                                                                                        <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.staticHead} m</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Friction Losses:</span>
+                                                                                    <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.frictionLosses.totalFrictionLoss.toFixed(2)} m</span>
+                                                                                </div>
+                                                                                <div className="ml-3 space-y-0.5 text-xs text-slate-400">
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>• Main Pipe:</span>
+                                                                                        <span>{pumpRecommendations.calculationDetails.pvc.frictionLosses.mainLoss.toFixed(2)} m</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>• SubMain Pipe:</span>
+                                                                                        <span>{pumpRecommendations.calculationDetails.pvc.frictionLosses.subMainLoss.toFixed(2)} m</span>
+                                                                                    </div>
+                                                                                    <div className="flex justify-between">
+                                                                                        <span>• Lateral Pipe:</span>
+                                                                                        <span>{pumpRecommendations.calculationDetails.pvc.frictionLosses.lateralLoss.toFixed(2)} m</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Minor Losses:</span>
+                                                                                    <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.minorLosses.toFixed(2)} m</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Pressure Requirement:</span>
+                                                                                    <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.pressureRequirement.toFixed(2)} m</span>
+                                                                                </div>
+                                                                                <div className="pt-1 border-t border-green-700/50 flex justify-between">
+                                                                                    <span className="font-medium">Total Dynamic Head (TDH):</span>
+                                                                                    <span className="font-bold text-green-400">{pumpRecommendations.calculationDetails.pvc.totalDynamicHead.toFixed(2)} m</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {/* Step 3: Pump Power - แสดงทั้ง PE และ PVC */}
+                                                            <div className="mb-3 rounded bg-sky-800/30 p-2 border border-sky-700/30">
+                                                                <div className="text-xs font-medium text-sky-300 mb-3">Step 3: Pump Power</div>
+                                                                <div className="space-y-3">
+                                                                    {/* PE Power */}
+                                                                    {pumpRecommendations.calculationDetails.pe && (
+                                                                        <div className="rounded bg-blue-900/30 p-2 border border-blue-700/30">
+                                                                            <div className="text-xs font-medium text-blue-300 mb-2">PE (Polyethylene)</div>
+                                                                            <div className="space-y-1 text-xs text-slate-300">
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Hydraulic Power:</span>
+                                                                                    <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.hydraulicPower.toFixed(3)} kW</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Pump Efficiency:</span>
+                                                                                    <span className="text-blue-400 font-semibold">{(pumpRecommendations.calculationDetails.pe.efficiency * 100).toFixed(0)}%</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Brake Power:</span>
+                                                                                    <span className="text-blue-400 font-semibold">{pumpRecommendations.calculationDetails.pe.brakePower.toFixed(3)} kW</span>
+                                                                                </div>
+                                                                                <div className="pt-1 border-t border-blue-700/50 flex justify-between">
+                                                                                    <span className="font-medium">Required Power:</span>
+                                                                                    <span className="font-bold text-blue-400">{pumpRecommendations.calculationDetails.pe.powerHP.toFixed(2)} HP</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* PVC Power */}
+                                                                    {pumpRecommendations.calculationDetails.pvc && (
+                                                                        <div className="rounded bg-green-900/30 p-2 border border-green-700/30">
+                                                                            <div className="text-xs font-medium text-green-300 mb-2">PVC (Polyvinyl Chloride)</div>
+                                                                            <div className="space-y-1 text-xs text-slate-300">
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Hydraulic Power:</span>
+                                                                                    <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.hydraulicPower.toFixed(3)} kW</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Pump Efficiency:</span>
+                                                                                    <span className="text-green-400 font-semibold">{(pumpRecommendations.calculationDetails.pvc.efficiency * 100).toFixed(0)}%</span>
+                                                                                </div>
+                                                                                <div className="flex justify-between">
+                                                                                    <span>Brake Power:</span>
+                                                                                    <span className="text-green-400 font-semibold">{pumpRecommendations.calculationDetails.pvc.brakePower.toFixed(3)} kW</span>
+                                                                                </div>
+                                                                                <div className="pt-1 border-t border-green-700/50 flex justify-between">
+                                                                                    <span className="font-medium">Required Power:</span>
+                                                                                    <span className="font-bold text-green-400">{pumpRecommendations.calculationDetails.pvc.powerHP.toFixed(2)} HP</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                         </>
                                     ) : null}
                                 </div>
@@ -1673,6 +2595,112 @@ function FreeProduct() {
                     </div>
                 </div>
             </div>
+
+            {/* Checkout Modal */}
+            {showCheckoutModal && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+                    onClick={handleCloseCheckoutModal}
+                >
+                    <div 
+                        className="relative mx-4 w-full max-w-md rounded-lg bg-slate-800 p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Close Button */}
+                        <button
+                            onClick={handleCloseCheckoutModal}
+                            className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <svg
+                                className="h-6 w-6"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+
+                        {/* Modal Content */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600">
+                                    <svg
+                                        className="h-6 w-6 text-white"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-bold text-white">{translations.checkoutModalTitle}</h3>
+                            </div>
+
+                            <div className="text-slate-300 leading-relaxed">
+                                <p className="mb-3">
+                                    {translations.checkoutModalMessage}
+                                </p>
+                            </div>
+
+                            {/* LINE QR Code Section */}
+                            <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-4">
+                                <div className="mb-3 text-center">
+                                    <h4 className="text-sm font-semibold text-green-400 mb-1">
+                                        {translations.addFriendOnLine}
+                                    </h4>
+                                    <p className="text-xs text-green-300">
+                                        {translations.scanQRCodeToContact}
+                                    </p>
+                                </div>
+                                <div className="flex justify-center">
+                                    <div className="rounded-lg bg-white p-3 shadow-lg">
+                                        <QRCodeSVG
+                                            value={LINE_FRIEND_URL}
+                                            size={200}
+                                            level="M"
+                                            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                            viewBox="0 0 200 200"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="mt-3 text-center text-xs text-green-300">
+                                    {translations.orAddFriendAtLineId} <span className="font-semibold text-green-400">{LINE_ID}</span>
+                                </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    onClick={handleCloseCheckoutModal}
+                                    className="flex-1 rounded-lg bg-slate-600 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-500"
+                                >
+                                    {translations.close}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // TODO: Add functionality to save plan image
+                                        handleCloseCheckoutModal();
+                                    }}
+                                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+                                >
+                                    {translations.savePlanImage}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
