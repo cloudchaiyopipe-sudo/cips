@@ -152,8 +152,10 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
 
     const sprinklerConfig = loadSprinklerConfig();
     const flowRatePerMinute = sprinklerConfig?.flowRatePerMinute || 0;
+    const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree || 1;
+    const totalSprinklers = plantCount * sprinklersPerTree;
 
-    const totalFlowRatePerMinute = plantCount * flowRatePerMinute;
+    const totalFlowRatePerMinute = plantCount * flowRatePerMinute * sprinklersPerTree;
     // const totalFlowRatePerHour = totalFlowRatePerMinute * 60;
 
     return (
@@ -236,6 +238,11 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                         <div className="text-lg font-bold text-green-800">
                             {plantCount.toLocaleString()}
+                            {sprinklersPerTree > 1 && (
+                                <span className="ml-2 text-sm text-green-600">
+                                    ({totalSprinklers.toLocaleString()} หัวฉีด)
+                                </span>
+                            )}
                         </div>
                     </div>
 

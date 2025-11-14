@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
 import SearchableDropdown from './SearchableDropdown';
@@ -775,10 +775,53 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     }, [projectMode, cachedMaxPumpHead, fieldCropData, selectedSprinkler, results.headLoss]);
 
 
-    const getMaxPumpHeadFromAllZones = () => {
-        const basePumpHead = calculatePumpHead();
-        return basePumpHead + (basePumpHead * 0.1); // เพิ่ม safety factor +10%
-    };
+    // ใช้ useState เพื่อเก็บค่าสูงสุดที่คำนวณแล้ว (ไม่เปลี่ยนตามโซนที่เลือก)
+    const [maxPumpHeadWithSafety, setMaxPumpHeadWithSafety] = useState<number>(0);
+    
+    // คำนวณและเก็บค่าสูงสุดจากทุกโซน (ไม่เปลี่ยนตามโซนที่เลือก) - เหมือนกับอัตราการไหล
+    // ใช้ maxPumpHeadForProjectMode (ค่าสูงสุดจากทุกโซน + 10%) เป็นหลัก
+    useEffect(() => {
+        let calculatedHead = 0;
+        let source = '';
+        
+        // 1. ใช้ maxPumpHeadForProjectMode ที่ส่งมา (ค่าสูงสุดจากทุกโซน + 10% แล้ว) - เป็นหลัก
+        //    ค่านี้มาจาก maxPumpHeadForAllZones ใน product.tsx ซึ่งเก็บค่าสูงสุดไว้แล้ว
+        if (maxPumpHeadForProjectMode !== undefined && maxPumpHeadForProjectMode > 0) {
+            calculatedHead = maxPumpHeadForProjectMode;
+            source = 'maxPumpHeadForProjectMode (prop - max from all zones)';
+        }
+        // 2. คำนวณจาก allZoneResults โดยตรง - หาค่าสูงสุดจากทุกโซน + 10%
+        else if (allZoneResults && allZoneResults.length > 0) {
+            const maxHead = Math.max(...allZoneResults.map((zone: any) => zone.totalHead || 0));
+            if (maxHead > 0) {
+                calculatedHead = maxHead + (maxHead * 0.1);
+                source = 'calculated from allZoneResults';
+            }
+        }
+        // 3. Fallback: ใช้ calculatePumpHead() + 10% (เฉพาะกรณีที่ไม่มีข้อมูลอื่น)
+        else {
+            const actualPumpHead = calculatePumpHead();
+            calculatedHead = actualPumpHead + (actualPumpHead * 0.1);
+            source = 'calculated from calculatePumpHead() (fallback)';
+        }
+        
+        // อัพเดตเสมอเมื่อค่าเปลี่ยน (ไม่ว่าจะเพิ่มขึ้นหรือลดลง)
+        // เพราะ maxPumpHeadForProjectMode ถูกคำนวณใหม่จากทุกโซนที่ยังมีอยู่
+        setMaxPumpHeadWithSafety((prevValue) => {
+            if (calculatedHead !== prevValue) {
+                return calculatedHead;
+            }
+            return prevValue;
+        });
+    }, [
+        // ใช้ maxPumpHeadForProjectMode เป็น dependency หลัก (ค่าสูงสุดจากทุกโซน)
+        maxPumpHeadForProjectMode ?? 0,
+        // ใช้ค่าสูงสุดจาก allZoneResults เป็น dependency (จะเปลี่ยนเฉพาะเมื่อค่าจริงๆ เปลี่ยน)
+        allZoneResults && allZoneResults.length > 0 
+            ? Math.max(...allZoneResults.map((z: any) => z.totalHead || 0))
+            : 0
+        // ไม่ใช้ calculatePumpHead เป็น dependency เพราะจะทำให้เปลี่ยนตามโซน
+    ]);
 
 
     const checkPumpAdequacy = useCallback(
@@ -795,8 +838,8 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         ? fieldCropRequirements.requiredFlowLPM
                         : horticultureReq.requiredFlowLPM;
             
-            const baseRequiredHeadM = calculatePumpHead();
-            const requiredHeadM = baseRequiredHeadM + (baseRequiredHeadM * 0.1); // เพิ่ม safety factor +10%
+            // ใช้ค่าสูงสุดจากทุกโซน (เหมือนกับอัตราการไหล)
+            const requiredHeadM = maxPumpHeadWithSafety;
 
             const isFlowAdequate = maxFlow >= requiredFlowLPM;
             const isHeadAdequate = maxHead >= requiredHeadM;
@@ -807,7 +850,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 headRatio: requiredHeadM > 0 ? maxHead / requiredHeadM : 0,
             };
         },
-        [projectMode, gardenReq, horticultureReq, fieldCropRequirements, calculatePumpHead]
+        [projectMode, gardenReq, horticultureReq, fieldCropRequirements, maxPumpHeadWithSafety]
     );
 
     const getFilteredPumps = useCallback(() => {
@@ -993,13 +1036,10 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     <span>
                         {t('Pump Head:')}{' '}
                         <span className="font-bold text-orange-300">
-                            {(() => {
-                                const basePumpHead = calculatePumpHead();
-                                return (basePumpHead + (basePumpHead * 0.1)).toFixed(1);
-                            })()}{' '}
+                            {maxPumpHeadWithSafety.toFixed(1)}{' '}
                             {t('เมตร')}
                         </span>
-                        <span className="ml-1 text-xs text-gray-400">(+ 10%)</span>
+                        <span className="ml-1 text-xs text-gray-400">(+ 10% + ความสูงจากปั๊มไปจุดสูงสุด)</span>
                     </span>
                 </div>
             </div>
@@ -1082,10 +1122,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                         if (projectMode === 'horticulture')
                                             return horticultureReq.requiredFlowLPM.toFixed(0);
                                         return requiredFlow.toFixed(0);
-                                    })()} LPM | Head: ${(pump.maxHead || 0).toFixed(1)}/${(() => {
-                                        const baseHead = calculatePumpHead();
-                                        return (baseHead + (baseHead * 0.1)).toFixed(1);
-                                    })()} ม.`,
+                                    })()} LPM | Head: ${(pump.maxHead || 0).toFixed(1)}/${maxPumpHeadWithSafety.toFixed(1)} ม.`,
                                 };
                             });
 

@@ -129,6 +129,7 @@ export interface HorticultureProjectData {
         placementMode: 'over_plants' | 'between_plants';
         totalFlowRate: number;
         connectionPoint: Coordinate;
+        zoneId?: string; // เพิ่ม zoneId เพื่อให้สามารถกรองท่อย่อยตามโซนได้
         emitterLines?: {
             id: string;
             lateralPipeId: string;
@@ -255,6 +256,7 @@ export interface LateralPipe {
     placementMode: 'over_plants' | 'between_plants';
     totalFlowRate: number;
     connectionPoint: Coordinate;
+    zoneId?: string; // เพิ่ม zoneId เพื่อให้สามารถกรองท่อย่อยตามโซนได้
     intersectionData?: {
         subMainPipeId: string;
         point: Coordinate;
@@ -274,7 +276,8 @@ export interface LateralPipe {
 export interface BestPipeInfo {
     id: string;
     length: number;
-    count: number; 
+    count: number; // จำนวนต้นไม้
+    sprinklerCount?: number; // จำนวนหัวฉีดทั้งหมด (count * sprinklersPerTree)
     waterFlowRate: number; 
     details?: any; 
 }
@@ -295,7 +298,7 @@ export interface HeadLossResult {
 export interface SprinklerConfig {
     flowRatePerMinute: number;
     pressureBar: number;
-    radiusMeters: number;
+    sprinklersPerTree: number; // จำนวนสปริงเกอร์ต่อต้นไม้ 1 ต้น
     createdAt: string;
     updatedAt: string;
 }
@@ -428,8 +431,11 @@ export const isCoordinateInZone = (coordinate: Coordinate, zone: any): boolean =
  * Calculate water flow rate for plants
  */
 export const calculateWaterFlowRate = (plantCount: number, sprinklerConfig: any): number => {
-    if (!sprinklerConfig || !sprinklerConfig.flowRatePerMinute) return plantCount * 2.5; 
-    return plantCount * sprinklerConfig.flowRatePerMinute;
+    if (!sprinklerConfig || !sprinklerConfig.flowRatePerMinute) {
+        return plantCount * 2.5; // Default: 1 sprinkler per tree
+    }
+    const sprinklersPerTree = sprinklerConfig.sprinklersPerTree || 1;
+    return plantCount * sprinklerConfig.flowRatePerMinute * sprinklersPerTree;
 };
 
 /**
@@ -629,6 +635,11 @@ export const calculateProjectSummary = (
             
             const lateralPipesInZone =
                 projectData.lateralPipes?.filter((lateral) => {
+                    // ใช้ zoneId โดยตรงถ้ามี (เร็วกว่าและแม่นยำกว่า)
+                    if (lateral.zoneId === zone.id) {
+                        return true;
+                    }
+                    // Fallback: กรองโดยดูที่ plants
                     const plantsInThisZone = lateral.plants.filter((plant) => {
                         const fullPlant = projectData.plants?.find((p) => p.id === plant.id);
                         return fullPlant?.zoneId === zone.id;
@@ -744,6 +755,11 @@ export const calculateProjectSummary = (
 
             const lateralPipesInZone =
                 projectData.lateralPipes?.filter((lateral) => {
+                    // ใช้ zoneId โดยตรงถ้ามี (เร็วกว่าและแม่นยำกว่า)
+                    if (lateral.zoneId === irrZone.id) {
+                        return true;
+                    }
+                    // Fallback: กรองโดยดูที่ plants
                     const plantsInThisZone = lateral.plants.filter((plant) => {
                         const fullPlant = projectData.plants?.find((p) => p.id === plant.id);
                         return fullPlant?.zoneId === irrZone.id;

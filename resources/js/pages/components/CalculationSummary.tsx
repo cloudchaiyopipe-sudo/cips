@@ -5,6 +5,7 @@ import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
+import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 
 interface ZoneOperationGroup {
     id: string;
@@ -1064,7 +1065,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             <p className="text-purple-50">{t('Pump Head')}</p>
                             <p className="text-xl font-bold text-orange-300">
                                 {(() => {
-                                    return (actualPumpHead + (actualPumpHead * 0.1)).toFixed(1);
+                                    // ใช้ actualPumpHead + 10% (ค่าตามโซนที่เลือก - สลับไปมา)
+                                    // ไม่ใช้ maxPumpHeadForProjectMode เพราะต้องการให้แสดงค่าตามโซนที่เลือก
+                                    const displayValue = actualPumpHead + (actualPumpHead * 0.1);
+                                    return displayValue.toFixed(1);
                                 })()} m
                             </p>
                             <p className="text-xs text-purple-100">(+ 10% + ความสูงจากปั๊มไปจุดสูงสุด)</p>
@@ -1076,7 +1080,15 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {getEquipmentName()}
                         </p>
                         <p className="text-xl font-bold text-green-300">
-                            {results.totalSprinklers} {t('หัว')}
+                            {(() => {
+                                if (projectMode === 'horticulture') {
+                                    const config = loadSprinklerConfig();
+                                    const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                    return (results.totalSprinklers * sprinklersPerTree).toLocaleString();
+                                }
+                                return results.totalSprinklers.toLocaleString();
+                            })()}{' '}
+                            {t('หัว')}
                         </p>
                         {currentZoneData && (
                             <p className="text-xs text-pink-100">

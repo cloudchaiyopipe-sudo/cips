@@ -40,7 +40,6 @@ interface SprinklerFlowRateInfo {
     formattedFlowRatePerHour: string;
     flowRatePerPlant: number;
     pressureBar: number;
-    radiusMeters: number;
 }
 
 /**
@@ -106,7 +105,6 @@ export const getOverallStats = (): {
             formattedFlowRatePerHour: formatFlowRatePerHour(totalFlowRatePerHour),
             flowRatePerPlant: sprinklerConfig.flowRatePerMinute,
             pressureBar: sprinklerConfig.pressureBar,
-            radiusMeters: sprinklerConfig.radiusMeters,
         };
     }
 
@@ -864,7 +862,6 @@ export const getFormattedStats = (): string | null => {
         formatted += `  • Q รวมต่อนาที: ${overallStats.sprinklerFlowRate.formattedFlowRatePerMinute}\n`;
         formatted += `  • Q รวมต่อชั่วโมง: ${overallStats.sprinklerFlowRate.formattedFlowRatePerHour}\n`;
         formatted += `  • แรงดันน้ำ: ${overallStats.sprinklerFlowRate.pressureBar.toFixed(1)} บาร์\n`;
-        formatted += `  • รัศมีฉีด: ${overallStats.sprinklerFlowRate.radiusMeters.toFixed(1)} เมตร\n`;
     }
     formatted += `\n`;
 
@@ -1120,11 +1117,16 @@ export const findBestBranchPipeInZone = (
         }
     }
 
+    const plantCount = bestPipe.plants?.length || 0;
+    const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree || 1;
+    const totalSprinklers = plantCount * sprinklersPerTree;
+    
     return {
         id: bestPipe.id,
         length: bestPipe.length || 0,
-        count: bestPipe.plants?.length || 0,
-        waterFlowRate: calculateWaterFlowRate(bestPipe.plants?.length || 0, sprinklerConfig),
+        count: plantCount,
+        sprinklerCount: totalSprinklers, // จำนวนหัวฉีดทั้งหมด
+        waterFlowRate: calculateWaterFlowRate(plantCount, sprinklerConfig),
         details: bestPipe,
     };
 };

@@ -1467,22 +1467,29 @@ export const useCalculations = (
             projectSummary,
 
             // คำนวณค่า maxPumpHeadForProjectMode สำหรับแต่ละ projectMode
+            // ใช้ค่าสูงสุดจากทุกโซน + 10% safety factor (เหมือนกับอัตราการไหล)
             maxPumpHeadForProjectMode: (() => {
                 if (allZoneResults && allZoneResults.length > 0) {
                     // หาค่า Pump Head ที่สูงที่สุดจากทุกโซน
                     let maxHead = 0;
                     
                     allZoneResults.forEach((zoneResult) => {
-                        // ใช้ค่า totalHead จาก zoneResult (รวม pipe head loss + sprinkler head loss)
+                        // ใช้ค่า totalHead จาก zoneResult (รวม pipe head loss + sprinkler head loss + static head)
                         const totalHead = zoneResult.totalHead || 0;
                         maxHead = Math.max(maxHead, totalHead);
                     });
                     
-                    return maxHead > 0 ? maxHead : pumpHeadRequired;
+                    // เพิ่ม 10% safety factor
+                    if (maxHead > 0) {
+                        return maxHead + (maxHead * 0.1);
+                    }
+                    
+                    // Fallback: ใช้ pumpHeadRequired + 10%
+                    return pumpHeadRequired + (pumpHeadRequired * 0.1);
                 }
                 
-                // สำหรับ projectMode อื่นๆ ใช้ค่า default
-                return pumpHeadRequired;
+                // สำหรับ projectMode อื่นๆ ใช้ค่า default + 10%
+                return pumpHeadRequired + (pumpHeadRequired * 0.1);
             })(),
 
             calculationMetadata: {

@@ -815,7 +815,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 currentZoneBestPipe,
                 selectedPipeType,
                 actualPressureClass,
-                `${selectedPipe.sizeMM}mm`
+                `${selectedPipe.sizeMM}mm`,
+                pipeType // ส่ง pipeType เพื่อให้ใช้ sprinklerCount สำหรับ branch pipe
             );
 
             setCalculation(calc);
@@ -958,7 +959,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     currentZoneBestPipe,
                     selectedPipeType,
                     actualPressureClass,
-                    `${pipe.sizeMM}mm`
+                    `${pipe.sizeMM}mm`,
+                    pipeType // ส่ง pipeType เพื่อให้ใช้ sprinklerCount สำหรับ branch pipe
                 )
                 : null;
 
@@ -1241,7 +1243,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                 }
                                                 return currentZoneBestPipe.count;
                                             })()
-                                            : currentZoneBestPipe.count}
+                                            : projectMode === 'horticulture' && pipeType === 'branch' && currentZoneBestPipe.sprinklerCount
+                                                ? currentZoneBestPipe.sprinklerCount
+                                                : currentZoneBestPipe.count}
                             </span>
                             <span className="text-orange-200 text-[12px]">| ใช้น้ำ:</span>
                             <span className="font-bold text-white text-[12px]">

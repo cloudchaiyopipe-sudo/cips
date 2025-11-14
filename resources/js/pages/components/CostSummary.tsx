@@ -13,6 +13,7 @@ import { GardenStatistics } from '../../utils/gardenStatistics';
 import { calculatePipeRolls } from '../utils/calculations';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
+import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 
 interface CostSummaryProps {
     results: CalculationResults;
@@ -820,14 +821,31 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     }
                 }
             });
-        } else if (projectData?.useZones && projectData.zones.length > 1) {
-            projectData.zones.forEach((zone) => {
+        } else if (
+            (projectData?.useZones && projectData.zones.length > 1) ||
+            Object.keys(zoneInputs).length > 1 ||
+            Object.keys(zoneSprinklers).length > 1
+        ) {
+            // ใช้ zoneInputs และ zoneSprinklers โดยตรงเพื่อให้ครอบคลุมทุกโซน
+            const zonesToProcess = projectData?.useZones && projectData.zones.length > 1
+                ? projectData.zones
+                : Object.keys(zoneInputs).length > 0
+                ? Object.keys(zoneInputs).map((zoneId) => ({ id: zoneId, plantCount: zoneInputs[zoneId]?.totalTrees || 0 }))
+                : Object.keys(zoneSprinklers).map((zoneId) => ({ id: zoneId, plantCount: 0 }));
+            
+            zonesToProcess.forEach((zone: any) => {
                 const zoneSprinkler = zoneSprinklers[zone.id];
                 const zonePipes = selectedPipes[zone.id] || {};
                 const zoneInput = zoneInputs[zone.id];
 
                 if (zoneSprinkler) {
-                    const sprinklerQuantity = zone.plantCount;
+                    // ใช้ zoneInput.totalTrees ถ้ามี ถ้าไม่มีให้ใช้ zone.plantCount
+                    let sprinklerQuantity = zoneInput?.totalTrees || zone.plantCount || 0;
+                    if (projectMode === 'horticulture') {
+                        const config = loadSprinklerConfig();
+                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                        sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
+                    }
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
@@ -846,7 +864,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    processExtraPipe(zone.id, zoneInput, zone.plantCount);
+                    // ใช้ zoneInput.totalTrees ถ้ามี ถ้าไม่มีให้ใช้ zone.plantCount
+                    let sprinklerCount = zoneInput.totalTrees || zone.plantCount || 0;
+                    if (projectMode === 'horticulture') {
+                        const config = loadSprinklerConfig();
+                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                        sprinklerCount = sprinklerCount * sprinklersPerTree;
+                    }
+                    processExtraPipe(zone.id, zoneInput, sprinklerCount);
 
                     const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
                     if (branchPipe && zoneInput.totalBranchPipeM > 0) {
@@ -924,7 +949,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 const zoneInput = zoneInputs[zoneId];
 
                 if (zoneSprinkler && zoneInput) {
-                    const sprinklerQuantity = zoneInput.totalTrees || results.totalSprinklers || 0;
+                    let sprinklerQuantity = zoneInput.totalTrees || results.totalSprinklers || 0;
+                    if (projectMode === 'horticulture') {
+                        const config = loadSprinklerConfig();
+                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                        sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
+                    }
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
@@ -943,7 +973,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    const sprinklerCount = zoneInput.totalTrees || results.totalSprinklers || 0;
+                    let sprinklerCount = zoneInput.totalTrees || results.totalSprinklers || 0;
+                    if (projectMode === 'horticulture') {
+                        const config = loadSprinklerConfig();
+                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                        sprinklerCount = sprinklerCount * sprinklersPerTree;
+                    }
                     processExtraPipe(zoneId, zoneInput, sprinklerCount);
 
                     const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;

@@ -18,7 +18,7 @@ import ElevationControlPanel from '../components/horticulture/ElevationControlPa
 // import DrawingDistanceOverlay from '../components/horticulture/DrawingDistanceOverlay'; // REMOVED - using DistanceMeasurementOverlay instead
 import DistanceMeasurementOverlay from '../components/horticulture/DistanceMeasurementOverlay';
 import Cesium3DMapPopup from '../components/horticulture/Cesium3DMapPopup';
-import { loadSprinklerConfig } from '../utils/sprinklerUtils';
+import { loadSprinklerConfig, SprinklerConfig } from '../utils/sprinklerUtils';
 import {
     snapMainPipeEndToSubMainPipe,
     findClosestPointOnLineSegment,
@@ -76,7 +76,6 @@ import {
     formatFlowRate,
     formatFlowRatePerHour,
     formatPressure,
-    formatRadius,
 } from '../utils/sprinklerUtils';
 
 import {
@@ -86,7 +85,6 @@ import {
     FaRedo,
     FaTrash,
     FaPlus,
-    FaShower,
     FaSave,
     FaTimes,
     FaCog,
@@ -308,13 +306,27 @@ const syncHorticultureData = (data: any): void => {
         // Save to both keys to ensure compatibility
         const dataString = JSON.stringify(data);
         
-        // Save to the main key used by HorticulturePlannerPage
-        localStorage.setItem('horticultureIrrigationData', dataString);
+        // Use safeLocalStorageSet to handle quota exceeded errors
+        const saved1 = safeLocalStorageSet('horticultureIrrigationData', dataString);
+        const saved2 = safeLocalStorageSet('horticultureSystemData', dataString);
         
-        // Also save to the key expected by product.tsx
-        localStorage.setItem('horticultureSystemData', dataString);
+        if (!saved1 || !saved2) {
+            console.warn('⚠️ Failed to save some horticulture data to localStorage');
+            if (typeof window !== 'undefined' && (window as any).showNotification) {
+                (window as any).showNotification(
+                    'ไม่สามารถบันทึกข้อมูลทั้งหมดได้ เนื่องจากพื้นที่เก็บข้อมูลเต็ม กรุณาลบข้อมูลเก่าบางส่วน',
+                    'warning'
+                );
+            }
+        }
     } catch (error) {
         console.error('❌ Failed to sync horticulture data:', error);
+        if (typeof window !== 'undefined' && (window as any).showNotification) {
+            (window as any).showNotification(
+                'เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + (error instanceof Error ? error.message : 'Unknown error'),
+                'error'
+            );
+        }
     }
 };
 
@@ -1984,14 +1996,11 @@ const formatWaterVolume = (volume: number, t: (key: string) => string): string =
 const formatWaterVolumeWithFlowRate = (
     volume: number,
     plantCount: number,
-    sprinklerConfig: {
-        flowRatePerMinute: number;
-        pressureBar: number;
-        radiusMeters: number;
-    } | null,
+    sprinklerConfig: SprinklerConfig | null,
     t: (key: string) => string,
 ): string => {
-    const flowRate = plantCount * (sprinklerConfig?.flowRatePerMinute || 0);
+    const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree || 1;
+    const flowRate = plantCount * (sprinklerConfig?.flowRatePerMinute || 0) * sprinklersPerTree;
     return `${flowRate.toFixed(2)} ${t('ลิตร/นาที')}`;
 };
 
@@ -3536,6 +3545,18 @@ const ManualZoneInfoModal: React.FC<{
                                 <span className="text-gray-300">{t('จำนวนต้นไม้')}:</span>
                                 <span className="font-medium text-white">
                                     {zone.plants.length} {t('ต้น')}
+                                    {(() => {
+                                        const config = loadSprinklerConfig();
+                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                        if (sprinklersPerTree > 1) {
+                                            return (
+                                                <span className="ml-2 text-sm text-gray-400">
+                                                    ({zone.plants.length * sprinklersPerTree} หัวฉีด)
+                                                </span>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </span>
                             </div>
 
@@ -4081,6 +4102,18 @@ const AutoZoneModal = ({
                             <ul className="mt-1 space-y-1">
                                 <li>
                                     • {t('ต้นไม้ทั้งหมด')}: {totalPlants} {t('ต้น')}
+                                    {(() => {
+                                        const config = loadSprinklerConfig();
+                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                        if (sprinklersPerTree > 1) {
+                                            return (
+                                                <span className="ml-2 text-blue-300">
+                                                    ({totalPlants * sprinklersPerTree} หัวฉีด)
+                                                </span>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </li>
                                 <li>
                                     • {t('ปริมาณน้ำรวม')}:{' '}
@@ -4190,12 +4223,37 @@ const AutoZoneDebugModal = ({
                                 <p className="text-blue-300">
                                     {t('ต้นไม้ทั้งหมด')}:{' '}
                                     <span className="text-white">{debugInfo.totalPlants}</span>
+                                    {(() => {
+                                        const config = loadSprinklerConfig();
+                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                        if (sprinklersPerTree > 1) {
+                                            return (
+                                                <span className="ml-2 text-blue-200">
+                                                    ({debugInfo.totalPlants * sprinklersPerTree} หัวฉีด)
+                                                </span>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </p>
                                 <p className="text-blue-300">
                                     {t('ต้นไม้ในโซน')}:{' '}
                                     <span className="text-white">
                                         {zones.reduce((sum, zone) => sum + zone.plants.length, 0)}
                                     </span>
+                                    {(() => {
+                                        const config = loadSprinklerConfig();
+                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                        const totalPlantsInZones = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
+                                        if (sprinklersPerTree > 1) {
+                                            return (
+                                                <span className="ml-2 text-blue-200">
+                                                    ({totalPlantsInZones * sprinklersPerTree} หัวฉีด)
+                                                </span>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </p>
                                 <p className="text-blue-300">
                                     {t('ปริมาณน้ำรวม')}:{' '}
@@ -4210,8 +4268,9 @@ const AutoZoneDebugModal = ({
                                                 (sum, zone) => sum + zone.totalWaterNeed,
                                                 0
                                             );
+                                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
                                             return formatWaterVolumeWithFlowRate(
-                                                actualTotalWaterNeed,
+                                                actualTotalWaterNeed * sprinklersPerTree,
                                                 actualPlantsInZones,
                                                 config,
                                                 t
@@ -4300,7 +4359,20 @@ const AutoZoneDebugModal = ({
                                         <span className="text-green-100">{zone.name}</span>
                                     </div>
                                     <div className="text-green-200">
-                                        {zone.plants.length} ต้น |{' '}
+                                        {zone.plants.length} ต้น
+                                        {(() => {
+                                            const config = loadSprinklerConfig();
+                                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                            if (sprinklersPerTree > 1) {
+                                                return (
+                                                    <span className="ml-1 text-green-300">
+                                                        ({zone.plants.length * sprinklersPerTree} หัวฉีด)
+                                                    </span>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                        {' | '}
                                         {(() => {
                                             const config = loadSprinklerConfig();
                                             return formatWaterVolumeWithFlowRate(
@@ -4475,6 +4547,18 @@ const AutoZoneDebugModal = ({
                                         </div>
                                         <div className="mt-1 text-xs text-purple-300">
                                             🌱 ต้นไม้: {plantCount} ต้น
+                                            {(() => {
+                                                const config = loadSprinklerConfig();
+                                                const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                if (sprinklersPerTree > 1) {
+                                                    return (
+                                                        <span className="ml-1 text-purple-200">
+                                                            ({plantCount * sprinklersPerTree} หัวฉีด)
+                                                        </span>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
                                         <div className="mt-1 h-2 rounded bg-purple-800">
                                             <div
@@ -4718,7 +4802,8 @@ export default function EnhancedHorticulturePlannerPage() {
             (lateralPipe.plants?.reduce((sum, plant) => 
                 sum + (plant.plantData?.waterNeed || 0), 0
             ) || 0);
-        const totalFlowRate = plantCount * flowRatePerMinute;
+        const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree || 1;
+        const totalFlowRate = plantCount * flowRatePerMinute * sprinklersPerTree;
 
         return (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
@@ -4785,6 +4870,11 @@ export default function EnhancedHorticulturePlannerPage() {
                                         <span className="text-green-600">{t('จำนวนต้นไม้')}:</span>
                                         <span className="text-lg font-bold text-green-800">
                                             {plantCount.toLocaleString()} {t('ต้น')}
+                                            {sprinklersPerTree > 1 && (
+                                                <span className="ml-2 text-sm text-green-600">
+                                                    ({plantCount * sprinklersPerTree} หัวฉีด)
+                                                </span>
+                                            )}
                                         </span>
                                     </div>
                                 </div>
@@ -4916,7 +5006,9 @@ export default function EnhancedHorticulturePlannerPage() {
         };
 
         const formatFlowRate = (plantCount: number, flowRate: number): string => {
-            const totalFlowRate = plantCount * flowRate;
+            const config = loadSprinklerConfig();
+            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+            const totalFlowRate = plantCount * flowRate * sprinklersPerTree;
             return `${totalFlowRate.toFixed(2)} ${t('ลิตร/นาที')}`;
         };
 
@@ -5002,7 +5094,6 @@ export default function EnhancedHorticulturePlannerPage() {
     const [showSprinklerConfigModal, setShowSprinklerConfigModal] = useState(false);
     const [selectedLateralPipe, setSelectedLateralPipe] = useState<LateralPipe | null>(null);
     const [showLateralPipeInfoModal, setShowLateralPipeInfoModal] = useState(false);
-    const [showSprinklerRadius, setShowSprinklerRadius] = useState(false);
 
     const [showAutoLateralPipeModal, setShowAutoLateralPipeModal] = useState(false);
 
@@ -5017,7 +5108,7 @@ export default function EnhancedHorticulturePlannerPage() {
             setSprinklerConfig({
                 flowRatePerMinute: savedConfig.flowRatePerMinute.toString(),
                 pressureBar: savedConfig.pressureBar.toString(),
-                radiusMeters: savedConfig.radiusMeters.toString(),
+                sprinklersPerTree: (savedConfig.sprinklersPerTree || 1).toString(),
             });
         }
     }, []);
@@ -6364,7 +6455,8 @@ export default function EnhancedHorticulturePlannerPage() {
                 0
             );
             const sprinklerConfig = loadSprinklerConfig();
-            const mergedFlowRate = mergedPlants.length * (sprinklerConfig?.flowRatePerMinute || 0);
+            const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree || 1;
+            const mergedFlowRate = mergedPlants.length * (sprinklerConfig?.flowRatePerMinute || 0) * sprinklersPerTree;
 
             return {
                 ...existingPipe,
@@ -6405,7 +6497,11 @@ export default function EnhancedHorticulturePlannerPage() {
             length: calculateDistanceBetweenPoints(fromPoint.position, toPoint.position),
             plants: plants,
             placementMode: 'over_plants' as 'over_plants' | 'between_plants',
-            totalFlowRate: plants.length * (loadSprinklerConfig()?.flowRatePerMinute || 0),
+            totalFlowRate: (() => {
+                const config = loadSprinklerConfig();
+                const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                return plants.length * (config?.flowRatePerMinute || 0) * sprinklersPerTree;
+            })(),
             connectionPoint: fromPoint.position,
             totalWaterNeed: plants.reduce((sum, plant) => sum + (plant.plantData?.waterNeed || 0), 0),
             plantCount: plants.length,
@@ -6506,8 +6602,10 @@ export default function EnhancedHorticulturePlannerPage() {
                     (sum, plant) => sum + (plant.plantData?.waterNeed || 0),
                     0
                 );
+                const config = loadSprinklerConfig();
+                const sprinklersPerTree = config?.sprinklersPerTree || 1;
                 mergedPipe.totalFlowRate =
-                    allPlants.length * (loadSprinklerConfig()?.flowRatePerMinute || 0);
+                    allPlants.length * (config?.flowRatePerMinute || 0) * sprinklersPerTree;
               
                 const updatedLateralPipes = latestLateralPipesRef.current
                     .filter(
@@ -6578,9 +6676,13 @@ export default function EnhancedHorticulturePlannerPage() {
                             toLateralPipe!.length,
                         plants: allPlantsFromBothPipes, 
                         plantCount: allPlantsFromBothPipes.length,
-                        totalFlowRate:
-                            allPlantsFromBothPipes.length *
-                            (loadSprinklerConfig()?.flowRatePerMinute || 0),
+                        totalFlowRate: (() => {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            return allPlantsFromBothPipes.length *
+                                (config?.flowRatePerMinute || 0) *
+                                sprinklersPerTree;
+                        })(),
                         totalWaterNeed: allPlantsFromBothPipes.reduce(
                             (sum, plant) => sum + (plant.plantData?.waterNeed || 0),
                             0
@@ -6628,9 +6730,12 @@ export default function EnhancedHorticulturePlannerPage() {
                     };
 
                     if ('totalFlowRate' in updatedExistingPipe) {
+                        const config = loadSprinklerConfig();
+                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
                         (updatedExistingPipe as any).totalFlowRate =
                             allPlantsForGroup.length *
-                            (loadSprinklerConfig()?.flowRatePerMinute || 0);
+                            (config?.flowRatePerMinute || 0) *
+                            sprinklersPerTree;
                     }
 
                     const connectionPipe = {
@@ -9718,12 +9823,8 @@ export default function EnhancedHorticulturePlannerPage() {
         setShowSprinklerConfigModal(false);
 
         const flowRate = parseFloat(config.flowRatePerMinute);
-        const totalFlowRate = calculateTotalFlowRate(history.present.plants.length, flowRate);
-
-        if (showSprinklerRadius) {
-            setShowSprinklerRadius(false);
-            setTimeout(() => setShowSprinklerRadius(true), 100);
-        }
+        const sprinklersPerTree = parseFloat(config.sprinklersPerTree || '1');
+        const totalFlowRate = calculateTotalFlowRate(history.present.plants.length, flowRate, sprinklersPerTree);
 
         if (typeof window !== 'undefined' && (window as any).showNotification) {
             const totalWaterNeed = history.present.plants.reduce(
@@ -9739,21 +9840,6 @@ export default function EnhancedHorticulturePlannerPage() {
 
     const handleSprinklerConfigClose = () => {
         setShowSprinklerConfigModal(false);
-    };
-
-    const toggleSprinklerRadius = () => {
-        const sprinklerConfig = loadSprinklerConfig();
-        if (!sprinklerConfig || sprinklerConfig.radiusMeters <= 0) {
-            if (typeof window !== 'undefined' && (window as any).showNotification) {
-                (window as any).showNotification(
-                    t('กรุณาตั้งค่าหัวฉีดน้ำก่อนเพื่อแสดงรัศมี'),
-                    'warning'
-                );
-            }
-            setShowSprinklerConfigModal(true);
-            return;
-        }
-        setShowSprinklerRadius(!showSprinklerRadius);
     };
 
     const handleCompletedLateralPipeClick = (lateralPipeId: string) => {
@@ -9775,7 +9861,7 @@ export default function EnhancedHorticulturePlannerPage() {
             setSprinklerConfig({
                 flowRatePerMinute: savedConfig.flowRatePerMinute.toString(),
                 pressureBar: savedConfig.pressureBar.toString(),
-                radiusMeters: savedConfig.radiusMeters.toString(),
+                sprinklersPerTree: (savedConfig.sprinklersPerTree || 1).toString(),
             });
         }
     }, []);
@@ -11324,6 +11410,9 @@ export default function EnhancedHorticulturePlannerPage() {
         // ตรวจสอบทั้ง zones และ irrigationZones เพื่อรองรับทั้งโซนอัตโนมัติและโซนที่วาดเอง
         let irrigationZones: IrrigationZone[] = [];
         
+        // ดึง rotationAngle ปัจจุบันเพื่อใช้กับต้นไม้ทั้งหมด
+        const currentRotationAngle = getCurrentRotationAngle();
+        
         // ถ้ามี irrigationZones ใช้มันก่อน (รองรับโซนที่วาดเอง)
         if (history.present.irrigationZones && history.present.irrigationZones.length > 0) {
             irrigationZones = history.present.irrigationZones.map((zone, index) => {
@@ -11344,7 +11433,10 @@ export default function EnhancedHorticulturePlannerPage() {
                         .filter((plant): plant is PlantLocation => plant !== undefined)
                         .map((plant) => ({
                             ...plant,
-                            rotationAngle: plant.rotationAngle || 0
+                            // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
+                            rotationAngle: plant.rotationAngle !== undefined 
+                                ? plant.rotationAngle 
+                                : currentRotationAngle
                         }));
                 } else {
                     // กรองจาก plants โดยใช้ zoneId
@@ -11352,7 +11444,10 @@ export default function EnhancedHorticulturePlannerPage() {
                         .filter(plant => plant.zoneId === zone.id)
                         .map((plant) => ({
                             ...plant,
-                            rotationAngle: plant.rotationAngle || 0
+                            // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
+                            rotationAngle: plant.rotationAngle !== undefined 
+                                ? plant.rotationAngle 
+                                : currentRotationAngle
                         }));
                 }
                 
@@ -11368,7 +11463,10 @@ export default function EnhancedHorticulturePlannerPage() {
                         })
                         .map((plant) => ({
                             ...plant,
-                            rotationAngle: plant.rotationAngle || 0
+                            // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
+                            rotationAngle: plant.rotationAngle !== undefined 
+                                ? plant.rotationAngle 
+                                : currentRotationAngle
                         }));
                 }
                 
@@ -11392,7 +11490,10 @@ export default function EnhancedHorticulturePlannerPage() {
                 coordinates: zone.coordinates,
                 plants: history.present.plants.filter(plant => plant.zoneId === zone.id).map((plant) => ({
                     ...plant,
-                    rotationAngle: plant.rotationAngle || 0
+                    // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
+                    rotationAngle: plant.rotationAngle !== undefined 
+                        ? plant.rotationAngle 
+                        : currentRotationAngle
                 })),
                 totalWaterNeed: zone.totalWaterNeed,
                 color: zone.color,
@@ -13223,21 +13324,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                 )}
                             </button>
 
-                            <button
-                                    onClick={toggleSprinklerRadius}
-                                    className={`h-10 w-10 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                                        showSprinklerRadius
-                                            ? 'bg-green-600 text-white hover:bg-green-500'
-                                            : 'bg-gray-600 text-gray-100 hover:bg-gray-500'
-                                    }`}
-                                    title={
-                                        showSprinklerRadius
-                                            ? t('ซ่อนรัศมีหัวฉีด')
-                                            : t('แสดงรัศมีหัวฉีด')
-                                    }
-                                >
-                                    <FaShower className="h-4 w-4" />
-                                </button>
 
                             <div className="flex items-center">
                                 <button
@@ -14029,6 +14115,20 @@ export default function EnhancedHorticulturePlannerPage() {
                                                             </span>
                                                             <span className="font-bold text-green-500">
                                                                 {actualTotalPlants} {t('ต้น')}
+                                                                {(() => {
+                                                                    const config = loadSprinklerConfig();
+                                                                    const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                                    if (sprinklersPerTree > 1) {
+                                                                        return (
+                                                                            <span className="ml-2 text-sm text-green-400">
+                                                                                ({(
+                                                                                    actualTotalPlants * sprinklersPerTree
+                                                                                ).toLocaleString()} หัวฉีด)
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
@@ -14054,7 +14154,8 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                 const totalFlowRatePerMinute =
                                                                     calculateTotalFlowRate(
                                                                         actualTotalPlants,
-                                                                        sprinklerConfig.flowRatePerMinute
+                                                                        sprinklerConfig.flowRatePerMinute,
+                                                                        sprinklerConfig.sprinklersPerTree || 1
                                                                     );
                                                                 const totalFlowRatePerHour =
                                                                     totalFlowRatePerMinute * 60;
@@ -14109,19 +14210,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                 <span className="font-bold text-orange-400">
                                                                                     {formatPressure(
                                                                                         sprinklerConfig.pressureBar
-                                                                                    )}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="flex justify-between">
-                                                                                <span className="text-purple-400">
-                                                                                    {t(
-                                                                                        'รัศมีหัวฉีด'
-                                                                                    )}
-                                                                                    :
-                                                                                </span>
-                                                                                <span className="font-bold text-purple-400">
-                                                                                    {formatRadius(
-                                                                                        sprinklerConfig.radiusMeters
                                                                                     )}
                                                                                 </span>
                                                                             </div>
@@ -14306,7 +14394,21 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                                             ].count.toLocaleString()}{' '}
                                                                                                             {t(
                                                                                                                 'ต้น'
-                                                                                                            )}{' '}
+                                                                                                            )}
+                                                                                                            {(() => {
+                                                                                                                const config = loadSprinklerConfig();
+                                                                                                                const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                                                                                if (sprinklersPerTree > 1) {
+                                                                                                                    return (
+                                                                                                                        <span className="ml-1 text-xs text-blue-700">
+                                                                                                                            ({(
+                                                                                                                                plantSummary[name].count * sprinklersPerTree
+                                                                                                                            ).toLocaleString()} หัวฉีด)
+                                                                                                                        </span>
+                                                                                                                    );
+                                                                                                                }
+                                                                                                                return null;
+                                                                                                            })()}{' '}
                                                                                                         </p>
                                                                                                         <p>
                                                                                                             {(() => {
@@ -14316,7 +14418,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                                                     plantSummary[
                                                                                                                         name
                                                                                                                     ]
-                                                                                                                        .totalWater,
+                                                                                                                        .totalWater * (config?.sprinklersPerTree || 1),
                                                                                                                     plantSummary[
                                                                                                                         name
                                                                                                                     ]
@@ -14391,46 +14493,43 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                     </span>
                                                                                 </div>
                                                                                 <span className="text-xs text-green-400">
-                                                                                    {
-                                                                                        zone.plants
-                                                                                            .length
-                                                                                    }{' '}
+                                                                                    {zone.plants.length}{' '}
                                                                                     {t('ต้น')}
+                                                                                    {(() => {
+                                                                                        const config = loadSprinklerConfig();
+                                                                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                                                        if (sprinklersPerTree > 1) {
+                                                                                            return (
+                                                                                                <span className="ml-1 text-green-300">
+                                                                                                    ({zone.plants.length * sprinklersPerTree} หัวฉีด)
+                                                                                                </span>
+                                                                                            );
+                                                                                        }
+                                                                                        return null;
+                                                                                    })()}
                                                                                 </span>
                                                                             </div>
                                                                             <div className="mt-1 flex flex-row justify-between text-xs text-gray-400">
                                                                                 <span className="text-xs text-gray-400">
-                                                                                    {
-                                                                                        zone.totalWaterNeed
-                                                                                    }{' '}
-                                                                                    {t(
-                                                                                        'ลิตร/ครั้ง'
-                                                                                    )}
+                                                                                    {zone.totalWaterNeed.toLocaleString()}{' '}
+                                                                                    {t('ลิตร/ครั้ง')}
                                                                                 </span>
                                                                                 <span className="text-xs text-blue-400">
-                                                                                    {/* ERROR: totalFlowRatePerMinute is not defined in this scope. */}
-                                                                                    {/* To debug, calculate per-zone flow rate using sprinklerConfig if available */}
                                                                                     {(() => {
-                                                                                        const sprinklerConfig =
-                                                                                            loadSprinklerConfig?.();
+                                                                                        const sprinklerConfig = loadSprinklerConfig();
                                                                                         if (
                                                                                             sprinklerConfig &&
-                                                                                            typeof sprinklerConfig.flowRatePerMinute ===
-                                                                                                'number'
+                                                                                            typeof sprinklerConfig.flowRatePerMinute === 'number'
                                                                                         ) {
+                                                                                            const sprinklersPerTree = sprinklerConfig.sprinklersPerTree || 1;
                                                                                             const zoneFlowRate =
-                                                                                                zone
-                                                                                                    .plants
-                                                                                                    .length *
-                                                                                                sprinklerConfig.flowRatePerMinute;
+                                                                                                zone.plants.length *
+                                                                                                sprinklerConfig.flowRatePerMinute *
+                                                                                                sprinklersPerTree;
                                                                                             return (
                                                                                                 <>
-                                                                                                    {
-                                                                                                        zoneFlowRate
-                                                                                                    }{' '}
-                                                                                                    {t(
-                                                                                                        'ลิตร/นาที'
-                                                                                                    )}
+                                                                                                    {zoneFlowRate.toFixed(2)}{' '}
+                                                                                                    {t('ลิตร/นาที')}
                                                                                                 </>
                                                                                             );
                                                                                         }
@@ -14988,6 +15087,18 @@ export default function EnhancedHorticulturePlannerPage() {
                                                     </span>
                                                     <span className="font-medium text-green-600">
                                                         {actualTotalPlants} {t('ต้น')}
+                                                        {(() => {
+                                                            const config = loadSprinklerConfig();
+                                                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                            if (sprinklersPerTree > 1) {
+                                                                return (
+                                                                    <span className="ml-2 text-green-400">
+                                                                        ({actualTotalPlants * sprinklersPerTree} หัวฉีด)
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })()}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
@@ -15002,10 +15113,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 {(() => {
                                                     const sprinklerConfig = loadSprinklerConfig();
                                                     if (sprinklerConfig && actualTotalPlants > 0) {
+                                                        const sprinklersPerTree = sprinklerConfig.sprinklersPerTree || 1;
                                                         const totalFlowRatePerMinute =
                                                             calculateTotalFlowRate(
                                                                 actualTotalPlants,
-                                                                sprinklerConfig.flowRatePerMinute
+                                                                sprinklerConfig.flowRatePerMinute,
+                                                                sprinklersPerTree
                                                             );
                                                         return (
                                                             <div className="flex justify-between">
@@ -15288,7 +15401,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 }
                                 onCreated={handleDrawingComplete}
                                 strokeColor={editMode === 'mainPipe' ? '#FF0000' : editMode === 'subMainPipe' ? '#8B5CF6' : '#FFD700'}
-                                strokeWeight={editMode === 'mainPipe' ? 2 : editMode === 'subMainPipe' ? 3 : 2}
+                                strokeWeight={editMode === 'mainPipe' ? 2 : editMode === 'subMainPipe' ? 5 : 2}
                                 pump={history.present.pump?.position || null}
                                 mainPipes={history.present.mainPipes}
                                 subMainPipes={history.present.subMainPipes}
@@ -15313,7 +15426,6 @@ export default function EnhancedHorticulturePlannerPage() {
                                 data={history.present}
                                 lateralPipesState={lateralPipesState}
                                 currentDrawnZone={currentDrawnZone}
-                                showSprinklerRadius={showSprinklerRadius}
                                 manualZones={manualZones}
                                 onMapClick={handleMapClick}
                                 isZoneEditMode={isZoneEditMode}
@@ -16119,7 +16231,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         pipeType: 'mainPipe' | 'subMainPipe' | 'lateralPipe' | 'branchPipe'
     ) => void;
     highlightedPlants?: Set<string>;
-    showSprinklerRadius?: boolean;
 }> = ({
     map,
     data,
@@ -16168,7 +16279,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
     isDeleteMode,
     handleDeletePipe,
     highlightedPlants = new Set(),
-    showSprinklerRadius = false,
 }) => {
     const overlaysRef = useRef<{
         polygons: Map<string, google.maps.Polygon>;
@@ -17865,15 +17975,15 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     );
 
                 let strokeColor = '#8B5CF6';
-                let strokeWeight = 2;
+                let strokeWeight = 5;
                 let strokeOpacity = 0.9;
 
                 if (isDeleteMode) {
-                    strokeWeight = 12; 
+                    strokeWeight = 14; 
                     strokeOpacity = 1;
                 } else if (isSelectedInConnectionMode) {
                     strokeColor = '#8B5CF6';
-                    strokeWeight = 8; 
+                    strokeWeight = 10; 
                     strokeOpacity = 1;
                 } else if (isSelected) {
                     strokeColor = '#FFD700';
@@ -18223,28 +18333,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
             });
         }
 
-        if (showSprinklerRadius && layerVisibility.plants) {
-            const sprinklerConfig = loadSprinklerConfig();
-
-            if (sprinklerConfig && sprinklerConfig.radiusMeters > 0) {
-                data.plants.forEach((plant) => {
-                    const radiusCircle = new google.maps.Circle({
-                        center: { lat: plant.position.lat, lng: plant.position.lng },
-                        radius: sprinklerConfig.radiusMeters,
-                        strokeColor: '#00BFFF',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 2,
-                        fillColor: '#00BFFF',
-                        fillOpacity: 0.1,
-                        clickable: false,
-                        zIndex: 100, 
-                    });
-
-                    radiusCircle.setMap(map);
-                    overlaysRef.current.circles.set(`sprinkler_${plant.id}`, radiusCircle);
-                });
-            }
-        }
 
         if (tempConnectionLine && tempConnectionLine.length >= 2) {
             const tempPolyline = new google.maps.Polyline({
@@ -18435,7 +18523,6 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         onZoneUpdate,
         selectedZoneForEdit,
         setDraggedControlPointIndex,
-        showSprinklerRadius,
         tempConnectionLine,
         zoneControlPoints,
     ]);

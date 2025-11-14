@@ -19,6 +19,7 @@ import { useCalculations } from '../hooks/useCalculations';
 import { useLanguage } from '@/contexts/LanguageContext';
 import SearchableDropdown from './SearchableDropdown';
 import { ConnectionPointStats } from '../../utils/horticultureProjectStats';
+import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 
 interface InputFormProps {
     input: IrrigationInput;
@@ -130,12 +131,41 @@ const InputForm: React.FC<InputFormProps> = ({
     const inputRef = useRef(input);
     const onInputChangeRef = useRef(onInputChange);
     const activeZoneRef = useRef(activeZone);
+    const hasInitializedSprinklersPerTree = useRef(false);
+    
+    // Load sprinklersPerTree from config for horticulture mode
+    const defaultSprinklersPerTree = useMemo(() => {
+        if (projectMode === 'horticulture' && (!input.sprinklersPerTree || input.sprinklersPerTree === 0)) {
+            const config = loadSprinklerConfig();
+            return config?.sprinklersPerTree || 1;
+        }
+        return input.sprinklersPerTree || 1;
+    }, [projectMode, input.sprinklersPerTree]);
     
     useEffect(() => {
         inputRef.current = input;
         onInputChangeRef.current = onInputChange;
         activeZoneRef.current = activeZone;
     });
+    
+    // Initialize sprinklersPerTree from config only once on mount if not set or is default value (1)
+    useEffect(() => {
+        if (projectMode === 'horticulture' && !hasInitializedSprinklersPerTree.current) {
+            const config = loadSprinklerConfig();
+            const configValue = config?.sprinklersPerTree;
+            
+            // ถ้ายังไม่มีค่า หรือค่าเป็น 0 หรือค่าเป็น 1 (ค่าเริ่มต้น) ให้ sync กับ config
+            // แต่ถ้าผู้ใช้แก้ไขเป็นค่าอื่น (2, 3, 4, 5) แล้ว จะไม่ override
+            if (configValue && (!input.sprinklersPerTree || input.sprinklersPerTree === 0 || input.sprinklersPerTree === 1)) {
+                // ตรวจสอบว่า config มีค่าและไม่ใช่ 1 (ถ้า config เป็น 1 ก็ไม่ต้อง sync)
+                if (configValue !== 1) {
+                    updateInput('sprinklersPerTree', configValue);
+                }
+            }
+            hasInitializedSprinklersPerTree.current = true;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectMode]);
 
     const isPointInZone = useCallback((point: any, zone: any): boolean => {
         if (!point.lat || !point.lng || !zone.coordinates) return false;
@@ -732,7 +762,9 @@ const InputForm: React.FC<InputFormProps> = ({
                     }
                 }
             }
-        } catch {}
+        } catch (error) {
+            console.error('Error reading elevation difference from localStorage:', error);
+        }
     }, [projectMode, activeZone?.id]);
 
     const isMultiZone = input.numberOfZones > 1;
@@ -1325,7 +1357,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     <input
                                         type="number"
                                         step="1"
-                                        defaultValue={input.sprinklersPerTree}
+                                        value={input.sprinklersPerTree || defaultSprinklersPerTree}
                                         onChange={(e) => {
                                             const value = parseFloat(e.target.value);
                                             if (!isNaN(value)) {
@@ -1337,8 +1369,26 @@ const InputForm: React.FC<InputFormProps> = ({
                                         }
                                         min="1"
                                         max="5"
-                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
+                                        disabled={projectMode === 'horticulture'}
+                                        className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
                                     />
+                                    {projectMode === 'horticulture' && (() => {
+                                        const config = loadSprinklerConfig();
+                                        const configValue = config?.sprinklersPerTree;
+                                        if (configValue) {
+                                            const currentValue = input.sprinklersPerTree || defaultSprinklersPerTree;
+                                            return (
+                                                <p className="mt-1 text-xs text-gray-400">
+                                                    {configValue === currentValue ? (
+                                                        <span>{t('ค่าจาก config')}: {configValue}</span>
+                                                    ) : (
+                                                        <span>{t('ค่าจาก config')}: {configValue} ({t('ปัจจุบัน')}: {currentValue})</span>
+                                                    )}
+                                                </p>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                             )}
 
