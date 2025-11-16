@@ -54,8 +54,6 @@ const snapPointToPump = (
     return point;
 };
 
-
-
 const snapPointToMainAreaBoundary = (
     point: Coordinate,
     mainArea: Coordinate[],
@@ -91,9 +89,6 @@ const snapPointToMainAreaBoundary = (
 const findClosestPointOnLineSegment = utilsFindClosestPointOnLineSegment;
 
 const calculateDistanceBetweenPoints = utilsCalculateDistanceBetweenPoints;
-
-
-
 
 const advancedSnapToMainArea = (
     coordinates: Coordinate[],
@@ -366,9 +361,7 @@ const snapMainPipeCoordinates = (
     return snappedCoordinates;
 };
 
-const snapSubMainPipeCoordinates = (
-    coordinates: Coordinate[]
-): Coordinate[] => {
+const snapSubMainPipeCoordinates = (coordinates: Coordinate[]): Coordinate[] => {
     return coordinates;
 };
 
@@ -380,22 +373,22 @@ const optimizeLateralPipeCoordinates = (
     if (originalCoordinates.length <= 2) {
         return [startPoint, endPoint];
     }
-    
+
     const optimized: Coordinate[] = [startPoint];
-    
+
     for (let i = 1; i < originalCoordinates.length - 1; i++) {
         const current = originalCoordinates[i];
         const prev = optimized[optimized.length - 1];
-        
+
         const distance = calculateDistanceBetweenPoints(prev, current);
-        
+
         if (distance > 2) {
             optimized.push(current);
         }
     }
-    
+
     optimized.push(endPoint);
-    
+
     return optimized;
 };
 
@@ -406,11 +399,11 @@ const validateLateralPipeInput = (
     if (!coordinates || coordinates.length < 2) {
         return false;
     }
-    
+
     if (!placementMode) {
         return false;
     }
-    
+
     for (const coord of coordinates) {
         if (
             typeof coord.lat !== 'number' ||
@@ -421,7 +414,7 @@ const validateLateralPipeInput = (
             return false;
         }
     }
-    
+
     return true;
 };
 
@@ -432,18 +425,16 @@ const enhanceLateralPipeDrawing = (
     if (!validateLateralPipeInput(coordinates, placementMode)) {
         return coordinates;
     }
-    
+
     if (coordinates.length === 2) {
         return coordinates;
     }
-    
+
     const startPoint = coordinates[0];
     const endPoint = coordinates[coordinates.length - 1];
-    
+
     return optimizeLateralPipeCoordinates(startPoint, endPoint, coordinates);
 };
-
-
 
 const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     map,
@@ -529,8 +520,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
             drawingManager.setMap(map);
             drawingManagerRef.current = drawingManager;
 
-
-
             // Handle lateral pipe mouse movement separately
             if (editMode === 'lateralPipe' && onLateralPipeMouseMove) {
                 drawingManager.addListener('mousemove', (event) => {
@@ -538,9 +527,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                 });
             }
 
-
             const listeners: google.maps.MapsEventListener[] = [];
-
 
             listeners.push(
                 drawingManager.addListener('polygoncomplete', (polygon: google.maps.Polygon) => {
@@ -571,7 +558,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             onCreated(coordinates, 'rectangle');
                         }
                         rectangle.setMap(null);
-                        
                     }
                 )
             );
@@ -588,7 +574,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         onCreated(coordinates, 'circle');
                     }
                     circle.setMap(null);
-                    
                 })
             );
 
@@ -597,10 +582,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     let coordinates = extractCoordinatesFromShape(polyline);
 
                     if (editMode === 'mainPipe') {
-                        coordinates = snapMainPipeCoordinates(
-                            coordinates,
-                            pump
-                        );
+                        coordinates = snapMainPipeCoordinates(coordinates, pump);
                     } else if (editMode === 'subMainPipe') {
                         coordinates = snapSubMainPipeCoordinates(coordinates);
                     } else if (editMode === 'lateralPipe') {
@@ -611,7 +593,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         onCreated(coordinates, 'polyline');
                     }
                     polyline.setMap(null);
-                    
                 })
             );
 
@@ -772,10 +753,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         onLateralPipeMouseMove,
     ]);
 
-
-
-
-
     useEffect(() => {
         return () => {
             if (drawingManagerRef.current) {
@@ -794,10 +771,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         };
     }, []);
 
-    return (
-        <>
-        </>
-    );
+    return <></>;
 };
 
 export default HorticultureDrawingManager;

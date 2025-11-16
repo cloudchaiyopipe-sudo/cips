@@ -61,7 +61,7 @@ export const findLineIntersection = (
     const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
 
     if (Math.abs(denominator) < 1e-10) {
-        return null; 
+        return null;
     }
 
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
@@ -79,7 +79,7 @@ export const findLineIntersection = (
         }
     }
 
-    return null; 
+    return null;
 };
 
 export const findLateralSubMainIntersection = (
@@ -200,7 +200,7 @@ export const findLateralToSubMainIntersections = (
             const subMainGroupId = (subMainPipe as any).groupId;
 
             if (lateralGroupId && subMainGroupId && lateralGroupId === subMainGroupId) {
-                continue; 
+                continue;
             }
 
             for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
@@ -293,7 +293,6 @@ export const calculateLateralPipeSegmentStats = (
         const distanceFromStart = calculateDistanceBetweenPoints(lateralStart, closestPoint);
 
         if (distanceFromStart <= distanceFromStartToIntersection + 1) {
-           
             segment1Plants.push(plant);
         } else {
             segment2Plants.push(plant);
@@ -394,7 +393,7 @@ export const findMainToSubMainConnections = (
             const mainZone = findPipeZone(mainPipe);
 
             if (mainZone && subMainZone && mainZone !== subMainZone) {
-                continue; 
+                continue;
             }
 
             const distanceToSubMainStart = calculateDistanceBetweenPoints(mainEnd, subMainStart);
@@ -407,9 +406,7 @@ export const findMainToSubMainConnections = (
         }
 
         if (closestMainPipe && closestMainEnd) {
-           
             for (let i = 1; i < subMainPipe.coordinates.length; i++) {
-                
                 const subMainPoint = subMainPipe.coordinates[i];
                 const distanceToSubMainPoint = calculateDistanceBetweenPoints(
                     closestMainEnd,
@@ -439,7 +436,7 @@ export const findMainToSubMainConnections = (
                         },
                     });
 
-                    break; 
+                    break;
                 }
             }
         }
@@ -532,8 +529,6 @@ export const findEndToEndConnections = (
     return connections;
 };
 
-
-
 const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -553,8 +548,8 @@ const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => 
 export const findSubMainToLateralStartConnections = (
     subMainPipes: any[],
     lateralPipes: any[],
-    zones?: any[], 
-    irrigationZones?: any[], 
+    zones?: any[],
+    irrigationZones?: any[],
     snapThreshold: number = 10
 ): {
     subMainPipeId: string;
@@ -625,14 +620,14 @@ export const findSubMainToLateralStartConnections = (
             const subMainZone = findPipeZone(subMainPipe);
 
             if (lateralZone && subMainZone && lateralZone !== subMainZone) {
-                continue; 
+                continue;
             }
 
             const lateralGroupId = (lateralPipe as any).groupId;
             const subMainGroupId = (subMainPipe as any).groupId;
 
             if (lateralGroupId && subMainGroupId && lateralGroupId === subMainGroupId) {
-                continue; 
+                continue;
             }
 
             const closestPoint = findClosestConnectionPoint(lateralStart, subMainPipe);
@@ -667,8 +662,8 @@ export const findSubMainToLateralStartConnections = (
 export const findSubMainToMainIntersections = (
     subMainPipes: any[],
     mainPipes: any[],
-    zones?: any[], 
-    irrigationZones?: any[] 
+    zones?: any[],
+    irrigationZones?: any[]
 ): {
     subMainPipeId: string;
     mainPipeId: string;
@@ -725,7 +720,7 @@ export const findSubMainToMainIntersections = (
             const mainZone = findPipeZone(mainPipe);
 
             if (subMainZone && mainZone && subMainZone !== mainZone) {
-                continue; 
+                continue;
             }
 
             const subMainStart = subMainPipe.coordinates[0];
@@ -747,7 +742,7 @@ export const findSubMainToMainIntersections = (
                 distanceToMainStartFromEnd < 25 ||
                 distanceToMainEndFromEnd < 25
             ) {
-                continue; 
+                continue;
             }
 
             for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
@@ -790,14 +785,14 @@ export const findSubMainToMainIntersections = (
 export const findMidConnections = (
     sourcePipes: any[],
     targetPipes: any[],
-    snapThreshold: number = 15, 
+    snapThreshold: number = 15,
     zones?: any[],
     irrigationZones?: any[]
 ): {
     sourcePipeId: string;
     targetPipeId: string;
     connectionPoint: Coordinate;
-    sourceEndIndex: number; 
+    sourceEndIndex: number;
     targetSegmentIndex: number;
 }[] => {
     const connections: {
@@ -883,7 +878,7 @@ export const findMidConnections = (
                 const targetZone = findPipeZone(targetPipe);
 
                 if (sourceZone && targetZone && sourceZone !== targetZone) {
-                    continue; 
+                    continue;
                 }
 
                 const connectionKey = `${targetPipe.id}-${sourcePipe.id}`;
@@ -894,7 +889,7 @@ export const findMidConnections = (
                             conn.subMainPipeId === sourcePipe.id
                     );
                     if (isExistingEndToEnd) {
-                        continue; 
+                        continue;
                     }
                 }
 
@@ -909,7 +904,7 @@ export const findMidConnections = (
                     );
                     const distance = calculateDistanceBetweenPoints(endpoint.point, closestPoint);
 
-                    if (distance <= snapThreshold) {    
+                    if (distance <= snapThreshold) {
                         const isEndToEndConnection =
                             calculateDistanceBetweenPoints(endpoint.point, segmentStart) <= 1.0 ||
                             calculateDistanceBetweenPoints(endpoint.point, segmentEnd) <= 1.0;
@@ -926,7 +921,7 @@ export const findMidConnections = (
                             distanceFromStart >
                                 0.00000000000000000000000000000000000000000000000000000000000000000000000001 &&
                             distanceFromEnd >
-                                0.00000000000000000000000000000000000000000000000000000000000000000000000001; 
+                                0.00000000000000000000000000000000000000000000000000000000000000000000000001;
 
                         const isActualMidConnection =
                             !isEndToEndConnection && isWithinSegment && distance > 1.0;
@@ -975,7 +970,7 @@ export interface SubMainPipe {
 }
 
 export const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coordinate): number => {
-    const R = 6371000; 
+    const R = 6371000;
     const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
     const dLng = ((point2.lng - point1.lng) * Math.PI) / 180;
 
@@ -987,7 +982,7 @@ export const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coord
         Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return Math.max(0, R * c); 
+    return Math.max(0, R * c);
 };
 
 export const findClosestPointOnLineSegment = (
@@ -1046,7 +1041,7 @@ export const isPointOnSubMainPipe = (
         return false;
     }
 
-    const adjustedThreshold = threshold * 1.2; 
+    const adjustedThreshold = threshold * 1.2;
     const startPoint = subMainPipe.coordinates[0];
     const endPoint = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
 
@@ -1099,12 +1094,12 @@ export const findClosestConnectionPoint = (
 
         const isWithinSegment =
             distanceFromStart < segmentLength - 0.001 && distanceFromEnd < segmentLength - 0.001;
-        const adjustedDistance = isWithinSegment ? distance * 0.8 : distance; 
+        const adjustedDistance = isWithinSegment ? distance * 0.8 : distance;
 
         if (adjustedDistance < minDistance) {
             minDistance = adjustedDistance;
             closestPoint = {
-                lat: parseFloat(pointOnSegment.lat.toFixed(8)), 
+                lat: parseFloat(pointOnSegment.lat.toFixed(8)),
                 lng: parseFloat(pointOnSegment.lng.toFixed(8)),
             };
         }
@@ -1138,96 +1133,95 @@ export const groupPlantsByRows = (plants: PlantLocation[]): PlantLocation[][] =>
     }
 
     try {
+        const groups: PlantLocation[][] = [];
+        const tolerance = 0.000005;
 
-    const groups: PlantLocation[][] = [];
-    const tolerance = 0.000005; 
+        const rotationInfo = hasRotation(plants);
 
-    const rotationInfo = hasRotation(plants);
+        let plantsToGroup: { plant: PlantLocation; transformedPosition: Coordinate }[] = [];
 
-    let plantsToGroup: { plant: PlantLocation; transformedPosition: Coordinate }[] = [];
+        if (rotationInfo.hasRotation) {
+            plantsToGroup = plants.map((plant) => ({
+                plant,
+                transformedPosition: transformToRotatedCoordinate(
+                    plant.position,
+                    rotationInfo.center,
+                    rotationInfo.rotationAngle
+                ),
+            }));
+        } else {
+            plantsToGroup = plants.map((plant) => ({
+                plant,
+                transformedPosition: plant.position,
+            }));
+        }
 
-    if (rotationInfo.hasRotation) {
-        plantsToGroup = plants.map((plant) => ({
-            plant,
-            transformedPosition: transformToRotatedCoordinate(
-                plant.position,
-                rotationInfo.center,
-                rotationInfo.rotationAngle
-            ),
-        }));
-    } else {
-        plantsToGroup = plants.map((plant) => ({
-            plant,
-            transformedPosition: plant.position,
-        }));
-    }
+        const plantsByLat = [...plantsToGroup].sort(
+            (a, b) => a.transformedPosition.lat - b.transformedPosition.lat
+        );
 
-    const plantsByLat = [...plantsToGroup].sort(
-        (a, b) => a.transformedPosition.lat - b.transformedPosition.lat
-    );
+        for (const plantData of plantsByLat) {
+            let addedToGroup = false;
 
-    for (const plantData of plantsByLat) {
-        let addedToGroup = false;
+            for (const group of groups) {
+                const avgLat =
+                    group.reduce((sum, p) => {
+                        const transformedPos = rotationInfo.hasRotation
+                            ? transformToRotatedCoordinate(
+                                  p.position,
+                                  rotationInfo.center,
+                                  rotationInfo.rotationAngle
+                              )
+                            : p.position;
+                        return sum + transformedPos.lat;
+                    }, 0) / group.length;
 
-        for (const group of groups) {
-            const avgLat =
-                group.reduce((sum, p) => {
-                    const transformedPos = rotationInfo.hasRotation
-                        ? transformToRotatedCoordinate(
-                              p.position,
-                              rotationInfo.center,
-                              rotationInfo.rotationAngle
-                          )
-                        : p.position;
-                    return sum + transformedPos.lat;
-                }, 0) / group.length;
+                if (Math.abs(plantData.transformedPosition.lat - avgLat) <= tolerance) {
+                    group.push(plantData.plant);
+                    addedToGroup = true;
+                    break;
+                }
+            }
 
-            if (Math.abs(plantData.transformedPosition.lat - avgLat) <= tolerance) {
-                group.push(plantData.plant);
-                addedToGroup = true;
-                break;
+            if (!addedToGroup) {
+                groups.push([plantData.plant]);
             }
         }
 
-        if (!addedToGroup) {
-            groups.push([plantData.plant]);
+        const filteredGroups = groups
+            .filter((group) => group.length >= 2)
+            .map((group) =>
+                group.sort((a, b) => {
+                    const aTransformed = rotationInfo.hasRotation
+                        ? transformToRotatedCoordinate(
+                              a.position,
+                              rotationInfo.center,
+                              rotationInfo.rotationAngle
+                          )
+                        : a.position;
+                    const bTransformed = rotationInfo.hasRotation
+                        ? transformToRotatedCoordinate(
+                              b.position,
+                              rotationInfo.center,
+                              rotationInfo.rotationAngle
+                          )
+                        : b.position;
+                    return aTransformed.lng - bTransformed.lng;
+                })
+            );
+
+        if (!plantGroupCache || plantGroupCache.plantsHash !== currentHash) {
+            plantGroupCache = {
+                plantsHash: currentHash,
+                rowGroups: filteredGroups,
+                columnGroups:
+                    plantGroupCache?.plantsHash === currentHash ? plantGroupCache.columnGroups : [],
+            };
+        } else {
+            plantGroupCache.rowGroups = filteredGroups;
         }
-    }
 
-    const filteredGroups = groups
-        .filter((group) => group.length >= 2)
-        .map((group) =>
-            group.sort((a, b) => {
-                const aTransformed = rotationInfo.hasRotation
-                    ? transformToRotatedCoordinate(
-                          a.position,
-                          rotationInfo.center,
-                          rotationInfo.rotationAngle
-                      )
-                    : a.position;
-                const bTransformed = rotationInfo.hasRotation
-                    ? transformToRotatedCoordinate(
-                          b.position,
-                          rotationInfo.center,
-                          rotationInfo.rotationAngle
-                      )
-                    : b.position;
-                return aTransformed.lng - bTransformed.lng;
-            })
-        );
-
-    if (!plantGroupCache || plantGroupCache.plantsHash !== currentHash) {
-        plantGroupCache = {
-            plantsHash: currentHash,
-            rowGroups: filteredGroups,
-            columnGroups:
-                plantGroupCache?.plantsHash === currentHash ? plantGroupCache.columnGroups : [],
-        };
-    } else {
-        plantGroupCache.rowGroups = filteredGroups;
-    }
-
-    return filteredGroups;
+        return filteredGroups;
     } catch (error) {
         console.warn('Error in groupPlantsByRows:', error);
         return [];
@@ -1247,7 +1241,7 @@ export const groupPlantsByColumns = (plants: PlantLocation[]): PlantLocation[][]
     }
 
     const groups: PlantLocation[][] = [];
-        const tolerance = 0.000005; 
+    const tolerance = 0.000005;
 
     const rotationInfo = hasRotation(plants);
 
@@ -1383,16 +1377,13 @@ const normalizeVector = (v: { lat: number; lng: number }): { lat: number; lng: n
     return { lat: v.lat / len, lng: v.lng / len };
 };
 
-
-
-
 export const transformToRotatedCoordinate = (
     point: Coordinate,
     center: Coordinate,
     rotationAngle: number
 ): Coordinate => {
     const angleRadians = (rotationAngle * Math.PI) / 180;
-    const cos = Math.cos(-angleRadians); 
+    const cos = Math.cos(-angleRadians);
     const sin = Math.sin(-angleRadians);
 
     const dx = point.lat - center.lat;
@@ -1428,7 +1419,7 @@ export const hasRotation = (
     const center = getPlantGroupCenter(plants);
 
     return {
-        hasRotation: Math.abs(rotationAngle) > 0.01, 
+        hasRotation: Math.abs(rotationAngle) > 0.01,
         rotationAngle,
         center,
     };
@@ -1500,12 +1491,12 @@ const getDragOrientation = (
     }
 
     const totalDistance = dLat + dLng;
-    const adaptiveThreshold = totalDistance > 0.0001 ? 0.15 : 0.08; 
+    const adaptiveThreshold = totalDistance > 0.0001 ? 0.15 : 0.08;
 
     if (dLat > dLng * (1 + adaptiveThreshold)) {
-        return 'columns'; 
+        return 'columns';
     } else if (dLng > dLat * (1 + adaptiveThreshold)) {
-        return 'rows'; 
+        return 'rows';
     } else {
         const ratio = dLat / dLng;
 
@@ -1516,7 +1507,6 @@ const getDragOrientation = (
         return ratio > 1 ? 'columns' : 'rows';
     }
 };
-
 
 const directionFromPlantsLine = (plants: PlantLocation[]): { lat: number; lng: number } => {
     if (!plants || plants.length < 2) return { lat: 0, lng: 1 };
@@ -1582,12 +1572,12 @@ const calculateAdaptiveSnapThreshold = (
     pipeDistance: number
 ): number => {
     if (!plants || plants.length === 0 || !isFinite(baseThreshold) || !isFinite(pipeDistance)) {
-        return Math.max(3, baseThreshold * 0.8); 
+        return Math.max(3, baseThreshold * 0.8);
     }
 
     let totalSpacing = 0;
     let spacingCount = 0;
-    const maxSampleSize = Math.min(plants.length, 15); 
+    const maxSampleSize = Math.min(plants.length, 15);
     const stride = Math.max(1, Math.floor(plants.length / maxSampleSize));
 
     for (let i = 0; i < plants.length - stride; i += stride) {
@@ -1620,12 +1610,10 @@ const calculateAdaptiveSnapThreshold = (
     let adaptiveThreshold = baseThreshold;
 
     if (avgSpacing < 5.0) {
-        adaptiveThreshold = Math.min(avgSpacing * 0.4, baseThreshold * 0.6); 
-    }
-    else if (avgSpacing <= 15.0) {
+        adaptiveThreshold = Math.min(avgSpacing * 0.4, baseThreshold * 0.6);
+    } else if (avgSpacing <= 15.0) {
         adaptiveThreshold = Math.min(avgSpacing * 0.5, baseThreshold * 0.8);
-    }
-    else {
+    } else {
         adaptiveThreshold = Math.min(avgSpacing * 0.6, baseThreshold * 1.0);
     }
 
@@ -1662,12 +1650,22 @@ export const computeAlignedLateral = (
 
     try {
         const pipeDistance = calculateDistanceBetweenPoints(startPoint, rawEndPoint);
-        const adaptiveThreshold = calculateAdaptiveSnapThreshold(snapThreshold, plants, pipeDistance);
+        const adaptiveThreshold = calculateAdaptiveSnapThreshold(
+            snapThreshold,
+            plants,
+            pipeDistance
+        );
 
         const direction = getDragOrientation(startPoint, rawEndPoint, plants);
 
         if (placementMode === 'over_plants') {
-            return computeOverPlantsMode(startPoint, rawEndPoint, plants, adaptiveThreshold, direction);
+            return computeOverPlantsMode(
+                startPoint,
+                rawEndPoint,
+                plants,
+                adaptiveThreshold,
+                direction
+            );
         } else {
             return computeBetweenPlantsMode(
                 startPoint,
@@ -1684,7 +1682,7 @@ export const computeAlignedLateral = (
 };
 
 export const computeAlignedLateralFromMainPipe = (
-    snappedStartPoint: Coordinate, 
+    snappedStartPoint: Coordinate,
     rawEndPoint: Coordinate,
     plants: PlantLocation[],
     placementMode: 'over_plants' | 'between_plants',
@@ -1712,7 +1710,7 @@ export const computeAlignedLateralFromMainPipe = (
             snappedStartPoint,
             rawEndPoint,
             plants,
-            adaptiveThreshold, 
+            adaptiveThreshold,
             direction
         );
     } else {
@@ -1720,7 +1718,7 @@ export const computeAlignedLateralFromMainPipe = (
             snappedStartPoint,
             rawEndPoint,
             plants,
-            adaptiveThreshold, 
+            adaptiveThreshold,
             direction
         );
     }
@@ -1733,10 +1731,8 @@ export const computeOverPlantsMode = (
     snapThreshold: number,
     direction: 'rows' | 'columns'
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
-
     const rows = groupPlantsByRows(plants);
     const cols = groupPlantsByColumns(plants);
-
 
     const findClosestPlantToStart = (
         group: PlantLocation[]
@@ -1755,8 +1751,8 @@ export const computeOverPlantsMode = (
     interface OverPlantsAlignment {
         type: 'row' | 'col';
         plants: PlantLocation[];
-        firstPlantDistance: number; 
-        firstPlant: PlantLocation; 
+        firstPlantDistance: number;
+        firstPlant: PlantLocation;
         centerLine: { start: Coordinate; end: Coordinate };
     }
 
@@ -1789,7 +1785,7 @@ export const computeOverPlantsMode = (
                         lng: group.reduce((sum, p) => sum + p.position.lng, 0) / group.length,
                     };
 
-                    const lineLength = 100; 
+                    const lineLength = 100;
                     fullCenterLine = {
                         start: {
                             lat: centerPoint.lat - (rowDirection.lat * lineLength) / 111320,
@@ -1813,7 +1809,7 @@ export const computeOverPlantsMode = (
                         lng: group.reduce((sum, p) => sum + p.position.lng, 0) / group.length,
                     };
 
-                    const lineLength = 100; 
+                    const lineLength = 100;
                     fullCenterLine = {
                         start: {
                             lat: centerPoint.lat - (colDirection.lat * lineLength) / 111320,
@@ -1862,7 +1858,6 @@ export const computeOverPlantsMode = (
         return { alignedEnd: rawEndPoint, selectedPlants: [], snappedStart: initialStartPoint };
     }
 
-
     const alignment = bestAlignment as OverPlantsAlignment;
     const projectedStart = findClosestPointOnLineSegment(
         initialStartPoint,
@@ -1888,7 +1883,6 @@ export const computeOverPlantsMode = (
             alignment.centerLine.end
         );
 
-
         let isInRange = false;
 
         if (rotationInfo.hasRotation) {
@@ -1896,19 +1890,19 @@ export const computeOverPlantsMode = (
             const distanceFromEnd = calculateDistanceBetweenPoints(plantProjected, alignedEnd);
             const pipeLength = calculateDistanceBetweenPoints(snappedStart, alignedEnd);
 
-            const tolerance = Math.max(2.0, pipeLength * 0.05); 
+            const tolerance = Math.max(2.0, pipeLength * 0.05);
             isInRange = distanceFromStart + distanceFromEnd <= pipeLength + tolerance;
         } else {
             if (alignment.type === 'row') {
                 const minLng = Math.min(snappedStart.lng, alignedEnd.lng);
                 const maxLng = Math.max(snappedStart.lng, alignedEnd.lng);
-                const buffer = Math.min(0.00001, (maxLng - minLng) * 0.01); 
+                const buffer = Math.min(0.00001, (maxLng - minLng) * 0.01);
                 isInRange =
                     plantProjected.lng >= minLng - buffer && plantProjected.lng <= maxLng + buffer;
             } else {
                 const minLat = Math.min(snappedStart.lat, alignedEnd.lat);
                 const maxLat = Math.max(snappedStart.lat, alignedEnd.lat);
-                const buffer = Math.min(0.00001, (maxLat - minLat) * 0.01); 
+                const buffer = Math.min(0.00001, (maxLat - minLat) * 0.01);
                 isInRange =
                     plantProjected.lat >= minLat - buffer && plantProjected.lat <= maxLat + buffer;
             }
@@ -1916,7 +1910,7 @@ export const computeOverPlantsMode = (
 
         const distanceToLine = calculateDistanceBetweenPoints(plant.position, plantProjected);
 
-        let plantSpacing = 5.0; 
+        let plantSpacing = 5.0;
         if (alignment.plants.length >= 2) {
             let totalSpacing = 0;
             let count = 0;
@@ -1949,7 +1943,6 @@ export const computeOverPlantsMode = (
         return result;
     });
 
-
     return { alignedEnd, selectedPlants, snappedStart };
 };
 
@@ -1960,10 +1953,9 @@ export const computeBetweenPlantsMode = (
     snapThreshold: number,
     direction: 'rows' | 'columns'
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
-    
     const rows = groupPlantsByRows(plants);
     const cols = groupPlantsByColumns(plants);
-    
+
     const findClosestPlantToStartInPair = (
         group1: PlantLocation[],
         group2: PlantLocation[]
@@ -1988,8 +1980,8 @@ export const computeBetweenPlantsMode = (
         type: 'between_rows' | 'between_cols';
         row1: PlantLocation[];
         row2: PlantLocation[];
-        firstPlantDistance: number; 
-        firstPlant: PlantLocation; 
+        firstPlantDistance: number;
+        firstPlant: PlantLocation;
         centerLine: { start: Coordinate; end: Coordinate };
     }
 
@@ -2015,7 +2007,7 @@ export const computeBetweenPlantsMode = (
         const closestToStart = findClosestPlantToStartInPair(group1, group2);
         if (!closestToStart) continue;
 
-        const adjustedSnapThreshold = snapThreshold * 2; 
+        const adjustedSnapThreshold = snapThreshold * 2;
 
         const group1CenterCalc = {
             lat: group1.reduce((sum, p) => sum + p.position.lat, 0) / group1.length,
@@ -2030,9 +2022,8 @@ export const computeBetweenPlantsMode = (
             group2CenterCalc
         );
 
-
-        const minGroupDistance = 1.0; 
-        const maxGroupDistance = 20.0; 
+        const minGroupDistance = 1.0;
+        const maxGroupDistance = 20.0;
 
         const isSuitablePair =
             closestToStart.distance <= adjustedSnapThreshold * 1.5 &&
@@ -2062,7 +2053,7 @@ export const computeBetweenPlantsMode = (
                 lineDirection = directionFromPlantsColumn(allPlantsInPair);
             }
 
-            const lineLength = 100; 
+            const lineLength = 100;
             centerLineStart = {
                 lat: centerPoint.lat - (lineDirection.lat * lineLength) / 111320,
                 lng:
@@ -2183,11 +2174,14 @@ export const computeBetweenPlantsMode = (
 
             return distance <= 25.0;
         });
-        
+
         if (directPlants.length === 0 && allPlants.length > 0) {
             const closestPlant = allPlants.reduce((closest, plant) => {
                 const distance = calculateDistanceBetweenPoints(plant.position, initialStartPoint);
-                const closestDistance = calculateDistanceBetweenPoints(closest.position, initialStartPoint);
+                const closestDistance = calculateDistanceBetweenPoints(
+                    closest.position,
+                    initialStartPoint
+                );
                 return distance < closestDistance ? plant : closest;
             });
             return {
@@ -2196,7 +2190,7 @@ export const computeBetweenPlantsMode = (
                 snappedStart: initialStartPoint,
             };
         }
-        
+
         return {
             alignedEnd: rawEndPoint,
             selectedPlants: directPlants,
@@ -2213,7 +2207,6 @@ export const computeBetweenPlantsMode = (
 
     const snappedStart = distanceToProjection <= snapThreshold ? projectedStart : initialStartPoint;
 
-
     const alignedEnd = findClosestPointOnLineSegment(
         rawEndPoint,
         bestAlignment.centerLine.start,
@@ -2223,7 +2216,7 @@ export const computeBetweenPlantsMode = (
     const allPlantsInPair = [...bestAlignment.row1, ...bestAlignment.row2];
 
     const calculatePlantSpacing = (plants: PlantLocation[]): number => {
-        if (plants.length < 2) return 5.0; 
+        if (plants.length < 2) return 5.0;
         let totalDistance = 0;
         let count = 0;
         for (let i = 0; i < plants.length - 1; i++) {
@@ -2368,7 +2361,7 @@ export const validateLateralPipeCoordinates = (coordinates: Coordinate[]): boole
     if (!coordinates || coordinates.length < 2) {
         return false;
     }
-    
+
     for (const coord of coordinates) {
         if (
             typeof coord.lat !== 'number' ||
@@ -2383,7 +2376,7 @@ export const validateLateralPipeCoordinates = (coordinates: Coordinate[]): boole
             return false;
         }
     }
-    
+
     return true;
 };
 
@@ -2394,33 +2387,33 @@ export const optimizeLateralPipePath = (
     if (!validateLateralPipeCoordinates(coordinates)) {
         return coordinates;
     }
-    
+
     if (coordinates.length <= 2) {
         return coordinates;
     }
-    
+
     const optimized: Coordinate[] = [coordinates[0]];
-    
+
     for (let i = 1; i < coordinates.length - 1; i++) {
         const current = coordinates[i];
         const prev = optimized[optimized.length - 1];
-        
+
         const distance = calculateDistanceBetweenPoints(prev, current);
-        
+
         if (distance >= minDistance) {
             optimized.push(current);
         }
     }
-    
+
     const lastPoint = coordinates[coordinates.length - 1];
     const lastOptimized = optimized[optimized.length - 1];
-    
+
     if (calculateDistanceBetweenPoints(lastOptimized, lastPoint) >= minDistance) {
         optimized.push(lastPoint);
     } else if (optimized.length > 1) {
         optimized[optimized.length - 1] = lastPoint;
     }
-    
+
     return optimized;
 };
 
@@ -2433,13 +2426,12 @@ export const generateEmitterLines = (
     placementMode?: 'over_plants' | 'between_plants'
 ): any[] => {
     if (placementMode !== 'between_plants') {
-        return []; 
+        return [];
     }
 
     const emitterLines: any[] = [];
 
     plants.forEach((plant, index) => {
-       
         const closestPointOnLateral = findClosestPointOnLineSegment(
             plant.position,
             lateralStart,
@@ -2447,7 +2439,7 @@ export const generateEmitterLines = (
         );
 
         const distance = calculateDistanceBetweenPoints(closestPointOnLateral, plant.position);
-        
+
         if (distance <= 20) {
             const emitterLine = {
                 id: `emitter_${lateralPipeId}_${index}`,
@@ -2470,10 +2462,9 @@ export const generateEmitterLinesForBetweenPlantsMode = (
     lateralPipeId: string,
     lateralStart: Coordinate,
     lateralEnd: Coordinate,
-    selectedPlants: PlantLocation[], 
+    selectedPlants: PlantLocation[],
     emitterDiameter: number = 4
 ): any[] => {
-
     const emitterLines: any[] = [];
 
     selectedPlants.forEach((plant) => {
@@ -2501,7 +2492,7 @@ export const generateEmitterLinesForBetweenPlantsMode = (
         };
 
         const avgSpacing = calculatePlantSpacing();
-        const adaptiveMaxDistance = Math.max(8.0, avgSpacing * 0.8); 
+        const adaptiveMaxDistance = Math.max(8.0, avgSpacing * 0.8);
 
         if (distance <= adaptiveMaxDistance) {
             const emitterLine = {
@@ -2509,8 +2500,8 @@ export const generateEmitterLinesForBetweenPlantsMode = (
                 lateralPipeId: lateralPipeId,
                 plantId: plant.id,
                 coordinates: [
-                    { lat: closestPointOnLateral.lat, lng: closestPointOnLateral.lng }, 
-                    { lat: plant.position.lat, lng: plant.position.lng }, 
+                    { lat: closestPointOnLateral.lat, lng: closestPointOnLateral.lng },
+                    { lat: plant.position.lat, lng: plant.position.lng },
                 ],
                 length: distance,
                 diameter: emitterDiameter,
@@ -2529,13 +2520,13 @@ export const generateEmitterLinesForBetweenPlantsMode = (
 
 export const generateEmitterLinesForMultiSegment = (
     lateralPipeId: string,
-    lateralCoordinates: Coordinate[], 
+    lateralCoordinates: Coordinate[],
     selectedPlants: PlantLocation[],
     emitterDiameter: number = 4
 ): any[] => {
     const emitterLines: any[] = [];
 
-    selectedPlants.forEach((plant) => { 
+    selectedPlants.forEach((plant) => {
         let closestPoint: Coordinate | null = null;
         let minDistance = Infinity;
 
@@ -2579,7 +2570,7 @@ export const generateEmitterLinesForMultiSegment = (
 };
 
 export const accumulatePlantsFromAllSegments = (
-    allWaypoints: Coordinate[], 
+    allWaypoints: Coordinate[],
     plants: PlantLocation[],
     placementMode: 'over_plants' | 'between_plants',
     snapThreshold: number = 20
@@ -2589,7 +2580,7 @@ export const accumulatePlantsFromAllSegments = (
     }
 
     const startPoint = allWaypoints[0];
-    const waypoints = allWaypoints.slice(1, -1); 
+    const waypoints = allWaypoints.slice(1, -1);
     const currentPoint = allWaypoints[allWaypoints.length - 1];
 
     const result = computeMultiSegmentAlignment(
@@ -2633,14 +2624,11 @@ export const computeMultiSegmentAlignment = (
     let lastAlignedEnd = startPoint;
     const allSelectedPlants: PlantLocation[] = [];
     const processedPlantIds = new Set<string>();
-    const waypointProximityThreshold = snapThreshold * 1.5; 
+    const waypointProximityThreshold = snapThreshold * 1.5;
 
-
-   
     for (let i = 0; i < allWaypoints.length - 1; i++) {
         const segmentStart = i === 0 ? startPoint : lastAlignedEnd;
         const segmentEnd = allWaypoints[i + 1];
-
 
         const segmentResult = computeAlignedLateral(
             segmentStart,
@@ -2649,7 +2637,6 @@ export const computeMultiSegmentAlignment = (
             placementMode,
             snapThreshold
         );
-
 
         const filteredSegmentPlants: PlantLocation[] = [];
 
@@ -2666,27 +2653,32 @@ export const computeMultiSegmentAlignment = (
                     // FIXED: Only exclude plant if it's close to a waypoint that's NOT part of current segment
                     // Current segment i uses waypoints at indices i and i+1
                     // For segment 0: waypoints 0,1
-                    // For segment 1: waypoints 1,2  
+                    // For segment 1: waypoints 1,2
                     // For segment 2: waypoints 2,3
                     // etc.
-                    const isWaypointInCurrentSegment = (j === i) || (j === i + 1);
-                    
+                    const isWaypointInCurrentSegment = j === i || j === i + 1;
+
                     // SPECIAL CASE: For the first segment (i=0), waypoint 0 is the start point
                     // and should not exclude plants even if they are very close to it
                     // Also, for any segment, if the waypoint is the start of that segment, don't exclude
-                    const isFirstSegmentStartPoint = (i === 0) && (j === 0);
-                    const isCurrentSegmentStartPoint = (j === i);
-                    
+                    const isFirstSegmentStartPoint = i === 0 && j === 0;
+                    const isCurrentSegmentStartPoint = j === i;
+
                     // Additional check: Don't exclude plants near waypoint 0 if it's the start of any segment
                     // This handles the case where waypoint 0 is used as start point for multiple segments
-                    const isWaypoint0StartPoint = (j === 0);
-                    
+                    const isWaypoint0StartPoint = j === 0;
+
                     // Also don't exclude plants near waypoint 1 if it's the start of any segment
                     // This handles the case where waypoint 1 is used as start point for multiple segments
-                    const isWaypoint1StartPoint = (j === 1);
-                    
-                    
-                    if (!isWaypointInCurrentSegment && !isFirstSegmentStartPoint && !isCurrentSegmentStartPoint && !isWaypoint0StartPoint && !isWaypoint1StartPoint) {
+                    const isWaypoint1StartPoint = j === 1;
+
+                    if (
+                        !isWaypointInCurrentSegment &&
+                        !isFirstSegmentStartPoint &&
+                        !isCurrentSegmentStartPoint &&
+                        !isWaypoint0StartPoint &&
+                        !isWaypoint1StartPoint
+                    ) {
                         shouldAddPlant = false;
                         break;
                     } else {
@@ -2696,14 +2688,12 @@ export const computeMultiSegmentAlignment = (
                 }
             }
 
-
             if (shouldAddPlant && !processedPlantIds.has(plant.id)) {
                 filteredSegmentPlants.push(plant);
                 allSelectedPlants.push(plant);
                 processedPlantIds.add(plant.id);
             }
         });
-
 
         segmentResults.push({
             startPoint: segmentStart,
@@ -2717,7 +2707,6 @@ export const computeMultiSegmentAlignment = (
 
     const totalWaterNeed = calculateTotalWaterNeed(allSelectedPlants);
 
-
     return {
         allSelectedPlants,
         totalWaterNeed,
@@ -2725,7 +2714,6 @@ export const computeMultiSegmentAlignment = (
         segmentResults,
     };
 };
-
 
 const computeOverPlantsModeFromMainPipe = (
     snappedStartPoint: Coordinate,

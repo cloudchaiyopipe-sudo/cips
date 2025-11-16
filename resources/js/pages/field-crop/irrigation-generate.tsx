@@ -8,10 +8,10 @@ import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils'
 import {
     FieldCropPageProps,
     FieldData,
-    Coordinate, 
-    Obstacle, 
+    Coordinate,
+    Obstacle,
     PlantPoint,
-    IrrigationPositions, 
+    IrrigationPositions,
     IrrigationSettings,
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
@@ -184,7 +184,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         plantSpacing,
     } = props;
     const { t } = useLanguage();
-    
+
     // Use standardized field data management
     const { fieldData, updateFieldData } = useFieldData(props);
 
@@ -196,10 +196,18 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     const [parsedPlantPoints, setParsedPlantPoints] = useState<PlantPoint[]>(fieldData.plantPoints);
     const [realPlantCount, setRealPlantCount] = useState<number>(fieldData.realPlantCount || 0); // Track real plant count for calculations
     const [parsedAreaRai, setParsedAreaRai] = useState<number | null>(fieldData.areaRai);
-    const [parsedPerimeterMeters, setParsedPerimeterMeters] = useState<number | null>(fieldData.perimeterMeters);
-    const [parsedRotationAngle, setParsedRotationAngle] = useState<number>(fieldData.rotationAngle || 0);
-    const [parsedRowSpacing, setParsedRowSpacing] = useState<Record<string, number>>(fieldData.rowSpacing);
-    const [parsedPlantSpacing, setParsedPlantSpacing] = useState<Record<string, number>>(fieldData.plantSpacing);
+    const [parsedPerimeterMeters, setParsedPerimeterMeters] = useState<number | null>(
+        fieldData.perimeterMeters
+    );
+    const [parsedRotationAngle, setParsedRotationAngle] = useState<number>(
+        fieldData.rotationAngle || 0
+    );
+    const [parsedRowSpacing, setParsedRowSpacing] = useState<Record<string, number>>(
+        fieldData.rowSpacing
+    );
+    const [parsedPlantSpacing, setParsedPlantSpacing] = useState<Record<string, number>>(
+        fieldData.plantSpacing
+    );
 
     // Adjust rotation angle by delta (supports 0.5° increments)
     const adjustRotationAngle = useCallback((delta: number) => {
@@ -210,8 +218,12 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             return Math.round(clamped * 2) / 2;
         });
     }, []);
-    const [parsedSelectedCrops, setParsedSelectedCrops] = useState<string[]>(fieldData.selectedCrops);
-    const [parsedMapCenter, setParsedMapCenter] = useState<{ lat: number; lng: number }>(fieldData.mapCenter);
+    const [parsedSelectedCrops, setParsedSelectedCrops] = useState<string[]>(
+        fieldData.selectedCrops
+    );
+    const [parsedMapCenter, setParsedMapCenter] = useState<{ lat: number; lng: number }>(
+        fieldData.mapCenter
+    );
     const [parsedMapZoom, setParsedMapZoom] = useState<number>(fieldData.mapZoom);
     const hasInitializedRef = useRef<boolean>(false);
 
@@ -526,7 +538,8 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     const finalRotationAngle = parsedRotationAngle !== 0 ? parsedRotationAngle : 0;
     const finalRowSpacing = Object.keys(parsedRowSpacing).length > 0 ? parsedRowSpacing : {};
     const finalPlantSpacing = Object.keys(parsedPlantSpacing).length > 0 ? parsedPlantSpacing : {};
-    const finalSelectedCrops = parsedSelectedCrops.length > 0 ? parsedSelectedCrops : fieldData.selectedCrops;
+    const finalSelectedCrops =
+        parsedSelectedCrops.length > 0 ? parsedSelectedCrops : fieldData.selectedCrops;
     const finalMapCenter =
         parsedMapCenter.lat !== 13.7563 || parsedMapCenter.lng !== 100.5018
             ? parsedMapCenter
@@ -570,7 +583,9 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     });
 
     // เพิ่ม state สำหรับเก็บตำแหน่งอุปกรณ์ irrigation
-    const [irrigationPositions, setIrrigationPositions] = useState<IrrigationPositions>(fieldData.irrigationPositions);
+    const [irrigationPositions, setIrrigationPositions] = useState<IrrigationPositions>(
+        fieldData.irrigationPositions
+    );
 
     // Sprinkler Management States
     const [sprinklerMode, setSprinklerMode] = useState<'none' | 'add' | 'move' | 'delete'>('none');
@@ -578,8 +593,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
 
     // Require at least one generated irrigation type before proceeding
     const hasGeneratedIrrigation =
-        irrigationPositions.sprinklers.length > 0 ||
-        irrigationPositions.pivots.length > 0;
+        irrigationPositions.sprinklers.length > 0 || irrigationPositions.pivots.length > 0;
 
     // Irrigation settings for different types
     const defaultSettings: IrrigationSettings = {
@@ -589,12 +603,18 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
 
     const [irrigationSettings, setIrrigationSettings] = useState<IrrigationSettings>({
         ...defaultSettings,
-        ...(fieldData.irrigationSettings || {})
+        ...(fieldData.irrigationSettings || {}),
     });
 
     // Type guard functions for irrigation settings
-    const getSprinklerSettings = useCallback(() => irrigationSettings.sprinkler_system || defaultSettings.sprinkler_system!, [irrigationSettings.sprinkler_system, defaultSettings.sprinkler_system]);
-    const getPivotSettings = useCallback(() => irrigationSettings.pivot || defaultSettings.pivot!, [irrigationSettings.pivot, defaultSettings.pivot]);
+    const getSprinklerSettings = useCallback(
+        () => irrigationSettings.sprinkler_system || defaultSettings.sprinkler_system!,
+        [irrigationSettings.sprinkler_system, defaultSettings.sprinkler_system]
+    );
+    const getPivotSettings = useCallback(
+        () => irrigationSettings.pivot || defaultSettings.pivot!,
+        [irrigationSettings.pivot, defaultSettings.pivot]
+    );
 
     // Calculate total water requirement
     const totalWaterRequirement = useMemo(() => {
@@ -701,7 +721,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 totalWaterRequirement,
                 irrigationPositions,
             };
-            
+
             // Use standardized storage approach
             updateFieldData(fieldDataToSave);
         } catch {
@@ -872,19 +892,24 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     // ฟังก์ชันอัปเดตขนาดของ markers แทนการสร้างใหม่ (เหมือนหน้าอื่นๆ)
     const updateMarkerSizes = useCallback((zoom: number) => {
         if (!mapRef.current || irrigationMarkersRef.current.length === 0) return;
-        
+
         // คำนวณขนาดใหม่ตาม zoom level
         let newSize = 12; // ขนาดเริ่มต้น
-        if (zoom < 16) newSize = 8;      // ซูมออกมาก
-        else if (zoom < 18) newSize = 10; // ซูมออกปานกลาง
-        else if (zoom < 20) newSize = 12; // ขนาดปกติ
-        else newSize = 14;                // ซูมเข้าใกล้
-        
+        if (zoom < 16)
+            newSize = 8; // ซูมออกมาก
+        else if (zoom < 18)
+            newSize = 10; // ซูมออกปานกลาง
+        else if (zoom < 20)
+            newSize = 12; // ขนาดปกติ
+        else newSize = 14; // ซูมเข้าใกล้
+
         // อัปเดตขนาดของ sprinkler markers โดยไม่สร้างใหม่
         irrigationMarkersRef.current.forEach((marker) => {
             if (marker.getTitle()?.includes('Sprinkler')) {
                 const newIcon = {
-                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                    url:
+                        'data:image/svg+xml;charset=UTF-8,' +
+                        encodeURIComponent(`
                         <svg width="${newSize}" height="${newSize}" viewBox="0 0 ${newSize} ${newSize}" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="${newSize / 2}" cy="${newSize / 2}" r="${newSize / 2 - 1}" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
                             <circle cx="${newSize / 2}" cy="${newSize / 2}" r="${newSize / 4}" fill="#ffffff"/>
@@ -896,7 +921,9 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 marker.setIcon(newIcon);
             } else if (marker.getTitle()?.includes('Pivot')) {
                 const newIcon = {
-                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                    url:
+                        'data:image/svg+xml;charset=UTF-8,' +
+                        encodeURIComponent(`
                         <svg width="${newSize}" height="${newSize}" viewBox="0 0 ${newSize} ${newSize}" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="${newSize / 2}" cy="${newSize / 2}" r="${newSize / 2 - 1}" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
                             <circle cx="${newSize / 2}" cy="${newSize / 2}" r="${newSize / 4}" fill="#ffffff"/>
@@ -910,40 +937,43 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         });
     }, []);
 
-    const handleMapLoad = useCallback((map: google.maps.Map) => {
-        mapRef.current = map;
-        setIsMapLoaded(true);
+    const handleMapLoad = useCallback(
+        (map: google.maps.Map) => {
+            mapRef.current = map;
+            setIsMapLoaded(true);
 
-        // Add zoom change listener with debounce เพื่อลดการอัปเดตบ่อยเกินไป
-        // แต่ไม่ให้ zoom ทำให้เรนเดอร์ markers ใหม่ (เหมือนหน้าอื่นๆ)
-        let zoomDebounceTimer: NodeJS.Timeout | null = null;
-        map.addListener('zoom_changed', () => {
-            if (zoomDebounceTimer) {
-                clearTimeout(zoomDebounceTimer);
-            }
-            
-            zoomDebounceTimer = setTimeout(() => {
-                const newZoom = map.getZoom() || 18;
-                setParsedMapZoom(newZoom);
-                
-                // อัปเดตขนาดของ markers แทนการสร้างใหม่ (เหมือนหน้าอื่นๆ)
-                updateMarkerSizes(newZoom);
-            }, 300); // รอ 300ms หลังจากหยุดซูมค่อยอัปเดต
-        });
-    }, [updateMarkerSizes]);
+            // Add zoom change listener with debounce เพื่อลดการอัปเดตบ่อยเกินไป
+            // แต่ไม่ให้ zoom ทำให้เรนเดอร์ markers ใหม่ (เหมือนหน้าอื่นๆ)
+            let zoomDebounceTimer: NodeJS.Timeout | null = null;
+            map.addListener('zoom_changed', () => {
+                if (zoomDebounceTimer) {
+                    clearTimeout(zoomDebounceTimer);
+                }
+
+                zoomDebounceTimer = setTimeout(() => {
+                    const newZoom = map.getZoom() || 18;
+                    setParsedMapZoom(newZoom);
+
+                    // อัปเดตขนาดของ markers แทนการสร้างใหม่ (เหมือนหน้าอื่นๆ)
+                    updateMarkerSizes(newZoom);
+                }, 300); // รอ 300ms หลังจากหยุดซูมค่อยอัปเดต
+            });
+        },
+        [updateMarkerSizes]
+    );
 
     // Real-time regenerate irrigation overlays when angle changes
     useEffect(() => {
         if (!isMapLoaded) return;
-        
+
         // ใช้ debounce timer แทน requestAnimationFrame เพื่อลดการ regenerate บ่อยเกินไป
         const debounceTimer = setTimeout(() => {
             setIsAngleRegenerating(true);
-            
+
             // Only regenerate the currently selected type, if any data exists
             const hasSprinklers = irrigationPositions.sprinklers.length > 0;
             const hasPivots = irrigationPositions.pivots.length > 0;
-            
+
             if (hasSprinklers && hasPivots) {
                 // If both exist, regenerate both but with a small delay between them
                 generateSprinklerSystem();
@@ -953,11 +983,11 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             } else if (hasPivots) {
                 generatePivotSystem();
             }
-            
+
             // Reset flag after a short delay to allow state updates to complete
             setTimeout(() => setIsAngleRegenerating(false), 150);
         }, 500); // เพิ่ม debounce time เป็น 500ms เพื่อลดการ regenerate บ่อยเกินไป
-        
+
         return () => {
             clearTimeout(debounceTimer);
         };
@@ -1100,19 +1130,18 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     break;
             }
         }
-
     }, []);
 
     // Handle map click for sprinkler operations
     const handleMapClickForSprinkler = useCallback(
         (event: google.maps.MapMouseEvent) => {
             if (!event.latLng) return;
-            
+
             const clickedPoint = {
                 lat: event.latLng.lat(),
                 lng: event.latLng.lng(),
             };
-            
+
             if (sprinklerMode === 'add') {
                 // เพิ่มสปริงเกลอร์ใหม่
                 addSprinkler(clickedPoint);
@@ -1120,40 +1149,42 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 // หาสปริงเกลอร์ที่ใกล้ที่สุดและลบ
                 let closestIndex = -1;
                 let closestDistance = Infinity;
-                
+
                 irrigationPositions.sprinklers.forEach((sprinkler, index) => {
                     const distance = Math.sqrt(
-                        Math.pow(sprinkler.lat - clickedPoint.lat, 2) + 
-                        Math.pow(sprinkler.lng - clickedPoint.lng, 2)
+                        Math.pow(sprinkler.lat - clickedPoint.lat, 2) +
+                            Math.pow(sprinkler.lng - clickedPoint.lng, 2)
                     );
                     if (distance < closestDistance) {
                         closestDistance = distance;
                         closestIndex = index;
                     }
                 });
-                
+
                 // ถ้าพบสปริงเกลอร์ในระยะที่เหมาะสม ให้ลบ
-                if (closestIndex !== -1 && closestDistance < 0.001) { // ~100m tolerance
+                if (closestIndex !== -1 && closestDistance < 0.001) {
+                    // ~100m tolerance
                     deleteSprinkler(closestIndex);
                 }
             } else if (sprinklerMode === 'move') {
                 // หาสปริงเกลอร์ที่ใกล้ที่สุดและเลือกเพื่อขยับ
                 let closestIndex = -1;
                 let closestDistance = Infinity;
-                
+
                 irrigationPositions.sprinklers.forEach((sprinkler, index) => {
                     const distance = Math.sqrt(
-                        Math.pow(sprinkler.lat - clickedPoint.lat, 2) + 
-                        Math.pow(sprinkler.lng - clickedPoint.lng, 2)
+                        Math.pow(sprinkler.lat - clickedPoint.lat, 2) +
+                            Math.pow(sprinkler.lng - clickedPoint.lng, 2)
                     );
                     if (distance < closestDistance) {
                         closestDistance = distance;
                         closestIndex = index;
                     }
                 });
-                
+
                 // ถ้าพบสปริงเกลอร์ในระยะที่เหมาะสม ให้เลือก
-                if (closestIndex !== -1 && closestDistance < 0.001) { // ~100m tolerance
+                if (closestIndex !== -1 && closestDistance < 0.001) {
+                    // ~100m tolerance
                     setSelectedSprinklers([closestIndex]);
                 } else {
                     setSelectedSprinklers([]);
@@ -1171,18 +1202,17 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     lat: event.latLng.lat(),
                     lng: event.latLng.lng(),
                 };
-                
+
                 // Move all selected sprinklers to new position
                 selectedSprinklers.forEach((index) => {
                     updateSprinklerPosition(index, newPosition);
                 });
-                
+
                 setSelectedSprinklers([]); // Clear selection after move
             }
         },
         [sprinklerMode, selectedSprinklers, updateSprinklerPosition]
     );
-
 
     // Delete selected sprinklers
     const deleteSelectedSprinklers = useCallback(() => {
@@ -1207,8 +1237,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         }
     }, [selectedSprinklers]);
 
-
-
     // Optimized generateSprinklerSystem function with better performance and resource management
     const generateSprinklerSystem = useCallback(async () => {
         if (!mapRef.current || finalMainArea.length < 3) return;
@@ -1224,20 +1252,22 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     sprinklerIndices.push(index);
                 }
             });
-            
+
             // ลบ markers และ circles ที่เกี่ยวข้องกัน
-            sprinklerIndices.sort((a, b) => b - a).forEach(index => {
-                // ลบ marker
-                if (irrigationMarkersRef.current[index]) {
-                    irrigationMarkersRef.current[index].setMap(null);
-                    irrigationMarkersRef.current.splice(index, 1);
-                }
-                // ลบ circle ที่ตรงกับ index เดียวกัน
-                if (irrigationCirclesRef.current[index]) {
-                    irrigationCirclesRef.current[index].setMap(null);
-                    irrigationCirclesRef.current.splice(index, 1);
-                }
-            });
+            sprinklerIndices
+                .sort((a, b) => b - a)
+                .forEach((index) => {
+                    // ลบ marker
+                    if (irrigationMarkersRef.current[index]) {
+                        irrigationMarkersRef.current[index].setMap(null);
+                        irrigationMarkersRef.current.splice(index, 1);
+                    }
+                    // ลบ circle ที่ตรงกับ index เดียวกัน
+                    if (irrigationCirclesRef.current[index]) {
+                        irrigationCirclesRef.current[index].setMap(null);
+                        irrigationCirclesRef.current.splice(index, 1);
+                    }
+                });
 
             const sprinklerSettings = getSprinklerSettings();
             const radius = sprinklerSettings.coverageRadius || 8;
@@ -1460,12 +1490,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         } finally {
             setIsGeneratingIrrigation(false);
         }
-    }, [
-        finalMainArea,
-        finalObstacles,
-        getSprinklerSettings,
-        parsedRotationAngle,
-    ]);
+    }, [finalMainArea, finalObstacles, getSprinklerSettings, parsedRotationAngle]);
 
     // Updated generatePivotSystem function to use center-first row placement like plant points
     const generatePivotSystem = useCallback(async () => {
@@ -1482,20 +1507,22 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     pivotIndices.push(index);
                 }
             });
-            
+
             // ลบ markers และ circles ที่เกี่ยวข้องกัน
-            pivotIndices.sort((a, b) => b - a).forEach(index => {
-                // ลบ marker
-                if (irrigationMarkersRef.current[index]) {
-                    irrigationMarkersRef.current[index].setMap(null);
-                    irrigationMarkersRef.current.splice(index, 1);
-                }
-                // ลบ circle ที่ตรงกับ index เดียวกัน
-                if (irrigationCirclesRef.current[index]) {
-                    irrigationCirclesRef.current[index].setMap(null);
-                    irrigationCirclesRef.current.splice(index, 1);
-                }
-            });
+            pivotIndices
+                .sort((a, b) => b - a)
+                .forEach((index) => {
+                    // ลบ marker
+                    if (irrigationMarkersRef.current[index]) {
+                        irrigationMarkersRef.current[index].setMap(null);
+                        irrigationMarkersRef.current.splice(index, 1);
+                    }
+                    // ลบ circle ที่ตรงกับ index เดียวกัน
+                    if (irrigationCirclesRef.current[index]) {
+                        irrigationCirclesRef.current[index].setMap(null);
+                        irrigationCirclesRef.current.splice(index, 1);
+                    }
+                });
 
             const pivotSettings = getPivotSettings();
             const radius = pivotSettings.coverageRadius || 165;
@@ -1776,14 +1803,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         } finally {
             setIsGeneratingIrrigation(false);
         }
-    }, [
-        finalMainArea,
-        finalObstacles,
-        getPivotSettings,
-        parsedRotationAngle,
-    ]);
-
-
+    }, [finalMainArea, finalObstacles, getPivotSettings, parsedRotationAngle]);
 
     // Function to render irrigation settings based on selected type
     const renderIrrigationSettings = () => {
@@ -1802,8 +1822,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         <div className="space-y-4">
                             <div>
                                 <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Coverage Radius')}:{' '}
-                                    {getSprinklerSettings().coverageRadius}m
+                                    {t('Coverage Radius')}: {getSprinklerSettings().coverageRadius}m
                                 </label>
                                 <input
                                     type="range"
@@ -1974,8 +1993,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         <div className="space-y-4">
                             <div>
                                 <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Coverage Radius')}:{' '}
-                                    {getPivotSettings().coverageRadius}m
+                                    {t('Coverage Radius')}: {getPivotSettings().coverageRadius}m
                                 </label>
                                 <input
                                     type="range"
@@ -2118,8 +2136,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         </div>
                     </div>
                 );
-
-
 
             default:
                 return null;
@@ -2457,7 +2473,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 irrigationCirclesRef.current.push(circle);
             });
         }
-
     }, [
         isMapLoaded,
         getSprinklerSettings,
@@ -2475,8 +2490,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         if (isMapLoaded && mapRef.current && !isAngleRegenerating) {
             // Check if we have irrigation data that should be displayed
             const hasIrrigationData =
-                irrigationPositions.sprinklers.length > 0 ||
-                irrigationPositions.pivots.length > 0;
+                irrigationPositions.sprinklers.length > 0 || irrigationPositions.pivots.length > 0;
 
             if (hasIrrigationData) {
                 renderIrrigationOverlays();
@@ -2500,7 +2514,11 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         const clickListener = mapRef.current.addListener(
             'click',
             (event: google.maps.MapMouseEvent) => {
-                if (sprinklerMode === 'add' || sprinklerMode === 'delete' || sprinklerMode === 'move') {
+                if (
+                    sprinklerMode === 'add' ||
+                    sprinklerMode === 'delete' ||
+                    sprinklerMode === 'move'
+                ) {
                     handleMapClickForSprinkler(event);
                 }
             }
@@ -2522,11 +2540,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         return () => {
             listeners.forEach((listener) => google.maps.event.removeListener(listener));
         };
-    }, [
-        sprinklerMode,
-        handleMapClickForSprinkler,
-        handleMoveSprinkler,
-    ]);
+    }, [sprinklerMode, handleMapClickForSprinkler, handleMoveSprinkler]);
 
     return (
         <>
@@ -2812,7 +2826,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                     </div>
                                                 )}
                                             </div>
-
                                         </div>
                                     </div>
 
@@ -3033,7 +3046,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                         )}
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>

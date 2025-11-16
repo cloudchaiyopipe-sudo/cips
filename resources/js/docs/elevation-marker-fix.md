@@ -8,6 +8,7 @@
 ## การแก้ไข
 
 ### 1. **เปลี่ยนจาก Canvas เป็น Markers**
+
 ```typescript
 // เก่า: Canvas overlay ที่ซับซ้อน
 class ElevationCanvasOverlay extends google.maps.OverlayView {
@@ -26,21 +27,23 @@ elevationData.forEach((point, index) => {
             fillColor: color,
             fillOpacity: 0.8,
             strokeColor: '#FFFFFF',
-            strokeWeight: 2
+            strokeWeight: 2,
         },
         title: `ความสูง: ${point.elevation.toFixed(1)} เมตร`,
-        zIndex: 1000
+        zIndex: 1000,
     });
     markers.push(marker);
 });
 ```
 
 ### 2. **เพิ่มขนาด Markers**
+
 - **Scale**: 15 (ใหญ่ขึ้นเพื่อให้เห็นชัดเจน)
 - **Fill Opacity**: 0.8 (ชัดเจนขึ้น)
 - **Stroke**: สีขาวเพื่อแยกจากพื้นหลัง
 
 ### 3. **ปรับปรุง Color Mapping**
+
 ```typescript
 const getElevationColorForMarker = (normalizedElevation: number): string => {
     if (normalizedElevation < 0.1) {

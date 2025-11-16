@@ -2,7 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
-import { gardenPlants, searchGardenPlants, getGardenPlantsByCategory, getGardenPlantByName, getTranslatedPlantName } from './utils/freeCrop';
+import {
+    gardenPlants,
+    searchGardenPlants,
+    getGardenPlantsByCategory,
+    getGardenPlantByName,
+    getTranslatedPlantName,
+} from './utils/freeCrop';
 import { getTranslations } from './utils/language';
 
 // 2. State & Hooks Component
@@ -10,7 +16,9 @@ function ChooseCrop() {
     // State
     const [searchValue, setSearchValue] = useState('');
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds'>('all');
+    const [selectedCategory, setSelectedCategory] = useState<
+        'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds'
+    >('all');
 
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());
@@ -24,10 +32,10 @@ function ChooseCrop() {
 
         // Listen for storage changes (when language is changed in other components)
         window.addEventListener('storage', handleLanguageChange);
-        
+
         // Listen for custom language change event
         window.addEventListener('languageChanged', handleLanguageChange);
-        
+
         // Also check on focus (when user comes back to tab)
         window.addEventListener('focus', handleLanguageChange);
 
@@ -56,10 +64,8 @@ function ChooseCrop() {
     };
 
     const handleCropSelect = (cropName: string) => {
-        setSelectedCrops(prev => (
-            prev.includes(cropName) ? [] : [cropName]
-        ));
-        
+        setSelectedCrops((prev) => (prev.includes(cropName) ? [] : [cropName]));
+
         // Console.log all plant data when selected
         const plantData = getGardenPlantByName(cropName);
         if (plantData) {
@@ -70,17 +76,17 @@ function ChooseCrop() {
     // Filter plants based on search and category
     const getFilteredPlants = () => {
         let filtered = gardenPlants;
-        
+
         // Filter by category
         if (selectedCategory !== 'all') {
             filtered = getGardenPlantsByCategory(selectedCategory);
         }
-        
+
         // Filter by search
         if (searchValue.trim()) {
             filtered = searchGardenPlants(searchValue);
         }
-        
+
         return filtered;
     };
 
@@ -90,25 +96,27 @@ function ChooseCrop() {
 
     const handleNext = () => {
         if (selectedCrops.length === 0) return;
-        
+
         // Get the complete plant data for the selected crop
         const selectedPlantData = getGardenPlantByName(selectedCrops[0]);
-        
+
         // Store in localStorage for persistence across page reloads
         if (selectedPlantData) {
             localStorage.setItem('selectedPlantData', JSON.stringify(selectedPlantData));
         }
-        
+
         router.visit('/free-plan/map', {
-            data: { 
+            data: {
                 crops: selectedCrops,
-                selectedPlant: selectedPlantData ? {
-                    name: selectedPlantData.name,
-                    waterNeed: selectedPlantData.waterNeed,
-                    plantSpacing: selectedPlantData.plantSpacing,
-                    rowSpacing: selectedPlantData.rowSpacing,
-                    icon: selectedPlantData.icon
-                } : null
+                selectedPlant: selectedPlantData
+                    ? {
+                          name: selectedPlantData.name,
+                          waterNeed: selectedPlantData.waterNeed,
+                          plantSpacing: selectedPlantData.plantSpacing,
+                          rowSpacing: selectedPlantData.rowSpacing,
+                          icon: selectedPlantData.icon,
+                      }
+                    : null,
             },
             preserveScroll: true,
         });
@@ -124,9 +132,8 @@ function ChooseCrop() {
 
             {/* Main Content */}
             <div className="flex min-h-[calc(100vh-80px)] flex-col">
-                
                 {/* Header Section */}
-                <div className="flex items-center justify-between px-4 py-6 md:px-6">
+                <div className="sticky top-0 z-10 flex items-center justify-between bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700 px-4 py-6 md:px-6">
                     <h1 className="text-xl font-bold text-white md:text-2xl">
                         {translations.selectCropTypes}
                     </h1>
@@ -151,7 +158,7 @@ function ChooseCrop() {
                 </div>
 
                 {/* Search and Filter Section */}
-                <div className="px-4 pb-6 md:px-6">
+                <div className="sticky top-[73px] z-10 bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700 px-4 pb-6 md:px-6">
                     <div className="flex gap-3">
                         <div className="relative flex-1">
                             <input
@@ -201,7 +208,7 @@ function ChooseCrop() {
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                         {getFilteredPlants().map((plant) => {
                             const isSelected = selectedCrops.includes(plant.name);
-                            
+
                             return (
                                 <button
                                     key={plant.name}
@@ -212,8 +219,10 @@ function ChooseCrop() {
                                             : 'bg-slate-600 text-white hover:bg-slate-500'
                                     }`}
                                 >
-                                    <div className="text-2xl mb-2">{plant.icon}</div>
-                                    <div className="text-sm md:text-base">{getTranslatedPlantName(plant.name, translations)}</div>
+                                    <div className="mb-2 text-2xl">{plant.icon}</div>
+                                    <div className="text-sm md:text-base">
+                                        {getTranslatedPlantName(plant.name, translations)}
+                                    </div>
                                     <div className="mt-1 text-xs text-slate-300">
                                         {plant.waterNeed}L/day
                                     </div>
@@ -221,12 +230,12 @@ function ChooseCrop() {
                             );
                         })}
                     </div>
-                    
+
                     {/* No results message */}
                     {getFilteredPlants().length === 0 && (
-                        <div className="text-center py-12">
-                            <p className="text-slate-400 text-lg">{translations.noPlantsFound}</p>
-                            <p className="text-slate-500 text-sm mt-2">
+                        <div className="py-12 text-center">
+                            <p className="text-lg text-slate-400">{translations.noPlantsFound}</p>
+                            <p className="mt-2 text-sm text-slate-500">
                                 {translations.tryAdjustingSearch}
                             </p>
                         </div>

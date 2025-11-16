@@ -52,10 +52,10 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         projectMode === 'garden'
             ? gardenSystemData
             : projectMode === 'greenhouse'
-                ? greenhouseData
-                : projectMode === 'field-crop'
-                    ? fieldCropData
-                    : horticultureSystemData;
+              ? greenhouseData
+              : projectMode === 'field-crop'
+                ? fieldCropData
+                : horticultureSystemData;
     if (!sprinklerPressure || !systemData || !activeZoneId) {
         return null;
     }
@@ -66,10 +66,10 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                 projectMode === 'garden'
                     ? 'garden_pipe_calculations'
                     : projectMode === 'greenhouse'
-                        ? 'greenhouse_pipe_calculations'
-                        : projectMode === 'field-crop'
-                            ? 'field_crop_pipe_calculations'
-                            : 'horticulture_pipe_calculations';
+                      ? 'greenhouse_pipe_calculations'
+                      : projectMode === 'field-crop'
+                        ? 'field_crop_pipe_calculations'
+                        : 'horticulture_pipe_calculations';
 
             const storedCalcStr = localStorage.getItem(storageKey);
             return storedCalcStr ? JSON.parse(storedCalcStr) : {};
@@ -84,11 +84,11 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         const filteredCalculations =
             projectMode === 'greenhouse'
                 ? {
-                    branch: storedCalculations.branch || {},
-                    main: storedCalculations.main || {},
-                    secondary: {},
-                    emitter: {},
-                }
+                      branch: storedCalculations.branch || {},
+                      main: storedCalculations.main || {},
+                      secondary: {},
+                      emitter: {},
+                  }
                 : storedCalculations;
 
         if (
@@ -111,7 +111,10 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                 branch: { headLoss: 0, pipeLength: 0, flowRate: 0 },
                 main: { headLoss: 0, pipeLength: 0, flowRate: 0 },
             };
-            localStorage.setItem('greenhouse_pipe_calculations', JSON.stringify(defaultCalculations));
+            localStorage.setItem(
+                'greenhouse_pipe_calculations',
+                JSON.stringify(defaultCalculations)
+            );
             return {
                 branchCalc: defaultCalculations.branch,
                 subMainCalc: null,
@@ -129,34 +132,34 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 
         const branchCalc = filteredCalculations.branch
             ? {
-                headLoss: filteredCalculations.branch.headLoss || 0,
-                pipeLength: filteredCalculations.branch.pipeLength || 0,
-                flowRate: filteredCalculations.branch.flowRate || 0,
-            }
+                  headLoss: filteredCalculations.branch.headLoss || 0,
+                  pipeLength: filteredCalculations.branch.pipeLength || 0,
+                  flowRate: filteredCalculations.branch.flowRate || 0,
+              }
             : null;
 
         const subMainCalc = filteredCalculations.secondary
             ? {
-                headLoss: filteredCalculations.secondary.headLoss || 0,
-                pipeLength: filteredCalculations.secondary.pipeLength || 0,
-                flowRate: filteredCalculations.secondary.flowRate || 0,
-            }
+                  headLoss: filteredCalculations.secondary.headLoss || 0,
+                  pipeLength: filteredCalculations.secondary.pipeLength || 0,
+                  flowRate: filteredCalculations.secondary.flowRate || 0,
+              }
             : null;
 
         const mainCalc = filteredCalculations.main
             ? {
-                headLoss: filteredCalculations.main.headLoss || 0,
-                pipeLength: filteredCalculations.main.pipeLength || 0,
-                flowRate: filteredCalculations.main.flowRate || 0,
-            }
+                  headLoss: filteredCalculations.main.headLoss || 0,
+                  pipeLength: filteredCalculations.main.pipeLength || 0,
+                  flowRate: filteredCalculations.main.flowRate || 0,
+              }
             : null;
 
         const emitterCalc = filteredCalculations.emitter
             ? {
-                headLoss: filteredCalculations.emitter.headLoss || 0,
-                pipeLength: filteredCalculations.emitter.pipeLength || 0,
-                flowRate: filteredCalculations.emitter.flowRate || 0,
-            }
+                  headLoss: filteredCalculations.emitter.headLoss || 0,
+                  pipeLength: filteredCalculations.emitter.pipeLength || 0,
+                  flowRate: filteredCalculations.emitter.flowRate || 0,
+              }
             : null;
 
         const branchSubMainCombined =
@@ -168,9 +171,9 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             projectMode === 'greenhouse'
                 ? (mainCalc?.headLoss || 0) + (branchCalc?.headLoss || 0)
                 : (mainCalc?.headLoss || 0) +
-                (subMainCalc?.headLoss || 0) +
-                (branchCalc?.headLoss || 0) +
-                (emitterCalc?.headLoss || 0);
+                  (subMainCalc?.headLoss || 0) +
+                  (branchCalc?.headLoss || 0) +
+                  (emitterCalc?.headLoss || 0);
 
         const head20Percent = sprinklerPressure.head20PercentM;
 
@@ -241,8 +244,6 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             <h4 className="mb-3 text-lg font-bold text-blue-300">🔧 สรุปการคำนวณระบบท่อทั้งหมด</h4>
 
             <div className="space-y-3 text-sm">
-
-
                 {/* สรุปการคำนวณทั้งหมด */}
                 <div className="rounded bg-green-800 p-3">
                     <h5 className="mb-2 font-medium text-green-200">
@@ -266,7 +267,9 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                 <div className="flex items-center space-x-2">
                                     <span className="text-[12px] text-blue-300">Head</span>
                                     <span className="text-[12px] font-bold text-white">
-                                        {parseFloat((sprinklerPressure?.headM || 0).toFixed(2)).toString()}
+                                        {parseFloat(
+                                            (sprinklerPressure?.headM || 0).toFixed(2)
+                                        ).toString()}
                                     </span>
                                     <span className="text-[12px] text-blue-300">ม.</span>
                                 </div>
@@ -278,7 +281,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                     <span className="text-[12px] text-blue-300">ม.</span>
                                 </div>
                             </div>
-                            <div className="space-y-1 mt-2">
+                            <div className="mt-2 space-y-1">
                                 <div className="flex justify-between">
                                     <span className="text-green-200">Head Loss ท่อเมนหลัก:</span>
                                     <span className="font-bold text-white">
@@ -307,7 +310,9 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                 </div>
                                 {emitterCalc && projectMode !== 'greenhouse' && (
                                     <div className="flex justify-between">
-                                        <span className="text-green-200">Head Loss ท่อย่อยแยก:</span>
+                                        <span className="text-green-200">
+                                            Head Loss ท่อย่อยแยก:
+                                        </span>
                                         <span className="font-bold text-white">
                                             {emitterCalc.headLoss > 0
                                                 ? `${emitterCalc.headLoss.toFixed(3)} ม.`

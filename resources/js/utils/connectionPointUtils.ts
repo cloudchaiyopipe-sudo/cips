@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Coordinate } from './horticultureUtils';
-import { findMainToSubMainConnections, findMidConnections, findSubMainToMainIntersections } from './lateralPipeUtils';
+import {
+    findMainToSubMainConnections,
+    findMidConnections,
+    findSubMainToMainIntersections,
+} from './lateralPipeUtils';
 
 export interface ConnectionPoint {
     id: string;
@@ -33,37 +37,35 @@ export interface ConnectionPointConfig {
 
 export const CONNECTION_POINT_CONFIG: ConnectionPointConfig = {
     mainToSubMain: {
-        color: '#DC2626', 
+        color: '#DC2626',
         title: 'จุดเชื่อมต่อท่อเมน → ท่อเมนรอง',
         zIndex: 2001,
     },
     subMainToMainMid: {
-        color: '#8B5CF6', 
+        color: '#8B5CF6',
         title: 'จุดเชื่อมท่อเมนรอง → กลางท่อเมน',
         zIndex: 2004,
     },
     subMainToMainIntersection: {
-        color: '#3B82F6', 
+        color: '#3B82F6',
         title: 'จุดตัดท่อเมนรอง ↔ ท่อเมน',
         zIndex: 2003,
     },
 };
 
-
 export const createMainToSubMainConnectionPoints = (
     mainPipes: any[],
     subMainPipes: any[],
     zones?: any[],
-    irrigationZones?: any[],
+    irrigationZones?: any[]
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
-
 
     const connections = findMainToSubMainConnections(
         mainPipes,
         subMainPipes,
         zones,
-        irrigationZones,
+        irrigationZones
     );
 
     connections.forEach((connection) => {
@@ -156,12 +158,7 @@ export const createAllConnectionPoints = (
     const allConnectionPoints: ConnectionPoint[] = [];
 
     allConnectionPoints.push(
-        ...createMainToSubMainConnectionPoints(
-            mainPipes,
-            subMainPipes,
-            zones,
-            irrigationZones,
-        )
+        ...createMainToSubMainConnectionPoints(mainPipes, subMainPipes, zones, irrigationZones)
     );
 
     allConnectionPoints.push(
@@ -193,11 +190,11 @@ export const createConnectionPointMarker = (
         map: map,
         icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 4, 
+            scale: 4,
             fillColor: connectionPoint.color,
             fillOpacity: 1.0,
             strokeColor: '#FFFFFF',
-            strokeWeight: 2, 
+            strokeWeight: 2,
         },
         zIndex: connectionPoint.zIndex,
         title: connectionPoint.title,

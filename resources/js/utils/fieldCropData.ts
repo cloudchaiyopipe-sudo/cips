@@ -532,7 +532,6 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
         }
     });
 
-
     const totalPlantingPoints = enhancedZones.reduce(
         (sum, zone) => sum + zone.totalPlantingPoints,
         0

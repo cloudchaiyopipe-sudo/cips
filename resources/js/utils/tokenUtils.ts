@@ -135,7 +135,6 @@ export const handleTokenConsumption = async (
     const remainingTokens = response.headers.get('X-Remaining-Tokens');
 
     if (tokensConsumed && remainingTokens) {
-
         // You can dispatch a custom event here to update the navbar token display
         window.dispatchEvent(
             new CustomEvent('tokensUpdated', {

@@ -719,7 +719,6 @@ export const universalSearch = async (
 
     // ตรวจสอบว่าเป็นพิกัดหรือไม่
     if (detectCoordinatePattern(trimmedQuery)) {
-
         const coordinates = parseCoordinatesFromText(trimmedQuery);
         if (coordinates) {
             const reverseResult = await reverseGeocode(coordinates.lat, coordinates.lng);

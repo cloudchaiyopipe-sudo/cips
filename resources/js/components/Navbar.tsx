@@ -206,9 +206,7 @@ const Navbar: React.FC = () => {
                                     </p>
                                 </div>
                                 <div className="block sm:hidden">
-                                    <h1 className="text-xl font-bold">
-                                        {t('CIPS')}
-                                    </h1>
+                                    <h1 className="text-xl font-bold">{t('CIPS')}</h1>
                                 </div>
                             </Link>
                         </div>
@@ -239,7 +237,9 @@ const Navbar: React.FC = () => {
                                         className="hidden rounded-lg bg-gray-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-700 sm:block sm:px-4 sm:py-2 sm:text-sm"
                                     >
                                         <span className="sm:hidden">⚙️</span>
-                                        <span className="hidden sm:inline">⚙️ {t('จัดการอุปกรณ์')}</span>
+                                        <span className="hidden sm:inline">
+                                            ⚙️ {t('จัดการอุปกรณ์')}
+                                        </span>
                                     </button>
                                 )}
                             </div>
@@ -275,7 +275,11 @@ const Navbar: React.FC = () => {
 
                             {/* User Avatar - Only show if authenticated */}
                             {auth?.user && (
-                                <UserAvatar user={auth.user} size="sm" className="ml-1 sm:ml-2 sm:size-md" />
+                                <UserAvatar
+                                    user={auth.user}
+                                    size="sm"
+                                    className="sm:size-md ml-1 sm:ml-2"
+                                />
                             )}
                         </div>
                     </div>

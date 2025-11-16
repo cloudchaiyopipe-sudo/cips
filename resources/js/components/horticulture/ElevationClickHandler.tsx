@@ -49,26 +49,31 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
 
             const lat = event.latLng.lat();
             const lng = event.latLng.lng();
-            
+
             setIsLoading(true);
             setError(null);
 
             // Request elevation for clicked point
-            elevationServiceRef.current.getElevationForLocations({
-                locations: [event.latLng]
-            }, (results, status) => {
-                if (status === google.maps.ElevationStatus.OK && results && results[0]) {
-                    setElevationInfo({
-                        lat,
-                        lng,
-                        elevation: results[0].elevation || 0,
-                        timestamp: Date.now()
-                    });
-                } else {
-                    setError(t('ไม่สามารถดึงข้อมูลความสูงได้') || 'ไม่สามารถดึงข้อมูลความสูงได้');
+            elevationServiceRef.current.getElevationForLocations(
+                {
+                    locations: [event.latLng],
+                },
+                (results, status) => {
+                    if (status === google.maps.ElevationStatus.OK && results && results[0]) {
+                        setElevationInfo({
+                            lat,
+                            lng,
+                            elevation: results[0].elevation || 0,
+                            timestamp: Date.now(),
+                        });
+                    } else {
+                        setError(
+                            t('ไม่สามารถดึงข้อมูลความสูงได้') || 'ไม่สามารถดึงข้อมูลความสูงได้'
+                        );
+                    }
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
-            });
+            );
         };
 
         clickListenerRef.current = map.addListener('click', handleMapClick);
@@ -93,8 +98,8 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
     if (!isActive) return null;
 
     return (
-        <div className="fixed top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm">
-            <div className="flex items-center justify-between mb-3">
+        <div className="fixed right-4 top-4 z-[1000] max-w-sm rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <FaMountain className="text-green-600" size={16} />
                     <h3 className="font-semibold text-gray-800">
@@ -103,7 +108,7 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
                 </div>
                 <button
                     onClick={onToggle}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 transition-colors hover:text-gray-600"
                 >
                     <FaTimes size={14} />
                 </button>
@@ -111,32 +116,33 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
 
             <div className="space-y-2">
                 <div className="text-sm text-gray-600">
-                    {t('คลิกบนแผนที่เพื่อดูความสูง ณ จุดนั้น') || 'คลิกบนแผนที่เพื่อดูความสูง ณ จุดนั้น'}
+                    {t('คลิกบนแผนที่เพื่อดูความสูง ณ จุดนั้น') ||
+                        'คลิกบนแผนที่เพื่อดูความสูง ณ จุดนั้น'}
                 </div>
 
                 {isLoading && (
-                    <div className="flex items-center gap-2 text-blue-600 text-sm">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
                         {t('กำลังดึงข้อมูลความสูง...') || 'กำลังดึงข้อมูลความสูง...'}
                     </div>
                 )}
 
                 {error && (
-                    <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <div className="flex items-center gap-2 text-sm text-red-600">
                         <FaInfoCircle size={14} />
                         {error}
                     </div>
                 )}
 
                 {elevationInfo && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-2">
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                        <div className="mb-2 flex items-center gap-2">
                             <FaMountain className="text-green-600" size={14} />
                             <span className="font-medium text-green-800">
                                 {t('ข้อมูลความสูง') || 'ข้อมูลความสูง'}
                             </span>
                         </div>
-                        
+
                         <div className="space-y-1 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-gray-600">{t('พิกัด:') || 'พิกัด:'}</span>
@@ -144,18 +150,22 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
                                     {elevationInfo.lat.toFixed(6)}, {elevationInfo.lng.toFixed(6)}
                                 </span>
                             </div>
-                            
+
                             <div className="flex justify-between">
                                 <span className="text-gray-600">{t('ความสูง:') || 'ความสูง:'}</span>
                                 <span className="font-semibold text-green-800">
                                     {elevationInfo.elevation.toFixed(2)} {t('เมตร') || 'เมตร'}
                                 </span>
                             </div>
-                            
+
                             <div className="flex justify-between">
-                                <span className="text-gray-600">{t('ระดับน้ำทะเล:') || 'ระดับน้ำทะเล:'}</span>
+                                <span className="text-gray-600">
+                                    {t('ระดับน้ำทะเล:') || 'ระดับน้ำทะเล:'}
+                                </span>
                                 <span className="text-gray-800">
-                                    {elevationInfo.elevation > 0 ? t('เหนือระดับน้ำทะเล') || 'เหนือระดับน้ำทะเล' : t('ต่ำกว่าระดับน้ำทะเล') || 'ต่ำกว่าระดับน้ำทะเล'}
+                                    {elevationInfo.elevation > 0
+                                        ? t('เหนือระดับน้ำทะเล') || 'เหนือระดับน้ำทะเล'
+                                        : t('ต่ำกว่าระดับน้ำทะเล') || 'ต่ำกว่าระดับน้ำทะเล'}
                                 </span>
                             </div>
                         </div>
@@ -166,15 +176,20 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
                     </div>
                 )}
 
-                <div className="text-xs text-gray-500 mt-3">
-                    <div className="flex items-center gap-1 mb-1">
+                <div className="mt-3 text-xs text-gray-500">
+                    <div className="mb-1 flex items-center gap-1">
                         <FaInfoCircle size={10} />
                         <span>{t('เคล็ดลับ:') || 'เคล็ดลับ:'}</span>
                     </div>
                     <div className="ml-3">
-                        • {t('คลิกที่ใดก็ได้บนแผนที่เพื่อดูความสูง') || 'คลิกที่ใดก็ได้บนแผนที่เพื่อดูความสูง'}<br/>
-                        • {t('ข้อมูลจะอัปเดตทันทีเมื่อคลิก') || 'ข้อมูลจะอัปเดตทันทีเมื่อคลิก'}<br/>
-                        • {t('ความสูงแสดงเป็นเมตรเหนือระดับน้ำทะเล') || 'ความสูงแสดงเป็นเมตรเหนือระดับน้ำทะเล'}
+                        •{' '}
+                        {t('คลิกที่ใดก็ได้บนแผนที่เพื่อดูความสูง') ||
+                            'คลิกที่ใดก็ได้บนแผนที่เพื่อดูความสูง'}
+                        <br />•{' '}
+                        {t('ข้อมูลจะอัปเดตทันทีเมื่อคลิก') || 'ข้อมูลจะอัปเดตทันทีเมื่อคลิก'}
+                        <br />•{' '}
+                        {t('ความสูงแสดงเป็นเมตรเหนือระดับน้ำทะเล') ||
+                            'ความสูงแสดงเป็นเมตรเหนือระดับน้ำทะเล'}
                     </div>
                 </div>
             </div>

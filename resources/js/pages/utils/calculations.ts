@@ -11,12 +11,12 @@ export const getAdjustedC = (pipeType: string, age: number): number => {
             'HDPE PE 80': 135,
             LDPE: 130,
             PE: 135,
-            PVC: 140, 
+            PVC: 140,
             'PE-RT': 138,
             'Flexible PE': 125,
             Steel: 120,
             Galvanized: 110,
-        }[pipeType] || 135; 
+        }[pipeType] || 135;
 
     const degradationRate = pipeType.includes('PVC')
         ? 0.3
@@ -37,24 +37,24 @@ export const getMinorLossCoefficient = (
     let totalK = 0;
 
     const baseK = {
-        branch: 0.2, 
-        secondary: 0.15, 
-        main: 0.1, 
+        branch: 0.2,
+        secondary: 0.15,
+        main: 0.1,
     };
 
     totalK += baseK[sectionType as keyof typeof baseK] || 0.15;
 
-    totalK += (fittingCount.elbows || 0) * 0.9; 
-    totalK += (fittingCount.tees || 0) * 1.8; 
-    totalK += (fittingCount.valves || 0) * 0.2; 
+    totalK += (fittingCount.elbows || 0) * 0.9;
+    totalK += (fittingCount.tees || 0) * 1.8;
+    totalK += (fittingCount.valves || 0) * 0.2;
 
     if (!Object.keys(fittingCount).length) {
         if (sectionType === 'branch') {
-            totalK += 0.5; 
+            totalK += 0.5;
         } else if (sectionType === 'secondary') {
-            totalK += 0.3; 
+            totalK += 0.3;
         } else if (sectionType === 'main') {
-            totalK += 0.2; 
+            totalK += 0.2;
         }
     }
 
@@ -82,12 +82,12 @@ export const calculateImprovedHeadLoss = (
         };
     }
 
-    const validatedFlow = Math.min(Math.max(flow_lpm, 0.1), 50000); 
-    const validatedDiameter = Math.min(Math.max(diameter_mm, 10), 1000); 
-    const validatedLength = Math.min(Math.max(length_m, 0.1), 5000); 
+    const validatedFlow = Math.min(Math.max(flow_lpm, 0.1), 50000);
+    const validatedDiameter = Math.min(Math.max(diameter_mm, 10), 1000);
+    const validatedLength = Math.min(Math.max(length_m, 0.1), 5000);
 
-    const Q_m3s = validatedFlow / 60000; 
-    const D_m = validatedDiameter / 1000; 
+    const Q_m3s = validatedFlow / 60000;
+    const D_m = validatedDiameter / 1000;
     const C = getAdjustedC(pipeType, pipeAgeYears);
 
     const A = Math.PI * Math.pow(D_m / 2, 2);
@@ -110,7 +110,7 @@ export const calculateImprovedHeadLoss = (
     if (validatedLength < 20) {
         minorLoss = minorLoss * 1.2;
     } else if (validatedLength < 50) {
-        minorLoss = minorLoss * 1.0; 
+        minorLoss = minorLoss * 1.0;
     }
 
     const totalLoss = majorLoss + minorLoss;
@@ -141,29 +141,28 @@ export const checkVelocity = (velocity: number, section: string): string => {
 };
 
 export const getVelocityScore = (velocity: number): number => {
-    if (velocity >= 0.6 && velocity <= 2.0) return 100; 
-    if (velocity >= 0.4 && velocity <= 2.5) return 80; 
-    if (velocity >= 0.3 && velocity <= 3.0) return 60; 
-    if (velocity > 3.0) return 20; 
-    if (velocity < 0.3) return 30; 
-    return 40; 
+    if (velocity >= 0.6 && velocity <= 2.0) return 100;
+    if (velocity >= 0.4 && velocity <= 2.5) return 80;
+    if (velocity >= 0.3 && velocity <= 3.0) return 60;
+    if (velocity > 3.0) return 20;
+    if (velocity < 0.3) return 30;
+    return 40;
 };
 
 export const calculateOptimalPipeSize = (
     flow_lpm: number,
-    targetVelocity: number = 1.2, 
-    maxVelocity: number = 2.0 
+    targetVelocity: number = 1.2,
+    maxVelocity: number = 2.0
 ): { optimal: number; acceptable: number } => {
     const Q_m3s = flow_lpm / 60000;
-    
+
     const optimalArea = Q_m3s / targetVelocity;
-    const optimalDiameter = Math.sqrt((4 * optimalArea) / Math.PI) * 1000; 
+    const optimalDiameter = Math.sqrt((4 * optimalArea) / Math.PI) * 1000;
 
-    
     const acceptableArea = Q_m3s / maxVelocity;
-    const acceptableDiameter = Math.sqrt((4 * acceptableArea) / Math.PI) * 1000; 
+    const acceptableDiameter = Math.sqrt((4 * acceptableArea) / Math.PI) * 1000;
 
-    const minPipeSize = 20; 
+    const minPipeSize = 20;
 
     return {
         optimal: Math.max(optimalDiameter, minPipeSize),
@@ -339,11 +338,11 @@ export const getHeadLossScore = (headLoss: number, pipeType: string, length: num
 
 export const calculateZoneFlowRate = (
     sprinklerCount: number,
-    waterPerSprinklerLPM: number = 6.0, 
+    waterPerSprinklerLPM: number = 6.0,
     irrigationTimeMinutes: number = 30
 ): {
     flowLPM: number;
-    totalWaterPerIrrigation: number; 
+    totalWaterPerIrrigation: number;
 } => {
     const flowLPM = sprinklerCount * waterPerSprinklerLPM;
 
@@ -351,7 +350,7 @@ export const calculateZoneFlowRate = (
 
     return {
         flowLPM: flowLPM,
-        totalWaterPerIrrigation: totalWaterPerIrrigation, 
+        totalWaterPerIrrigation: totalWaterPerIrrigation,
     };
 };
 
@@ -361,7 +360,7 @@ export const calculateFieldCropZoneFlowRate = (
     irrigationTimeMinutes: number = 30
 ): {
     flowLPM: number;
-    totalWaterPerIrrigation: number; 
+    totalWaterPerIrrigation: number;
 } => {
     const flowLPM = sprinklerCount * waterPerSprinklerLPM;
 
@@ -369,7 +368,7 @@ export const calculateFieldCropZoneFlowRate = (
 
     return {
         flowLPM: flowLPM,
-        totalWaterPerIrrigation: totalWaterPerIrrigation, 
+        totalWaterPerIrrigation: totalWaterPerIrrigation,
     };
 };
 
@@ -625,7 +624,9 @@ export const evaluatePumpOverall = (pump: any, requiredFlow: number, requiredHea
         isHeadAdequate: maxHead >= requiredHead,
         isRecommended: maxFlow >= requiredFlow && maxHead >= requiredHead,
         isGoodChoice: maxFlow >= requiredFlow && maxHead >= requiredHead && totalScore < 80,
-        isUsable: (maxFlow >= requiredFlow || maxHead >= requiredHead) && !(maxFlow >= requiredFlow && maxHead >= requiredHead),
+        isUsable:
+            (maxFlow >= requiredFlow || maxHead >= requiredHead) &&
+            !(maxFlow >= requiredFlow && maxHead >= requiredHead),
     };
 };
 

@@ -149,14 +149,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     // ฟังก์ชันแปลงชื่อโซนเป็น "โซน 1,2,3,4"
     const formatZoneNames = (zoneNames: string[]): string => {
         if (!zoneNames || zoneNames.length === 0) return '';
-        
+
         // ดึงตัวเลขลำดับโซน (1-3 หลัก) จากชื่อโซน
         const zoneNumbers: number[] = [];
-        
+
         zoneNames.forEach((zoneName) => {
             // ลบข้อมูลในวงเล็บออก (เช่น "โซน 1 (area...)" -> "โซน 1")
             const cleanedName = zoneName.split(' (')[0].trim();
-            
+
             // หาเลขลำดับโซนที่อยู่หลังคำว่า "โซน" หรือ pattern ที่เหมาะสม
             // 1. ลองหาจาก pattern "โซน {เลข 1-3 หลัก}"
             let match = cleanedName.match(/โซน\s*(\d{1,3})\b/);
@@ -167,7 +167,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     return;
                 }
             }
-            
+
             // 2. ลองหาจาก pattern "Zone {เลข 1-3 หลัก}" (ภาษาอังกฤษ)
             match = cleanedName.match(/Zone\s*(\d{1,3})\b/i);
             if (match) {
@@ -177,17 +177,17 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     return;
                 }
             }
-            
+
             // 3. ถ้าไม่มี pattern ที่ชัดเจน ให้ข้าม (ไม่ใช้ ID ที่ยาว)
             // ไม่ดึงเลขจากชื่อโซนที่ไม่มี pattern ที่ชัดเจน เพราะอาจเป็น ID
         });
-        
+
         // ถ้ามีตัวเลข ให้เรียงลำดับและแสดงเป็น "โซน 1,2,3,4"
         if (zoneNumbers.length > 0) {
             zoneNumbers.sort((a, b) => a - b);
             return `โซน ${zoneNumbers.join(',')}`;
         }
-        
+
         // ถ้าไม่มีตัวเลข ให้ใช้ชื่อโซนเดิม
         return zoneNames.join(', ');
     };
@@ -359,7 +359,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
                     if (isPipe && item.quantity > 0) {
                         const extraPipeId = item.equipment.id;
-                        const extraLength = item.quantity; 
+                        const extraLength = item.quantity;
 
                         const zonePipes = selectedPipes[zoneId] || {};
                         const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
@@ -469,8 +469,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             name: item.equipment.name,
                             productCode: item.equipment.product_code,
                             price: item.equipment.price || 0,
-                            sizeMM: 20, 
-                            lengthM: 100, 
+                            sizeMM: 20,
+                            lengthM: 100,
                             image: item.equipment.image,
                         };
 
@@ -1263,10 +1263,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             return gardenStats.summary.totalArea / 1600;
         }
         if (projectMode === 'field-crop' && fieldCropData) {
-            return fieldCropData.area.sizeInRai; 
+            return fieldCropData.area.sizeInRai;
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
-            return greenhouseData.summary.totalPlotArea; 
+            return greenhouseData.summary.totalPlotArea;
         }
         return projectData?.totalArea ? projectData.totalArea / 1600 : 0;
     };
@@ -1312,7 +1312,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         }
                     );
                     totalSprinklers = sprinklerCounts.reduce((sum, count) => sum + count, 0);
-                    totalIrrigationPoints = totalSprinklers; 
+                    totalIrrigationPoints = totalSprinklers;
                 }
 
                 if (totalSprinklers === 0) {
@@ -1423,7 +1423,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                         <p className="text-xs text-green-300">
                                             {Number(
                                                 (
-                                                    (Number(item.totalCost) || 0) / (Number(item.quantity) || 1)
+                                                    (Number(item.totalCost) || 0) /
+                                                    (Number(item.quantity) || 1)
                                                 ).toFixed(2)
                                             ).toLocaleString('th-TH')}{' '}
                                             {t('บาท')}/{t('หัว')}
@@ -1478,17 +1479,23 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         )}
                                                     </p>
                                                     <p className="text-xs text-purple-200">
-                                                    <span>
-                                                        {item.zones.join(', ')}
-                                                        <span className="mx-1 text-xs text-red-500">|</span>
-                                                    </span>
+                                                        <span>
+                                                            {item.zones.join(', ')}
+                                                            <span className="mx-1 text-xs text-red-500">
+                                                                |
+                                                            </span>
+                                                        </span>
                                                         {Number(
                                                             (Number(item.pipe.price) || 0).toFixed(
                                                                 2
                                                             )
                                                         ).toLocaleString('th-TH')}{' '}
                                                         {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                        {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
+                                                        {t('ม./ม้วน')}){' '}
+                                                        <span className="mx-1 text-xs text-red-500">
+                                                            |
+                                                        </span>{' '}
+                                                        {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
                                                         {item.extraLength &&
@@ -1496,7 +1503,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 <span className="text-yellow-300">
                                                                     {' '}
                                                                     (+ {t('Riser')}{' '}
-                                                                    {(item.extraLength || 0).toFixed(1)}{' '}
+                                                                    {(
+                                                                        item.extraLength || 0
+                                                                    ).toFixed(1)}{' '}
                                                                     ม.)
                                                                 </span>
                                                             )}{' '}
@@ -1553,13 +1562,19 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         <p className="text-xs text-purple-200">
                                                             <span>
                                                                 {item.zones.join(', ')}
-                                                                <span className="mx-1 text-xs text-red-500">|</span>
+                                                                <span className="mx-1 text-xs text-red-500">
+                                                                    |
+                                                                </span>
                                                             </span>
                                                             {Number(
                                                                 (item.pipe.price || 0).toFixed(2)
                                                             ).toLocaleString('th-TH')}{' '}
                                                             {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                            {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
+                                                            {t('ม./ม้วน')}){' '}
+                                                            <span className="mx-1 text-xs text-red-500">
+                                                                |
+                                                            </span>{' '}
+                                                            {t('รวมความยาว:')}{' '}
                                                             {(
                                                                 item.totalLength || 0
                                                             ).toLocaleString()}{' '}
@@ -1569,9 +1584,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                     <span className="text-yellow-300">
                                                                         {' '}
                                                                         (+ {t('Riser')}{' '}
-                                                                        {(item.extraLength || 0).toFixed(
-                                                                            1
-                                                                        )}{' '}
+                                                                        {(
+                                                                            item.extraLength || 0
+                                                                        ).toFixed(1)}{' '}
                                                                         ม.)
                                                                     </span>
                                                                 )}{' '}
@@ -1625,15 +1640,21 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         {item.pipe.sizeMM}mm
                                                     </p>
                                                     <p className="text-xs text-purple-200">
-                                                    <span>
-                                                        {item.zones.join(', ')}
-                                                        <span className="mx-1 text-xs text-red-500">|</span>
-                                                    </span>
+                                                        <span>
+                                                            {item.zones.join(', ')}
+                                                            <span className="mx-1 text-xs text-red-500">
+                                                                |
+                                                            </span>
+                                                        </span>
                                                         {Number(
                                                             (item.pipe.price || 0).toFixed(2)
                                                         ).toLocaleString('th-TH')}{' '}
                                                         {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                        {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
+                                                        {t('ม./ม้วน')}){' '}
+                                                        <span className="mx-1 text-xs text-red-500">
+                                                            |
+                                                        </span>{' '}
+                                                        {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
                                                         {item.extraLength &&
@@ -1641,7 +1662,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 <span className="text-yellow-300">
                                                                     {' '}
                                                                     (+ {t('Riser')}{' '}
-                                                                    {(item.extraLength || 0).toFixed(1)}{' '}
+                                                                    {(
+                                                                        item.extraLength || 0
+                                                                    ).toFixed(1)}{' '}
                                                                     ม.)
                                                                 </span>
                                                             )}{' '}
@@ -1694,15 +1717,21 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         {item.pipe.sizeMM}mm
                                                     </p>
                                                     <p className="text-xs text-purple-200">
-                                                    <span>
-                                                        {item.zones.join(', ')}
-                                                        <span className="mx-1 text-xs text-red-500">|</span>
-                                                    </span>
+                                                        <span>
+                                                            {item.zones.join(', ')}
+                                                            <span className="mx-1 text-xs text-red-500">
+                                                                |
+                                                            </span>
+                                                        </span>
                                                         {Number(
                                                             (item.pipe.price || 0).toFixed(2)
                                                         ).toLocaleString('th-TH')}{' '}
                                                         {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
-                                                        {t('ม./ม้วน')}) <span className="mx-1 text-xs text-red-500">|</span> {t('รวมความยาว:')}{' '}
+                                                        {t('ม./ม้วน')}){' '}
+                                                        <span className="mx-1 text-xs text-red-500">
+                                                            |
+                                                        </span>{' '}
+                                                        {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
                                                         {item.extraLength &&
@@ -1710,7 +1739,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                                 <span className="text-yellow-300">
                                                                     {' '}
                                                                     (+ {t('Riser')}{' '}
-                                                                    {(item.extraLength || 0).toFixed(1)}{' '}
+                                                                    {(
+                                                                        item.extraLength || 0
+                                                                    ).toFixed(1)}{' '}
                                                                     ม.)
                                                                 </span>
                                                             )}{' '}

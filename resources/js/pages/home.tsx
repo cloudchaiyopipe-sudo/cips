@@ -1093,7 +1093,7 @@ export default function Home() {
 
     // Always call usePage hook at the top level
     const page = usePage();
-    
+
     let auth: any = null;
     try {
         auth = (page.props as any).auth;
@@ -1282,7 +1282,6 @@ export default function Home() {
 
         // Add to fields state
         setFields((prev) => [...prev, mockField]);
-
     };
 
     const handleCategorySelect = (category: PlantCategory) => {
@@ -1630,7 +1629,6 @@ export default function Home() {
                 });
 
                 if (response.data.success) {
-
                     // Update field in frontend
                     setFields((prev) =>
                         prev.map((f) =>

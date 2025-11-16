@@ -1,13 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import {
-    FaWater,
-    FaTree,
-    FaRulerCombined,
-    FaInfoCircle,
-    FaCheck,
-    FaTimes,
-} from 'react-icons/fa';
+import { FaWater, FaTree, FaRulerCombined, FaInfoCircle, FaCheck, FaTimes } from 'react-icons/fa';
 import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 
 interface Coordinate {
@@ -254,7 +247,8 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                             </span>
                         </div>
                         <div className="text-lg font-bold text-cyan-800">
-                            {totalFlowRatePerMinute.toLocaleString()} {t('ลิตร/นาที') || 'ลิตร/นาที'}
+                            {totalFlowRatePerMinute.toLocaleString()}{' '}
+                            {t('ลิตร/นาที') || 'ลิตร/นาที'}
                         </div>
                     </div>
 

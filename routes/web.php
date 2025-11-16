@@ -806,6 +806,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/upgradePro');
     })->name('free-plan.upgradePro');
 
+    // Free Plan Payment QR Code Route
+    Route::get('/free-plan/payment-qr', function () {
+        return Inertia::render('free-plan/components/paymentQR');
+    })->name('free-plan.payment-qr');
+
     // Free Plan Advertisement Management Route - Sales users cannot access
     Route::get('/free-plan/ads', function () {
         return Inertia::render('free-plan/components/ads');

@@ -1,5 +1,11 @@
 import { Coordinate, PlantLocation, IrrigationZone } from './irrigationZoneUtils';
-import { isPointInPolygon, findPlantsInPolygon, checkPolygonIntersection, calculatePolygonArea, calculateOverlapArea } from './autoZoneUtils';
+import {
+    isPointInPolygon,
+    findPlantsInPolygon,
+    checkPolygonIntersection,
+    calculatePolygonArea,
+    calculateOverlapArea,
+} from './autoZoneUtils';
 
 export const updateEditedZone = (
     zones: IrrigationZone[],
@@ -87,11 +93,15 @@ export const validateEditedZone = (
             (coord) => !isPointInPolygon(coord, mainArea)
         );
         const outsidePercentage = (outsidePoints.length / editedZone.coordinates.length) * 100;
-        
+
         if (outsidePercentage > 50) {
-            errors.push(`โซน ${editedZone.name} มีส่วนที่อยู่นอกพื้นที่หลัก ${outsidePercentage.toFixed(1)}%`);
+            errors.push(
+                `โซน ${editedZone.name} มีส่วนที่อยู่นอกพื้นที่หลัก ${outsidePercentage.toFixed(1)}%`
+            );
         } else if (outsidePercentage > 10) {
-            warnings.push(`โซน ${editedZone.name} มีส่วนที่อยู่นอกพื้นที่หลัก ${outsidePercentage.toFixed(1)}%`);
+            warnings.push(
+                `โซน ${editedZone.name} มีส่วนที่อยู่นอกพื้นที่หลัก ${outsidePercentage.toFixed(1)}%`
+            );
         }
     }
 
@@ -99,14 +109,21 @@ export const validateEditedZone = (
     for (const otherZone of otherZones) {
         if (otherZone.coordinates && otherZone.coordinates.length >= 3) {
             if (checkPolygonIntersection(editedZone.coordinates, otherZone.coordinates)) {
-                const overlapArea = calculateOverlapArea(editedZone.coordinates, otherZone.coordinates);
+                const overlapArea = calculateOverlapArea(
+                    editedZone.coordinates,
+                    otherZone.coordinates
+                );
                 const editedZoneArea = calculatePolygonArea(editedZone.coordinates);
                 const overlapPercentage = (overlapArea / editedZoneArea) * 100;
-                
+
                 if (overlapPercentage > 10) {
-                    errors.push(`โซน ${editedZone.name} ทับซ้อนกับโซน ${otherZone.name} ${overlapPercentage.toFixed(1)}%`);
+                    errors.push(
+                        `โซน ${editedZone.name} ทับซ้อนกับโซน ${otherZone.name} ${overlapPercentage.toFixed(1)}%`
+                    );
                 } else if (overlapPercentage > 1) {
-                    warnings.push(`โซน ${editedZone.name} ทับซ้อนกับโซน ${otherZone.name} ${overlapPercentage.toFixed(1)}%`);
+                    warnings.push(
+                        `โซน ${editedZone.name} ทับซ้อนกับโซน ${otherZone.name} ${overlapPercentage.toFixed(1)}%`
+                    );
                 }
             }
         }

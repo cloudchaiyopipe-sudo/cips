@@ -15,15 +15,17 @@ function FreeNav() {
 
     // Handle language toggle with localStorage persistence
     const handleLanguageToggle = () => {
-        setLanguage(prev => {
+        setLanguage((prev) => {
             const newLanguage = prev === 'EN' ? 'TH' : 'EN';
             // Save to localStorage
             if (typeof window !== 'undefined') {
                 localStorage.setItem('cips-language', newLanguage);
                 // Dispatch a custom event to notify other components
-                window.dispatchEvent(new CustomEvent('languageChanged', { 
-                    detail: { language: newLanguage } 
-                }));
+                window.dispatchEvent(
+                    new CustomEvent('languageChanged', {
+                        detail: { language: newLanguage },
+                    })
+                );
             }
             return newLanguage;
         });
@@ -33,11 +35,11 @@ function FreeNav() {
         <nav className="border-b border-slate-600 bg-slate-800/50 backdrop-blur-sm">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-6">
                 {/* Logo/Brand */}
-                <button 
+                <button
                     onClick={() => router.visit('/free-plan')}
-                    className="flex items-center gap-3 transition-all duration-200 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500/20 rounded-lg p-1"
+                    className="flex items-center gap-3 rounded-lg p-1 transition-all duration-200 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg">
                         <img
                             src="/images/chaiyo-logo.png"
                             alt="Chaiyo Logo"
@@ -54,7 +56,7 @@ function FreeNav() {
 
                 {/* Language Toggle / Profile Shortcut */}
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                         onClick={handleLanguageToggle}
                         className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-600 md:px-4 md:text-sm"
                     >
