@@ -1,7 +1,6 @@
 // 1. Import
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
-import QRCodeSVG from 'react-qr-code';
 import FreeNav from './components/freeNav';
 import {
     calculatePipeRecommendations,
@@ -14,10 +13,6 @@ import { getTranslations } from './utils/language';
 
 // 2. Component
 function FreeProduct() {
-    // LINE Official Account ID - สามารถแก้ไขได้ที่นี่
-    const LINE_ID = '@fang.nitipoom';
-    const LINE_FRIEND_URL = `https://line.me/R/ti/p/${LINE_ID}`;
-
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<unknown>(null);
@@ -43,9 +38,7 @@ function FreeProduct() {
     const [showPipeZoneDropdown, setShowPipeZoneDropdown] = useState(false);
     const [selectedPumpZoneId, setSelectedPumpZoneId] = useState<'all' | 'single' | null>(null);
     const [showPumpZoneDropdown, setShowPumpZoneDropdown] = useState(false);
-    const [showCalculationDetails, setShowCalculationDetails] = useState(false);
     const [showPumpCalculationDetails, setShowPumpCalculationDetails] = useState(false);
-    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [sprinklerSpecs, setSprinklerSpecs] = useState<{
         flowRatePerMin: number;
         waterPressure: number;
@@ -315,11 +308,22 @@ function FreeProduct() {
 
     const handleBack = () => router.visit('/free-plan/summary');
     const handleCheckout = () => {
-        setShowCheckoutModal(true);
-    };
-
-    const handleCloseCheckoutModal = () => {
-        setShowCheckoutModal(false);
+        // Save current recommendations to localStorage for checkout page
+        if (pipeRecommendations) {
+            localStorage.setItem('pipeRecommendations', JSON.stringify(pipeRecommendations));
+        }
+        if (pipeTypeRecommendations) {
+            localStorage.setItem('pipeTypeRecommendations', JSON.stringify(pipeTypeRecommendations));
+        }
+        if (pumpRecommendations) {
+            localStorage.setItem('pumpRecommendations', JSON.stringify(pumpRecommendations));
+        }
+        if (calculatedSprinklerSpecs) {
+            localStorage.setItem('calculatedSprinklerSpecs', JSON.stringify(calculatedSprinklerSpecs));
+        }
+        localStorage.setItem('sprinklerMode', sprinklerMode);
+        
+        router.visit('/free-plan/checkout');
     };
 
     // Function to find zone with highest flow rate
@@ -838,19 +842,20 @@ function FreeProduct() {
         }
 
         // คำนวณ pressure loss จากท่อแยกตาม PE และ PVC
+        // Use pipeTypeRecs directly instead of pipeTypeRecommendations state to avoid infinite loop
         const pumpRecs = calculatePumpRequirements(
             pumpFlowRate,
             currentSpecs.waterPressure,
             {
                 pe: {
-                    mainLoss: pipeTypeRecommendations?.main?.pe?.pressureLoss ?? 0,
-                    subMainLoss: pipeTypeRecommendations?.subMain?.pe?.pressureLoss ?? 0,
-                    lateralLoss: pipeTypeRecommendations?.lateral?.pe?.pressureLoss ?? 0,
+                    mainLoss: pipeTypeRecs?.main?.pe?.pressureLoss ?? 0,
+                    subMainLoss: pipeTypeRecs?.subMain?.pe?.pressureLoss ?? 0,
+                    lateralLoss: pipeTypeRecs?.lateral?.pe?.pressureLoss ?? 0,
                 },
                 pvc: {
-                    mainLoss: pipeTypeRecommendations?.main?.pvc?.pressureLoss ?? 0,
-                    subMainLoss: pipeTypeRecommendations?.subMain?.pvc?.pressureLoss ?? 0,
-                    lateralLoss: pipeTypeRecommendations?.lateral?.pvc?.pressureLoss ?? 0,
+                    mainLoss: pipeTypeRecs?.main?.pvc?.pressureLoss ?? 0,
+                    subMainLoss: pipeTypeRecs?.subMain?.pvc?.pressureLoss ?? 0,
+                    lateralLoss: pipeTypeRecs?.lateral?.pvc?.pressureLoss ?? 0,
                 },
             },
             0, // staticHead (สามารถเพิ่มในอนาคต)
@@ -865,9 +870,9 @@ function FreeProduct() {
         selectedPumpZoneId,
         selectedPipeZoneId,
         longestPipes,
-        pipeTypeRecommendations,
-        calculateOptimalSprinklerSpecs,
         calculateLongestPipeFlowRates,
+        // Removed pipeTypeRecommendations from dependencies to prevent infinite loop
+        // It's set in this effect, so using the computed value (pipeTypeRecs) directly instead
     ]);
 
     // Load Google Maps and render an interactive, read-only map like freeMap
@@ -1535,13 +1540,7 @@ function FreeProduct() {
                         </div>
                         {sprinklerMode === 'preset' ? (
                             sprinklerSpecs ? (
-                                <div className="space-y-3 rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
-                                    {/* Mode Indicator */}
-                                    <div className="flex items-center gap-2 text-xs text-emerald-400">
-                                        <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                        <span>{translations.usingSettingsFromSummary}</span>
-                                    </div>
-
+                                <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
                                     {/* Basic Specifications */}
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                         <div className="flex items-center justify-between">
@@ -1549,7 +1548,7 @@ function FreeProduct() {
                                                 {translations.flowRateProduct}:
                                             </span>
                                             <span className="font-semibold text-emerald-400">
-                                                {sprinklerSpecs.flowRatePerMin} LPM/plant
+                                                {sprinklerSpecs.flowRatePerMin} LPM
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
@@ -1569,65 +1568,6 @@ function FreeProduct() {
                                             </span>
                                         </div>
                                     </div>
-
-                                    {/* System Overview */}
-                                    <div className="border-t border-emerald-800/50 pt-2">
-                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-emerald-300">
-                                                    {translations.totalPlants}:
-                                                </span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {summaryData?.plants?.total || 0}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-emerald-300">
-                                                    {translations.totalZones}
-                                                </span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {zones.length}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Flow Rate Summary */}
-                                    <div className="border-t border-emerald-800/50 pt-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-emerald-300">
-                                                {translations.totalFlowRateProduct}:
-                                            </span>
-                                            <span className="text-lg font-bold text-emerald-400">
-                                                {Math.round(sprinklerSpecs.totalLPM)} LPM
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-xs text-emerald-400">
-                                            {summaryData?.plants?.total || 0} plants ×{' '}
-                                            {sprinklerSpecs.flowRatePerMin} LPM/plant
-                                        </div>
-                                    </div>
-
-                                    {/* Additional Info */}
-                                    <div className="border-t border-emerald-800/50 pt-2">
-                                        <div className="text-xs text-emerald-300">
-                                            <div className="mb-1 flex items-center justify-between">
-                                                <span>{translations.flowRatePerHour}</span>
-                                                <span className="font-semibold">
-                                                    {Math.round(sprinklerSpecs.totalLPM * 60)} LPH
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span>{translations.coveragePerSprinkler}</span>
-                                                <span className="font-semibold">
-                                                    {(
-                                                        Math.PI * Math.pow(sprinklerSpecs.radius, 2)
-                                                    ).toFixed(1)}{' '}
-                                                    m²
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             ) : (
                                 <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
@@ -1635,486 +1575,32 @@ function FreeProduct() {
                                 </div>
                             )
                         ) : calculatedSprinklerSpecs ? (
-                            <div className="space-y-4 rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
-                                {/* Mode Indicator */}
-                                <div className="flex items-center gap-2 text-xs text-emerald-400">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                    <span>{translations.calculatedUsing5StepMethod}</span>
-                                </div>
-
-                                {/* Zone Information */}
-                                {calculatedSprinklerSpecs.calculationDetails?.zoneInfo && (
-                                    <div className="rounded bg-emerald-800/30 p-3">
-                                        <div className="mb-2 text-xs font-medium text-emerald-300">
-                                            {translations.basedOnZone}{' '}
-                                            {
-                                                calculatedSprinklerSpecs.calculationDetails.zoneInfo
-                                                    .zoneName
-                                            }
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div className="flex justify-between">
-                                                <span>Area:</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneArea.toFixed(
-                                                        2
-                                                    )}{' '}
-                                                    Rai
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Plants:</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {
-                                                        calculatedSprinklerSpecs.calculationDetails
-                                                            .zoneInfo.zonePlants
-                                                    }
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Flow Rate:</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {
-                                                        calculatedSprinklerSpecs.calculationDetails
-                                                            .zoneInfo.zoneLPM
-                                                    }{' '}
-                                                    LPM
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>
-                                                    {translations.waterNeedPerSessionLabel}:
-                                                </span>
-                                                <span className="font-semibold text-cyan-400">
-                                                    {summaryData?.selectedPlant
-                                                        ? Math.round(
-                                                              calculatedSprinklerSpecs
-                                                                  .calculationDetails.zoneInfo
-                                                                  .zonePlants *
-                                                                  summaryData.selectedPlant
-                                                                      .waterNeed
-                                                          )
-                                                        : Math.round(
-                                                              calculatedSprinklerSpecs
-                                                                  .calculationDetails.zoneInfo
-                                                                  .zoneLPM * 30
-                                                          )}{' '}
-                                                    L/session
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>{translations.plantDensity}</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {
-                                                        calculatedSprinklerSpecs.calculationDetails
-                                                            .step3.plantDensity
-                                                    }{' '}
-                                                    {translations.plantsPerRai}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Calculation Details Toggle */}
-                                <div className="flex items-center justify-between">
-                                    <div className="text-sm font-medium text-emerald-300">
-                                        {translations.fiveStepCalculationProcess}
-                                    </div>
-                                    <button
-                                        onClick={() =>
-                                            setShowCalculationDetails(!showCalculationDetails)
-                                        }
-                                        className="flex items-center gap-2 rounded-lg bg-emerald-800/50 px-3 py-1 text-xs text-emerald-300 transition-colors hover:bg-emerald-700/50"
-                                    >
-                                        <span>
-                                            {showCalculationDetails
-                                                ? translations.hideDetails
-                                                : translations.showDetails}
-                                        </span>
-                                        <span
-                                            className={`transition-transform duration-200 ${showCalculationDetails ? 'rotate-180' : ''}`}
-                                        >
-                                            ▼
-                                        </span>
-                                    </button>
-                                </div>
-
-                                {/* 5-Step Calculation Process - Collapsible */}
-                                {showCalculationDetails && (
-                                    <div className="space-y-4">
-                                        {/* Step 1: Water Depth */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step1 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        1
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.convertWaterVolumeToDepth}
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                        <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-emerald-300">
-                                                                {translations.irrigationTime}
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-emerald-400">
-                                                                {
-                                                                    calculatedSprinklerSpecs
-                                                                        .calculationDetails.step1
-                                                                        .irrigationTimeMinutes
-                                                                }{' '}
-                                                                min
-                                                            </div>
-                                                        </div>
-                                                        <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-emerald-300">
-                                                                {translations.area}
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-emerald-400">
-                                                                {calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(
-                                                                    1
-                                                                )}{' '}
-                                                                m²
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                        <div className="rounded-lg border border-cyan-700/30 bg-cyan-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-cyan-300">
-                                                                {
-                                                                    translations.waterNeedPerSessionLabel
-                                                                }
-                                                            </div>
-                                                            <div className="text-sm font-bold text-cyan-400">
-                                                                {summaryData?.selectedPlant
-                                                                    ? Math.round(
-                                                                          calculatedSprinklerSpecs
-                                                                              .calculationDetails
-                                                                              .zoneInfo.zonePlants *
-                                                                              summaryData
-                                                                                  .selectedPlant
-                                                                                  .waterNeed
-                                                                      )
-                                                                    : calculatedSprinklerSpecs
-                                                                          .calculationDetails.step1
-                                                                          .totalWaterVolumeLiters}{' '}
-                                                                L/session
-                                                            </div>
-                                                        </div>
-                                                        <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-emerald-300">
-                                                                {translations.totalWaterVolume}
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-emerald-400">
-                                                                {
-                                                                    calculatedSprinklerSpecs
-                                                                        .calculationDetails.step1
-                                                                        .totalWaterVolumeLiters
-                                                                }{' '}
-                                                                L
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.waterDepthResult}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step1
-                                                                    .waterDepthMm
-                                                            }{' '}
-                                                            mm
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 2: Irrigation Rate */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step2 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        2
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.calculateIrrigationRate}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                    <div className="mb-1 text-xs text-emerald-300">
-                                                        {translations.requiredIrrigationRate}
-                                                    </div>
-                                                    <div className="text-lg font-bold text-emerald-400">
-                                                        {
-                                                            calculatedSprinklerSpecs
-                                                                .calculationDetails.step2
-                                                                .irrigationRateMmPerHour
-                                                        }{' '}
-                                                        mm/hour
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 3: Sprinkler Layout */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step3 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        3
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.designSprinklerLayout}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.optimalRadius}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .optimalRadius
-                                                            }{' '}
-                                                            m
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.sprinklerSpacing}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .sprinklerSpacing
-                                                            }{' '}
-                                                            m
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.totalSprinklersCalculated}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .totalSprinklers
-                                                            }
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-emerald-500">
-                                                            Area ÷ Coverage ={' '}
-                                                            {calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(
-                                                                0
-                                                            )}{' '}
-                                                            ÷{' '}
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerCoverageArea
-                                                            }{' '}
-                                                            ={' '}
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .totalSprinklers
-                                                            }
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.plantDensity}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .plantDensity
-                                                            }{' '}
-                                                            {translations.plantsPerRai}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 4: Flow Rate per Sprinkler */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step4 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        4
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.calculateFlowRatePerSprinkler}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.coverageAreaPerSprinkler}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerCoverageArea
-                                                            }{' '}
-                                                            m²
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-emerald-500">
-                                                            π × r² = π ×{' '}
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .optimalRadius
-                                                            }
-                                                            ²
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.flowRateLPH}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerFlowRateLPH
-                                                            }{' '}
-                                                            LPH
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.flowRateLPMResult}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerFlowRateLPM
-                                                            }{' '}
-                                                            LPM
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 5: Pressure Requirements */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step5 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        5
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.selectPressureFromCatalog}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.requiredPressure}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step5
-                                                                    .requiredPressure
-                                                            }{' '}
-                                                            Bar
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.pressureCategory}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step5
-                                                                    .pressureCategory
-                                                            }
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
+                            <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
                                 {/* Final Specifications */}
-                                <div className="border-t border-emerald-800/50 pt-4">
-                                    <div className="mb-4 flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-                                        <div className="text-lg font-semibold text-emerald-300">
-                                            {translations.finalSprinklerSpecifications}
-                                        </div>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-emerald-300">
+                                            {translations.flowRateProduct}:
+                                        </span>
+                                        <span className="font-semibold text-emerald-400">
+                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} LPM
+                                        </span>
                                     </div>
-
-                                    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-4">
-                                            <div className="mb-1 text-xs text-emerald-300">
-                                                {translations.flowRateProduct}
-                                            </div>
-                                            <div className="text-xl font-bold text-emerald-400">
-                                                {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)}{' '}
-                                                LPM
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-4">
-                                            <div className="mb-1 text-xs text-emerald-300">
-                                                {translations.pressureProduct}
-                                            </div>
-                                            <div className="text-xl font-bold text-emerald-400">
-                                                {calculatedSprinklerSpecs.waterPressure} Bar
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-4">
-                                            <div className="mb-1 text-xs text-emerald-300">
-                                                {translations.radiusProduct}
-                                            </div>
-                                            <div className="text-xl font-bold text-emerald-400">
-                                                {calculatedSprinklerSpecs.radius} m
-                                            </div>
-                                        </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-emerald-300">
+                                            {translations.pressureProduct}:
+                                        </span>
+                                        <span className="font-semibold text-emerald-400">
+                                            {calculatedSprinklerSpecs.waterPressure} Bar
+                                        </span>
                                     </div>
-
-                                    <div className="rounded-lg border border-emerald-600/30 bg-emerald-800/30 p-4">
-                                        <div className="mb-2 flex items-center justify-between">
-                                            <div className="text-sm font-medium text-emerald-300">
-                                                {translations.totalFlowRateProduct}
-                                            </div>
-                                            <div className="text-2xl font-bold text-emerald-400">
-                                                {Math.round(calculatedSprinklerSpecs.totalLPM)} LPM
-                                            </div>
-                                        </div>
-                                        <div className="text-xs text-emerald-400">
-                                            {calculatedSprinklerSpecs.calculationDetails?.step3
-                                                .totalSprinklers || 0}{' '}
-                                            sprinklers ×{' '}
-                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)}{' '}
-                                            LPM/sprinkler
-                                            <div className="mt-1 text-xs text-emerald-500">
-                                                Coverage:{' '}
-                                                {(calculatedSprinklerSpecs.calculationDetails?.step3
-                                                    .totalSprinklers || 0) *
-                                                    (calculatedSprinklerSpecs.calculationDetails
-                                                        ?.step4.sprinklerCoverageArea || 0)}{' '}
-                                                m²
-                                            </div>
-                                        </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-emerald-300">
+                                            {translations.radiusProduct}:
+                                        </span>
+                                        <span className="font-semibold text-emerald-400">
+                                            {calculatedSprinklerSpecs.radius} m
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -2183,7 +1669,7 @@ function FreeProduct() {
                                                 {translations.recommendedSize}:
                                             </span>
                                             <span className="font-semibold text-rose-400">
-                                                {pipeRecommendations?.main.sizeMM}mm (
+                                                {pipeRecommendations?.main.sizeMM?.toFixed(2)}mm (
                                                 {pipeRecommendations?.main.sizeInch})
                                             </span>
                                         </div>
@@ -2210,7 +1696,7 @@ function FreeProduct() {
                                                                     <span className="font-semibold text-blue-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .main.pe.sizeMM
+                                                                                .main.pe.sizeMM?.toFixed(2)
                                                                         }
                                                                         mm (
                                                                         {
@@ -2274,14 +1760,8 @@ function FreeProduct() {
                                                                     <span className="font-semibold text-green-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .main.pvc.sizeMM
-                                                                        }
-                                                                        mm (
-                                                                        {
-                                                                            pipeTypeRecommendations
                                                                                 .main.pvc.sizeInch
                                                                         }
-                                                                        )
                                                                     </span>
                                                                 </div>
                                                                 {pipeTypeRecommendations.main.pvc
@@ -2439,7 +1919,7 @@ function FreeProduct() {
                                                 {translations.recommendedSize}:
                                             </span>
                                             <span className="font-semibold text-violet-400">
-                                                {pipeRecommendations?.subMain.sizeMM}mm (
+                                                {pipeRecommendations?.subMain.sizeMM?.toFixed(2)}mm (
                                                 {pipeRecommendations?.subMain.sizeInch})
                                             </span>
                                         </div>
@@ -2466,7 +1946,7 @@ function FreeProduct() {
                                                                     <span className="font-semibold text-blue-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .subMain.pe.sizeMM
+                                                                                .subMain.pe.sizeMM?.toFixed(2)
                                                                         }
                                                                         mm (
                                                                         {
@@ -2530,15 +2010,9 @@ function FreeProduct() {
                                                                     <span className="font-semibold text-green-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .subMain.pvc.sizeMM
-                                                                        }
-                                                                        mm (
-                                                                        {
-                                                                            pipeTypeRecommendations
                                                                                 .subMain.pvc
                                                                                 .sizeInch
                                                                         }
-                                                                        )
                                                                     </span>
                                                                 </div>
                                                                 {pipeTypeRecommendations.subMain.pvc
@@ -2696,7 +2170,7 @@ function FreeProduct() {
                                                 {translations.recommendedSize}:
                                             </span>
                                             <span className="font-semibold text-amber-400">
-                                                {pipeRecommendations?.lateral.sizeMM}mm (
+                                                {pipeRecommendations?.lateral.sizeMM?.toFixed(2)}mm (
                                                 {pipeRecommendations?.lateral.sizeInch})
                                             </span>
                                         </div>
@@ -2723,7 +2197,7 @@ function FreeProduct() {
                                                                     <span className="font-semibold text-blue-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .lateral.pe.sizeMM
+                                                                                .lateral.pe.sizeMM?.toFixed(2)
                                                                         }
                                                                         mm (
                                                                         {
@@ -2787,15 +2261,9 @@ function FreeProduct() {
                                                                     <span className="font-semibold text-green-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .lateral.pvc.sizeMM
-                                                                        }
-                                                                        mm (
-                                                                        {
-                                                                            pipeTypeRecommendations
                                                                                 .lateral.pvc
                                                                                 .sizeInch
                                                                         }
-                                                                        )
                                                                     </span>
                                                                 </div>
                                                                 {pipeTypeRecommendations.lateral.pvc
@@ -4097,117 +3565,6 @@ function FreeProduct() {
                     </div>
                 </div>
             </div>
-
-            {/* Checkout Modal */}
-            {showCheckoutModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-                    onClick={handleCloseCheckoutModal}
-                >
-                    <div
-                        className="relative mx-4 w-full max-w-md rounded-lg bg-slate-800 p-6 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Close Button */}
-                        <button
-                            onClick={handleCloseCheckoutModal}
-                            className="absolute right-4 top-4 text-slate-400 transition-colors hover:text-white"
-                        >
-                            <svg
-                                className="h-6 w-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                />
-                            </svg>
-                        </button>
-
-                        {/* Modal Content */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600">
-                                    <svg
-                                        className="h-6 w-6 text-white"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        />
-                                    </svg>
-                                </div>
-                                <h3 className="text-xl font-bold text-white">
-                                    {translations.checkoutModalTitle}
-                                </h3>
-                            </div>
-
-                            <div className="leading-relaxed text-slate-300">
-                                <p className="mb-3">{translations.checkoutModalMessage}</p>
-                            </div>
-
-                            {/* LINE QR Code Section */}
-                            <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-4">
-                                <div className="mb-3 text-center">
-                                    <h4 className="mb-1 text-sm font-semibold text-green-400">
-                                        {translations.addFriendOnLine}
-                                    </h4>
-                                    <p className="text-xs text-green-300">
-                                        {translations.scanQRCodeToContact}
-                                    </p>
-                                </div>
-                                <div className="flex justify-center">
-                                    <div className="rounded-lg bg-white p-3 shadow-lg">
-                                        <QRCodeSVG
-                                            value={LINE_FRIEND_URL}
-                                            size={200}
-                                            level="M"
-                                            style={{
-                                                height: 'auto',
-                                                maxWidth: '100%',
-                                                width: '100%',
-                                            }}
-                                            viewBox="0 0 200 200"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="mt-3 text-center text-xs text-green-300">
-                                    {translations.orAddFriendAtLineId}{' '}
-                                    <span className="font-semibold text-green-400">{LINE_ID}</span>
-                                </p>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    onClick={handleCloseCheckoutModal}
-                                    className="flex-1 rounded-lg bg-slate-600 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-500"
-                                >
-                                    {translations.close}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        // TODO: Add functionality to save plan image
-                                        handleCloseCheckoutModal();
-                                    }}
-                                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
-                                >
-                                    {translations.savePlanImage}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

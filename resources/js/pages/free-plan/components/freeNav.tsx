@@ -1,6 +1,6 @@
 // FreeNav Component
 import { router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function FreeNav() {
     // State for language switching with localStorage persistence
@@ -13,6 +13,27 @@ function FreeNav() {
         return 'EN';
     });
 
+    // Track if this is the initial mount to avoid dispatching event on mount
+    const isInitialMount = useRef(true);
+
+    // Dispatch language change event after state update (outside render cycle)
+    useEffect(() => {
+        // Skip the initial mount
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (typeof window !== 'undefined') {
+            // Dispatch event after render cycle completes
+            window.dispatchEvent(
+                new CustomEvent('languageChanged', {
+                    detail: { language },
+                })
+            );
+        }
+    }, [language]);
+
     // Handle language toggle with localStorage persistence
     const handleLanguageToggle = () => {
         setLanguage((prev) => {
@@ -20,12 +41,6 @@ function FreeNav() {
             // Save to localStorage
             if (typeof window !== 'undefined') {
                 localStorage.setItem('cips-language', newLanguage);
-                // Dispatch a custom event to notify other components
-                window.dispatchEvent(
-                    new CustomEvent('languageChanged', {
-                        detail: { language: newLanguage },
-                    })
-                );
             }
             return newLanguage;
         });

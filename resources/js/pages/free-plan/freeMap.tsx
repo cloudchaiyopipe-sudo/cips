@@ -140,6 +140,8 @@ function FreeMap() {
     const drawingManagerRef = useRef<unknown>(null);
     const mapInstanceRef = useRef<unknown>(null);
     const [mapInitialized, setMapInitialized] = useState(false);
+    // Keep track of all pipe overlays to ensure they can be cleared on reset
+    const allPipeOverlaysRef = useRef<Array<google.maps.Polyline>>([]);
     // Remove plant points that overlap a given position within a small radius
     const removeOverlappedPlantPoints = useCallback(
         (position: { lat: number; lng: number }, radiusMeters: number = 5) => {
@@ -979,6 +981,7 @@ function FreeMap() {
                         });
 
                         polyline.setMap(map);
+                        allPipeOverlaysRef.current.push(polyline); // Track for reset
                         setMainPipes((prev) =>
                             prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                         );
@@ -1000,6 +1003,7 @@ function FreeMap() {
                         });
 
                         polyline.setMap(map);
+                        allPipeOverlaysRef.current.push(polyline); // Track for reset
                         setSubMainPipes((prev) =>
                             prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                         );
@@ -1021,6 +1025,7 @@ function FreeMap() {
                         });
 
                         polyline.setMap(map);
+                        allPipeOverlaysRef.current.push(polyline); // Track for reset
                         setLateralPipes((prev) =>
                             prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                         );
@@ -1549,6 +1554,10 @@ function FreeMap() {
         return () => {
             isMounted = false;
         };
+        // Note: createPumpPlacementPoints, createWaterSourceMarkerSimple, createZoneCenterMarker, and translations
+        // are declared later in the file but are used within event listeners that are created after component mount.
+        // They are safe to use here because event listeners capture the function references at creation time.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         mapInitialized,
         completedSteps,
@@ -1562,7 +1571,7 @@ function FreeMap() {
         subMainPipes,
         lateralPipes,
         createPlantPoints,
-    ]); // eslint-disable-line react-hooks/exhaustive-deps
+    ]);
 
     // 4. Handlers
 
@@ -1723,6 +1732,7 @@ function FreeMap() {
                         zIndex: 1200,
                     });
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setMainPipes((prev) =>
                         prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                     );
@@ -1742,6 +1752,7 @@ function FreeMap() {
                         zIndex: 1100,
                     });
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setSubMainPipes((prev) =>
                         prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                     );
@@ -1761,6 +1772,7 @@ function FreeMap() {
                         zIndex: 1000,
                     });
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setLateralPipes((prev) =>
                         prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                     );
@@ -1890,6 +1902,15 @@ function FreeMap() {
     const handleReset = () => {
         // Clear all overlays from the map first
         if (mapInstanceRef.current) {
+            // FIRST: Clear all pipes from the tracking ref (includes pipes created by useEffect)
+            // This ensures we remove pipes that might not be in state yet
+            allPipeOverlaysRef.current.forEach((polyline) => {
+                if (polyline) {
+                    polyline.setMap(null);
+                }
+            });
+            allPipeOverlaysRef.current = []; // Clear the ref
+
             // Clear all drawn shapes overlays
             drawnShapes.forEach((shape) => {
                 if (shape.overlay) {
@@ -1928,21 +1949,21 @@ function FreeMap() {
                 }
             });
 
-            // Clear all main pipes
+            // Clear all main pipes from state
             mainPipes.forEach((pipe) => {
                 if (pipe.overlay) {
                     (pipe.overlay as { setMap: (map: unknown) => void }).setMap(null);
                 }
             });
 
-            // Clear all sub-main pipes
+            // Clear all sub-main pipes from state
             subMainPipes.forEach((pipe) => {
                 if (pipe.overlay) {
                     (pipe.overlay as { setMap: (map: unknown) => void }).setMap(null);
                 }
             });
 
-            // Clear all lateral pipes
+            // Clear all lateral pipes from state
             lateralPipes.forEach((pipe) => {
                 if (pipe.overlay) {
                     (pipe.overlay as { setMap: (map: unknown) => void }).setMap(null);
@@ -1969,7 +1990,19 @@ function FreeMap() {
             ).setOptions({ drawingControl: false });
         }
 
-        // Reset all state
+        // Clear localStorage FIRST to prevent useEffect from recreating pipes
+        // Clear step progress, drawn shapes, water sources, pumps, zones, plant points, main pipes, sub-main pipes, and lateral pipes from localStorage, keep plant data
+        localStorage.removeItem('mapStepProgress');
+        localStorage.removeItem('drawnShapes');
+        localStorage.removeItem('waterSources');
+        localStorage.removeItem('pumps');
+        localStorage.removeItem('zones');
+        localStorage.removeItem('plantPoints');
+        localStorage.removeItem('mainPipes');
+        localStorage.removeItem('subMainPipes');
+        localStorage.removeItem('lateralPipes');
+
+        // Reset all state AFTER clearing localStorage
         setCurrentStep(0);
         setCompletedSteps([]);
         setDrawnShapes([]);
@@ -1982,17 +2015,6 @@ function FreeMap() {
         setSubMainPipes([]);
         setLateralPipes([]);
         setIsDrawingMode(false);
-
-        // Clear step progress, drawn shapes, water sources, pumps, zones, plant points, main pipes, sub-main pipes, and lateral pipes from localStorage, keep plant data
-        localStorage.removeItem('mapStepProgress');
-        localStorage.removeItem('drawnShapes');
-        localStorage.removeItem('waterSources');
-        localStorage.removeItem('pumps');
-        localStorage.removeItem('zones');
-        localStorage.removeItem('plantPoints');
-        localStorage.removeItem('mainPipes');
-        localStorage.removeItem('subMainPipes');
-        localStorage.removeItem('lateralPipes');
     };
     const handleNext = async () => {
         try {
@@ -2338,22 +2360,23 @@ function FreeMap() {
     );
 
     // Function to create water source marker (simple version for useEffect)
-    const createWaterSourceMarkerSimple = (
-        position: { lat: number; lng: number },
-        map: google.maps.Map
-    ) => {
-        console.log('🔧 Creating water source marker at:', position);
-        console.log('🔧 Map instance:', map);
+    const createWaterSourceMarkerSimple = useCallback(
+        (
+            position: { lat: number; lng: number },
+            map: google.maps.Map
+        ) => {
+            console.log('🔧 Creating water source marker at:', position);
+            console.log('🔧 Map instance:', map);
 
-        try {
-            const marker = new window.google.maps.Marker({
-                position: position,
-                map: map,
-                title: 'Water Source',
-                icon: {
-                    url:
-                        'data:image/svg+xml;charset=UTF-8,' +
-                        encodeURIComponent(`
+            try {
+                const marker = new window.google.maps.Marker({
+                    position: position,
+                    map: map,
+                    title: 'Water Source',
+                    icon: {
+                        url:
+                            'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent(`
                         <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                             <rect x="4" y="4" width="40" height="40" rx="8" fill="#3B82F6" stroke="#1E40AF" stroke-width="3"/>
                             <rect x="12" y="12" width="24" height="24" rx="4" fill="#FFFFFF"/>
@@ -2361,24 +2384,26 @@ function FreeMap() {
                             <circle cx="24" cy="24" r="4" fill="#3B82F6"/>
                         </svg>
                     `),
-                    scaledSize: new window.google.maps.Size(48, 48),
-                    anchor: new window.google.maps.Point(24, 24),
-                },
-                draggable: false,
-                clickable: true,
-                zIndex: 2000, // Higher than zones and plant points
-            });
+                        scaledSize: new window.google.maps.Size(48, 48),
+                        anchor: new window.google.maps.Point(24, 24),
+                    },
+                    draggable: false,
+                    clickable: true,
+                    zIndex: 2000, // Higher than zones and plant points
+                });
 
-            // Remove overlapped plant points at water source position (4 meters radius)
-            removeOverlappedPlantPoints(position, 4);
+                // Remove overlapped plant points at water source position (4 meters radius)
+                removeOverlappedPlantPoints(position, 4);
 
-            console.log('✅ Water source marker created successfully:', marker);
-            return marker;
-        } catch (error) {
-            console.error('❌ Error creating water source marker:', error);
-            return null;
-        }
-    };
+                console.log('✅ Water source marker created successfully:', marker);
+                return marker;
+            } catch (error) {
+                console.error('❌ Error creating water source marker:', error);
+                return null;
+            }
+        },
+        [removeOverlappedPlantPoints]
+    );
 
     // Function to create water source marker (with drag functionality)
     const createWaterSourceMarker = useCallback(
@@ -3654,6 +3679,7 @@ function FreeMap() {
             });
 
             polyline.setMap(map);
+            allPipeOverlaysRef.current.push(polyline); // Track for reset
 
             newMainPipes.push({
                 id: pipeId,
@@ -4014,12 +4040,20 @@ function FreeMap() {
                 return;
             }
 
-            // Calculate actual pipe boundaries that stay strictly within zone polygon
-            // For polygon zones, we need to find intersection points with zone boundaries
-            let westLng = zone.bounds.west;
-            let eastLng = zone.bounds.east;
-
-            // If zone has coordinates (polygon), find actual intersection points
+            // Calculate actual pipe boundaries based on actual tree positions
+            // Find the westernmost and easternmost trees in this zone
+            const treeLngs = zonePlantPoints.map((point) => point.position.lng);
+            
+            // Find westernmost and easternmost tree positions
+            const westmostTreeLng = Math.min(...treeLngs);
+            const eastmostTreeLng = Math.max(...treeLngs);
+            
+            // Use tree positions as primary boundaries for the pipe
+            // Pipe should not extend beyond the actual tree range
+            let westLng = westmostTreeLng;
+            let eastLng = eastmostTreeLng;
+            
+            // If zone has coordinates (polygon), ensure pipe doesn't exceed polygon boundaries
             if (zone.coordinates && zone.coordinates.length > 0) {
                 const pipeLat = zone.center.lat;
 
@@ -4069,29 +4103,28 @@ function FreeMap() {
                     }
                 });
 
-                // Find westernmost and easternmost intersection points
+                // If polygon intersections exist, clamp pipe to be within both tree range and polygon
                 if (uniqueIntersections.length >= 2) {
-                    const lngs = uniqueIntersections.map((i) => i.lng);
-                    westLng = Math.min(...lngs);
-                    eastLng = Math.max(...lngs);
-                } else if (uniqueIntersections.length === 1) {
-                    // Only one intersection (edge case), use bounds as fallback
-                    westLng = Math.max(zone.bounds.west, uniqueIntersections[0].lng - 0.0001);
-                    eastLng = Math.min(zone.bounds.east, uniqueIntersections[0].lng + 0.0001);
-                } else {
-                    // No intersections found, use bounds but ensure we're conservative
-                    westLng = zone.bounds.west;
-                    eastLng = zone.bounds.east;
+                    const polygonLngs = uniqueIntersections.map((i) => i.lng);
+                    const polygonWestLng = Math.min(...polygonLngs);
+                    const polygonEastLng = Math.max(...polygonLngs);
+                    
+                    // Pipe should be within tree range, but also not exceed polygon boundaries
+                    // Take the intersection of tree range and polygon range
+                    westLng = Math.max(westmostTreeLng, polygonWestLng);
+                    eastLng = Math.min(eastmostTreeLng, polygonEastLng);
                 }
-            } else {
-                // For rectangle zones, use bounds directly
-                westLng = zone.bounds.west;
-                eastLng = zone.bounds.east;
+                // If no intersections or only one, use tree positions (already set above)
             }
 
             // Final safety check: ensure pipe doesn't exceed zone bounds
+            // But pipe should primarily be limited by tree positions (not extending beyond trees)
             westLng = Math.max(westLng, zone.bounds.west);
             eastLng = Math.min(eastLng, zone.bounds.east);
+            
+            // Most importantly: ensure pipe doesn't extend beyond the actual tree range
+            westLng = Math.max(westLng, westmostTreeLng);
+            eastLng = Math.min(eastLng, eastmostTreeLng);
 
             console.log(`🌳 Zone ${index + 1} has ${zonePlantPoints.length} plant points`);
             console.log(
@@ -4122,6 +4155,7 @@ function FreeMap() {
 
             // Add to map
             polyline.setMap(map);
+            allPipeOverlaysRef.current.push(polyline); // Track for reset
             console.log(`✅ Created sub-main pipe for zone ${zone.id}`);
 
             newSubMainPipes.push({
@@ -4203,23 +4237,38 @@ function FreeMap() {
             if (needsConnection) {
                 // Create extended path that includes connection from zone center to closest point on sub-main pipe
                 // Build path: zone center -> closest point -> rest of sub-main pipe
+                // IMPORTANT: Use tree boundaries (westmostTreeLng, eastmostTreeLng) to ensure pipe doesn't extend beyond actual trees
                 let finalPath: Array<{ lat: number; lng: number }>;
 
-                // Determine the order of points in the final path
-                if (closestPointOnSubMain.lng === westLng) {
-                    // Connection point is at west end - path: zone center -> west -> east
+                // Check if there's only one tree (westmostTreeLng === eastmostTreeLng)
+                const isSingleTree = Math.abs(westmostTreeLng - eastmostTreeLng) < 0.000001;
+                
+                if (isSingleTree) {
+                    // If only one tree, pipe should only go from zone center to that tree position
+                    // Don't extend beyond the single tree
                     finalPath = [
                         zoneCenter,
-                        closestPointOnSubMain,
-                        { lat: zone.center.lat, lng: eastLng },
+                        { lat: zone.center.lat, lng: westmostTreeLng }, // Single tree position
                     ];
                 } else {
-                    // Connection point is at east end - path: zone center -> east -> west
-                    finalPath = [
-                        zoneCenter,
-                        closestPointOnSubMain,
-                        { lat: zone.center.lat, lng: westLng },
-                    ];
+                    // Multiple trees - extend pipe to cover tree range
+                    // Determine the order of points in the final path
+                    // Use tree boundaries instead of westLng/eastLng to ensure pipe doesn't extend beyond actual trees
+                    if (closestPointOnSubMain.lng === westLng || Math.abs(closestPointOnSubMain.lng - westmostTreeLng) < 0.000001) {
+                        // Connection point is at west end - path: zone center -> west -> east (but only to eastmost tree)
+                        finalPath = [
+                            zoneCenter,
+                            closestPointOnSubMain,
+                            { lat: zone.center.lat, lng: eastmostTreeLng }, // Use tree boundary, not eastLng
+                        ];
+                    } else {
+                        // Connection point is at east end - path: zone center -> east -> west (but only to westmost tree)
+                        finalPath = [
+                            zoneCenter,
+                            closestPointOnSubMain,
+                            { lat: zone.center.lat, lng: westmostTreeLng }, // Use tree boundary, not westLng
+                        ];
+                    }
                 }
 
                 // Update the sub-main pipe overlay with extended path
@@ -4657,12 +4706,7 @@ function FreeMap() {
                                 zone.bounds.south
                             );
 
-                            // Ensure we have a valid range
-                            if (topLat <= bottomLat) {
-                                // Use bounds as fallback
-                                topLat = Math.min(northernmostLat, zone.bounds.north);
-                                bottomLat = Math.max(southernmostLat, zone.bounds.south);
-                            }
+                            // Note: topLat can equal bottomLat for single tree columns - that's OK
                         } else {
                             // No intersections found - use plant positions with zone bounds as fallback
                             console.log(
@@ -4681,31 +4725,8 @@ function FreeMap() {
                     topLat = Math.min(topLat, zone.bounds.north);
                     bottomLat = Math.max(bottomLat, zone.bounds.south);
 
-                    // Ensure topLat is greater than bottomLat
-                    if (topLat <= bottomLat) {
-                        // Try to fix by using a minimum height
-                        const minHeight = 0.0001; // Approximately 10 meters
-                        const centerLat = (topLat + bottomLat) / 2;
-                        topLat = centerLat + minHeight / 2;
-                        bottomLat = centerLat - minHeight / 2;
-
-                        // Final check - if still invalid, use plant positions directly
-                        if (topLat <= bottomLat) {
-                            console.log(
-                                `⚠️ Invalid pipe bounds for column ${columnIndex + 1}, using plant positions directly`
-                            );
-                            topLat = Math.max(northernmostLat, zone.bounds.south + minHeight);
-                            bottomLat = Math.min(southernmostLat, zone.bounds.north - minHeight);
-                        }
-
-                        // If still invalid, skip
-                        if (topLat <= bottomLat) {
-                            console.log(
-                                `⚠️ Cannot create valid pipe bounds for column ${columnIndex + 1}, skipping lateral pipe`
-                            );
-                            return; // Skip this column
-                        }
-                    }
+                    // Note: topLat can equal bottomLat for single tree columns - that's OK
+                    // The pipe path logic below can handle this case correctly
 
                     // Define lateral pipe endpoints
                     const lateralTopPoint = { lat: topLat, lng: columnLng };
@@ -5043,6 +5064,7 @@ function FreeMap() {
 
                     // Add to map
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     console.log(
                         `✅ Successfully created lateral pipe ${columnIndex + 1} for zone ${zone.id}`
                     );
@@ -5301,13 +5323,8 @@ function FreeMap() {
                     topLat = Math.min(topLat, zone.bounds.north);
                     bottomLat = Math.max(bottomLat, zone.bounds.south);
 
-                    // Ensure topLat is greater than bottomLat
-                    if (topLat <= bottomLat) {
-                        console.log(
-                            `⚠️ Invalid pipe bounds for unconnected column ${columnIndex + 1}, skipping`
-                        );
-                        return;
-                    }
+                    // Note: topLat can equal bottomLat for single tree columns - that's OK
+                    // The pipe path logic below can handle this case correctly
 
                     // Create pipe path from top to bottom
                     const pipePath = [
@@ -5351,6 +5368,7 @@ function FreeMap() {
 
                     // Add to map
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     console.log(
                         `✅ Successfully created lateral pipe for unconnected column ${columnIndex + 1}`
                     );

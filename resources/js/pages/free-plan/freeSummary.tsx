@@ -791,37 +791,19 @@ function FreeSummary() {
                 alert('บันทึกโปรเจคสำเร็จ!');
             } else {
                 // Adding new project - check if we've reached the limit of 2 projects
-                let deletedProjectName = null;
                 if (projects.length >= 2) {
-                    // Sort projects by savedAt (oldest first)
-                    const sortedProjects = [...projects].sort(
-                        (a: { savedAt: string }, b: { savedAt: string }) => {
-                            return new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime();
-                        }
+                    // ถ้ามีโปรเจคครบ 2 โปรเจคแล้ว ให้แสดงเตือนและไม่ให้เพิ่ม
+                    alert(
+                        `ไม่สามารถเพิ่มโปรเจคใหม่ได้\n\nคุณมีโปรเจคที่บันทึกไว้ครบ 2 โปรเจคแล้ว\n\nกรุณาลบโปรเจคเก่าออกก่อน หรืออัปเดตโปรเจคที่มีอยู่`
                     );
-
-                    // Remove the oldest project
-                    const oldestProjectName = sortedProjects[0].projectName;
-                    const oldestIndex = projects.findIndex(
-                        (p: { projectName: string }) => p.projectName === oldestProjectName
-                    );
-                    if (oldestIndex >= 0) {
-                        projects.splice(oldestIndex, 1);
-                        deletedProjectName = oldestProjectName;
-                    }
+                    return; // หยุดการทำงาน ไม่บันทึกโปรเจคใหม่
                 }
 
                 // Add new project
                 projects.push(projectData);
 
                 // Show alert message
-                if (deletedProjectName) {
-                    alert(
-                        `โปรเจค "${deletedProjectName}" ถูกลบออกเนื่องจากจำกัดไว้เพียง 2 โปรเจคเท่านั้น\n\nบันทึกโปรเจค "${savedProjectName}" สำเร็จ!`
-                    );
-                } else {
-                    alert('บันทึกโปรเจคสำเร็จ!');
-                }
+                alert(`บันทึกโปรเจค "${savedProjectName}" สำเร็จ!\n\nตอนนี้คุณมี ${projects.length} โปรเจคที่บันทึกไว้`);
             }
 
             // Save to localStorage

@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             SuperUserSeeder::class,     // สร้าง Super Users และ Regular Users
+            AdminUserSeeder::class,     // ตั้งค่า admin user (fang.nitipoom@gmail.com)
             PlantTypeSeeder::class,     // สร้างข้อมูลประเภทพืช
             SprinklerSeeder::class,     // สร้างข้อมูลสปริงเกลอร์
             EquipmentSeeder::class,     // สร้างข้อมูลอุปกรณ์

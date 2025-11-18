@@ -310,6 +310,10 @@ export interface LanguageTranslations {
     requiredIrrigationRate: string;
     areaLabel: string;
     flowRateLabel: string;
+    equipment: string;
+    specifications: string;
+    details: string;
+    image: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -632,6 +636,10 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         requiredIrrigationRate: 'Required Irrigation Rate',
         areaLabel: 'Area',
         flowRateLabel: 'Flow Rate:',
+        equipment: 'Equipment',
+        specifications: 'Specifications',
+        details: 'Details',
+        image: 'Image',
     },
     TH: {
         // FreeHome page
@@ -947,6 +955,10 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         requiredIrrigationRate: 'อัตราการให้น้ำที่ต้องการ',
         areaLabel: 'พื้นที่',
         flowRateLabel: 'อัตราการไหล:',
+        equipment: 'อุปกรณ์',
+        specifications: 'ข้อมูลจำเพาะ',
+        details: 'รายละเอียด',
+        image: 'รูปภาพ',
     },
 };
 

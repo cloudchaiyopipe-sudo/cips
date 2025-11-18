@@ -197,9 +197,18 @@ export default function Profile() {
                                                 </span>
                                             )}
                                             {user.is_super_user && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-yellow-900/30 px-2 py-1 text-xs text-yellow-400">
-                                                    👑 Super User
-                                                </span>
+                                                <>
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-yellow-900/30 px-2 py-1 text-xs text-yellow-400">
+                                                        👑 Super User
+                                                    </span>
+                                                    <button
+                                                        onClick={() => router.visit('/free-plan')}
+                                                        className="inline-flex items-center gap-1 rounded-full bg-purple-900/30 px-2 py-1 text-xs text-purple-400 transition-colors hover:bg-purple-800/50"
+                                                        title="ไปหน้า Free Plan"
+                                                    >
+                                                        🌐 Free Plan
+                                                    </button>
+                                                </>
                                             )}
                                             <span
                                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${tierInfo.bgColor} ${tierInfo.color}`}
@@ -400,6 +409,35 @@ export default function Profile() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Admin Quick Links - สำหรับ Super User */}
+                            {user.is_super_user && (
+                                <div className="rounded-lg bg-gray-800 p-6">
+                                    <h3 className="mb-4 text-lg font-semibold text-white">
+                                        ⚡ Admin Quick Links
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={() => router.visit('/free-plan')}
+                                            className="w-full rounded-lg bg-purple-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-purple-700"
+                                        >
+                                            🌐 Free Plan
+                                        </button>
+                                        <button
+                                            onClick={() => router.visit('/admin/articles')}
+                                            className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-indigo-700"
+                                        >
+                                            📝 จัดการบทความ
+                                        </button>
+                                        <button
+                                            onClick={() => router.visit('/super/dashboard')}
+                                            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-left font-semibold text-white transition-colors hover:bg-blue-700"
+                                        >
+                                            🎛️ Super Dashboard
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Account Security */}
                             <div className="rounded-lg bg-gray-800 p-6">

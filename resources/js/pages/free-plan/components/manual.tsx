@@ -11,23 +11,23 @@ const manualPages = [
     {
         title: 'ยินดีต้อนรับสู่ Free Plan',
         description: 'ระบบออกแบบระบบน้ำหยดอัตโนมัติสำหรับเกษตรกร',
+        image: '/freePlanImg/freeManual/manual_1.jpg',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-600">
-                        <svg
-                            className="h-10 w-10 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                            />
-                        </svg>
+                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                        <img
+                            src="/freePlanImg/freeManual/manual_1.jpg"
+                            alt="เริ่มต้นใช้งาน"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                }
+                            }}
+                        />
                     </div>
                     <h3 className="text-xl font-bold text-white">เริ่มต้นใช้งาน</h3>
                 </div>
@@ -41,23 +41,23 @@ const manualPages = [
     {
         title: 'ขั้นตอนที่ 1: เลือกพืช',
         description: 'เลือกพืชที่คุณต้องการปลูก',
+        image: '/freePlanImg/freeManual/manual_2.jpg',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-600">
-                        <svg
-                            className="h-10 w-10 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                            />
-                        </svg>
+                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                        <img
+                            src="/freePlanImg/freeManual/manual_2.jpg"
+                            alt="เลือกพืช"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                }
+                            }}
+                        />
                     </div>
                     <h3 className="text-xl font-bold text-white">เลือกพืช</h3>
                 </div>
@@ -72,23 +72,23 @@ const manualPages = [
     {
         title: 'ขั้นตอนที่ 2: วาดแผนที่',
         description: 'วาดพื้นที่แปลงเกษตรของคุณบนแผนที่',
+        image: '/freePlanImg/freeManual/manual_3.jpg',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-purple-600">
-                        <svg
-                            className="h-10 w-10 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-                            />
-                        </svg>
+                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                        <img
+                            src="/freePlanImg/freeManual/manual_3.jpg"
+                            alt="วาดแผนที่"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                }
+                            }}
+                        />
                     </div>
                     <h3 className="text-xl font-bold text-white">วาดแผนที่</h3>
                 </div>
@@ -103,23 +103,23 @@ const manualPages = [
     {
         title: 'ขั้นตอนที่ 3: วางตำแหน่งพืช',
         description: 'วางตำแหน่งพืชบนแผนที่',
+        image: '/freePlanImg/freeManual/manual_4.jpg',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-yellow-600">
-                        <svg
-                            className="h-10 w-10 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
-                            />
-                        </svg>
+                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                        <img
+                            src="/freePlanImg/freeManual/manual_4.jpg"
+                            alt="วางตำแหน่งพืช"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                }
+                            }}
+                        />
                     </div>
                     <h3 className="text-xl font-bold text-white">วางตำแหน่งพืช</h3>
                 </div>
@@ -134,23 +134,23 @@ const manualPages = [
     {
         title: 'ขั้นตอนที่ 4: วางท่อ',
         description: 'วางท่อเมน ท่อย่อย และท่อแขนง',
+        image: '/freePlanImg/freeManual/manual_5.jpg',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-600">
-                        <svg
-                            className="h-10 w-10 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                            />
-                        </svg>
+                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                        <img
+                            src="/freePlanImg/freeManual/manual_5.jpg"
+                            alt="วางท่อ"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                }
+                            }}
+                        />
                     </div>
                     <h3 className="text-xl font-bold text-white">วางท่อ</h3>
                 </div>
@@ -165,23 +165,23 @@ const manualPages = [
     {
         title: 'ขั้นตอนที่ 5: ดูผลลัพธ์',
         description: 'ดูสรุปและคำแนะนำอุปกรณ์',
+        image: '/freePlanImg/freeManual/manual_5.jpg',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600">
-                        <svg
-                            className="h-10 w-10 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                            />
-                        </svg>
+                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                        <img
+                            src="/freePlanImg/freeManual/manual_5.jpg"
+                            alt="ดูผลลัพธ์"
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                }
+                            }}
+                        />
                     </div>
                     <h3 className="text-xl font-bold text-white">ดูผลลัพธ์</h3>
                 </div>
@@ -246,7 +246,7 @@ function Manual({ onClose }: ManualProps) {
                 </div>
 
                 {/* Content */}
-                <div className="mb-6 min-h-[300px] md:min-h-[350px]">
+                <div className="mb-6 min-h-[250px] md:min-h-[300px]">
                     {manualPages[currentPage].content}
                 </div>
 

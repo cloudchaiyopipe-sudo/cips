@@ -3,6 +3,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { useState, useEffect } from 'react';
 import { getTranslations } from './utils/language';
+import { SharedData } from '@/types';
 
 // Types
 interface User {
@@ -26,8 +27,9 @@ interface PageProps {
 // 2. Component
 function AcCount() {
     // Get user data from Inertia page props
-    const page = usePage<PageProps>();
+    const page = usePage<PageProps & SharedData>();
     const user = page.props.auth?.user;
+    const isAdmin = page.props.auth?.user?.is_admin || false;
 
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());
@@ -54,7 +56,30 @@ function AcCount() {
         };
     }, []);
 
-    const handleBack = () => window.history.back();
+    const handleBack = () => {
+        // ตรวจสอบ sessionStorage ว่ามาจากหน้า newsArticle หรือไม่
+        const fromNewsArticle = sessionStorage.getItem('fromNewsArticle');
+        if (fromNewsArticle === 'true') {
+            sessionStorage.removeItem('fromNewsArticle');
+            router.visit('/free-plan');
+            return;
+        }
+        
+        // ตรวจสอบ referrer ว่ามาจากหน้า /admin/articles หรือไม่
+        const referrer = document.referrer;
+        if (referrer && (referrer.includes('/admin/articles') || referrer.includes('/admin/articles/create'))) {
+            router.visit('/free-plan');
+            return;
+        }
+        
+        // ถ้ามี history ให้กลับไปหน้าก่อนหน้า
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            // ถ้าไม่มี history ให้ไปหน้า free-plan
+            router.visit('/free-plan');
+        }
+    };
     const handleUpgrade = () => router.visit('/free-plan/upgradePro');
     const handleEditProfile = () => alert('Edit profile (demo)');
     const handleChangePassword = () => alert('Change password (demo)');
@@ -177,19 +202,37 @@ function AcCount() {
                     )}
                 </div>
 
-                {/* Advertisement Management */}
-                <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
-                    <div className="mb-2 font-semibold">{translations.advertisementManagement}</div>
-                    <div className="mb-3 text-sm text-slate-300">
-                        {translations.uploadManageAds}
+                {/* Advertisement Management - แสดงเฉพาะ Admin */}
+                {isAdmin && (
+                    <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
+                        <div className="mb-2 font-semibold">{translations.advertisementManagement}</div>
+                        <div className="mb-3 text-sm text-slate-300">
+                            {translations.uploadManageAds}
+                        </div>
+                        <button
+                            onClick={handleManageAds}
+                            className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
+                        >
+                            {translations.manageAdvertisements}
+                        </button>
                     </div>
-                    <button
-                        onClick={handleManageAds}
-                        className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
-                    >
-                        {translations.manageAdvertisements}
-                    </button>
-                </div>
+                )}
+
+                {/* Article Management - แสดงเฉพาะ Admin */}
+                {isAdmin && (
+                    <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
+                        <div className="mb-2 font-semibold">จัดการบทความ</div>
+                        <div className="mb-3 text-sm text-slate-300">
+                            จัดการและแก้ไขบทความที่แสดงในหน้าแรก
+                        </div>
+                        <button
+                            onClick={() => router.visit('/admin/articles')}
+                            className="w-full rounded-lg bg-purple-600 py-3 font-semibold text-white transition-colors hover:bg-purple-700"
+                        >
+                            📝 จัดการบทความ
+                        </button>
+                    </div>
+                )}
 
                 {/* Account Statistics */}
                 <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">

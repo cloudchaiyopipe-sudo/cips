@@ -45,11 +45,11 @@ return [
 
         'mysql' => [
             'driver' => 'mysql',
-    'host' => '127.0.0.1', // Hardcoded
-    'port' => '3306', // Hardcoded
-    'database' => 'waterapp_local', // Hardcoded
-    'username' => 'root', // Hardcoded
-    'password' => '', // Hardcoded
+            'host' => '127.0.0.1', // Hardcoded
+            'port' => '3306', // Hardcoded
+            'database' => 'waterapp_local', // Hardcoded
+            'username' => 'root', // Hardcoded
+            'password' => '', // Hardcoded
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_general_ci'),

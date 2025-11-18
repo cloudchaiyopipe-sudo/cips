@@ -5,7 +5,11 @@ use Inertia\Inertia;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SuperUserController;
-use App\Http\Controllers\FarmController; // เพิ่มบรรทัดนี้
+use App\Http\Controllers\FarmController;
+use App\Http\Controllers\Admin\ArticleAdminController;
+use App\Http\Controllers\FreePlan\NewsController;
+use App\Http\Controllers\Admin\ProductAdminController;
+use App\Http\Controllers\FreePlan\ProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -772,10 +776,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/folders/{folderId}', [SuperUserController::class, 'deleteFolder'])->name('delete-folder');
     });
 
+    
+    // Admin Routes - normal users cannot access
+    Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+        // GET /admin/articles (แสดงรายการ)
+        // GET /admin/articles/create (แสดงฟอร์มสร้าง)
+        // POST /admin/articles (บันทึกของใหม่)
+        // GET /admin/articles/{article}/edit (แสดงฟอร์มแก้ไข)
+        // PUT /admin/articles/{article} (อัปเดตของเดิม)
+        Route::resource('articles', ArticleAdminController::class);
+    });
+
+
+    Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+        // ... (Route::resource('articles', ...) ของเดิม) ...
+    
+        // เพิ่ม Route สำหรับ Products
+        Route::resource('products', ProductAdminController::class);
+    });
+
+    // Free Plan Product Route - Sales users cannot access
+    Route::get('/free-plan/products', [ProductController::class, 'index'])->name('free.products');
+
     // Free Plan Routes - Sales users cannot access
     Route::get('/free-plan', function () {
         return Inertia::render('free-plan/freeHome');
     })->name('free-plan');
+
+    // Free Plan News Route - Sales users cannot access
+    Route::get('/free-plan/news', [NewsController::class, 'index'])->name('free.news');
+    Route::get('/free-plan/articles/{article}', [NewsController::class, 'show'])->name('free.article.show');
 
     Route::get('/free-plan/choose-crop', function () {
         return Inertia::render('free-plan/chooseCrop');
@@ -796,10 +826,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/freeProduct');
     })->name('free-plan.product');
 
+    // Free Plan Checkout Route - Sales users cannot access
+    Route::get('/free-plan/checkout', function () {
+        return Inertia::render('free-plan/freeCheckout');
+    })->name('free-plan.checkout');
+
+
     // Free Plan Account/Profile Route - Sales users cannot access
     Route::get('/free-plan/account', function () {
-        return Inertia::render('free-plan/acCount');
+        return Inertia::render('free-plan/acCount', [
+            'verified' => session('verified'),
+        ]);
     })->name('free-plan.account');
+
+    // Free Plan Email Verification Routes - Sales users cannot access
+    Route::post('/free-plan/email/verification-notification', [\App\Http\Controllers\FreePlan\FreePlanEmailVerificationNotificationController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('free-plan.verification.send');
+
+    Route::get('/free-plan/verify-email/{id}/{hash}', [\App\Http\Controllers\FreePlan\FreePlanVerifyEmailController::class, '__invoke'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('free-plan.verification.verify');
 
     // Free Plan Upgrade Pro Route - Sales users cannot access
     Route::get('/free-plan/upgradePro', function () {
@@ -816,6 +863,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/components/ads');
     })->name('free-plan.ads');
 });
+
+// Serve storage files (fallback if symbolic link doesn't work)
+Route::get('/storage/{path}', function ($path) {
+    $filePath = storage_path('app/public/' . $path);
+    
+    if (!file_exists($filePath)) {
+        abort(404);
+    }
+    
+    return response()->file($filePath);
+})->where('path', '.*')->name('storage.serve');
+
+// Auth routes are handled in routes/auth.php
+// Removed Auth::routes() to avoid laravel/ui dependency
 
 // Include other route files
 require __DIR__.'/auth.php';

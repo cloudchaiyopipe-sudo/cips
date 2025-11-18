@@ -2,6 +2,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import FreeFooter from './components/freeFooter';
+import FootNav from './components/footNav';
 import Manual from './components/manual';
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
@@ -45,6 +46,8 @@ function FreeHome() {
 
     // Ref to track if ad has been shown (to prevent showing again)
     const adShownRef = useRef(false);
+    // Ref to track if manual was shown (to show ad after manual closes)
+    const manualWasShownRef = useRef(false);
 
     // State for language
     const [translations, setTranslations] = useState(getTranslations());
@@ -88,7 +91,7 @@ function FreeHome() {
 
     // Show manual first when page loads (if not disabled)
     useEffect(() => {
-        if (!loading && !adShownRef.current) {
+        if (!loading) {
             const dontShowManual = localStorage.getItem('manualDontShowAgain');
             if (!dontShowManual) {
                 // Show manual first
@@ -96,31 +99,41 @@ function FreeHome() {
                     setShowManualModal(true);
                 }, 500);
                 return () => clearTimeout(timer);
-            } else {
-                // If manual is disabled, show ad immediately (only once)
-                if (advertisements.length > 0 && !adShownRef.current) {
+            }
+        }
+    }, [loading]);
+
+    // Show advertisement modal when manual is disabled (user checked "don't show again" before)
+    useEffect(() => {
+        if (!loading && advertisements.length > 0 && !showAdModal && !showManualModal) {
+            const dontShowManual = localStorage.getItem('manualDontShowAgain');
+            if (dontShowManual) {
+                // Manual is disabled, show ad immediately (only once)
+                if (!adShownRef.current) {
                     adShownRef.current = true;
-                    setShowAdModal(true);
+                    const timer = setTimeout(() => {
+                        setShowAdModal(true);
+                    }, 500);
+                    return () => clearTimeout(timer);
                 }
             }
         }
-    }, [loading, advertisements.length]);
+    }, [loading, advertisements.length, showAdModal, showManualModal]);
 
-    // Show advertisement modal after manual is closed
+    // Show advertisement modal after manual is closed (when user closes manual without "don't show again")
     useEffect(() => {
-        if (
-            !showManualModal &&
-            !loading &&
-            advertisements.length > 0 &&
-            !showAdModal &&
-            !adShownRef.current
-        ) {
-            // Show ad after manual is closed (only if ad hasn't been shown yet)
-            adShownRef.current = true;
-            const timer = setTimeout(() => {
-                setShowAdModal(true);
-            }, 500);
-            return () => clearTimeout(timer);
+        if (showManualModal) {
+            manualWasShownRef.current = true;
+        } else if (manualWasShownRef.current && !showManualModal && !loading && advertisements.length > 0 && !showAdModal) {
+            // Manual was shown and now closed, show ad after a delay
+            const dontShowManual = localStorage.getItem('manualDontShowAgain');
+            if (!dontShowManual && !adShownRef.current) {
+                adShownRef.current = true;
+                const timer = setTimeout(() => {
+                    setShowAdModal(true);
+                }, 500);
+                return () => clearTimeout(timer);
+            }
         }
     }, [showManualModal, loading, advertisements.length, showAdModal]);
 
@@ -323,6 +336,10 @@ function FreeHome() {
         setCurrentAdIndex((prev) => (prev - 1 + advertisements.length) % advertisements.length);
     };
 
+    const handleOpenManual = () => {
+        setShowManualModal(true);
+    };
+
     // 5. Return TSX
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
@@ -332,7 +349,7 @@ function FreeHome() {
             <FreeNav />
 
             {/* Main Content */}
-            <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-between">
+            <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-between pb-20 md:pb-0">
                 {/* Welcome Section */}
                 <div className="md:min-h-auto min-h-[80vh] w-full max-w-md px-4 pb-4 pt-8 text-center md:px-6 md:pb-6 md:pt-12">
                     <h1 className="mb-8 text-3xl font-bold text-white md:mb-12 md:text-4xl lg:text-5xl">
@@ -340,6 +357,30 @@ function FreeHome() {
                         <br />
                         {translations.freePlan}
                     </h1>
+
+                    {/* Help/Manual Button */}
+                    <div className="mb-4 flex justify-center">
+                        <button
+                            onClick={handleOpenManual}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-500 bg-slate-700/50 px-4 py-2 text-sm font-medium text-slate-300 transition-all hover:bg-slate-600 hover:text-white md:px-5 md:py-2.5 md:text-base"
+                            title="เปิดคู่มือการใช้งาน"
+                        >
+                            <svg
+                                className="h-4 w-4 md:h-5 md:w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                />
+                            </svg>
+                            <span>คู่มือการใช้งาน</span>
+                        </button>
+                    </div>
 
                     {/* Add Field Button */}
                     <button
@@ -606,6 +647,9 @@ function FreeHome() {
 
             {/* Manual/Tutorial Modal */}
             {showManualModal && <Manual onClose={() => setShowManualModal(false)} />}
+
+            {/* Bottom Navigation for Mobile */}
+            <FootNav />
         </div>
     );
 }
