@@ -916,6 +916,38 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         setHasAutoSelected(false);
     }, [analyzedPumps]);
 
+    const requiredHorsepower = useMemo(() => {
+        const requiredFlowLPM =
+            projectMode === 'garden'
+                ? gardenReq.requiredFlowLPM
+                : projectMode === 'greenhouse'
+                  ? horticultureReq.requiredFlowLPM
+                  : projectMode === 'field-crop'
+                    ? fieldCropRequirements.requiredFlowLPM
+                    : horticultureReq.requiredFlowLPM;
+        
+        const requiredHeadM = maxPumpHeadWithSafety;
+        
+        // ถ้าไม่มีค่าหรือเป็น 0 ให้ return 0
+        if (!requiredFlowLPM || !requiredHeadM || requiredFlowLPM === 0 || requiredHeadM === 0) {
+            return 0;
+        }
+        
+        // สูตรคำนวณกำลังปั๊ม: Power (HP) = (Flow (LPM) × Head (m)) / (4500 × efficiency)
+        // ใช้ efficiency = 0.6 (60%) เป็นค่าเริ่มต้น
+        const efficiency = 0.6;
+        const powerHP = (requiredFlowLPM * requiredHeadM) / (4500 * efficiency);
+        
+        // ปัดขึ้นเป็นจำนวนเต็ม (เพราะต้องใช้ปั๊มอย่างน้อยเท่านี้)
+        return Math.ceil(powerHP);
+    }, [
+        projectMode,
+        gardenReq.requiredFlowLPM,
+        horticultureReq.requiredFlowLPM,
+        fieldCropRequirements.requiredFlowLPM,
+        maxPumpHeadWithSafety,
+    ]);
+
     const getSelectionStatus = (pump: any) => {
         if (!pump) return null;
         
@@ -1039,8 +1071,14 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             {maxPumpHeadWithSafety.toFixed(1)}{' '}
                             {t('เมตร')}
                         </span>
-                        <span className="ml-1 text-xs text-gray-400">(+ 10% + ความสูงจากปั๊มไปจุดสูงสุด)</span>
+                        <span className="ml-1 text-xs text-gray-400"></span>
+                        
                     </span>
+                    {requiredHorsepower > 0 && (
+                            <span>
+                                {t('ต้องการปั๊มอย่างน้อย')} <span className="font-bold text-yellow-300">{requiredHorsepower}{t('HP')}</span>
+                            </span>
+                        )}
                 </div>
             </div>
 
@@ -1177,7 +1215,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
                         <div>
                             <p>
-                                <strong>{t('รุ่น:')}</strong> {currentPump.productCode}
+                                <strong>{t('รหัสสินค้า:')}</strong> {currentPump.productCode}
                             </p>
                             <p>
                                 <strong>{t('ชื่อ:')}</strong>{' '}

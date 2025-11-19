@@ -14,6 +14,7 @@ import {
     calculateWaterFlowRate,
     isPointInPolygon,
     calculateDistanceBetweenPoints,
+    Coordinate,
 } from './horticultureUtils';
 import {
     loadSprinklerConfig,
@@ -1803,14 +1804,79 @@ export const findMainToSubMainConnectionsInResults = (
 
     if (!mainPipes || !subMainPipes) return connections;
 
-    const findPipeZone = (pipe: any): string | null => {
+    const findPipeZone = (pipe: any, checkPoint?: Coordinate): string | null => {
         if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
 
-        const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
+        // ตรวจสอบหลายจุดของท่อเพื่อหาว่าท่ออยู่ในโซนไหน
+        // ตรวจสอบจุดเริ่มต้น, จุดสิ้นสุด, จุดกึ่งกลาง, และจุดที่ต้องการตรวจสอบ (ถ้ามี)
+        const pointsToCheck: Coordinate[] = [
+            pipe.coordinates[0], // จุดเริ่มต้น
+            pipe.coordinates[pipe.coordinates.length - 1], // จุดสิ้นสุด
+        ];
+
+        // เพิ่มจุดกึ่งกลางถ้ามีหลายจุด
+        if (pipe.coordinates.length > 2) {
+            const midIndex = Math.floor(pipe.coordinates.length / 2);
+            pointsToCheck.push(pipe.coordinates[midIndex]);
+        }
+
+        // เพิ่มจุดที่ต้องการตรวจสอบ (เช่น connection point)
+        if (checkPoint) {
+            pointsToCheck.push(checkPoint);
+        }
+
+        // ตรวจสอบว่าท่ออยู่ในโซนไหน โดยต้องตรวจสอบว่าจุดส่วนใหญ่อยู่ในโซนเดียวกัน
+        const zoneCounts = new Map<string, number>();
 
         if (irrigationZones) {
             for (const zone of irrigationZones) {
-                if (isPointInPolygon(endPoint, zone.coordinates)) {
+                let count = 0;
+                for (const point of pointsToCheck) {
+                    if (isPointInPolygon(point, zone.coordinates)) {
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    zoneCounts.set(zone.id, count);
+                }
+            }
+        }
+
+        if (zones) {
+            for (const zone of zones) {
+                let count = 0;
+                for (const point of pointsToCheck) {
+                    if (isPointInPolygon(point, zone.coordinates)) {
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    const existingCount = zoneCounts.get(zone.id) || 0;
+                    zoneCounts.set(zone.id, existingCount + count);
+                }
+            }
+        }
+
+        // หาโซนที่มีจุดมากที่สุด (ต้องมีอย่างน้อย 2 จุดหรือมากกว่า 50% ของจุดที่ตรวจสอบ)
+        let maxCount = 0;
+        let selectedZone: string | null = null;
+        const minRequiredPoints = Math.max(2, Math.ceil(pointsToCheck.length * 0.5));
+
+        for (const [zoneId, count] of zoneCounts.entries()) {
+            if (count >= minRequiredPoints && count > maxCount) {
+                maxCount = count;
+                selectedZone = zoneId;
+            }
+        }
+
+        return selectedZone;
+    };
+
+    // ฟังก์ชันตรวจสอบว่าจุดอยู่ในโซนไหน (สำหรับจุดเดียว)
+    const findPipeZoneForPoint = (point: Coordinate): string | null => {
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (isPointInPolygon(point, zone.coordinates)) {
                     return zone.id;
                 }
             }
@@ -1818,7 +1884,7 @@ export const findMainToSubMainConnectionsInResults = (
 
         if (zones) {
             for (const zone of zones) {
-                if (isPointInPolygon(endPoint, zone.coordinates)) {
+                if (isPointInPolygon(point, zone.coordinates)) {
                     return zone.id;
                 }
             }
@@ -1827,41 +1893,105 @@ export const findMainToSubMainConnectionsInResults = (
         return null;
     };
 
+    // ฟังก์ชันตรวจสอบว่าจุดอยู่ในโซนเดียวกันหรือไม่
+    const isPointInSameZone = (point: Coordinate, zoneId: string): boolean => {
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (zone.id === zoneId && isPointInPolygon(point, zone.coordinates)) {
+                    return true;
+                }
+            }
+        }
+
+        if (zones) {
+            for (const zone of zones) {
+                if (zone.id === zoneId && isPointInPolygon(point, zone.coordinates)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    };
+
+    // เก็บ connection ที่มีอยู่แล้วในแต่ละโซน เพื่อป้องกันการเชื่อมต่อซ้ำ
+    const zoneConnections = new Map<string, Set<string>>(); // zoneId -> Set<subMainId>
+
     for (const mainPipe of mainPipes) {
         if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) continue;
 
         const mainEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-        const mainZone = findPipeZone(mainPipe);
+        
+        // ตรวจสอบโซนของจุดปลายท่อเมนก่อน (ไม่ใช่โซนของทั้งท่อ)
+        const mainEndZone = findPipeZoneForPoint(mainEnd);
+        const mainZone = findPipeZone(mainPipe, mainEnd); // ตรวจสอบโซนของท่อเมนโดยใช้จุดปลายท่อ
+
+        // ถ้าไม่พบโซนของจุดปลายท่อเมน ให้ข้าม
+        if (!mainEndZone) {
+            continue;
+        }
 
         for (const subMain of subMainPipes) {
             if (!subMain.coordinates || subMain.coordinates.length === 0) continue;
 
             const subMainStart = subMain.coordinates[0];
-            const subMainZone = findPipeZone(subMain);
+            
+            // ตรวจสอบโซนของจุดเริ่มต้นท่อเมนรองก่อน (ไม่ใช่โซนของทั้งท่อ)
+            const subMainStartZone = findPipeZoneForPoint(subMainStart);
+            const subMainZone = findPipeZone(subMain, subMainStart); // ตรวจสอบโซนของท่อเมนรองโดยใช้จุดเริ่มต้น
 
-            if (mainZone && subMainZone && mainZone !== subMainZone) {
-                const isMultiZoneMainPipe = checkMainPipePassesThroughMultipleZones(
-                    mainPipe,
-                    zones,
-                    irrigationZones
-                );
+            // ข้อกำหนด 1: ท่อเมนห้ามไปเชื่อมกับท่อเมนรองของโซนอื่น
+            // ต้องตรวจสอบว่าโซนของจุดปลายท่อเมนและโซนของจุดเริ่มต้นท่อเมนรองต้องตรงกัน
+            if (!subMainStartZone || mainEndZone !== subMainStartZone) {
+                continue;
+            }
 
-                const connectionDistance = calculateDistanceBetweenPoints(mainEnd, subMainStart);
-                const isCloseConnection = connectionDistance <= snapThreshold;
+            // ตรวจสอบเพิ่มเติม: ตรวจสอบว่าจุดเชื่อมต่อ (mainEnd และ subMainStart) อยู่ในโซนเดียวกันจริงๆ
+            // เพื่อป้องกันกรณีที่ท่ออยู่ใกล้ขอบโซน - ต้องตรวจสอบทั้งสองจุด
+            if (!isPointInSameZone(mainEnd, mainEndZone)) {
+                continue;
+            }
+            if (!isPointInSameZone(subMainStart, subMainStartZone)) {
+                continue;
+            }
 
-                if (!isMultiZoneMainPipe && !isCloseConnection) {
+            // ตรวจสอบอีกครั้ง: ต้องแน่ใจว่าทั้งสองจุดอยู่ในโซนเดียวกันจริงๆ
+            if (mainEndZone !== subMainStartZone) {
+                continue;
+            }
+
+            // ตรวจสอบว่าท่อเมนรองนี้เชื่อมต่อกับท่อเมนแล้วหรือยัง
+            if (zoneConnections.has(mainEndZone)) {
+                const connectedSubMains = zoneConnections.get(mainEndZone);
+                if (connectedSubMains && connectedSubMains.has(subMain.id)) {
+                    // ท่อเมนรองนี้เชื่อมต่อแล้วในโซนนี้ ให้ข้าม
                     continue;
                 }
             }
 
+            // ข้อกำหนด 2: ในโซนเดียวท่อเมนรองต้องเชื่อมกับท่อเมนเพียงจุดเดียวเท่านั้น คือจุดของปลายท่อเมน
             const distance = calculateDistanceBetweenPoints(mainEnd, subMainStart);
 
             if (distance <= snapThreshold) {
+                // ตรวจสอบอีกครั้งว่าจุดเชื่อมต่ออยู่ในโซนเดียวกันจริงๆ
+                if (!isPointInSameZone(mainEnd, mainEndZone) || !isPointInSameZone(subMainStart, subMainStartZone)) {
+                    continue;
+                }
+                if (mainEndZone !== subMainStartZone) {
+                    continue;
+                }
+
                 connections.push({
                     mainId: mainPipe.id,
                     subMainId: subMain.id,
                     distance,
                 });
+
+                // บันทึกว่าท่อเมนรองนี้เชื่อมต่อแล้วในโซนนี้
+                if (!zoneConnections.has(mainEndZone)) {
+                    zoneConnections.set(mainEndZone, new Set());
+                }
+                zoneConnections.get(mainEndZone)?.add(subMain.id);
             }
         }
     }

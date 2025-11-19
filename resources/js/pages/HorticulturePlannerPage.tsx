@@ -8808,7 +8808,9 @@ export default function EnhancedHorticulturePlannerPage() {
 
                 const { mainPipes: updatedMainPipes, snapped } = snapMainPipeEndToSubMainPipe(
                     history.present.mainPipes,
-                    newSubMainPipe.coordinates
+                    newSubMainPipe.coordinates,
+                    history.present.zones,
+                    history.present.irrigationZones
                 );
 
                 if (snapped && typeof window !== 'undefined' && (window as any).showNotification) {
@@ -11434,7 +11436,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         .map((plant) => ({
                             ...plant,
                             // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
-                            rotationAngle: plant.rotationAngle !== undefined 
+                            rotationAngle: (plant.rotationAngle !== undefined && plant.rotationAngle !== null)
                                 ? plant.rotationAngle 
                                 : currentRotationAngle
                         }));
@@ -11445,7 +11447,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         .map((plant) => ({
                             ...plant,
                             // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
-                            rotationAngle: plant.rotationAngle !== undefined 
+                            rotationAngle: (plant.rotationAngle !== undefined && plant.rotationAngle !== null)
                                 ? plant.rotationAngle 
                                 : currentRotationAngle
                         }));
@@ -11464,7 +11466,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         .map((plant) => ({
                             ...plant,
                             // ใช้ rotationAngle จากต้นไม้จริง หรือใช้ค่าปัจจุบันจาก settings
-                            rotationAngle: plant.rotationAngle !== undefined 
+                            rotationAngle: (plant.rotationAngle !== undefined && plant.rotationAngle !== null)
                                 ? plant.rotationAngle 
                                 : currentRotationAngle
                         }));

@@ -91,30 +91,10 @@ export const createSubMainToMainMidConnectionPoints = (
     irrigationZones?: any[],
     snapThreshold: number = 15
 ): ConnectionPoint[] => {
-    const connectionPoints: ConnectionPoint[] = [];
-
-    const connections = findMidConnections(
-        subMainPipes,
-        mainPipes,
-        snapThreshold,
-        zones,
-        irrigationZones
-    );
-
-    connections.forEach((connection) => {
-        connectionPoints.push({
-            id: `submain-mainmid-${connection.sourcePipeId}-${connection.targetPipeId}`,
-            type: 'submain-to-main-mid',
-            position: connection.connectionPoint,
-            mainPipeId: connection.targetPipeId,
-            subMainPipeId: connection.sourcePipeId,
-            color: CONNECTION_POINT_CONFIG.subMainToMainMid.color,
-            title: CONNECTION_POINT_CONFIG.subMainToMainMid.title,
-            zIndex: CONNECTION_POINT_CONFIG.subMainToMainMid.zIndex,
-        });
-    });
-
-    return connectionPoints;
+    // ข้อกำหนด 2: ในโซนเดียวท่อเมนรองต้องเชื่อมกับท่อเมนเพียงจุดเดียวเท่านั้น คือจุดของปลายท่อเมน
+    // ดังนั้นไม่ควรสร้าง connection points สำหรับ submain-to-main-mid
+    // เพราะห้ามการเชื่อมต่อที่จุดกลาง
+    return [];
 };
 
 export const createSubMainToMainIntersectionPoints = (

@@ -1195,7 +1195,9 @@ export const findClosestPointOnLineSegment = (
 
 export const snapMainPipeEndToSubMainPipe = (
     mainPipes: MainPipe[],
-    subMainPipeCoordinates: Coordinate[]
+    subMainPipeCoordinates: Coordinate[],
+    zones?: any[],
+    irrigationZones?: any[]
 ): { mainPipes: MainPipe[]; snapped: boolean } => {
     if (
         !mainPipes ||
@@ -1206,6 +1208,27 @@ export const snapMainPipeEndToSubMainPipe = (
         return { mainPipes, snapped: false };
     }
 
+    // ฟังก์ชันตรวจสอบว่าจุดอยู่ในโซนไหน (สำหรับจุดเดียว)
+    const findPipeZoneForPoint = (point: Coordinate): string | null => {
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (isPointInPolygon(point, zone.coordinates)) {
+                    return zone.id;
+                }
+            }
+        }
+
+        if (zones) {
+            for (const zone of zones) {
+                if (isPointInPolygon(point, zone.coordinates)) {
+                    return zone.id;
+                }
+            }
+        }
+
+        return null;
+    };
+
     const SNAP_THRESHOLD = 5.0; 
     let hasSnapped = false;
 
@@ -1215,6 +1238,15 @@ export const snapMainPipeEndToSubMainPipe = (
         }
 
         const mainPipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+        
+        // ตรวจสอบโซนของจุดปลายท่อเมนก่อน
+        const mainEndZone = findPipeZoneForPoint(mainPipeEnd);
+        
+        // ถ้าไม่พบโซนของจุดปลายท่อเมน ให้ข้าม
+        if (!mainEndZone) {
+            return mainPipe;
+        }
+
         let closestPoint = mainPipeEnd;
         let minDistance = Infinity;
         let snapType = 'none'; 
@@ -1222,21 +1254,36 @@ export const snapMainPipeEndToSubMainPipe = (
         const subMainStart = subMainPipeCoordinates[0];
         const subMainEnd = subMainPipeCoordinates[subMainPipeCoordinates.length - 1];
 
+        // ตรวจสอบโซนของจุดเริ่มต้นท่อเมนรอง
+        const subMainStartZone = findPipeZoneForPoint(subMainStart);
+
+        // ข้อกำหนด: ท่อเมนห้ามไปเชื่อมกับท่อเมนรองของโซนอื่น
+        // ต้องตรวจสอบว่าโซนของจุดปลายท่อเมนและโซนของจุดเริ่มต้นท่อเมนรองต้องตรงกัน
+        if (!subMainStartZone || mainEndZone !== subMainStartZone) {
+            // ไม่สามารถ snap ได้เพราะอยู่คนละโซน
+            return mainPipe;
+        }
+
         const distanceToStart = calculateDistanceBetweenPoints(mainPipeEnd, subMainStart);
         const distanceToEnd = calculateDistanceBetweenPoints(mainPipeEnd, subMainEnd);
 
-        if (distanceToStart < minDistance) {
+        // ตรวจสอบเฉพาะจุดเริ่มต้นท่อเมนรอง (subMainStart) เพราะต้องเชื่อมต่อที่จุดนี้เท่านั้น
+        // และต้องอยู่ในโซนเดียวกัน
+        if (distanceToStart < minDistance && mainEndZone === subMainStartZone) {
             minDistance = distanceToStart;
             closestPoint = subMainStart;
             snapType = 'endpoint';
         }
 
-        if (distanceToEnd < minDistance) {
+        // ตรวจสอบจุดสิ้นสุดท่อเมนรองด้วย แต่ต้องอยู่ในโซนเดียวกัน
+        const subMainEndZone = findPipeZoneForPoint(subMainEnd);
+        if (distanceToEnd < minDistance && mainEndZone === subMainEndZone) {
             minDistance = distanceToEnd;
             closestPoint = subMainEnd;
             snapType = 'endpoint';
         }
 
+        // ตรวจสอบจุดบนเส้นท่อเมนรอง แต่ต้องอยู่ในโซนเดียวกัน
         for (let i = 0; i < subMainPipeCoordinates.length - 1; i++) {
             const lineStart = subMainPipeCoordinates[i];
             const lineEnd = subMainPipeCoordinates[i + 1];
@@ -1248,7 +1295,9 @@ export const snapMainPipeEndToSubMainPipe = (
             );
             const distanceToLine = calculateDistanceBetweenPoints(mainPipeEnd, closestPointOnLine);
 
-            if (distanceToLine < minDistance) {
+            // ตรวจสอบว่า closestPointOnLine อยู่ในโซนเดียวกัน
+            const closestPointZone = findPipeZoneForPoint(closestPointOnLine);
+            if (distanceToLine < minDistance && mainEndZone === closestPointZone) {
                 minDistance = distanceToLine;
                 closestPoint = closestPointOnLine;
                 snapType = 'midpoint';
@@ -1256,6 +1305,13 @@ export const snapMainPipeEndToSubMainPipe = (
         }
 
         if (minDistance <= SNAP_THRESHOLD && snapType !== 'none') {
+            // ตรวจสอบอีกครั้งว่าจุดที่ต้องการ snap อยู่ในโซนเดียวกันจริงๆ
+            const finalClosestPointZone = findPipeZoneForPoint(closestPoint);
+            if (!finalClosestPointZone || mainEndZone !== finalClosestPointZone) {
+                // ไม่สามารถ snap ได้เพราะจุดที่ต้องการ snap ไม่อยู่ในโซนเดียวกัน
+                return mainPipe;
+            }
+
             const updatedCoordinates = [...mainPipe.coordinates];
             updatedCoordinates[updatedCoordinates.length - 1] = closestPoint;
 

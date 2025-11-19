@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { FaTimes, FaRoute, FaDownload } from 'react-icons/fa';
+import { FaTimes, FaRoute, FaDownload, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 
 interface ElevationProfileProps {
     map: google.maps.Map | null;
@@ -20,8 +20,7 @@ interface ProfileData {
     totalDistance: number;
     minElevation: number;
     maxElevation: number;
-    elevationGain: number;
-    elevationLoss: number;
+    elevationChange: number; // ความต่างระหว่างจุดสุดท้าย - จุดแรก (บวก = สูงขึ้น, ลบ = ต่ำลง)
     startPoint: google.maps.LatLng;
     endPoint: google.maps.LatLng;
 }
@@ -325,7 +324,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
             if (!start || !end) {
                 setError(
                     t('จุดเริ่มต้นหรือจุดสิ้นสุดไม่ถูกต้อง') ||
-                        'จุดเริ่มต้นหรือจุดสิ้นสุดไม่ถูกต้อง'
+                    'จุดเริ่มต้นหรือจุดสิ้นสุดไม่ถูกต้อง'
                 );
                 return;
             }
@@ -368,21 +367,18 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                             const minElevation = Math.min(...elevations);
                             const maxElevation = Math.max(...elevations);
 
-                            let elevationGain = 0;
-                            let elevationLoss = 0;
-                            for (let i = 1; i < points.length; i++) {
-                                const diff = points[i].elevation - points[i - 1].elevation;
-                                if (diff > 0) elevationGain += diff;
-                                else elevationLoss += Math.abs(diff);
-                            }
+                            // คำนวณความต่างระหว่างจุดสุดท้าย - จุดแรก
+                            // บวก = สูงขึ้น, ลบ = ต่ำลง
+                            const startElevation = points[0].elevation;
+                            const endElevation = points[points.length - 1].elevation;
+                            const elevationChange = endElevation - startElevation;
 
                             const newProfileData = {
                                 points,
                                 totalDistance,
                                 minElevation,
                                 maxElevation,
-                                elevationGain,
-                                elevationLoss,
+                                elevationChange,
                                 startPoint: start,
                                 endPoint: end,
                             };
@@ -401,7 +397,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                         } else {
                             setError(
                                 t('ไม่สามารถสร้างกราฟแสดงความสูงได้ - สถานะ: ') + status ||
-                                    'ไม่สามารถสร้างกราฟแสดงความสูงได้ - สถานะ: ' + status
+                                'ไม่สามารถสร้างกราฟแสดงความสูงได้ - สถานะ: ' + status
                             );
                         }
                         setIsLoading(false);
@@ -410,7 +406,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
             } catch (err) {
                 setError(
                     t('เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ') + (err as Error).message ||
-                        'เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ' + (err as Error).message
+                    'เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ' + (err as Error).message
                 );
                 setIsLoading(false);
             }
@@ -647,7 +643,9 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                     </button>
                 </div>
 
-                {!profileData && (
+                {!isDrawing && (
+                    <div className="space-y-3">
+                        {!profileData && (
                     <div className="space-y-3">
                         <div className="text-sm text-gray-600">
                             {t('คลิก 2 จุดบนแผนที่เพื่อสร้างกราฟแสดงความสูง') ||
@@ -674,6 +672,8 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                         >
                             {t('เริ่มวาดเส้นทาง') || 'เริ่มวาดเส้นทาง'}
                         </button>
+                    </div>
+                )}
                     </div>
                 )}
 
@@ -729,11 +729,10 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                                 </label>
                                 <div className="flex items-center gap-2">
                                     <span
-                                        className={`rounded px-2 py-1 text-xs ${
-                                            useCustomRange
+                                        className={`rounded px-2 py-1 text-xs ${useCustomRange
                                                 ? 'bg-blue-500 text-white'
                                                 : 'bg-gray-200 text-gray-600'
-                                        }`}
+                                            }`}
                                     >
                                         {useCustomRange
                                             ? t('กำหนดเอง') || 'กำหนดเอง'
@@ -875,13 +874,15 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                         </div>
 
                         {/* Profile Statistics */}
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-3 gap-3 text-sm">
                             <div className="rounded bg-blue-50 p-2">
                                 <div className="font-medium text-blue-600">
                                     {t('ระยะทาง') || 'ระยะทาง'}
                                 </div>
                                 <div className="text-gray-800">
-                                    {(profileData.totalDistance / 1000).toFixed(2)} km
+                                    {profileData.totalDistance < 1000
+                                        ? `${profileData.totalDistance.toFixed(1)} m`
+                                        : `${(profileData.totalDistance / 1000).toFixed(2)} km`}
                                 </div>
                             </div>
 
@@ -902,13 +903,35 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                                     {profileData.maxElevation.toFixed(1)} m
                                 </div>
                             </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded bg-indigo-50 p-2">
+                                <div className="font-medium text-indigo-600">
+                                    {t('ความต่าง max-min') || 'ความต่าง max-min'}
+                                </div>
+                                <div className="text-gray-800">
+                                    {(profileData.maxElevation - profileData.minElevation).toFixed(1)} m
+                                </div>
+                            </div>
 
                             <div className="rounded bg-purple-50 p-2">
                                 <div className="font-medium text-purple-600">
-                                    {t('ขึ้น') || 'ขึ้น'}
+                                    {t('ความต่าง จุดเริ่ม-จุดสิ้นสุด') || 'ความต่าง จุดเริ่ม-จุดสิ้นสุด'}
                                 </div>
-                                <div className="text-gray-800">
-                                    {profileData.elevationGain.toFixed(1)} m
+                                <div className="flex items-center gap-1 text-gray-800">
+                                    {profileData.elevationChange > 0 ? (
+                                        <>
+                                            <FaArrowUp className="text-green-600" size={12} />
+                                            <span>+{profileData.elevationChange.toFixed(1)} m</span>
+                                        </>
+                                    ) : profileData.elevationChange < 0 ? (
+                                        <>
+                                            <FaArrowDown className="text-red-600" size={12} />
+                                            <span>{profileData.elevationChange.toFixed(1)} m</span>
+                                        </>
+                                    ) : (
+                                        <span>0.0 m</span>
+                                    )}
                                 </div>
                             </div>
                         </div>
