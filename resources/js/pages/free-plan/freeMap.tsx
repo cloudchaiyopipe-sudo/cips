@@ -2284,18 +2284,18 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: `Pump Placement Point (Corner ${index + 1})`,
+                    title: 'คลิกเพื่อวางปั๊มน้ำ (มุม)',
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="8" cy="8" r="6" fill="#EF4444" stroke="#DC2626" stroke-width="1"/>
-                            <circle cx="8" cy="8" r="2" fill="#FFFFFF"/>
+                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="10" cy="10" r="8" fill="#3B82F6" fill-opacity="0.2" stroke="#3B82F6" stroke-width="2"/>
+                            <circle cx="10" cy="10" r="4" fill="#3B82F6"/>
                         </svg>
                     `),
-                        scaledSize: new window.google.maps.Size(16, 16),
-                        anchor: new window.google.maps.Point(8, 8),
+                        scaledSize: new window.google.maps.Size(20, 20),
+                        anchor: new window.google.maps.Point(10, 10),
                     },
                     draggable: false,
                     clickable: true,
@@ -2321,18 +2321,18 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: `Pump Placement Point (Midpoint ${index + 1})`,
+                    title: 'คลิกเพื่อวางปั๊มน้ำ (กลาง)',
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                        <svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="7" cy="7" r="5" fill="#F59E0B" stroke="#D97706" stroke-width="1"/>
-                            <circle cx="7" cy="7" r="2" fill="#FFFFFF"/>
+                        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="9" cy="9" r="7" fill="#60A5FA" fill-opacity="0.2" stroke="#60A5FA" stroke-width="2"/>
+                            <circle cx="9" cy="9" r="3.5" fill="#60A5FA"/>
                         </svg>
                     `),
-                        scaledSize: new window.google.maps.Size(14, 14),
-                        anchor: new window.google.maps.Point(7, 7),
+                        scaledSize: new window.google.maps.Size(18, 18),
+                        anchor: new window.google.maps.Point(9, 9),
                     },
                     draggable: false,
                     clickable: true,
@@ -5524,7 +5524,7 @@ function FreeMap() {
                 </div>
 
                 {/* Google Maps Container */}
-                <div className="relative mb-4 h-[420px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40">
+                <div className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40 md:h-[420px]">
                     {/* Search Component */}
                     <div className="absolute left-32 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
                         <div className="relative">
@@ -5575,7 +5575,7 @@ function FreeMap() {
                         </div>
                     </div>
 
-                    <div ref={mapRef} className="h-full w-full" style={{ minHeight: '420px' }} />
+                    <div ref={mapRef} className="h-full w-full min-h-[350px] md:min-h-[420px]" />
                     {!mapLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-700/40 backdrop-blur-sm">
                             <div className="text-center text-sky-300">
@@ -5603,12 +5603,22 @@ function FreeMap() {
                 {/* Tools + Info Panel */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                     {/* Left tools */}
-                    <div className="space-y-3 md:col-span-2">
+                    <div className="relative h-14 overflow-visible rounded-lg md:h-auto md:flex-col md:space-y-3 md:overflow-visible md:col-span-2">
                         {/* Step 1: Draw Area */}
                         <button
                             onClick={() => !isStepCompleted(0) && handleStepClick(0)}
                             disabled={getButtonState(0) === 'disabled' || isStepCompleted(0)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 0 ? 50 : currentStep > 0 ? 40 - currentStep * 10 : 0,
+                                transform: currentStep === 0 ? 'translateX(0)' : currentStep > 0 ? `translateX(${currentStep * 8}px)` : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 0
+                                    ? 'w-full opacity-100'
+                                    : currentStep > 0
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(0) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(0) === 'active'
@@ -5618,18 +5628,30 @@ function FreeMap() {
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                         >
-                            {getButtonState(0) === 'completed'
-                                ? translations.drawAreaCompleted
-                                : isDrawingMode
-                                  ? translations.drawing
-                                  : translations.drawArea}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(0) === 'completed'
+                                    ? translations.drawAreaCompleted
+                                    : isDrawingMode
+                                      ? translations.drawing
+                                      : translations.drawArea}
+                            </span>
                         </button>
 
                         {/* Step 2: Water */}
                         <button
                             onClick={() => !isStepCompleted(1) && handleStepClick(1)}
                             disabled={getButtonState(1) === 'disabled' || isStepCompleted(1)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 1 ? 50 : currentStep > 1 ? 40 - (currentStep - 1) * 10 : currentStep < 1 ? 10 : 0,
+                                transform: currentStep === 1 ? 'translateX(0)' : currentStep > 1 ? `translateX(${(currentStep - 1) * 8}px)` : currentStep < 1 ? 'translateX(8px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 1
+                                    ? 'w-full opacity-100'
+                                    : currentStep !== 1
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(1) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(1) === 'active'
@@ -5644,18 +5666,30 @@ function FreeMap() {
                                     : ''
                             }
                         >
-                            {getButtonState(1) === 'completed'
-                                ? translations.waterCompleted
-                                : currentStep === 1 && waterSources.length === 0
-                                  ? translations.placingWater
-                                  : translations.water}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(1) === 'completed'
+                                    ? translations.waterCompleted
+                                    : currentStep === 1 && waterSources.length === 0
+                                      ? translations.placingWater
+                                      : translations.water}
+                            </span>
                         </button>
 
                         {/* Step 3: Place Pump */}
                         <button
                             onClick={() => !isStepCompleted(2) && handleStepClick(2)}
                             disabled={getButtonState(2) === 'disabled' || isStepCompleted(2)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 2 ? 50 : currentStep > 2 ? 40 - (currentStep - 2) * 10 : currentStep < 2 ? 20 : 0,
+                                transform: currentStep === 2 ? 'translateX(0)' : currentStep > 2 ? `translateX(${(currentStep - 2) * 8}px)` : currentStep < 2 ? 'translateX(16px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 2
+                                    ? 'w-full opacity-100'
+                                    : currentStep !== 2
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(2) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(2) === 'active'
@@ -5670,18 +5704,30 @@ function FreeMap() {
                                     : ''
                             }
                         >
-                            {getButtonState(2) === 'completed'
-                                ? translations.placePumpCompleted
-                                : currentStep === 2 && pumps.length === 0
-                                  ? translations.placingWaterPump
-                                  : translations.placePump}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(2) === 'completed'
+                                    ? translations.placePumpCompleted
+                                    : currentStep === 2 && pumps.length === 0
+                                      ? translations.placingWaterPump
+                                      : translations.placePump}
+                            </span>
                         </button>
 
                         {/* Step 4: Zones */}
                         <button
                             onClick={() => !isStepCompleted(3) && handleStepClick(3)}
                             disabled={getButtonState(3) === 'disabled' || isStepCompleted(3)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 3 ? 50 : currentStep > 3 ? 40 - (currentStep - 3) * 10 : currentStep < 3 ? 30 : 0,
+                                transform: currentStep === 3 ? 'translateX(0)' : currentStep > 3 ? `translateX(${(currentStep - 3) * 8}px)` : currentStep < 3 ? 'translateX(24px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 3
+                                    ? 'w-full opacity-100'
+                                    : currentStep !== 3
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(3) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(3) === 'active'
@@ -5696,11 +5742,40 @@ function FreeMap() {
                                     : ''
                             }
                         >
-                            {getButtonState(3) === 'completed'
-                                ? `${translations.zones} ✓`
-                                : currentStep === 3 && zones.length === 0
-                                  ? translations.clickToDivideZones
-                                  : translations.zones}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(3) === 'completed'
+                                    ? `${translations.zones} ✓`
+                                    : currentStep === 3 && zones.length === 0
+                                      ? translations.clickToDivideZones
+                                      : translations.zones}
+                            </span>
+                        </button>
+
+                        {/* Step 5: Generate Pipe System */}
+                        <button
+                            onClick={() => handleStepClick(4)}
+                            disabled={getButtonState(4) === 'disabled'}
+                            style={{
+                                zIndex: currentStep === 4 ? 50 : currentStep < 4 ? 40 : 0,
+                                transform: currentStep === 4 ? 'translateX(0)' : currentStep < 4 ? 'translateX(32px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 font-medium text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 4
+                                    ? 'w-full opacity-100'
+                                    : currentStep < 4
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
+                                getButtonState(4) === 'completed'
+                                    ? 'cursor-not-allowed bg-green-600'
+                                    : getButtonState(4) === 'active'
+                                      ? 'bg-blue-600 hover:bg-blue-700'
+                                      : 'cursor-not-allowed bg-slate-400'
+                            }`}
+                        >
+                            <span className="whitespace-nowrap">
+                                {translations.generatePipeSystem}
+                            </span>
                         </button>
                     </div>
 
@@ -5806,7 +5881,7 @@ function FreeMap() {
                                 </div>
                             )}
                         </div>
-                        <div className="mt-3">
+                        <div className="mt-3 hidden md:block">
                             {/* Step 5: Generate Pipe System */}
                             <button
                                 onClick={() => handleStepClick(4)}

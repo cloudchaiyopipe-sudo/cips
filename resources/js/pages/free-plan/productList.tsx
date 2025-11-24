@@ -2,7 +2,8 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import FootNav from './components/footNav';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getTranslations } from './utils/language';
 
 // Types
 interface Product {
@@ -39,9 +40,27 @@ function ProductList() {
     const { products = [] } = page.props;
     const isAdmin = page.props.auth?.user?.is_admin || false;
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [translations, setTranslations] = useState(getTranslations());
 
     // Active tab state
     const [activeTab, setActiveTab] = useState<'new' | 'promotion'>('new');
+
+    // Listen for language changes
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        window.addEventListener('storage', handleLanguageChange);
+        window.addEventListener('languageChanged', handleLanguageChange);
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // Filter products based on active tab
     const filteredProducts = (products || []).filter(
@@ -72,7 +91,7 @@ function ProductList() {
     const handleDelete = (e: React.MouseEvent, productId: number) => {
         e.stopPropagation(); // ป้องกันการ trigger handleProductClick
         
-        if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?')) {
+        if (!confirm(translations.confirmDeleteProduct)) {
             return;
         }
 
@@ -83,7 +102,7 @@ function ProductList() {
             },
             onError: () => {
                 setDeletingId(null);
-                alert('เกิดข้อผิดพลาดในการลบสินค้า');
+                alert(translations.errorDeletingProduct);
             },
         });
     };
@@ -91,7 +110,7 @@ function ProductList() {
     // 5. Return TSX
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title="รายการสินค้า - Free Plan" />
+            <Head title={translations.productListTitle} />
 
             {/* Custom Navbar */}
             <FreeNav />
@@ -116,14 +135,14 @@ function ProductList() {
                             d="M10 19l-7-7m0 0l7-7m-7 7h18"
                         />
                     </svg>
-                    <span className="font-medium">กลับไปหน้าหลัก</span>
+                    <span className="font-medium">{translations.back}</span>
                 </button>
 
                 {/* Page Title */}
                 <div className="mb-8">
                     <div className="mb-3 flex items-center justify-between">
                         <h1 className="text-3xl font-bold text-white md:text-4xl lg:text-5xl">
-                            รายการสินค้า
+                            {translations.productList}
                         </h1>
                         {/* Admin Button - แสดงเฉพาะ Admin */}
                         {isAdmin && (
@@ -144,7 +163,7 @@ function ProductList() {
                                         d="M12 4v16m8-8H4"
                                     />
                                 </svg>
-                                <span>เพิ่มสินค้า</span>
+                                <span>{translations.addProduct}</span>
                             </button>
                         )}
                     </div>
@@ -162,7 +181,7 @@ function ProductList() {
                                 : 'text-slate-400 hover:text-slate-200'
                         }`}
                     >
-                        สินค้าใหม่
+                        {translations.newProducts}
                     </button>
                     <button
                         onClick={() => setActiveTab('promotion')}
@@ -172,14 +191,14 @@ function ProductList() {
                                 : 'text-slate-400 hover:text-slate-200'
                         }`}
                     >
-                        สินค้าโปรโมชั่น
+                        {translations.promotionProducts}
                     </button>
                 </div>
 
                 {/* Products Grid */}
                 {filteredProducts.length === 0 ? (
                     <div className="flex items-center justify-center py-20">
-                        <p className="text-slate-300">ไม่มีสินค้าในหมวดหมู่นี้</p>
+                        <p className="text-slate-300">{translations.noProductsInCategory}</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -199,7 +218,7 @@ function ProductList() {
                                                 ? 'right-20'
                                                 : 'right-2'
                                         }`}
-                                        title="ลบสินค้า"
+                                        title={translations.deleteProduct}
                                     >
                                         {deletingId === product.id ? (
                                             <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,14 +236,14 @@ function ProductList() {
                                 {product.isNew && (
                                     <div className="absolute left-4 top-4 z-20">
                                         <span className="inline-flex items-center rounded-md bg-green-500 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white shadow-lg">
-                                            ใหม่
+                                            {translations.newBadge}
                                         </span>
                                     </div>
                                 )}
                                 {product.isPromotion && (
                                     <div className="absolute left-4 top-4 z-20">
                                         <span className="inline-flex items-center rounded-md bg-red-500 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white shadow-lg">
-                                            โปรโมชั่น
+                                            {translations.promotionBadge}
                                         </span>
                                     </div>
                                 )}
@@ -297,7 +316,7 @@ function ProductList() {
                                         onClick={(e) => e.stopPropagation()}
                                         className="mt-4 block w-full rounded-lg bg-green-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-green-700"
                                     >
-                                        ดูรายละเอียด
+                                        {translations.viewDetails}
                                     </a>
                                 </div>
                             </div>

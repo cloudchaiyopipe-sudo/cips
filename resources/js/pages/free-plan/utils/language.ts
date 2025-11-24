@@ -58,6 +58,15 @@ export interface LanguageTranslations {
     changePassword: string;
     verifyEmail: string;
     logout: string;
+    sending: string;
+    sendVerificationEmail: string;
+    verificationEmailSent: string;
+    errorSendingEmail: string;
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+    passwordChangedSuccessfully: string;
+    saving: string;
 
     // ChooseCrop page
     selectCropTypes: string;
@@ -314,6 +323,66 @@ export interface LanguageTranslations {
     specifications: string;
     details: string;
     image: string;
+
+    // FreeNews page
+    news: string;
+    addArticle: string;
+    readMore: string;
+    noNewsAvailable: string;
+    deleteArticle: string;
+    confirmDeleteArticle: string;
+    errorDeletingArticle: string;
+    newsTitle: string;
+
+    // NewsArticle page
+    createNewArticle: string;
+    articleTitle: string;
+    articleImage: string;
+    articleContent: string;
+    pleaseSelectImageFile: string;
+    fileSizeMustNotExceed5MB: string;
+    uploading: string;
+    cannotUploadImage: string;
+    errorUploadingImage: string;
+    removeImage: string;
+    pleaseEnterArticleTitle: string;
+    pleaseEnterArticleContent: string;
+    savingArticle: string;
+    saveArticle: string;
+    accessDenied: string;
+    youDoNotHavePermission: string;
+    articleCreatedSuccessfully: string;
+    errorOccurred: string;
+
+    // ProductList page
+    productListTitle: string;
+    productList: string;
+    addProduct: string;
+    newProducts: string;
+    promotionProducts: string;
+    noProductsInCategory: string;
+    deleteProduct: string;
+    confirmDeleteProduct: string;
+    errorDeletingProduct: string;
+    newBadge: string;
+    promotionBadge: string;
+    viewDetails: string;
+
+    // ProductArticle page
+    createNewProduct: string;
+    backToProductList: string;
+    productName: string;
+    pleaseEnterProductName: string;
+    productDescription: string;
+    pleaseEnterProductDescription: string;
+    price: string;
+    originalPrice: string;
+    optional: string;
+    category: string;
+    discount: string;
+    productImage: string;
+    savingProduct: string;
+    saveProduct: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -377,6 +446,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         changePassword: 'Change Password',
         verifyEmail: 'Verify Email',
         logout: 'Logout',
+        sending: 'Sending...',
+        sendVerificationEmail: 'Send Verification Email',
+        verificationEmailSent: 'Verification email sent. Please check your email.',
+        errorSendingEmail: 'Error sending email',
+        currentPassword: 'Current Password',
+        newPassword: 'New Password',
+        confirmPassword: 'Confirm New Password',
+        passwordChangedSuccessfully: 'Password changed successfully',
+        saving: 'Saving...',
 
         // ChooseCrop page
         selectCropTypes: 'Select Crop Types',
@@ -453,8 +531,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
             'The water source will be used to supply water to your irrigation system',
         placingWaterPump: '🔧 Placing Water Pump',
         clickOnlyOnRedOrangePoints:
-            'Click ONLY on the red/orange placement points around the water source',
-        redCirclesCornerPoints: 'Red circles = corner points, Orange circles = midpoint points',
+            'Click ONLY on the blue placement points around the water source',
+        redCirclesCornerPoints: 'Dark blue circles = corner points, Light blue circles = midpoint points',
         orangeCirclesMidpointPoints: 'Orange circles = midpoint points',
         cannotPlacePumpsAnywhereElse: '⚠️ You cannot place pumps anywhere else in the area',
         pumpWillDistributeWater:
@@ -640,6 +718,66 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         specifications: 'Specifications',
         details: 'Details',
         image: 'Image',
+
+        // FreeNews page
+        news: 'News',
+        addArticle: 'Add Article',
+        readMore: 'Read More',
+        noNewsAvailable: 'No news available',
+        deleteArticle: 'Delete Article',
+        confirmDeleteArticle: 'Are you sure you want to delete this article?',
+        errorDeletingArticle: 'Error deleting article',
+        newsTitle: 'News - Free Plan',
+
+        // NewsArticle page
+        createNewArticle: 'Create New Article',
+        articleTitle: 'Title:',
+        articleImage: 'Image:',
+        articleContent: 'Content:',
+        pleaseSelectImageFile: 'Please select an image file',
+        fileSizeMustNotExceed5MB: 'File size must not exceed 5MB',
+        uploading: 'Uploading...',
+        cannotUploadImage: 'Cannot upload image:',
+        errorUploadingImage: 'Error uploading image',
+        removeImage: 'Remove Image',
+        pleaseEnterArticleTitle: 'Please enter article title',
+        pleaseEnterArticleContent: 'Please enter article content',
+        savingArticle: 'Saving...',
+        saveArticle: 'Save Article',
+        accessDenied: 'Access Denied',
+        youDoNotHavePermission: 'You do not have permission to access this page',
+        articleCreatedSuccessfully: 'Article created successfully',
+        errorOccurred: 'An error occurred',
+
+        // ProductList page
+        productListTitle: 'Product List - Free Plan',
+        productList: 'Product List',
+        addProduct: 'Add Product',
+        newProducts: 'New Products',
+        promotionProducts: 'Promotion Products',
+        noProductsInCategory: 'No products in this category',
+        deleteProduct: 'Delete Product',
+        confirmDeleteProduct: 'Are you sure you want to delete this product?',
+        errorDeletingProduct: 'Error deleting product',
+        newBadge: 'New',
+        promotionBadge: 'Promotion',
+        viewDetails: 'View Details',
+
+        // ProductArticle page
+        createNewProduct: 'Create New Product',
+        backToProductList: 'Back to Product List',
+        productName: 'Product Name:',
+        pleaseEnterProductName: 'Please enter product name',
+        productDescription: 'Product Description:',
+        pleaseEnterProductDescription: 'Please enter product description',
+        price: 'Price:',
+        originalPrice: 'Original Price (if any):',
+        optional: 'Optional',
+        category: 'Category:',
+        discount: 'Discount (%):',
+        productImage: 'Product Image:',
+        savingProduct: 'Saving...',
+        saveProduct: 'Save Product',
     },
     TH: {
         // FreeHome page
@@ -700,6 +838,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         changePassword: 'เปลี่ยนรหัสผ่าน',
         verifyEmail: 'ยืนยันอีเมล',
         logout: 'ออกจากระบบ',
+        sending: 'กำลังส่ง...',
+        sendVerificationEmail: 'ส่งอีเมลยืนยัน',
+        verificationEmailSent: 'ส่งอีเมลยืนยันเรียบร้อยแล้ว กรุณาตรวจสอบอีเมลของคุณ',
+        errorSendingEmail: 'เกิดข้อผิดพลาดในการส่งอีเมล',
+        currentPassword: 'รหัสผ่านปัจจุบัน',
+        newPassword: 'รหัสผ่านใหม่',
+        confirmPassword: 'ยืนยันรหัสผ่านใหม่',
+        passwordChangedSuccessfully: 'รหัสผ่านถูกเปลี่ยนเรียบร้อยแล้ว',
+        saving: 'กำลังบันทึก...',
 
         // ChooseCrop page
         selectCropTypes: 'เลือกประเภทพืช',
@@ -773,8 +920,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         clickAnywhereInDrawnArea: 'คลิกที่ใดก็ได้ในพื้นที่ที่วาดแล้วเพื่อวางแหล่งน้ำ',
         waterSourceWillSupplyWater: 'แหล่งน้ำจะใช้เพื่อจ่ายน้ำให้กับระบบชลประทานของคุณ',
         placingWaterPump: '🔧 วางปั๊มน้ำ',
-        clickOnlyOnRedOrangePoints: 'คลิกเฉพาะจุดสีแดง/ส้มรอบแหล่งน้ำเท่านั้น',
-        redCirclesCornerPoints: 'วงกลมสีแดง = จุดมุม, วงกลมสีส้ม = จุดกลาง',
+        clickOnlyOnRedOrangePoints: 'คลิกเฉพาะจุดสีน้ำเงินรอบแหล่งน้ำเท่านั้น',
+        redCirclesCornerPoints: 'วงกลมสีน้ำเงินเข้ม = จุดมุม, วงกลมสีน้ำเงินอ่อน = จุดกลาง',
         orangeCirclesMidpointPoints: 'วงกลมสีส้ม = จุดกลาง',
         cannotPlacePumpsAnywhereElse: '⚠️ คุณไม่สามารถวางปั๊มที่อื่นในพื้นที่ได้',
         pumpWillDistributeWater: 'ปั๊มจะกระจายน้ำจากแหล่งน้ำไปยังโซนต่างๆ',
@@ -959,6 +1106,66 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         specifications: 'ข้อมูลจำเพาะ',
         details: 'รายละเอียด',
         image: 'รูปภาพ',
+
+        // FreeNews page
+        news: 'ข่าวสาร',
+        addArticle: 'เพิ่มบทความ',
+        readMore: 'อ่านเพิ่มเติม',
+        noNewsAvailable: 'ยังไม่มีข่าวสาร',
+        deleteArticle: 'ลบบทความ',
+        confirmDeleteArticle: 'คุณแน่ใจหรือไม่ว่าต้องการลบบทความนี้?',
+        errorDeletingArticle: 'เกิดข้อผิดพลาดในการลบบทความ',
+        newsTitle: 'ข่าวสาร - Free Plan',
+
+        // NewsArticle page
+        createNewArticle: 'สร้างบทความใหม่',
+        articleTitle: 'หัวข้อ:',
+        articleImage: 'รูปภาพ:',
+        articleContent: 'เนื้อหา:',
+        pleaseSelectImageFile: 'กรุณาเลือกไฟล์รูปภาพ',
+        fileSizeMustNotExceed5MB: 'ขนาดไฟล์ต้องไม่เกิน 5MB',
+        uploading: 'กำลังอัปโหลด...',
+        cannotUploadImage: 'ไม่สามารถอัปโหลดรูปภาพได้:',
+        errorUploadingImage: 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ',
+        removeImage: 'ลบรูปภาพ',
+        pleaseEnterArticleTitle: 'กรุณากรอกหัวข้อบทความ',
+        pleaseEnterArticleContent: 'กรุณากรอกเนื้อหาบทความ',
+        savingArticle: 'กำลังบันทึก...',
+        saveArticle: 'บันทึกบทความ',
+        accessDenied: 'Access Denied',
+        youDoNotHavePermission: 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้',
+        articleCreatedSuccessfully: 'บทความถูกสร้างเรียบร้อยแล้ว',
+        errorOccurred: 'เกิดข้อผิดพลาด',
+
+        // ProductList page
+        productListTitle: 'รายการสินค้า - Free Plan',
+        productList: 'รายการสินค้า',
+        addProduct: 'เพิ่มสินค้า',
+        newProducts: 'สินค้าใหม่',
+        promotionProducts: 'สินค้าโปรโมชั่น',
+        noProductsInCategory: 'ไม่มีสินค้าในหมวดหมู่นี้',
+        deleteProduct: 'ลบสินค้า',
+        confirmDeleteProduct: 'คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?',
+        errorDeletingProduct: 'เกิดข้อผิดพลาดในการลบสินค้า',
+        newBadge: 'ใหม่',
+        promotionBadge: 'โปรโมชั่น',
+        viewDetails: 'ดูรายละเอียด',
+
+        // ProductArticle page
+        createNewProduct: 'เพิ่มสินค้าใหม่',
+        backToProductList: 'กลับไปรายการสินค้า',
+        productName: 'ชื่อสินค้า:',
+        pleaseEnterProductName: 'กรุณากรอกชื่อสินค้า',
+        productDescription: 'รายละเอียดสินค้า:',
+        pleaseEnterProductDescription: 'กรุณากรอกรายละเอียดสินค้า',
+        price: 'ราคา:',
+        originalPrice: 'ราคาเดิม (ถ้ามี):',
+        optional: 'ไม่บังคับ',
+        category: 'หมวดหมู่:',
+        discount: 'ส่วนลด (%):',
+        productImage: 'รูปภาพสินค้า:',
+        savingProduct: 'กำลังบันทึก...',
+        saveProduct: 'บันทึกสินค้า',
     },
 };
 

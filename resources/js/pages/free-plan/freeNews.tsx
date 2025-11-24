@@ -1,9 +1,10 @@
 // FreeNews Component - News Page
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FreeNav from './components/freeNav';
 import FootNav from './components/footNav';
 import { SharedData } from '@/types';
+import { getTranslations } from './utils/language';
 
 // Types
 interface Article {
@@ -39,6 +40,24 @@ function FreeNews() {
     const { articles = [] } = page.props;
     const isAdmin = page.props.auth?.user?.is_admin || false;
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        window.addEventListener('storage', handleLanguageChange);
+        window.addEventListener('languageChanged', handleLanguageChange);
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // Handle article click
     const handleArticleClick = (articleId: number) => {
@@ -54,7 +73,7 @@ function FreeNews() {
     const handleDelete = (e: React.MouseEvent, articleId: number) => {
         e.stopPropagation(); // ป้องกันการ trigger handleArticleClick
         
-        if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบบทความนี้?')) {
+        if (!confirm(translations.confirmDeleteArticle)) {
             return;
         }
 
@@ -65,7 +84,7 @@ function FreeNews() {
             },
             onError: () => {
                 setDeletingId(null);
-                alert('เกิดข้อผิดพลาดในการลบบทความ');
+                alert(translations.errorDeletingArticle);
             },
         });
     };
@@ -73,7 +92,7 @@ function FreeNews() {
     // 5. Return TSX
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title="ข่าวสาร - Free Plan" />
+            <Head title={translations.newsTitle} />
 
             {/* Custom Navbar */}
             <FreeNav />
@@ -98,14 +117,14 @@ function FreeNews() {
                             d="M10 19l-7-7m0 0l7-7m-7 7h18"
                         />
                     </svg>
-                    <span className="font-medium">กลับไปหน้าหลัก</span>
+                    <span className="font-medium">{translations.back}</span>
                 </button>
 
                 {/* Page Title */}
                 <div className="mb-8">
                     <div className="mb-3 flex items-center justify-between">
                         <h1 className="text-3xl font-bold text-white md:text-4xl lg:text-5xl">
-                            ข่าวสาร
+                            {translations.news}
                         </h1>
                         {/* Admin Button - แสดงเฉพาะ Admin */}
                         {isAdmin && (
@@ -126,7 +145,7 @@ function FreeNews() {
                                         d="M12 4v16m8-8H4"
                                     />
                                 </svg>
-                                <span>เพิ่มบทความ</span>
+                                <span>{translations.addArticle}</span>
                             </button>
                         )}
                     </div>
@@ -166,7 +185,7 @@ function FreeNews() {
                                             onClick={(e) => handleDelete(e, article.id)}
                                             disabled={deletingId === article.id}
                                             className="absolute right-2 top-2 z-10 rounded-full bg-red-600 p-2 text-white transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="ลบบทความ"
+                                            title={translations.deleteArticle}
                                         >
                                             {deletingId === article.id ? (
                                                 <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,7 +268,7 @@ function FreeNews() {
 
                                             {/* Read More Indicator */}
                                             <div className="mt-auto flex items-center gap-2 text-sm font-medium text-blue-400">
-                                                <span>อ่านเพิ่มเติม</span>
+                                                <span>{translations.readMore}</span>
                                                 <svg
                                                     className="h-4 w-4 transition-transform group-hover:translate-x-1"
                                                     fill="none"
@@ -271,7 +290,7 @@ function FreeNews() {
                         })
                     ) : (
                         <div className="rounded-xl bg-slate-800/80 p-8 text-center">
-                            <p className="text-slate-400">ยังไม่มีข่าวสาร</p>
+                            <p className="text-slate-400">{translations.noNewsAvailable}</p>
                         </div>
                     )}
                 </div>

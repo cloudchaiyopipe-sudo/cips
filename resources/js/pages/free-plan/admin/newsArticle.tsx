@@ -1,6 +1,7 @@
 import { Head, useForm, usePage, router } from '@inertiajs/react';
 import { useState, useRef, useEffect } from 'react';
-import FreeNav from '../components/freeNav'; 
+import FreeNav from '../components/freeNav';
+import { getTranslations } from '../utils/language'; 
 
 interface User {
     id: number;
@@ -23,6 +24,24 @@ export default function CreateArticle() {
     const [imagePreview, setImagePreview] = useState<string>('');
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        window.addEventListener('storage', handleLanguageChange);
+        window.addEventListener('languageChanged', handleLanguageChange);
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // Check if user is admin on component mount
     useEffect(() => {
@@ -47,13 +66,13 @@ export default function CreateArticle() {
 
         // ตรวจสอบประเภทไฟล์
         if (!file.type.startsWith('image/')) {
-            alert('กรุณาเลือกไฟล์รูปภาพ');
+            alert(translations.pleaseSelectImageFile);
             return;
         }
 
         // ตรวจสอบขนาดไฟล์ (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-            alert('ขนาดไฟล์ต้องไม่เกิน 5MB');
+            alert(translations.fileSizeMustNotExceed5MB);
             return;
         }
 
@@ -85,11 +104,11 @@ export default function CreateArticle() {
                 };
                 reader.readAsDataURL(file);
             } else {
-                alert('ไม่สามารถอัปโหลดรูปภาพได้: ' + (result.message || 'เกิดข้อผิดพลาด'));
+                alert(translations.cannotUploadImage + ' ' + (result.message || translations.errorOccurred));
             }
         } catch (error) {
             console.error('Error uploading image:', error);
-            alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+            alert(translations.errorUploadingImage);
         } finally {
             setUploadingImage(false);
         }
@@ -112,10 +131,10 @@ export default function CreateArticle() {
         post('/admin/articles', {
             onSuccess: () => {
                 // เมื่อบันทึกสำเร็จ จะ redirect ไปหน้า account ตามที่กำหนดใน controller
-                console.log('บทความถูกสร้างเรียบร้อยแล้ว');
+                console.log(translations.articleCreatedSuccessfully);
             },
             onError: (errors) => {
-                console.error('เกิดข้อผิดพลาด:', errors);
+                console.error(translations.errorOccurred, errors);
             }
         }); 
     }
@@ -124,20 +143,20 @@ export default function CreateArticle() {
     if (!isAdmin) {
         return (
             <>
-                <Head title="Access Denied" />
+                <Head title={translations.accessDenied} />
                 <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
                     <FreeNav />
                     <div className="mx-auto max-w-4xl px-4 py-4 md:px-6 md:py-6">
                         <div className="rounded-lg bg-slate-600/30 p-6 text-center text-white">
-                            <h2 className="mb-4 text-2xl font-bold">Access Denied</h2>
+                            <h2 className="mb-4 text-2xl font-bold">{translations.accessDenied}</h2>
                             <p className="mb-4 text-slate-300">
-                                คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+                                {translations.youDoNotHavePermission}
                             </p>
                             <button
                                 onClick={() => router.visit('/free-plan/account')}
                                 className="rounded-lg bg-blue-600 px-6 py-2 font-semibold text-white hover:bg-blue-700"
                             >
-                                กลับไปหน้าบัญชี
+                                {translations.back}
                             </button>
                         </div>
                     </div>
@@ -148,7 +167,7 @@ export default function CreateArticle() {
 
     return (
         <>
-            <Head title="สร้างบทความใหม่" />
+            <Head title={translations.createNewArticle} />
             <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
                 {/* Custom Navbar */}
                 <FreeNav />
@@ -176,22 +195,22 @@ export default function CreateArticle() {
                                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                 />
                             </svg>
-                            <span className="font-medium">กลับ</span>
+                            <span className="font-medium">{translations.back}</span>
                         </button>
                     </div>
 
-                    <h1 className="text-3xl font-bold text-white mb-6">สร้างบทความใหม่</h1>
+                    <h1 className="text-3xl font-bold text-white mb-6">{translations.createNewArticle}</h1>
 
                 <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
                     <div>
-                        <label htmlFor="title" className="block mb-1 text-white font-medium">หัวข้อ:</label>
+                        <label htmlFor="title" className="block mb-1 text-white font-medium">{translations.articleTitle}</label>
                         <input
                             id="title"
                             type="text"
                             value={data.title}
                             onChange={(e) => setData('title', e.target.value)}
                             className="w-full border border-slate-500 rounded-md p-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="กรุณากรอกหัวข้อบทความ"
+                            placeholder={translations.pleaseEnterArticleTitle}
                             disabled={processing}
                         />
                         {/* 4. แสดง Error ถ้ามี (Inertia ส่งมาให้) */}
@@ -200,7 +219,7 @@ export default function CreateArticle() {
 
                     {/* อัปโหลดรูปภาพ */}
                     <div>
-                        <label htmlFor="image" className="block mb-1 text-white font-medium">รูปภาพ:</label>
+                        <label htmlFor="image" className="block mb-1 text-white font-medium">{translations.articleImage}</label>
                         <input
                             ref={fileInputRef}
                             id="image"
@@ -211,7 +230,7 @@ export default function CreateArticle() {
                             className="w-full border border-slate-500 rounded-md p-2 text-white bg-slate-700/50 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600 disabled:opacity-50"
                         />
                         {uploadingImage && (
-                            <div className="text-blue-400 text-sm mt-1">กำลังอัปโหลด...</div>
+                            <div className="text-blue-400 text-sm mt-1">{translations.uploading}</div>
                         )}
                         {errors.image_url && (
                             <div className="text-red-400 text-sm mt-1">{errors.image_url}</div>
@@ -230,7 +249,7 @@ export default function CreateArticle() {
                                     type="button"
                                     onClick={handleRemoveImage}
                                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-                                    title="ลบรูปภาพ"
+                                    title={translations.removeImage}
                                 >
                                     ×
                                 </button>
@@ -239,14 +258,14 @@ export default function CreateArticle() {
                     </div>
 
                     <div>
-                        <label htmlFor="content" className="block mb-1 text-white font-medium">เนื้อหา:</label>
+                        <label htmlFor="content" className="block mb-1 text-white font-medium">{translations.articleContent}</label>
                         <textarea
                             id="content"
                             value={data.content}
                             onChange={(e) => setData('content', e.target.value)}
                             rows={10}
                             className="w-full border border-slate-500 rounded-md p-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="กรุณากรอกเนื้อหาบทความ"
+                            placeholder={translations.pleaseEnterArticleContent}
                             disabled={processing}
                         />
                         {errors.content && <div className="text-red-400 text-sm mt-1">{errors.content}</div>}
@@ -257,7 +276,7 @@ export default function CreateArticle() {
                         disabled={processing}
                         className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                        {processing ? 'กำลังบันทึก...' : 'บันทึกบทความ'}
+                        {processing ? translations.savingArticle : translations.saveArticle}
                     </button>
                 </form>
                 </div>

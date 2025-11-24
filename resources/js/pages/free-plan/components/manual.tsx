@@ -15,7 +15,7 @@ const manualPages = [
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_1.jpg"
                             alt="เริ่มต้นใช้งาน"
@@ -31,10 +31,6 @@ const manualPages = [
                     </div>
                     <h3 className="text-xl font-bold text-white">เริ่มต้นใช้งาน</h3>
                 </div>
-                <div className="space-y-2 text-slate-300">
-                    <p>ระบบนี้จะช่วยคุณออกแบบระบบน้ำหยดสำหรับแปลงเกษตรของคุณ</p>
-                    <p>ทำตามขั้นตอนง่ายๆ เพียงไม่กี่คลิก</p>
-                </div>
             </div>
         ),
     },
@@ -45,7 +41,7 @@ const manualPages = [
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_2.jpg"
                             alt="เลือกพืช"
@@ -61,11 +57,6 @@ const manualPages = [
                     </div>
                     <h3 className="text-xl font-bold text-white">เลือกพืช</h3>
                 </div>
-                <div className="space-y-2 text-slate-300">
-                    <p>1. คลิกปุ่ม "เพิ่มแปลง"</p>
-                    <p>2. เลือกพืชที่ต้องการปลูก</p>
-                    <p>3. ระบบจะคำนวณความต้องการน้ำอัตโนมัติ</p>
-                </div>
             </div>
         ),
     },
@@ -76,7 +67,7 @@ const manualPages = [
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_3.jpg"
                             alt="วาดแผนที่"
@@ -92,11 +83,6 @@ const manualPages = [
                     </div>
                     <h3 className="text-xl font-bold text-white">วาดแผนที่</h3>
                 </div>
-                <div className="space-y-2 text-slate-300">
-                    <p>1. ใช้เครื่องมือวาดบนแผนที่เพื่อกำหนดพื้นที่แปลง</p>
-                    <p>2. ระบุตำแหน่งแหล่งน้ำและปั๊ม</p>
-                    <p>3. แบ่งโซนการให้น้ำตามต้องการ</p>
-                </div>
             </div>
         ),
     },
@@ -107,7 +93,7 @@ const manualPages = [
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_4.jpg"
                             alt="วางตำแหน่งพืช"
@@ -123,11 +109,6 @@ const manualPages = [
                     </div>
                     <h3 className="text-xl font-bold text-white">วางตำแหน่งพืช</h3>
                 </div>
-                <div className="space-y-2 text-slate-300">
-                    <p>1. คลิกบนแผนที่เพื่อวางตำแหน่งพืช</p>
-                    <p>2. ระบบจะนับจำนวนพืชอัตโนมัติ</p>
-                    <p>3. คำนวณความต้องการน้ำตามจำนวนพืช</p>
-                </div>
             </div>
         ),
     },
@@ -138,7 +119,7 @@ const manualPages = [
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
+                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_5.jpg"
                             alt="วางท่อ"
@@ -153,42 +134,6 @@ const manualPages = [
                         />
                     </div>
                     <h3 className="text-xl font-bold text-white">วางท่อ</h3>
-                </div>
-                <div className="space-y-2 text-slate-300">
-                    <p>1. วางท่อเมนจากปั๊มไปยังโซน</p>
-                    <p>2. วางท่อย่อยในแต่ละโซน</p>
-                    <p>3. วางท่อแขนงเชื่อมต่อกับท่อย่อย</p>
-                </div>
-            </div>
-        ),
-    },
-    {
-        title: 'ขั้นตอนที่ 5: ดูผลลัพธ์',
-        description: 'ดูสรุปและคำแนะนำอุปกรณ์',
-        image: '/freePlanImg/freeManual/manual_5.jpg',
-        content: (
-            <div className="space-y-4">
-                <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-56 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700">
-                        <img
-                            src="/freePlanImg/freeManual/manual_5.jpg"
-                            alt="ดูผลลัพธ์"
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                if (target.parentElement) {
-                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
-                                }
-                            }}
-                        />
-                    </div>
-                    <h3 className="text-xl font-bold text-white">ดูผลลัพธ์</h3>
-                </div>
-                <div className="space-y-2 text-slate-300">
-                    <p>1. ดูสรุปข้อมูลแปลงและพืช</p>
-                    <p>2. ดูคำแนะนำขนาดท่อและปั๊ม</p>
-                    <p>3. บันทึกโปรเจคเพื่อใช้งานในอนาคต</p>
                 </div>
             </div>
         ),
@@ -242,11 +187,10 @@ function Manual({ onClose }: ManualProps) {
                     <h2 className="mb-2 text-2xl font-bold text-white">
                         {manualPages[currentPage].title}
                     </h2>
-                    <p className="text-sm text-slate-300">{manualPages[currentPage].description}</p>
                 </div>
 
                 {/* Content */}
-                <div className="mb-6 min-h-[250px] md:min-h-[300px]">
+                <div className="mb-6 min-h-[350px] md:min-h-[400px]">
                     {manualPages[currentPage].content}
                 </div>
 

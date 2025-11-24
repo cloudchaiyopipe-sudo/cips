@@ -149,7 +149,7 @@ function FreeFooter() {
 
     // 4. Return TSX
     return (
-        <div className="w-full bg-[#000005] px-4 py-6 md:px-6 md:py-8">
+        <div className="w-full bg-[#000005] px-4 pb-0 pt-6 md:px-6 md:py-8">
             <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 text-xs text-white md:gap-8 md:text-sm">
                 {/* Kanok Products */}
                 <div className="space-y-1 md:space-y-2">

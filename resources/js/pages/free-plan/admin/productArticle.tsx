@@ -1,12 +1,31 @@
 import { Head, useForm, router } from '@inertiajs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import FreeNav from '../components/freeNav';
 import FootNav from '../components/footNav';
+import { getTranslations } from '../utils/language';
 
 export default function CreateProduct() {
     const [imagePreview, setImagePreview] = useState<string>('');
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        window.addEventListener('storage', handleLanguageChange);
+        window.addEventListener('languageChanged', handleLanguageChange);
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // 1. เพิ่ม field ทั้งหมด รวมถึง 'image_url' แทน 'image'
     const { data, setData, post, processing, errors } = useForm({
@@ -26,13 +45,13 @@ export default function CreateProduct() {
 
         // ตรวจสอบประเภทไฟล์
         if (!file.type.startsWith('image/')) {
-            alert('กรุณาเลือกไฟล์รูปภาพ');
+            alert(translations.pleaseSelectImageFile);
             return;
         }
 
         // ตรวจสอบขนาดไฟล์ (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-            alert('ขนาดไฟล์ต้องไม่เกิน 5MB');
+            alert(translations.fileSizeMustNotExceed5MB);
             return;
         }
 
@@ -64,11 +83,11 @@ export default function CreateProduct() {
                 };
                 reader.readAsDataURL(file);
             } else {
-                alert('ไม่สามารถอัปโหลดรูปภาพได้: ' + (result.message || 'เกิดข้อผิดพลาด'));
+                alert(translations.cannotUploadImage + ' ' + (result.message || translations.errorOccurred));
             }
         } catch (error) {
             console.error('Error uploading image:', error);
-            alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+            alert(translations.errorUploadingImage);
         } finally {
             setUploadingImage(false);
         }
@@ -90,7 +109,7 @@ export default function CreateProduct() {
 
     return (
         <>
-            <Head title="เพิ่มสินค้าใหม่" />
+            <Head title={translations.createNewProduct} />
             <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
                 {/* Custom Navbar */}
                 <FreeNav />
@@ -115,16 +134,16 @@ export default function CreateProduct() {
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
                             />
                         </svg>
-                        <span className="font-medium">กลับไปรายการสินค้า</span>
+                        <span className="font-medium">{translations.backToProductList}</span>
                     </button>
 
-                    <h1 className="mb-6 text-3xl font-bold text-white">เพิ่มสินค้าใหม่</h1>
+                    <h1 className="mb-6 text-3xl font-bold text-white">{translations.createNewProduct}</h1>
 
                     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
                         {/* Name Field */}
                         <div>
                             <label htmlFor="name" className="mb-1 block font-medium text-white">
-                                ชื่อสินค้า:
+                                {translations.productName}
                             </label>
                             <input
                                 id="name"
@@ -132,7 +151,7 @@ export default function CreateProduct() {
                                 value={data.name}
                                 onChange={(e) => setData('name', e.target.value)}
                                 className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                placeholder="กรุณากรอกชื่อสินค้า"
+                                placeholder={translations.pleaseEnterProductName}
                                 disabled={processing}
                             />
                             {errors.name && <div className="mt-1 text-sm text-red-400">{errors.name}</div>}
@@ -141,7 +160,7 @@ export default function CreateProduct() {
                         {/* Description Field */}
                         <div>
                             <label htmlFor="description" className="mb-1 block font-medium text-white">
-                                รายละเอียดสินค้า:
+                                {translations.productDescription}
                             </label>
                             <textarea
                                 id="description"
@@ -149,7 +168,7 @@ export default function CreateProduct() {
                                 onChange={(e) => setData('description', e.target.value)}
                                 rows={5}
                                 className="w-full resize-y rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                placeholder="กรุณากรอกรายละเอียดสินค้า"
+                                placeholder={translations.pleaseEnterProductDescription}
                                 disabled={processing}
                             />
                             {errors.description && (
@@ -160,7 +179,7 @@ export default function CreateProduct() {
                         {/* Price Field */}
                         <div>
                             <label htmlFor="price" className="mb-1 block font-medium text-white">
-                                ราคา:
+                                {translations.price}
                             </label>
                             <input
                                 id="price"
@@ -180,7 +199,7 @@ export default function CreateProduct() {
                         {data.category === 'promotion' && (
                             <div>
                                 <label htmlFor="originalPrice" className="mb-1 block font-medium text-white">
-                                    ราคาเดิม (ถ้ามี):
+                                    {translations.originalPrice}
                                 </label>
                                 <input
                                     id="originalPrice"
@@ -190,7 +209,7 @@ export default function CreateProduct() {
                                     value={data.originalPrice}
                                     onChange={(e) => setData('originalPrice', parseFloat(e.target.value) || 0)}
                                     className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                    placeholder="0.00 (ไม่บังคับ)"
+                                    placeholder={`0.00 (${translations.optional})`}
                                     disabled={processing}
                                 />
                                 {errors.originalPrice && (
@@ -202,7 +221,7 @@ export default function CreateProduct() {
                         {/* Category Field */}
                         <div>
                             <label htmlFor="category" className="mb-1 block font-medium text-white">
-                                หมวดหมู่:
+                                {translations.category}
                             </label>
                             <select
                                 id="category"
@@ -211,8 +230,8 @@ export default function CreateProduct() {
                                 className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
                                 disabled={processing}
                             >
-                                <option value="new">สินค้าใหม่</option>
-                                <option value="promotion">สินค้าโปรโมชั่น</option>
+                                <option value="new">{translations.newProducts}</option>
+                                <option value="promotion">{translations.promotionProducts}</option>
                             </select>
                             {errors.category && (
                                 <div className="mt-1 text-sm text-red-400">{errors.category}</div>
@@ -223,7 +242,7 @@ export default function CreateProduct() {
                         {data.category === 'promotion' && (
                             <div>
                                 <label htmlFor="discount" className="mb-1 block font-medium text-white">
-                                    ส่วนลด (%):
+                                    {translations.discount}
                                 </label>
                                 <input
                                     id="discount"
@@ -245,7 +264,7 @@ export default function CreateProduct() {
                         {/* Image Field */}
                         <div>
                             <label htmlFor="image" className="mb-1 block font-medium text-white">
-                                รูปภาพสินค้า:
+                                {translations.productImage}
                             </label>
                             <input
                                 ref={fileInputRef}
@@ -257,7 +276,7 @@ export default function CreateProduct() {
                                 disabled={processing || uploadingImage}
                             />
                             {uploadingImage && (
-                                <div className="mt-2 text-sm text-blue-400">กำลังอัปโหลดรูปภาพ...</div>
+                                <div className="mt-2 text-sm text-blue-400">{translations.uploading}</div>
                             )}
                             {errors.image_url && <div className="mt-1 text-sm text-red-400">{errors.image_url}</div>}
 
@@ -279,7 +298,7 @@ export default function CreateProduct() {
                                             }
                                         }}
                                         className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
-                                        title="ลบรูปภาพ"
+                                        title={translations.removeImage}
                                     >
                                         ×
                                     </button>
@@ -293,7 +312,7 @@ export default function CreateProduct() {
                             disabled={processing}
                             className="w-full rounded-lg bg-green-600 py-3 font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
                         >
-                            {processing ? 'กำลังบันทึก...' : 'บันทึกสินค้า'}
+                            {processing ? translations.savingProduct : translations.saveProduct}
                         </button>
                     </form>
                 </div>

@@ -1,8 +1,13 @@
 // FreeNav Component
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
+import { SharedData } from '@/types';
 
 function FreeNav() {
+    // Get user data from Inertia page props
+    const page = usePage<SharedData>();
+    const isAdmin = page.props.auth?.user?.is_admin || false;
+
     // State for language switching with localStorage persistence
     const [language, setLanguage] = useState<'EN' | 'TH'>(() => {
         // Initialize from localStorage or default to 'EN'
@@ -77,12 +82,28 @@ function FreeNav() {
                     >
                         {language}
                     </button>
-                    <button
-                        onClick={() => router.visit('/free-plan/account')}
-                        className="rounded-lg border border-blue-500 bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 md:px-4 md:text-sm"
-                    >
-                        NP
-                    </button>
+                    {/* Profile Button with Admin Crown Icon on top */}
+                    <div className="relative">
+                        {/* Admin Crown Icon - positioned on top */}
+                        {isAdmin && (
+                            <div className="absolute -top-2 -right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 border-2 border-slate-800 shadow-lg" title="Admin">
+                                <svg
+                                    className="h-4 w-4 text-yellow-100"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
+                                </svg>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => router.visit('/free-plan/account')}
+                            className="rounded-lg border border-blue-500 bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 md:px-4 md:text-sm"
+                        >
+                            NP
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>

@@ -22,14 +22,15 @@ class EnsureUserIsAdmin
             return redirect()->route('login');
         }
         
-        // 2. ตรวจสอบ "คอลัมน์ role" โดยตรง (ตรงกับ Migration)
-        if ($user->role !== 'super_user') {
-            // ถ้าไม่ใช่ 'super_user', ส่งกลับบ้าน
-            return redirect()->route('home') // หรือ redirect()->back()
+        // 2. ตรวจสอบว่าเป็น admin (super_user) หรือไม่
+        // ใช้ isSuperUser() เพื่อตรวจสอบทั้ง is_super_user และ role === 'super_user'
+        if (!$user->isSuperUser()) {
+            // ถ้าไม่ใช่ admin, ส่งกลับไปหน้า free-plan
+            return redirect()->route('free-plan')
                            ->with('error', 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
         }
         
-        // 3. ถ้าเป็น 'super_user' ให้ผ่านไปได้
+        // 3. ถ้าเป็น admin ให้ผ่านไปได้ (ไม่ต้อง verify email)
         return $next($request);
     }
 }

@@ -51,6 +51,16 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return to_route('home');
+        // Redirect based on user role
+        if ($user->role === 'sales') {
+            return redirect()->route('equipment-crud');
+        }
+        
+        if ($user->isSuperUser()) {
+            return redirect()->route('fields');
+        }
+        
+        // Default: redirect to free-plan for regular users
+        return redirect()->route('free-plan');
     }
 }

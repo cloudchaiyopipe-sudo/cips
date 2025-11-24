@@ -349,7 +349,7 @@ function FreeHome() {
             <FreeNav />
 
             {/* Main Content */}
-            <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-between pb-20 md:pb-0">
+            <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-between pb-16 md:pb-0">
                 {/* Welcome Section */}
                 <div className="md:min-h-auto min-h-[80vh] w-full max-w-md px-4 pb-4 pt-8 text-center md:px-6 md:pb-6 md:pt-12">
                     <h1 className="mb-8 text-3xl font-bold text-white md:mb-12 md:text-4xl lg:text-5xl">
@@ -563,7 +563,7 @@ function FreeHome() {
             {/* Advertisement Modal */}
             {showAdModal && advertisements.length > 0 && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="relative mx-4 w-full max-w-2xl rounded-2xl bg-slate-800 p-6 shadow-2xl md:p-8 lg:max-w-3xl">
+                    <div className="relative mx-4 w-full max-w-md rounded-2xl bg-slate-800 p-4 shadow-2xl md:p-6 lg:max-w-lg">
                         {/* Close Button */}
                         <button
                             onClick={handleCloseAdModal}
@@ -574,7 +574,7 @@ function FreeHome() {
 
                         {/* Advertisement Content */}
                         <div
-                            className="cursor-pointer rounded-lg p-4 transition-all"
+                            className="cursor-pointer rounded-lg p-2 transition-all"
                             onClick={() => handleAdClick(advertisements[currentAdIndex].link_url)}
                         >
                             <div className="mb-5 text-center">
@@ -587,20 +587,13 @@ function FreeHome() {
                                 <img
                                     src={advertisements[currentAdIndex].image_url}
                                     alt={advertisements[currentAdIndex].title}
-                                    className="h-[24rem] w-full rounded-lg object-cover md:h-[28rem]"
+                                    className="h-[450px] min-w-[300px] max-w-[300px] w-[300px] rounded-lg object-cover"
+                                    style={{ width: '300px', height: '400px' }}
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.src = '/images/no-image.jpg';
                                     }}
                                 />
-                                <div className="text-center">
-                                    <h4 className="text-2xl font-semibold text-white lg:text-3xl">
-                                        {advertisements[currentAdIndex].title}
-                                    </h4>
-                                    <p className="mt-2 text-base text-slate-300 lg:text-lg">
-                                        {advertisements[currentAdIndex].description}
-                                    </p>
-                                </div>
                             </div>
                         </div>
 
