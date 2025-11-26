@@ -403,7 +403,7 @@ function FreeSummary() {
                             new window.google.maps.Marker({
                                 position: point.position,
                                 map,
-                                title: plantData ? `${plantData.name} Plant` : 'Plant',
+                                title: plantData ? `${plantData.name} ${translations.plant}` : translations.plant,
                                 icon: {
                                     url:
                                         'data:image/svg+xml;charset=UTF-8,' +
@@ -441,19 +441,22 @@ function FreeSummary() {
                             new window.google.maps.Marker({
                                 position: ws.position,
                                 map,
-                                title: 'Water Source',
+                                title: translations.waterSource,
                                 icon: {
                                     url:
                                         'data:image/svg+xml;charset=UTF-8,' +
                                         encodeURIComponent(`
                                             <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                                                <rect x="4" y="4" width="40" height="40" rx="8" fill="#3B82F6" stroke="#1E40AF" stroke-width="3"/>
-                                                <rect x="12" y="12" width="24" height="24" rx="4" fill="#FFFFFF"/>
-                                                <path d="M24 16C21 16 19 19 19 21.5C19 25 24 30 24 30C24 30 29 25 29 21.5C29 19 27 16 24 16ZM24 23C22.6 23 21.5 21.9 21.5 20.5C21.5 19.1 22.6 18 24 18C25.4 18 26.5 19.1 26.5 20.5C26.5 21.9 25.4 23 24 23Z" fill="#2563EB"/>
+                                                <!-- Outer circle background -->
+                                                <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
+                                                <!-- Water drop shape -->
+                                                <path d="M24 8 Q20 8 18 12 Q16 16 16 20 Q16 24 18 28 Q20 32 24 36 Q28 32 30 28 Q32 24 32 20 Q32 16 30 12 Q28 8 24 8 Z" fill="#60A5FA" stroke="#2563EB" stroke-width="1.5"/>
+                                                <!-- Highlight -->
+                                                <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                                             </svg>
                                         `),
-                                    scaledSize: new window.google.maps.Size(36, 36),
-                                    anchor: new window.google.maps.Point(18, 18),
+                                    scaledSize: new window.google.maps.Size(48, 48),
+                                    anchor: new window.google.maps.Point(24, 24),
                                 },
                             });
                             bounds.extend(
@@ -476,7 +479,7 @@ function FreeSummary() {
                             new window.google.maps.Marker({
                                 position: pump.position,
                                 map,
-                                title: 'Water Pump',
+                                title: translations.waterPump,
                                 icon: {
                                     url: '/images/water-pump.png',
                                     scaledSize: new window.google.maps.Size(32, 32),
@@ -716,13 +719,13 @@ function FreeSummary() {
         return () => {
             isMounted = false;
         };
-    }, [flowRateConfig.flowRatePerMin, flowRateConfig.waterPressure, flowRateConfig.radius]);
+    }, [flowRateConfig.flowRatePerMin, flowRateConfig.waterPressure, flowRateConfig.radius, translations.plant, translations.waterSource, translations.waterPump]);
 
     // Handlers
     const handleSave = () => {
         try {
             // Get project name from localStorage or use default
-            const savedProjectName = localStorage.getItem('projectName') || 'Untitled Project';
+            const savedProjectName = localStorage.getItem('projectName') || translations.untitledProject;
 
             // Collect all project data
             const projectData = {
@@ -788,13 +791,13 @@ function FreeSummary() {
             if (existingIndex >= 0) {
                 // Update existing project
                 projects[existingIndex] = projectData;
-                alert('บันทึกโปรเจคสำเร็จ!');
+                alert(translations.projectSavedSuccessfully);
             } else {
                 // Adding new project - check if we've reached the limit of 2 projects
                 if (projects.length >= 2) {
                     // ถ้ามีโปรเจคครบ 2 โปรเจคแล้ว ให้แสดงเตือนและไม่ให้เพิ่ม
                     alert(
-                        `ไม่สามารถเพิ่มโปรเจคใหม่ได้\n\nคุณมีโปรเจคที่บันทึกไว้ครบ 2 โปรเจคแล้ว\n\nกรุณาลบโปรเจคเก่าออกก่อน หรืออัปเดตโปรเจคที่มีอยู่`
+                        `${translations.cannotAddNewProject}\n\n${translations.projectLimitReached}\n\n${translations.pleaseDeleteOldProject}`
                     );
                     return; // หยุดการทำงาน ไม่บันทึกโปรเจคใหม่
                 }
@@ -803,14 +806,16 @@ function FreeSummary() {
                 projects.push(projectData);
 
                 // Show alert message
-                alert(`บันทึกโปรเจค "${savedProjectName}" สำเร็จ!\n\nตอนนี้คุณมี ${projects.length} โปรเจคที่บันทึกไว้`);
+                alert(
+                    `${translations.projectSavedWithName.replace('{name}', savedProjectName)}\n\n${translations.youHaveProjects.replace('{count}', projects.length.toString())}`
+                );
             }
 
             // Save to localStorage
             localStorage.setItem('freePlanProjects', JSON.stringify(projects));
         } catch (error) {
             console.error('Error saving project:', error);
-            alert('เกิดข้อผิดพลาดในการบันทึกโปรเจค');
+            alert(translations.errorSavingProject);
         }
     };
 
@@ -880,7 +885,7 @@ function FreeSummary() {
         }
 
         setShowFlowRateModal(false);
-        alert('Flow rate configuration saved!');
+        alert(translations.flowRateConfigSaved);
     };
 
     const handleFlowRateChange = (field: string, value: number) => {
@@ -922,12 +927,12 @@ function FreeSummary() {
                 </div>
 
                 {/* Interactive Google Map (read-only). Fallback to image if map can't load */}
-                <div className="mb-6 h-[500px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40">
-                    <div ref={mapRef} className="h-full w-full" />
+                <div className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40 md:h-[420px]">
+                    <div ref={mapRef} className="h-full w-full min-h-[350px] md:min-h-[420px]" />
                     {!window.google && imageUrl && (
                         <img
                             src={imageUrl}
-                            alt="Map snapshot"
+                            alt={translations.mapSnapshot}
                             className="h-full w-full object-cover"
                         />
                     )}
@@ -973,7 +978,7 @@ function FreeSummary() {
                     {summaryData?.selectedPlant && (
                         <div className="mb-3 text-white">
                             <h3 className="mb-2 text-base font-semibold">
-                                Selected Plant Information
+                                {translations.selectedPlantInformation}
                             </h3>
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="mb-2 flex items-center gap-2">
@@ -984,27 +989,27 @@ function FreeSummary() {
                                         {summaryData.selectedPlant.name}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">Water Need:</span>
+                                        <span className="text-slate-300">{translations.waterNeed}</span>
                                         <span className="font-semibold text-blue-400">
-                                            {summaryData.selectedPlant.waterNeed} L/day/plant
+                                            {summaryData.selectedPlant.waterNeed} {translations.lPerDayPerPlant}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">Plant Spacing:</span>
+                                        <span className="text-slate-300">{translations.plantSpacing}</span>
                                         <span className="font-semibold text-green-400">
                                             {summaryData.selectedPlant.plantSpacing} cm
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">Row Spacing:</span>
+                                        <span className="text-slate-300">{translations.rowSpacing}</span>
                                         <span className="font-semibold text-green-400">
                                             {summaryData.selectedPlant.rowSpacing} cm
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">Total Water Need:</span>
+                                        <span className="text-slate-300">{translations.totalWaterNeed}</span>
                                         <span className="font-semibold text-cyan-400">
                                             {Math.round(
                                                 summaryData.selectedPlant.waterNeed *
@@ -1038,7 +1043,7 @@ function FreeSummary() {
                                             LPM
                                         </div>
                                         <div className="text-xs text-slate-400">
-                                            {summaryData?.plants?.total || 0} plants ×{' '}
+                                            {summaryData?.plants?.total || 0} {translations.plantsLabel} ×{' '}
                                             {summaryData?.flowRate?.flowRatePerMin ||
                                                 flowRateConfig.flowRatePerMin}{' '}
                                             LPM
@@ -1199,7 +1204,7 @@ function FreeSummary() {
                                                 {zoneArea
                                                     ? `${zoneArea.areaRai.toFixed(2)} Rai`
                                                     : ''}{' '}
-                                                • {zonePlants?.plants || 0} Plants
+                                                • {zonePlants?.plants || 0} {translations.plantsLabel}
                                             </div>
                                         </button>
 
@@ -1209,7 +1214,7 @@ function FreeSummary() {
                                                 <div className="mb-2 flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-                                                        Flow Rate
+                                                        {translations.flowRateLabel}
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="text-lg font-semibold text-blue-400">
@@ -1230,7 +1235,7 @@ function FreeSummary() {
                                                             LPM
                                                         </div>
                                                         <div className="text-[10px] text-slate-400">
-                                                            {zonePlants?.plants || 0} plants ×{' '}
+                                                            {zonePlants?.plants || 0} {translations.plantsLabel} ×{' '}
                                                             {summaryData?.flowRate
                                                                 ?.flowRatePerMin ||
                                                                 flowRateConfig.flowRatePerMin}{' '}
@@ -1253,15 +1258,15 @@ function FreeSummary() {
                                                                         summaryData.selectedPlant
                                                                             .waterNeed
                                                                 )}{' '}
-                                                                L/session
+                                                                {translations.lPerSession}
                                                             </div>
                                                             <div className="text-[10px] text-slate-400">
-                                                                {zonePlants?.plants || 0} plants ×{' '}
+                                                                {zonePlants?.plants || 0} {translations.plantsLabel} ×{' '}
                                                                 {
                                                                     summaryData.selectedPlant
                                                                         .waterNeed
                                                                 }{' '}
-                                                                L/day/plant
+                                                                {translations.lPerDayPerPlant}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1279,7 +1284,7 @@ function FreeSummary() {
                                                                 </span>
                                                             </div>
                                                             <div className="text-right">
-                                                                <div>
+                                                                <div className="flex flex-col md:flex-row md:items-center md:gap-2">
                                                                     <span className="text-lg font-semibold text-red-400">
                                                                         {zone.mainMeters.toFixed(1)}{' '}
                                                                         m
@@ -1293,7 +1298,7 @@ function FreeSummary() {
                                                                             ]?.longestMain || 0;
                                                                         return (
                                                                             longestMain > 0 && (
-                                                                                <span className="ml-2 text-sm text-red-300">
+                                                                                <span className="text-sm text-red-300 md:ml-2">
                                                                                     (
                                                                                     {
                                                                                         translations.longest
@@ -1310,7 +1315,7 @@ function FreeSummary() {
                                                                 </div>
                                                                 {zone.mainOutlets !== undefined && (
                                                                     <div className="text-[10px] text-slate-400">
-                                                                        {zone.mainOutlets} outlets
+                                                                        {zone.mainOutlets} {translations.outletsLabel}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1327,7 +1332,7 @@ function FreeSummary() {
                                                                 </span>
                                                             </div>
                                                             <div className="text-right">
-                                                                <div>
+                                                                <div className="flex flex-col md:flex-row md:items-center md:gap-2">
                                                                     <span className="text-lg font-semibold text-purple-400">
                                                                         {zone.subMainMeters.toFixed(
                                                                             1
@@ -1343,7 +1348,7 @@ function FreeSummary() {
                                                                             ]?.longestSubMain || 0;
                                                                         return (
                                                                             longestSubMain > 0 && (
-                                                                                <span className="ml-2 text-sm text-purple-300">
+                                                                                <span className="text-sm text-purple-300 md:ml-2">
                                                                                     (
                                                                                     {
                                                                                         translations.longest
@@ -1362,7 +1367,7 @@ function FreeSummary() {
                                                                     undefined && (
                                                                     <div className="text-[10px] text-slate-400">
                                                                         {zone.subMainOutlets}{' '}
-                                                                        outlets
+                                                                        {translations.outletsLabel}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1379,7 +1384,7 @@ function FreeSummary() {
                                                                 </span>
                                                             </div>
                                                             <div className="text-right">
-                                                                <div>
+                                                                <div className="flex flex-col md:flex-row md:items-center md:gap-2">
                                                                     <span className="text-lg font-semibold text-yellow-400">
                                                                         {zone.lateralMeters.toFixed(
                                                                             1
@@ -1395,7 +1400,7 @@ function FreeSummary() {
                                                                             ]?.longestLateral || 0;
                                                                         return (
                                                                             longestLateral > 0 && (
-                                                                                <span className="ml-2 text-sm text-yellow-300">
+                                                                                <span className="text-sm text-yellow-300 md:ml-2">
                                                                                     (
                                                                                     {
                                                                                         translations.longest
@@ -1414,7 +1419,7 @@ function FreeSummary() {
                                                                     undefined && (
                                                                     <div className="text-[10px] text-slate-400">
                                                                         {zone.lateralOutlets}{' '}
-                                                                        outlets
+                                                                        {translations.outletsLabel}
                                                                     </div>
                                                                 )}
                                                             </div>

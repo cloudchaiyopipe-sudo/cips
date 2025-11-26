@@ -73,9 +73,7 @@ export interface LanguageTranslations {
     searchPlants: string;
     allCategories: string;
     fruits: string;
-    vegetables: string;
-    rootCrops: string;
-    gourds: string;
+    economicTrees: string;
     back: string;
     noPlantsFound: string;
     tryAdjustingSearch: string;
@@ -86,35 +84,23 @@ export interface LanguageTranslations {
     longan: string;
     lychee: string;
     rambutan: string;
-    roseApple: string;
-    papaya: string;
     coconut: string;
     pomelo: string;
-    lime: string;
-    banana: string;
-    pineapple: string;
-    guava: string;
-    crownFlower: string;
     tamarind: string;
-    waterSpinach: string;
-    waterMimosa: string;
-    chineseKale: string;
-    chineseCabbage: string;
-    lettuce: string;
-    cabbage: string;
-    cauliflower: string;
-    brusselsSprouts: string;
-    kohlrabi: string;
-    turnip: string;
-    cassava: string;
-    sweetPotato: string;
-    potato: string;
-    radish: string;
-    carrot: string;
-    cucumber: string;
-    watermelon: string;
-    pumpkin: string;
-    winterMelon: string;
+    mango: string;
+    jackfruit: string;
+    longkong: string;
+    mayongChit: string;
+    avocado: string;
+    bitterBean: string;
+    oilPalm: string;
+    coconutCooking: string;
+    coconutFragrant: string;
+    rubber: string;
+    bamboo: string;
+    teak: string;
+    yangNa: string;
+    payung: string;
 
     // FreeFooter page
     kanokProducts: string;
@@ -218,6 +204,29 @@ export interface LanguageTranslations {
     longest: string;
     waterNeedPerSession: string;
     pipeInformation: string;
+    plant: string;
+    waterSource: string;
+    waterPump: string;
+    untitledProject: string;
+    mapSnapshot: string;
+    selectedPlantInformation: string;
+    waterNeed: string;
+    plantSpacing: string;
+    rowSpacing: string;
+    totalWaterNeed: string;
+    plantsLabel: string;
+    flowRateLabel: string;
+    outletsLabel: string;
+    lPerSession: string;
+    lPerDayPerPlant: string;
+    projectSavedSuccessfully: string;
+    cannotAddNewProject: string;
+    projectLimitReached: string;
+    pleaseDeleteOldProject: string;
+    projectSavedWithName: string;
+    youHaveProjects: string;
+    errorSavingProject: string;
+    flowRateConfigSaved: string;
 
     // FreeProduct page
     irrigationProducts: string;
@@ -308,6 +317,26 @@ export interface LanguageTranslations {
     subMainPipeLabel2: string;
     lateralPipeLabel2: string;
     totalFrictionLoss: string;
+    pePolyethylene: string;
+    pvcPolyvinylChloride: string;
+    sizeLabel: string;
+    typeLabel: string;
+    pressureLoss: string;
+    hfLabel: string;
+    flowPerSprinklerLabel: string;
+    calculatedBasedOn: string;
+    step1Label: string;
+    step2Label: string;
+    step3Label: string;
+    mainPipeLabel3: string;
+    subMainPipeLabel3: string;
+    lateralPipeLabel3: string;
+    loading: string;
+    sprinklerAlt: string;
+    mainPipeAlt: string;
+    subMainPipeAlt: string;
+    lateralPipeAlt: string;
+    pumpAlt: string;
     checkoutModalTitle: string;
     checkoutModalMessage: string;
     addFriendOnLine: string;
@@ -461,9 +490,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         searchPlants: 'Search plants...',
         allCategories: 'All Categories',
         fruits: 'Fruits',
-        vegetables: 'Vegetables',
-        rootCrops: 'Root Crops',
-        gourds: 'Gourds',
+        economicTrees: 'Economic Trees',
         back: 'Back',
         noPlantsFound: 'No plants found',
         tryAdjustingSearch: 'Try adjusting your search or category filter',
@@ -474,26 +501,23 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longan: 'Longan',
         lychee: 'Lychee',
         rambutan: 'Rambutan',
-        roseApple: 'Rose Apple',
-        papaya: 'Papaya',
         coconut: 'Coconut',
         pomelo: 'Pomelo',
-        lime: 'Lime',
-        banana: 'Banana',
-        pineapple: 'Pineapple',
-        guava: 'Guava',
-        crownFlower: 'Crown Flower',
         tamarind: 'Tamarind',
-        waterSpinach: 'Water Spinach',
-        waterMimosa: 'Water Mimosa',
-        chineseKale: 'Chinese Kale',
-        chineseCabbage: 'Chinese Cabbage',
-        lettuce: 'Lettuce',
-        cabbage: 'Cabbage',
-        cauliflower: 'Cauliflower',
-        brusselsSprouts: 'Brussels Sprouts',
-        kohlrabi: 'Kohlrabi',
-        turnip: 'Turnip',
+        mango: 'Mango',
+        jackfruit: 'Jackfruit',
+        longkong: 'Longkong',
+        mayongChit: 'Mayong Chit',
+        avocado: 'Avocado',
+        bitterBean: 'Bitter Bean',
+        oilPalm: 'Oil Palm',
+        coconutCooking: 'Coconut (Cooking)',
+        coconutFragrant: 'Coconut (Fragrant)',
+        rubber: 'Rubber',
+        bamboo: 'Bamboo',
+        teak: 'Teak',
+        yangNa: 'Yang Na',
+        payung: 'Payung',
         cassava: 'Cassava',
         sweetPotato: 'Sweet Potato',
         potato: 'Potato',
@@ -612,6 +636,29 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longest: 'Longest',
         waterNeedPerSession: 'Water Need per Session',
         pipeInformation: 'Pipe Information',
+        plant: 'Plant',
+        waterSource: 'Water Source',
+        waterPump: 'Water Pump',
+        untitledProject: 'Untitled Project',
+        mapSnapshot: 'Map snapshot',
+        selectedPlantInformation: 'Selected Plant Information',
+        waterNeed: 'Water Need:',
+        plantSpacing: 'Plant Spacing:',
+        rowSpacing: 'Row Spacing:',
+        totalWaterNeed: 'Total Water Need:',
+        plantsLabel: 'plants',
+        flowRateLabel: 'Flow Rate',
+        outletsLabel: 'outlets',
+        lPerSession: 'L/session',
+        lPerDayPerPlant: 'L/day/plant',
+        projectSavedSuccessfully: 'Project saved successfully!',
+        cannotAddNewProject: 'Cannot add new project',
+        projectLimitReached: 'You have reached the limit of 2 saved projects',
+        pleaseDeleteOldProject: 'Please delete an old project or update an existing one',
+        projectSavedWithName: 'Project "{name}" saved successfully!',
+        youHaveProjects: 'You now have {count} saved project(s)',
+        errorSavingProject: 'Error saving project',
+        flowRateConfigSaved: 'Flow rate configuration saved!',
 
         // FreeProduct page
         irrigationProducts: 'Irrigation Products',
@@ -702,6 +749,26 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         subMainPipeLabel2: 'SubMain Pipe',
         lateralPipeLabel2: 'Lateral Pipe',
         totalFrictionLoss: 'Total Friction Loss:',
+        pePolyethylene: 'PE (Polyethylene)',
+        pvcPolyvinylChloride: 'PVC (Polyvinyl Chloride)',
+        sizeLabel: 'Size:',
+        typeLabel: 'Type:',
+        pressureLoss: 'Pressure Loss:',
+        hfLabel: 'HF:',
+        flowPerSprinklerLabel: 'Flow per Sprinkler:',
+        calculatedBasedOn: 'Calculated based on highest flow rate zone:',
+        step1Label: 'Step 1: System Flow Rate',
+        step2Label: 'Step 2: Total Dynamic Head (TDH)',
+        step3Label: 'Step 3: Pump Power',
+        mainPipeLabel3: 'Main Pipe:',
+        subMainPipeLabel3: 'SubMain Pipe:',
+        lateralPipeLabel3: 'Lateral Pipe:',
+        loading: 'Loading...',
+        sprinklerAlt: 'Sprinkler',
+        mainPipeAlt: 'Main Pipe',
+        subMainPipeAlt: 'SubMain Pipe',
+        lateralPipeAlt: 'Lateral Pipe',
+        pumpAlt: 'Pump',
         checkoutModalTitle: 'Notification',
         checkoutModalMessage:
             'This is only a preliminary calculation. Please contact the installation team for maximum benefits and save the plan image.',
@@ -853,9 +920,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         searchPlants: 'ค้นหาพืช...',
         allCategories: 'หมวดหมู่ทั้งหมด',
         fruits: 'ผลไม้',
-        vegetables: 'ผัก',
-        rootCrops: 'พืชหัว',
-        gourds: 'พืชตระกูลแตง',
+        economicTrees: 'ไม้เศรษฐกิจ',
         back: 'กลับ',
         noPlantsFound: 'ไม่พบพืช',
         tryAdjustingSearch: 'ลองปรับการค้นหาหรือตัวกรองหมวดหมู่',
@@ -866,26 +931,23 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longan: 'ลำไย',
         lychee: 'ลิ้นจี่',
         rambutan: 'เงาะ',
-        roseApple: 'ชมพู่',
-        papaya: 'มะละกอ',
         coconut: 'มะพร้าว',
         pomelo: 'ส้มโอ',
-        lime: 'มะนาว',
-        banana: 'กล้วย',
-        pineapple: 'สับปะรด',
-        guava: 'ฝรั่ง',
-        crownFlower: 'ดอกชบา',
         tamarind: 'มะขาม',
-        waterSpinach: 'ผักบุ้ง',
-        waterMimosa: 'ผักกระเฉด',
-        chineseKale: 'คะน้า',
-        chineseCabbage: 'กะหล่ำปลีจีน',
-        lettuce: 'ผักกาดหอม',
-        cabbage: 'กะหล่ำปลี',
-        cauliflower: 'กะหล่ำดอก',
-        brusselsSprouts: 'กะหล่ำดาว',
-        kohlrabi: 'กะหล่ำปม',
-        turnip: 'หัวผักกาด',
+        mango: 'มะม่วง',
+        jackfruit: 'ขนุน',
+        longkong: 'ลองกอง',
+        mayongChit: 'มะยงชิด/มะปราง',
+        avocado: 'อะโวคาโด',
+        bitterBean: 'สะตอ',
+        oilPalm: 'ปาล์มน้ำมัน',
+        coconutCooking: 'มะพร้าวแกง/กะทิ',
+        coconutFragrant: 'มะพร้าวน้ำหอม',
+        rubber: 'ยางพารา',
+        bamboo: 'ไผ่',
+        teak: 'สัก',
+        yangNa: 'ยางนา',
+        payung: 'พะยูง/ชิงชัน/ประดู่',
         cassava: 'มันสำปะหลัง',
         sweetPotato: 'มันเทศ',
         potato: 'มันฝรั่ง',
@@ -1000,6 +1062,29 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longest: 'ยาวที่สุด',
         waterNeedPerSession: 'ความต้องการน้ำต่อรอบ',
         pipeInformation: 'ข้อมูลท่อ',
+        plant: 'พืช',
+        waterSource: 'แหล่งน้ำ',
+        waterPump: 'ปั๊มน้ำ',
+        untitledProject: 'โปรเจคที่ยังไม่มีชื่อ',
+        mapSnapshot: 'ภาพแผนที่',
+        selectedPlantInformation: 'ข้อมูลพืชที่เลือก',
+        waterNeed: 'ความต้องการน้ำ:',
+        plantSpacing: 'ระยะห่างระหว่างพืช:',
+        rowSpacing: 'ระยะห่างระหว่างแถว:',
+        totalWaterNeed: 'ความต้องการน้ำรวม:',
+        plantsLabel: 'พืช',
+        flowRateLabel: 'อัตราการไหล',
+        outletsLabel: 'จุดจ่าย',
+        lPerSession: 'ลิตร/รอบ',
+        lPerDayPerPlant: 'ลิตร/วัน/พืช',
+        projectSavedSuccessfully: 'บันทึกโปรเจคสำเร็จ!',
+        cannotAddNewProject: 'ไม่สามารถเพิ่มโปรเจคใหม่ได้',
+        projectLimitReached: 'คุณมีโปรเจคที่บันทึกไว้ครบ 2 โปรเจคแล้ว',
+        pleaseDeleteOldProject: 'กรุณาลบโปรเจคเก่าออกก่อน หรืออัปเดตโปรเจคที่มีอยู่',
+        projectSavedWithName: 'บันทึกโปรเจค "{name}" สำเร็จ!',
+        youHaveProjects: 'ตอนนี้คุณมี {count} โปรเจคที่บันทึกไว้',
+        errorSavingProject: 'เกิดข้อผิดพลาดในการบันทึกโปรเจค',
+        flowRateConfigSaved: 'บันทึกการตั้งค่าอัตราการไหลสำเร็จ!',
 
         // FreeProduct page
         irrigationProducts: 'ผลิตภัณฑ์ระบบชลประทาน',
@@ -1090,6 +1175,26 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         subMainPipeLabel2: 'ท่อรอง',
         lateralPipeLabel2: 'ท่อแขนง',
         totalFrictionLoss: 'การสูญเสียแรงเสียดทานรวม:',
+        pePolyethylene: 'PE (โพลีเอทิลีน)',
+        pvcPolyvinylChloride: 'PVC (โพลีไวนิลคลอไรด์)',
+        sizeLabel: 'ขนาด:',
+        typeLabel: 'ประเภท:',
+        pressureLoss: 'การสูญเสียแรงดัน:',
+        hfLabel: 'HF:',
+        flowPerSprinklerLabel: 'อัตราการไหลต่อสปริงเกลอร์:',
+        calculatedBasedOn: 'คำนวณจากโซนที่มีอัตราการไหลสูงสุด:',
+        step1Label: 'ขั้นตอนที่ 1: อัตราการไหลของระบบ',
+        step2Label: 'ขั้นตอนที่ 2: หัวแรงดันรวม (TDH)',
+        step3Label: 'ขั้นตอนที่ 3: กำลังปั๊ม',
+        mainPipeLabel3: 'ท่อหลัก:',
+        subMainPipeLabel3: 'ท่อรอง:',
+        lateralPipeLabel3: 'ท่อแขนง:',
+        loading: 'กำลังโหลด...',
+        sprinklerAlt: 'สปริงเกลอร์',
+        mainPipeAlt: 'ท่อหลัก',
+        subMainPipeAlt: 'ท่อรอง',
+        lateralPipeAlt: 'ท่อแขนง',
+        pumpAlt: 'ปั๊ม',
         checkoutModalTitle: 'แจ้งเตือน',
         checkoutModalMessage:
             'นี่เป็นเพียงการคำนวณเบื้องต้น กรุณาติดต่อทีมติดตั้งเพื่อได้รับประโยชน์สูงสุดและเซฟภาพแบบแปลนไว้',

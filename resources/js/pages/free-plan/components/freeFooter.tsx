@@ -1,36 +1,9 @@
 // 1. Import
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getTranslations } from '../utils/language';
-
-// Google Maps TypeScript declarations
-interface MapOptions {
-    zoom: number;
-    center: { lat: number; lng: number };
-    mapTypeId: string;
-    styles?: Array<{
-        featureType: string;
-        elementType: string;
-        stylers: Array<{ color: string }>;
-    }>;
-}
-
-interface MarkerOptions {
-    position: { lat: number; lng: number };
-    map: unknown;
-    title: string;
-    icon?: {
-        url: string;
-        scaledSize: unknown;
-        anchor: unknown;
-    };
-}
 
 // 2. FreeFooter Component
 function FreeFooter() {
-    // State
-    const [mapLoaded, setMapLoaded] = useState(false);
-    const mapRef = useRef<HTMLDivElement>(null);
-
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());
 
@@ -57,96 +30,6 @@ function FreeFooter() {
         };
     }, []);
 
-    useEffect(() => {
-        let isMounted = true;
-
-        // Load Google Maps script
-        const loadGoogleMaps = () => {
-            if (window.google && window.google.maps) {
-                if (isMounted) {
-                    setMapLoaded(true);
-                    initializeMap();
-                }
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&libraries=places`;
-            script.async = true;
-            script.defer = true;
-            script.onload = () => {
-                if (isMounted) {
-                    setMapLoaded(true);
-                    initializeMap();
-                }
-            };
-            document.head.appendChild(script);
-        };
-
-        const initializeMap = () => {
-            if (!isMounted || !mapRef.current || !window.google) return;
-
-            // Kanok Products location coordinates
-            const kanokLocation = {
-                lat: 13.6567, // Bang Bon District, Bangkok - Kanok Products Co., Ltd.
-                lng: 100.3956,
-            };
-
-            const mapOptions: MapOptions = {
-                zoom: 19,
-                center: kanokLocation,
-                mapTypeId: window.google.maps.MapTypeId.SATELLITE,
-                styles: [
-                    {
-                        featureType: 'all',
-                        elementType: 'geometry.fill',
-                        stylers: [{ color: '#2d3748' }],
-                    },
-                    {
-                        featureType: 'water',
-                        elementType: 'geometry',
-                        stylers: [{ color: '#1e3a8a' }],
-                    },
-                    {
-                        featureType: 'road',
-                        elementType: 'geometry',
-                        stylers: [{ color: '#374151' }],
-                    },
-                ],
-            };
-
-            const map = new window.google.maps.Map(mapRef.current, mapOptions);
-
-            // Add marker for Kanok Products
-            const markerOptions: MarkerOptions = {
-                position: kanokLocation,
-                map: map,
-                title: 'Kanok Products Co., Ltd.',
-                icon: {
-                    url:
-                        'data:image/svg+xml;charset=UTF-8,' +
-                        encodeURIComponent(`
-                        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="20" cy="20" r="18" fill="#10b981" stroke="#ffffff" stroke-width="2"/>
-                            <text x="20" y="26" text-anchor="middle" fill="white" font-size="16" font-weight="bold">K</text>
-                        </svg>
-                    `),
-                    scaledSize: new window.google.maps.Size(40, 40),
-                    anchor: new window.google.maps.Point(20, 20),
-                },
-            };
-
-            new window.google.maps.Marker(markerOptions);
-        };
-
-        loadGoogleMaps();
-
-        // Cleanup function
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
     // 4. Return TSX
     return (
         <div className="w-full bg-[#000005] px-4 pb-0 pt-6 md:px-6 md:py-8">
@@ -170,28 +53,16 @@ function FreeFooter() {
 
             {/* Map Section */}
             <div className="mx-auto mt-6 max-w-4xl overflow-hidden rounded-lg bg-slate-300 md:mt-8">
-                <div className="relative">
-                    <div
-                        ref={mapRef}
-                        className="aspect-[2/1] w-full"
-                        style={{ minHeight: '200px' }}
-                    />
-                    {!mapLoaded && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
-                            <div className="text-center">
-                                <svg
-                                    className="mx-auto h-16 w-16 text-slate-600 md:h-20 md:w-20"
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                                </svg>
-                                <p className="mt-2 text-sm text-slate-600">
-                                    {translations.loadingMap}
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                <div className="h-80">
+                    <iframe
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d966.7642280441407!2d100.42009950900939!3d13.665848348465142!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e2bd69ca5b596f%3A0x9343e7f0feddd541!2z4Lia4LiI4LiBLiDguIHguJnguIHguYLguJvguKPguJTguLHguIHguKrguYwgKOC4quC4s-C4meC4seC4geC4h-C4suC4meC5g-C4q-C4jeC5iCkgS0FOT0sgUFJPRFVDVCBDTy4sIExURC4!5e1!3m2!1sen!2sth!4v1753790987668!5m2!1sen!2sth"
+                        width="100%"
+                        height="100%"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        className="rounded"
+                    ></iframe>
                 </div>
             </div>
         </div>

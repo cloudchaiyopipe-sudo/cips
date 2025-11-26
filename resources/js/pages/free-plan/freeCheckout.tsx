@@ -1,5 +1,5 @@
 // 1. Import
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Head, router } from '@inertiajs/react';
 import QRCodeSVG from 'react-qr-code';
 import FreeNav from './components/freeNav';
@@ -12,6 +12,7 @@ function FreeCheckout() {
     const LINE_FRIEND_URL = `https://line.me/R/ti/p/${LINE_ID}`;
 
     const [translations, setTranslations] = useState(getTranslations());
+    const qrCodeRef = useRef<HTMLDivElement>(null);
     const [sprinklerSpecs, setSprinklerSpecs] = useState<{
         flowRatePerMin: number;
         waterPressure: number;
@@ -155,11 +156,44 @@ function FreeCheckout() {
         router.visit('/free-plan/product');
     };
 
+    const handleSaveImage = async () => {
+        if (!qrCodeRef.current) return;
+
+        try {
+            // Dynamically import html2canvas
+            const { default: html2canvas } = await import('html2canvas');
+            
+            // Capture the QR code container
+            const canvas = await html2canvas(qrCodeRef.current, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                logging: false,
+            });
+
+            // Convert canvas to blob and create download link
+            canvas.toBlob((blob) => {
+                if (!blob) return;
+                
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `line-qr-code-${LINE_ID.replace('@', '')}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        } catch (error) {
+            console.error('Error saving image:', error);
+            alert('ไม่สามารถบันทึกภาพได้ กรุณาลองอีกครั้ง');
+        }
+    };
+
     const currentSpecs = sprinklerMode === 'preset' ? sprinklerSpecs : calculatedSprinklerSpecs;
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title={translations.checkout || 'Checkout'} />
+            <Head title={translations.checkout} />
 
             {/* Navbar */}
             <FreeNav />
@@ -169,10 +203,10 @@ function FreeCheckout() {
                 {/* Header */}
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-white">
-                        {translations.checkoutModalTitle || 'Equipment Specifications Summary'}
+                        {translations.checkoutModalTitle}
                     </h1>
                     <p className="mt-2 text-slate-300">
-                        {translations.checkoutModalMessage || 'Please review the equipment specifications below and contact us via LINE for further assistance.'}
+                        {translations.checkoutModalMessage}
                     </p>
                 </div>
 
@@ -183,13 +217,13 @@ function FreeCheckout() {
                             <thead className="bg-slate-700/50">
                                 <tr>
                                     <th className="px-4 py-4 text-center text-sm font-semibold text-white w-24">
-                                        {translations.image || 'Image'}
+                                        {translations.image}
                                     </th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-white">
-                                        {translations.equipment || 'Equipment'}
+                                        {translations.equipment}
                                     </th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-white">
-                                        {translations.specifications || 'Specifications'}
+                                        {translations.specifications}
                                     </th>
                                 </tr>
                             </thead>
@@ -200,20 +234,20 @@ function FreeCheckout() {
                                         <div className="flex items-center justify-center">
                                             <img
                                                 src="/freePlanImg/sprinkler.png"
-                                                alt="Sprinkler"
+                                                alt={translations.sprinklerAlt}
                                                 className="h-16 w-16 rounded-lg object-contain"
                                             />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-emerald-300">
-                                        {translations.sprinklerSelector || 'Sprinkler'}
+                                        {translations.sprinklerSelector}
                                     </td>
                                     <td className="px-6 py-4 text-slate-200">
                                         {currentSpecs ? (
                                             <div className="space-y-1">
                                                 <div>
                                                     <span className="text-slate-400">
-                                                        {translations.flowRateProduct || 'Flow Rate'}:{' '}
+                                                        {translations.flowRateProduct}:{' '}
                                                     </span>
                                                     <span className="font-semibold text-emerald-400">
                                                         {currentSpecs.flowRatePerMin.toFixed(2)} LPM
@@ -221,7 +255,7 @@ function FreeCheckout() {
                                                 </div>
                                                 <div>
                                                     <span className="text-slate-400">
-                                                        {translations.pressureProduct || 'Pressure'}:{' '}
+                                                        {translations.pressureProduct}:{' '}
                                                     </span>
                                                     <span className="font-semibold text-emerald-400">
                                                         {currentSpecs.waterPressure} Bar
@@ -229,7 +263,7 @@ function FreeCheckout() {
                                                 </div>
                                                 <div>
                                                     <span className="text-slate-400">
-                                                        {translations.radiusProduct || 'Radius'}:{' '}
+                                                        {translations.radiusProduct}:{' '}
                                                     </span>
                                                     <span className="font-semibold text-emerald-400">
                                                         {currentSpecs.radius} m
@@ -237,7 +271,7 @@ function FreeCheckout() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">Loading...</span>
+                                            <span className="text-slate-400">{translations.loading}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -248,19 +282,19 @@ function FreeCheckout() {
                                         <div className="flex items-center justify-center">
                                             <img
                                                 src="/freePlanImg/pvc-pipes.png"
-                                                alt="Main Pipe"
+                                                alt={translations.mainPipeAlt}
                                                 className="h-16 w-16 rounded-lg object-contain"
                                             />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-rose-300">
-                                        {translations.mainPipeSelection || 'Main Pipe'}
+                                        {translations.mainPipeSelection}
                                     </td>
                                     <td className="px-6 py-4 text-slate-200">
                                         {pipeRecommendations?.main ? (
                                             <div>
                                                 <span className="text-slate-400">
-                                                    {translations.recommendedSize || 'Recommended Size'}:{' '}
+                                                    {translations.recommendedSize}:{' '}
                                                 </span>
                                                 <span className="font-semibold text-rose-400">
                                                     {(() => {
@@ -278,7 +312,7 @@ function FreeCheckout() {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">Loading...</span>
+                                            <span className="text-slate-400">{translations.loading}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -289,19 +323,19 @@ function FreeCheckout() {
                                         <div className="flex items-center justify-center">
                                             <img
                                                 src="/freePlanImg/pvc-pipes.png"
-                                                alt="SubMain Pipe"
+                                                alt={translations.subMainPipeAlt}
                                                 className="h-16 w-16 rounded-lg object-contain"
                                             />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-violet-300">
-                                        {translations.subMainPipeSelection || 'SubMain Pipe'}
+                                        {translations.subMainPipeSelection}
                                     </td>
                                     <td className="px-6 py-4 text-slate-200">
                                         {pipeRecommendations?.subMain ? (
                                             <div>
                                                 <span className="text-slate-400">
-                                                    {translations.recommendedSize || 'Recommended Size'}:{' '}
+                                                    {translations.recommendedSize}:{' '}
                                                 </span>
                                                 <span className="font-semibold text-violet-400">
                                                     {(() => {
@@ -319,7 +353,7 @@ function FreeCheckout() {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">Loading...</span>
+                                            <span className="text-slate-400">{translations.loading}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -330,19 +364,19 @@ function FreeCheckout() {
                                         <div className="flex items-center justify-center">
                                             <img
                                                 src="/freePlanImg/pvc-pipes.png"
-                                                alt="Lateral Pipe"
+                                                alt={translations.lateralPipeAlt}
                                                 className="h-16 w-16 rounded-lg object-contain"
                                             />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-amber-300">
-                                        {translations.lateralPipeSelection || 'Lateral Pipe'}
+                                        {translations.lateralPipeSelection}
                                     </td>
                                     <td className="px-6 py-4 text-slate-200">
                                         {pipeRecommendations?.lateral ? (
                                             <div>
                                                 <span className="text-slate-400">
-                                                    {translations.recommendedSize || 'Recommended Size'}:{' '}
+                                                    {translations.recommendedSize}:{' '}
                                                 </span>
                                                 <span className="font-semibold text-amber-400">
                                                     {(() => {
@@ -360,7 +394,7 @@ function FreeCheckout() {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">Loading...</span>
+                                            <span className="text-slate-400">{translations.loading}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -371,20 +405,20 @@ function FreeCheckout() {
                                         <div className="flex items-center justify-center">
                                             <img
                                                 src="/images/water-pump.png"
-                                                alt="Pump"
+                                                alt={translations.pumpAlt}
                                                 className="h-16 w-16 rounded-lg object-contain"
                                             />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-sky-300">
-                                        {translations.pumpSelection || 'Pump'}
+                                        {translations.pumpSelection}
                                     </td>
                                     <td className="px-6 py-4 text-slate-200">
                                         {pumpRecommendations ? (
                                             <div className="space-y-1">
                                                 <div>
                                                     <span className="text-slate-400">
-                                                        {translations.flowRateProduct || 'Flow Rate'}:{' '}
+                                                        {translations.flowRateProduct}:{' '}
                                                     </span>
                                                     <span className="font-semibold text-sky-400">
                                                         {pumpRecommendations.flowRate} LPM
@@ -392,7 +426,7 @@ function FreeCheckout() {
                                                 </div>
                                                 <div>
                                                     <span className="text-slate-400">
-                                                        {translations.headProduct || 'Head'}:{' '}
+                                                        {translations.headProduct}:{' '}
                                                     </span>
                                                     <span className="font-semibold text-sky-400">
                                                         {pumpRecommendations.head} m
@@ -400,7 +434,7 @@ function FreeCheckout() {
                                                 </div>
                                                 <div>
                                                     <span className="text-slate-400">
-                                                        {translations.powerProduct || 'Power'}:{' '}
+                                                        {translations.powerProduct}:{' '}
                                                     </span>
                                                     <span className="font-semibold text-sky-400">
                                                         {pumpRecommendations.power} HP
@@ -408,7 +442,7 @@ function FreeCheckout() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">Loading...</span>
+                                            <span className="text-slate-400">{translations.loading}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -421,14 +455,14 @@ function FreeCheckout() {
                 <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-6">
                     <div className="mb-4 text-center">
                         <h3 className="mb-2 text-xl font-semibold text-green-400">
-                            {translations.addFriendOnLine || 'Add Friend on LINE'}
+                            {translations.addFriendOnLine}
                         </h3>
                         <p className="text-sm text-green-300">
-                            {translations.scanQRCodeToContact || 'Scan the QR code below to contact us for more information and assistance.'}
+                            {translations.scanQRCodeToContact}
                         </p>
                     </div>
                     <div className="flex justify-center">
-                        <div className="rounded-lg bg-white p-4 shadow-lg">
+                        <div ref={qrCodeRef} className="rounded-lg bg-white p-4 shadow-lg">
                             <QRCodeSVG
                                 value={LINE_FRIEND_URL}
                                 size={250}
@@ -443,18 +477,24 @@ function FreeCheckout() {
                         </div>
                     </div>
                     <p className="mt-4 text-center text-sm text-green-300">
-                        {translations.orAddFriendAtLineId || 'Or add friend at LINE ID'}{' '}
+                        {translations.orAddFriendAtLineId}{' '}
                         <span className="font-semibold text-green-400">{LINE_ID}</span>
                     </p>
                 </div>
 
-                {/* Back Button */}
-                <div className="mt-6 flex justify-center">
+                {/* Action Buttons */}
+                <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                     <button
                         onClick={handleBack}
-                        className="rounded-lg bg-slate-600 px-8 py-3 font-medium text-white transition-colors hover:bg-slate-500"
+                        className="w-full rounded-lg bg-slate-600 px-8 py-3 font-medium text-white transition-colors hover:bg-slate-500 sm:w-auto"
                     >
-                        {translations.back || 'Back'}
+                        {translations.back}
+                    </button>
+                    <button
+                        onClick={handleSaveImage}
+                        className="w-full rounded-lg bg-green-600 px-8 py-3 font-medium text-white transition-colors hover:bg-green-700 sm:w-auto"
+                    >
+                        บันทึกภาพ QR Code
                     </button>
                 </div>
             </div>

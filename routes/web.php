@@ -839,16 +839,7 @@ Route::middleware(['auth'])->group(function () {
             'status' => session('status'),
         ]);
     })->name('free-plan.account');
-
-    // Free Plan Email Verification Routes - DISABLED
-    // Route::post('/free-plan/email/verification-notification', [\App\Http\Controllers\FreePlan\FreePlanEmailVerificationNotificationController::class, 'store'])
-    //     ->middleware('throttle:6,1')
-    //     ->name('free-plan.verification.send');
-
-    // Route::get('/free-plan/verify-email/{id}/{hash}', [\App\Http\Controllers\FreePlan\FreePlanVerifyEmailController::class, '__invoke'])
-    //     ->middleware(['signed', 'throttle:6,1'])
-    //     ->name('free-plan.verification.verify');
-
+    
     // Route สำหรับส่งอีเมลยืนยัน (เมื่อกดปุ่ม)
     Route::post('/email/verification-notification', function (Request $request) {
         try {

@@ -11,14 +11,11 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    // Register routes temporarily disabled - redirect to login
-    Route::get('register', function () {
-        return redirect()->route('login')->with('message', 'การสมัครสมาชิกปิดใช้งานชั่วคราว');
-    })->name('register');
+    // Register routes
+    Route::get('register', [RegisteredUserController::class, 'create'])
+        ->name('register');
 
-    Route::post('register', function () {
-        return redirect()->route('login')->with('message', 'การสมัครสมาชิกปิดใช้งานชั่วคราว');
-    });
+    Route::post('register', [RegisteredUserController::class, 'store']);
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');

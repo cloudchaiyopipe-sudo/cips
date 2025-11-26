@@ -17,7 +17,7 @@ function ChooseCrop() {
     const [searchValue, setSearchValue] = useState('');
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<
-        'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds'
+        'all' | 'fruits' | 'economic-trees'
     >('all');
 
     // State for translations
@@ -60,7 +60,7 @@ function ChooseCrop() {
     };
 
     const handleCategoryChange = (category: string) => {
-        setSelectedCategory(category as 'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds');
+        setSelectedCategory(category as 'all' | 'fruits' | 'economic-trees');
     };
 
     const handleCropSelect = (cropName: string) => {
@@ -196,9 +196,7 @@ function ChooseCrop() {
                         >
                             <option value="all">{translations.allCategories}</option>
                             <option value="fruits">{translations.fruits}</option>
-                            <option value="vegetables">{translations.vegetables}</option>
-                            <option value="root-crops">{translations.rootCrops}</option>
-                            <option value="gourds">{translations.gourds}</option>
+                            <option value="economic-trees">{translations.economicTrees}</option>
                         </select>
                     </div>
                 </div>
