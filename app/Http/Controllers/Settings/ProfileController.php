@@ -29,13 +29,29 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $validated = $request->validated();
+        
+        // Only update fields that are present in the request
+        if (isset($validated['name'])) {
+            $request->user()->name = $validated['name'];
+        }
+        
+        if (isset($validated['email'])) {
+            $oldEmail = $request->user()->email;
+            $request->user()->email = $validated['email'];
+            
+            if ($oldEmail !== $validated['email']) {
+                $request->user()->email_verified_at = null;
+            }
         }
 
         $request->user()->save();
+
+        // For Inertia requests, redirect back to preserve the current page
+        // For regular requests, redirect to profile page
+        if ($request->header('X-Inertia')) {
+            return redirect()->back();
+        }
 
         return redirect('/profile');
     }

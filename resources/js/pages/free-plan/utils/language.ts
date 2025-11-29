@@ -58,15 +58,22 @@ export interface LanguageTranslations {
     changePassword: string;
     verifyEmail: string;
     logout: string;
+    sending: string;
+    sendVerificationEmail: string;
+    verificationEmailSent: string;
+    errorSendingEmail: string;
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+    passwordChangedSuccessfully: string;
+    saving: string;
 
     // ChooseCrop page
     selectCropTypes: string;
     searchPlants: string;
     allCategories: string;
     fruits: string;
-    vegetables: string;
-    rootCrops: string;
-    gourds: string;
+    economicTrees: string;
     back: string;
     noPlantsFound: string;
     tryAdjustingSearch: string;
@@ -77,26 +84,23 @@ export interface LanguageTranslations {
     longan: string;
     lychee: string;
     rambutan: string;
-    roseApple: string;
-    papaya: string;
     coconut: string;
     pomelo: string;
-    lime: string;
-    banana: string;
-    pineapple: string;
-    guava: string;
-    crownFlower: string;
     tamarind: string;
-    waterSpinach: string;
-    waterMimosa: string;
-    chineseKale: string;
-    chineseCabbage: string;
-    lettuce: string;
-    cabbage: string;
-    cauliflower: string;
-    brusselsSprouts: string;
-    kohlrabi: string;
-    turnip: string;
+    mango: string;
+    jackfruit: string;
+    longkong: string;
+    mayongChit: string;
+    avocado: string;
+    bitterBean: string;
+    oilPalm: string;
+    coconutCooking: string;
+    coconutFragrant: string;
+    rubber: string;
+    bamboo: string;
+    teak: string;
+    yangNa: string;
+    payung: string;
     cassava: string;
     sweetPotato: string;
     potato: string;
@@ -209,6 +213,25 @@ export interface LanguageTranslations {
     longest: string;
     waterNeedPerSession: string;
     pipeInformation: string;
+    waterSource: string;
+    waterPump: string;
+    untitledProject: string;
+    mapSnapshot: string;
+    waterNeed: string;
+    plantSpacing: string;
+    rowSpacing: string;
+    totalWaterNeed: string;
+    plantsLabel: string;
+    lPerSession: string;
+    lPerDayPerPlant: string;
+    projectSavedSuccessfully: string;
+    cannotAddNewProject: string;
+    projectLimitReached: string;
+    pleaseDeleteOldProject: string;
+    projectSavedWithName: string;
+    youHaveProjects: string;
+    errorSavingProject: string;
+    flowRateConfigSaved: string;
 
     // FreeProduct page
     irrigationProducts: string;
@@ -261,9 +284,7 @@ export interface LanguageTranslations {
     zoneFlowRate: string;
     pipeLength: string;
     longestPipe: string;
-    outletsLabel: string;
     pipeTypeRecommendations: string;
-    selectedPlantInformation: string;
     irrigationTime: string;
     waterNeedPerSessionLabel: string;
     totalWaterVolume: string;
@@ -299,6 +320,26 @@ export interface LanguageTranslations {
     subMainPipeLabel2: string;
     lateralPipeLabel2: string;
     totalFrictionLoss: string;
+    pePolyethylene: string;
+    pvcPolyvinylChloride: string;
+    sizeLabel: string;
+    typeLabel: string;
+    pressureLoss: string;
+    hfLabel: string;
+    flowPerSprinklerLabel: string;
+    calculatedBasedOn: string;
+    step1Label: string;
+    step2Label: string;
+    step3Label: string;
+    mainPipeLabel3: string;
+    subMainPipeLabel3: string;
+    lateralPipeLabel3: string;
+    loading: string;
+    sprinklerAlt: string;
+    mainPipeAlt: string;
+    subMainPipeAlt: string;
+    lateralPipeAlt: string;
+    pumpAlt: string;
     checkoutModalTitle: string;
     checkoutModalMessage: string;
     addFriendOnLine: string;
@@ -309,7 +350,91 @@ export interface LanguageTranslations {
     waterDepthResult: string;
     requiredIrrigationRate: string;
     areaLabel: string;
-    flowRateLabel: string;
+    equipment: string;
+    specifications: string;
+    details: string;
+    image: string;
+
+    // FreeNews page
+    news: string;
+    addArticle: string;
+    readMore: string;
+    noNewsAvailable: string;
+    deleteArticle: string;
+    confirmDeleteArticle: string;
+    errorDeletingArticle: string;
+    newsTitle: string;
+
+    // NewsArticle page
+    createNewArticle: string;
+    articleTitle: string;
+    articleImage: string;
+    articleContent: string;
+    pleaseSelectImageFile: string;
+    fileSizeMustNotExceed5MB: string;
+    uploading: string;
+    cannotUploadImage: string;
+    errorUploadingImage: string;
+    removeImage: string;
+    pleaseEnterArticleTitle: string;
+    pleaseEnterArticleContent: string;
+    savingArticle: string;
+    saveArticle: string;
+    accessDenied: string;
+    youDoNotHavePermission: string;
+    articleCreatedSuccessfully: string;
+    errorOccurred: string;
+
+    // ProductList page
+    productListTitle: string;
+    productList: string;
+    addProduct: string;
+    newProducts: string;
+    promotionProducts: string;
+    noProductsInCategory: string;
+    deleteProduct: string;
+    confirmDeleteProduct: string;
+    errorDeletingProduct: string;
+    newBadge: string;
+    promotionBadge: string;
+    viewDetails: string;
+
+    // ProductArticle page
+    createNewProduct: string;
+    backToProductList: string;
+    productName: string;
+    pleaseEnterProductName: string;
+    productDescription: string;
+    pleaseEnterProductDescription: string;
+    price: string;
+    originalPrice: string;
+    optional: string;
+    category: string;
+    discount: string;
+    productImage: string;
+    savingProduct: string;
+    saveProduct: string;
+
+    // Manual page
+    welcomeToFreePlan: string;
+    manualDescription: string;
+    gettingStarted: string;
+    step1SelectCrop: string;
+    selectCrop: string;
+    selectCropDescription: string;
+    step2DrawMap: string;
+    drawMap: string;
+    drawMapDescription: string;
+    step3PlacePlants: string;
+    placePlants: string;
+    placePlantsDescription: string;
+    step4PlacePipes: string;
+    placePipes: string;
+    placePipesDescription: string;
+    skip: string;
+    finish: string;
+    dontShowAgainManual: string;
+    noImage: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -373,15 +498,22 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         changePassword: 'Change Password',
         verifyEmail: 'Verify Email',
         logout: 'Logout',
+        sending: 'Sending...',
+        sendVerificationEmail: 'Send Verification Email',
+        verificationEmailSent: 'Verification email sent. Please check your email.',
+        errorSendingEmail: 'Error sending email',
+        currentPassword: 'Current Password',
+        newPassword: 'New Password',
+        confirmPassword: 'Confirm New Password',
+        passwordChangedSuccessfully: 'Password changed successfully',
+        saving: 'Saving...',
 
         // ChooseCrop page
         selectCropTypes: 'Select Crop Types',
         searchPlants: 'Search plants...',
         allCategories: 'All Categories',
         fruits: 'Fruits',
-        vegetables: 'Vegetables',
-        rootCrops: 'Root Crops',
-        gourds: 'Gourds',
+        economicTrees: 'Economic Trees',
         back: 'Back',
         noPlantsFound: 'No plants found',
         tryAdjustingSearch: 'Try adjusting your search or category filter',
@@ -392,26 +524,23 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longan: 'Longan',
         lychee: 'Lychee',
         rambutan: 'Rambutan',
-        roseApple: 'Rose Apple',
-        papaya: 'Papaya',
         coconut: 'Coconut',
         pomelo: 'Pomelo',
-        lime: 'Lime',
-        banana: 'Banana',
-        pineapple: 'Pineapple',
-        guava: 'Guava',
-        crownFlower: 'Crown Flower',
         tamarind: 'Tamarind',
-        waterSpinach: 'Water Spinach',
-        waterMimosa: 'Water Mimosa',
-        chineseKale: 'Chinese Kale',
-        chineseCabbage: 'Chinese Cabbage',
-        lettuce: 'Lettuce',
-        cabbage: 'Cabbage',
-        cauliflower: 'Cauliflower',
-        brusselsSprouts: 'Brussels Sprouts',
-        kohlrabi: 'Kohlrabi',
-        turnip: 'Turnip',
+        mango: 'Mango',
+        jackfruit: 'Jackfruit',
+        longkong: 'Longkong',
+        mayongChit: 'Mayong Chit',
+        avocado: 'Avocado',
+        bitterBean: 'Bitter Bean',
+        oilPalm: 'Oil Palm',
+        coconutCooking: 'Coconut (Cooking)',
+        coconutFragrant: 'Coconut (Fragrant)',
+        rubber: 'Rubber',
+        bamboo: 'Bamboo',
+        teak: 'Teak',
+        yangNa: 'Yang Na',
+        payung: 'Payung',
         cassava: 'Cassava',
         sweetPotato: 'Sweet Potato',
         potato: 'Potato',
@@ -449,8 +578,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
             'The water source will be used to supply water to your irrigation system',
         placingWaterPump: '🔧 Placing Water Pump',
         clickOnlyOnRedOrangePoints:
-            'Click ONLY on the red/orange placement points around the water source',
-        redCirclesCornerPoints: 'Red circles = corner points, Orange circles = midpoint points',
+            'Click ONLY on the blue placement points around the water source',
+        redCirclesCornerPoints: 'Dark blue circles = corner points, Light blue circles = midpoint points',
         orangeCirclesMidpointPoints: 'Orange circles = midpoint points',
         cannotPlacePumpsAnywhereElse: '⚠️ You cannot place pumps anywhere else in the area',
         pumpWillDistributeWater:
@@ -530,6 +659,25 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longest: 'Longest',
         waterNeedPerSession: 'Water Need per Session',
         pipeInformation: 'Pipe Information',
+        waterSource: 'Water Source',
+        waterPump: 'Water Pump',
+        untitledProject: 'Untitled Project',
+        mapSnapshot: 'Map snapshot',
+        waterNeed: 'Water Need:',
+        plantSpacing: 'Plant Spacing:',
+        rowSpacing: 'Row Spacing:',
+        totalWaterNeed: 'Total Water Need:',
+        plantsLabel: 'plants',
+        lPerSession: 'L/session',
+        lPerDayPerPlant: 'L/day/plant',
+        projectSavedSuccessfully: 'Project saved successfully!',
+        cannotAddNewProject: 'Cannot add new project',
+        projectLimitReached: 'You have reached the limit of 2 saved projects',
+        pleaseDeleteOldProject: 'Please delete an old project or update an existing one',
+        projectSavedWithName: 'Project "{name}" saved successfully!',
+        youHaveProjects: 'You now have {count} saved project(s)',
+        errorSavingProject: 'Error saving project',
+        flowRateConfigSaved: 'Flow rate configuration saved!',
 
         // FreeProduct page
         irrigationProducts: 'Irrigation Products',
@@ -582,9 +730,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         zoneFlowRate: 'Zone Flow Rate:',
         pipeLength: 'Pipe Length:',
         longestPipe: 'Longest Pipe:',
-        outletsLabel: 'Outlets:',
         pipeTypeRecommendations: 'Pipe Type Recommendations:',
-        selectedPlantInformation: 'Selected Plant Information',
         irrigationTime: 'Irrigation Time',
         waterNeedPerSessionLabel: 'Water Need per Session',
         totalWaterVolume: 'Total Water Volume',
@@ -620,6 +766,26 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         subMainPipeLabel2: 'SubMain Pipe',
         lateralPipeLabel2: 'Lateral Pipe',
         totalFrictionLoss: 'Total Friction Loss:',
+        pePolyethylene: 'PE (Polyethylene)',
+        pvcPolyvinylChloride: 'PVC (Polyvinyl Chloride)',
+        sizeLabel: 'Size:',
+        typeLabel: 'Type:',
+        pressureLoss: 'Pressure Loss:',
+        hfLabel: 'HF:',
+        flowPerSprinklerLabel: 'Flow per Sprinkler:',
+        calculatedBasedOn: 'Calculated based on highest flow rate zone:',
+        step1Label: 'Step 1: System Flow Rate',
+        step2Label: 'Step 2: Total Dynamic Head (TDH)',
+        step3Label: 'Step 3: Pump Power',
+        mainPipeLabel3: 'Main Pipe:',
+        subMainPipeLabel3: 'SubMain Pipe:',
+        lateralPipeLabel3: 'Lateral Pipe:',
+        loading: 'Loading...',
+        sprinklerAlt: 'Sprinkler',
+        mainPipeAlt: 'Main Pipe',
+        subMainPipeAlt: 'SubMain Pipe',
+        lateralPipeAlt: 'Lateral Pipe',
+        pumpAlt: 'Pump',
         checkoutModalTitle: 'Notification',
         checkoutModalMessage:
             'This is only a preliminary calculation. Please contact the installation team for maximum benefits and save the plan image.',
@@ -631,7 +797,91 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         waterDepthResult: 'Water Depth (Result)',
         requiredIrrigationRate: 'Required Irrigation Rate',
         areaLabel: 'Area',
-        flowRateLabel: 'Flow Rate:',
+        equipment: 'Equipment',
+        specifications: 'Specifications',
+        details: 'Details',
+        image: 'Image',
+
+        // FreeNews page
+        news: 'News',
+        addArticle: 'Add Article',
+        readMore: 'Read More',
+        noNewsAvailable: 'No news available',
+        deleteArticle: 'Delete Article',
+        confirmDeleteArticle: 'Are you sure you want to delete this article?',
+        errorDeletingArticle: 'Error deleting article',
+        newsTitle: 'News - Free Plan',
+
+        // NewsArticle page
+        createNewArticle: 'Create New Article',
+        articleTitle: 'Title:',
+        articleImage: 'Image:',
+        articleContent: 'Content:',
+        pleaseSelectImageFile: 'Please select an image file',
+        fileSizeMustNotExceed5MB: 'File size must not exceed 5MB',
+        uploading: 'Uploading...',
+        cannotUploadImage: 'Cannot upload image:',
+        errorUploadingImage: 'Error uploading image',
+        removeImage: 'Remove Image',
+        pleaseEnterArticleTitle: 'Please enter article title',
+        pleaseEnterArticleContent: 'Please enter article content',
+        savingArticle: 'Saving...',
+        saveArticle: 'Save Article',
+        accessDenied: 'Access Denied',
+        youDoNotHavePermission: 'You do not have permission to access this page',
+        articleCreatedSuccessfully: 'Article created successfully',
+        errorOccurred: 'An error occurred',
+
+        // ProductList page
+        productListTitle: 'Product List - Free Plan',
+        productList: 'Product List',
+        addProduct: 'Add Product',
+        newProducts: 'New Products',
+        promotionProducts: 'Promotion Products',
+        noProductsInCategory: 'No products in this category',
+        deleteProduct: 'Delete Product',
+        confirmDeleteProduct: 'Are you sure you want to delete this product?',
+        errorDeletingProduct: 'Error deleting product',
+        newBadge: 'New',
+        promotionBadge: 'Promotion',
+        viewDetails: 'View Details',
+
+        // ProductArticle page
+        createNewProduct: 'Create New Product',
+        backToProductList: 'Back to Product List',
+        productName: 'Product Name:',
+        pleaseEnterProductName: 'Please enter product name',
+        productDescription: 'Product Description:',
+        pleaseEnterProductDescription: 'Please enter product description',
+        price: 'Price:',
+        originalPrice: 'Original Price (if any):',
+        optional: 'Optional',
+        category: 'Category:',
+        discount: 'Discount (%):',
+        productImage: 'Product Image:',
+        savingProduct: 'Saving...',
+        saveProduct: 'Save Product',
+
+        // Manual page
+        welcomeToFreePlan: 'Welcome to Free Plan',
+        manualDescription: 'Automated drip irrigation system design for farmers',
+        gettingStarted: 'Getting Started',
+        step1SelectCrop: 'Step 1: Select Crop',
+        selectCrop: 'Select Crop',
+        selectCropDescription: 'Select the crop you want to plant',
+        step2DrawMap: 'Step 2: Draw Map',
+        drawMap: 'Draw Map',
+        drawMapDescription: 'Draw your farm area on the map',
+        step3PlacePlants: 'Step 3: Place Plants',
+        placePlants: 'Place Plants',
+        placePlantsDescription: 'Place plants on the map',
+        step4PlacePipes: 'Step 4: Place Pipes',
+        placePipes: 'Place Pipes',
+        placePipesDescription: 'Place main pipe, sub-main pipe, and lateral pipe',
+        skip: 'Skip',
+        finish: 'Finish',
+        dontShowAgainManual: "Don't show this manual again",
+        noImage: 'No image',
     },
     TH: {
         // FreeHome page
@@ -692,15 +942,22 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         changePassword: 'เปลี่ยนรหัสผ่าน',
         verifyEmail: 'ยืนยันอีเมล',
         logout: 'ออกจากระบบ',
+        sending: 'กำลังส่ง...',
+        sendVerificationEmail: 'ส่งอีเมลยืนยัน',
+        verificationEmailSent: 'ส่งอีเมลยืนยันเรียบร้อยแล้ว กรุณาตรวจสอบอีเมลของคุณ',
+        errorSendingEmail: 'เกิดข้อผิดพลาดในการส่งอีเมล',
+        currentPassword: 'รหัสผ่านปัจจุบัน',
+        newPassword: 'รหัสผ่านใหม่',
+        confirmPassword: 'ยืนยันรหัสผ่านใหม่',
+        passwordChangedSuccessfully: 'รหัสผ่านถูกเปลี่ยนเรียบร้อยแล้ว',
+        saving: 'กำลังบันทึก...',
 
         // ChooseCrop page
         selectCropTypes: 'เลือกประเภทพืช',
         searchPlants: 'ค้นหาพืช...',
         allCategories: 'หมวดหมู่ทั้งหมด',
         fruits: 'ผลไม้',
-        vegetables: 'ผัก',
-        rootCrops: 'พืชหัว',
-        gourds: 'พืชตระกูลแตง',
+        economicTrees: 'ไม้เศรษฐกิจ',
         back: 'กลับ',
         noPlantsFound: 'ไม่พบพืช',
         tryAdjustingSearch: 'ลองปรับการค้นหาหรือตัวกรองหมวดหมู่',
@@ -711,26 +968,23 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longan: 'ลำไย',
         lychee: 'ลิ้นจี่',
         rambutan: 'เงาะ',
-        roseApple: 'ชมพู่',
-        papaya: 'มะละกอ',
         coconut: 'มะพร้าว',
         pomelo: 'ส้มโอ',
-        lime: 'มะนาว',
-        banana: 'กล้วย',
-        pineapple: 'สับปะรด',
-        guava: 'ฝรั่ง',
-        crownFlower: 'ดอกชบา',
         tamarind: 'มะขาม',
-        waterSpinach: 'ผักบุ้ง',
-        waterMimosa: 'ผักกระเฉด',
-        chineseKale: 'คะน้า',
-        chineseCabbage: 'กะหล่ำปลีจีน',
-        lettuce: 'ผักกาดหอม',
-        cabbage: 'กะหล่ำปลี',
-        cauliflower: 'กะหล่ำดอก',
-        brusselsSprouts: 'กะหล่ำดาว',
-        kohlrabi: 'กะหล่ำปม',
-        turnip: 'หัวผักกาด',
+        mango: 'มะม่วง',
+        jackfruit: 'ขนุน',
+        longkong: 'ลองกอง',
+        mayongChit: 'มะยงชิด/มะปราง',
+        avocado: 'อะโวคาโด',
+        bitterBean: 'สะตอ',
+        oilPalm: 'ปาล์มน้ำมัน',
+        coconutCooking: 'มะพร้าวแกง/กะทิ',
+        coconutFragrant: 'มะพร้าวน้ำหอม',
+        rubber: 'ยางพารา',
+        bamboo: 'ไผ่',
+        teak: 'สัก',
+        yangNa: 'ยางนา',
+        payung: 'พะยูง/ชิงชัน/ประดู่',
         cassava: 'มันสำปะหลัง',
         sweetPotato: 'มันเทศ',
         potato: 'มันฝรั่ง',
@@ -765,8 +1019,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         clickAnywhereInDrawnArea: 'คลิกที่ใดก็ได้ในพื้นที่ที่วาดแล้วเพื่อวางแหล่งน้ำ',
         waterSourceWillSupplyWater: 'แหล่งน้ำจะใช้เพื่อจ่ายน้ำให้กับระบบชลประทานของคุณ',
         placingWaterPump: '🔧 วางปั๊มน้ำ',
-        clickOnlyOnRedOrangePoints: 'คลิกเฉพาะจุดสีแดง/ส้มรอบแหล่งน้ำเท่านั้น',
-        redCirclesCornerPoints: 'วงกลมสีแดง = จุดมุม, วงกลมสีส้ม = จุดกลาง',
+        clickOnlyOnRedOrangePoints: 'คลิกเฉพาะจุดสีน้ำเงินรอบแหล่งน้ำเท่านั้น',
+        redCirclesCornerPoints: 'วงกลมสีน้ำเงินเข้ม = จุดมุม, วงกลมสีน้ำเงินอ่อน = จุดกลาง',
         orangeCirclesMidpointPoints: 'วงกลมสีส้ม = จุดกลาง',
         cannotPlacePumpsAnywhereElse: '⚠️ คุณไม่สามารถวางปั๊มที่อื่นในพื้นที่ได้',
         pumpWillDistributeWater: 'ปั๊มจะกระจายน้ำจากแหล่งน้ำไปยังโซนต่างๆ',
@@ -845,6 +1099,25 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longest: 'ยาวที่สุด',
         waterNeedPerSession: 'ความต้องการน้ำต่อรอบ',
         pipeInformation: 'ข้อมูลท่อ',
+        waterSource: 'แหล่งน้ำ',
+        waterPump: 'ปั๊มน้ำ',
+        untitledProject: 'โปรเจคที่ยังไม่มีชื่อ',
+        mapSnapshot: 'ภาพแผนที่',
+        waterNeed: 'ความต้องการน้ำ:',
+        plantSpacing: 'ระยะห่างระหว่างพืช:',
+        rowSpacing: 'ระยะห่างระหว่างแถว:',
+        totalWaterNeed: 'ความต้องการน้ำรวม:',
+        plantsLabel: 'พืช',
+        lPerSession: 'ลิตร/รอบ',
+        lPerDayPerPlant: 'ลิตร/วัน/พืช',
+        projectSavedSuccessfully: 'บันทึกโปรเจคสำเร็จ!',
+        cannotAddNewProject: 'ไม่สามารถเพิ่มโปรเจคใหม่ได้',
+        projectLimitReached: 'คุณมีโปรเจคที่บันทึกไว้ครบ 2 โปรเจคแล้ว',
+        pleaseDeleteOldProject: 'กรุณาลบโปรเจคเก่าออกก่อน หรืออัปเดตโปรเจคที่มีอยู่',
+        projectSavedWithName: 'บันทึกโปรเจค "{name}" สำเร็จ!',
+        youHaveProjects: 'ตอนนี้คุณมี {count} โปรเจคที่บันทึกไว้',
+        errorSavingProject: 'เกิดข้อผิดพลาดในการบันทึกโปรเจค',
+        flowRateConfigSaved: 'บันทึกการตั้งค่าอัตราการไหลสำเร็จ!',
 
         // FreeProduct page
         irrigationProducts: 'ผลิตภัณฑ์ระบบชลประทาน',
@@ -897,9 +1170,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         zoneFlowRate: 'อัตราการไหลโซน:',
         pipeLength: 'ความยาวท่อ:',
         longestPipe: 'ท่อยาวที่สุด:',
-        outletsLabel: 'จุดจ่าย:',
         pipeTypeRecommendations: 'คำแนะนำประเภทท่อ:',
-        selectedPlantInformation: 'ข้อมูลพืชที่เลือก',
         irrigationTime: 'เวลาน้ำ',
         waterNeedPerSessionLabel: 'ความต้องการน้ำต่อรอบ',
         totalWaterVolume: 'ปริมาณน้ำทั้งหมด',
@@ -935,6 +1206,26 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         subMainPipeLabel2: 'ท่อรอง',
         lateralPipeLabel2: 'ท่อแขนง',
         totalFrictionLoss: 'การสูญเสียแรงเสียดทานรวม:',
+        pePolyethylene: 'PE (โพลีเอทิลีน)',
+        pvcPolyvinylChloride: 'PVC (โพลีไวนิลคลอไรด์)',
+        sizeLabel: 'ขนาด:',
+        typeLabel: 'ประเภท:',
+        pressureLoss: 'การสูญเสียแรงดัน:',
+        hfLabel: 'HF:',
+        flowPerSprinklerLabel: 'อัตราการไหลต่อสปริงเกลอร์:',
+        calculatedBasedOn: 'คำนวณจากโซนที่มีอัตราการไหลสูงสุด:',
+        step1Label: 'ขั้นตอนที่ 1: อัตราการไหลของระบบ',
+        step2Label: 'ขั้นตอนที่ 2: หัวแรงดันรวม (TDH)',
+        step3Label: 'ขั้นตอนที่ 3: กำลังปั๊ม',
+        mainPipeLabel3: 'ท่อหลัก:',
+        subMainPipeLabel3: 'ท่อรอง:',
+        lateralPipeLabel3: 'ท่อแขนง:',
+        loading: 'กำลังโหลด...',
+        sprinklerAlt: 'สปริงเกลอร์',
+        mainPipeAlt: 'ท่อหลัก',
+        subMainPipeAlt: 'ท่อรอง',
+        lateralPipeAlt: 'ท่อแขนง',
+        pumpAlt: 'ปั๊ม',
         checkoutModalTitle: 'แจ้งเตือน',
         checkoutModalMessage:
             'นี่เป็นเพียงการคำนวณเบื้องต้น กรุณาติดต่อทีมติดตั้งเพื่อได้รับประโยชน์สูงสุดและเซฟภาพแบบแปลนไว้',
@@ -946,7 +1237,91 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         waterDepthResult: 'ความลึกน้ำ (ผลลัพธ์)',
         requiredIrrigationRate: 'อัตราการให้น้ำที่ต้องการ',
         areaLabel: 'พื้นที่',
-        flowRateLabel: 'อัตราการไหล:',
+        equipment: 'อุปกรณ์',
+        specifications: 'ข้อมูลจำเพาะ',
+        details: 'รายละเอียด',
+        image: 'รูปภาพ',
+
+        // FreeNews page
+        news: 'ข่าวสาร',
+        addArticle: 'เพิ่มบทความ',
+        readMore: 'อ่านเพิ่มเติม',
+        noNewsAvailable: 'ยังไม่มีข่าวสาร',
+        deleteArticle: 'ลบบทความ',
+        confirmDeleteArticle: 'คุณแน่ใจหรือไม่ว่าต้องการลบบทความนี้?',
+        errorDeletingArticle: 'เกิดข้อผิดพลาดในการลบบทความ',
+        newsTitle: 'ข่าวสาร - Free Plan',
+
+        // NewsArticle page
+        createNewArticle: 'สร้างบทความใหม่',
+        articleTitle: 'หัวข้อ:',
+        articleImage: 'รูปภาพ:',
+        articleContent: 'เนื้อหา:',
+        pleaseSelectImageFile: 'กรุณาเลือกไฟล์รูปภาพ',
+        fileSizeMustNotExceed5MB: 'ขนาดไฟล์ต้องไม่เกิน 5MB',
+        uploading: 'กำลังอัปโหลด...',
+        cannotUploadImage: 'ไม่สามารถอัปโหลดรูปภาพได้:',
+        errorUploadingImage: 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ',
+        removeImage: 'ลบรูปภาพ',
+        pleaseEnterArticleTitle: 'กรุณากรอกหัวข้อบทความ',
+        pleaseEnterArticleContent: 'กรุณากรอกเนื้อหาบทความ',
+        savingArticle: 'กำลังบันทึก...',
+        saveArticle: 'บันทึกบทความ',
+        accessDenied: 'Access Denied',
+        youDoNotHavePermission: 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้',
+        articleCreatedSuccessfully: 'บทความถูกสร้างเรียบร้อยแล้ว',
+        errorOccurred: 'เกิดข้อผิดพลาด',
+
+        // ProductList page
+        productListTitle: 'รายการสินค้า - Free Plan',
+        productList: 'รายการสินค้า',
+        addProduct: 'เพิ่มสินค้า',
+        newProducts: 'สินค้าใหม่',
+        promotionProducts: 'สินค้าโปรโมชั่น',
+        noProductsInCategory: 'ไม่มีสินค้าในหมวดหมู่นี้',
+        deleteProduct: 'ลบสินค้า',
+        confirmDeleteProduct: 'คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?',
+        errorDeletingProduct: 'เกิดข้อผิดพลาดในการลบสินค้า',
+        newBadge: 'ใหม่',
+        promotionBadge: 'โปรโมชั่น',
+        viewDetails: 'ดูรายละเอียด',
+
+        // ProductArticle page
+        createNewProduct: 'เพิ่มสินค้าใหม่',
+        backToProductList: 'กลับไปรายการสินค้า',
+        productName: 'ชื่อสินค้า:',
+        pleaseEnterProductName: 'กรุณากรอกชื่อสินค้า',
+        productDescription: 'รายละเอียดสินค้า:',
+        pleaseEnterProductDescription: 'กรุณากรอกรายละเอียดสินค้า',
+        price: 'ราคา:',
+        originalPrice: 'ราคาเดิม (ถ้ามี):',
+        optional: 'ไม่บังคับ',
+        category: 'หมวดหมู่:',
+        discount: 'ส่วนลด (%):',
+        productImage: 'รูปภาพสินค้า:',
+        savingProduct: 'กำลังบันทึก...',
+        saveProduct: 'บันทึกสินค้า',
+
+        // Manual page
+        welcomeToFreePlan: 'ยินดีต้อนรับสู่ Free Plan',
+        manualDescription: 'ระบบออกแบบระบบน้ำหยดอัตโนมัติสำหรับเกษตรกร',
+        gettingStarted: 'เริ่มต้นใช้งาน',
+        step1SelectCrop: 'ขั้นตอนที่ 1: เลือกพืช',
+        selectCrop: 'เลือกพืช',
+        selectCropDescription: 'เลือกพืชที่คุณต้องการปลูก',
+        step2DrawMap: 'ขั้นตอนที่ 2: วาดแผนที่',
+        drawMap: 'วาดแผนที่',
+        drawMapDescription: 'วาดพื้นที่แปลงเกษตรของคุณบนแผนที่',
+        step3PlacePlants: 'ขั้นตอนที่ 3: วางตำแหน่งพืช',
+        placePlants: 'วางตำแหน่งพืช',
+        placePlantsDescription: 'วางตำแหน่งพืชบนแผนที่',
+        step4PlacePipes: 'ขั้นตอนที่ 4: วางท่อ',
+        placePipes: 'วางท่อ',
+        placePipesDescription: 'วางท่อเมน ท่อย่อย และท่อแขนง',
+        skip: 'ข้าม',
+        finish: 'เสร็จสิ้น',
+        dontShowAgainManual: 'ไม่แสดงคู่มือนี้อีก',
+        noImage: 'ไม่มีรูปภาพ',
     },
 };
 

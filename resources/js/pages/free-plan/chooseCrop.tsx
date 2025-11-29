@@ -17,7 +17,7 @@ function ChooseCrop() {
     const [searchValue, setSearchValue] = useState('');
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<
-        'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds'
+        'all' | 'fruits' | 'economic-trees'
     >('all');
 
     // State for translations
@@ -60,7 +60,7 @@ function ChooseCrop() {
     };
 
     const handleCategoryChange = (category: string) => {
-        setSelectedCategory(category as 'all' | 'fruits' | 'vegetables' | 'root-crops' | 'gourds');
+        setSelectedCategory(category as 'all' | 'fruits' | 'economic-trees');
     };
 
     const handleCropSelect = (cropName: string) => {
@@ -196,9 +196,7 @@ function ChooseCrop() {
                         >
                             <option value="all">{translations.allCategories}</option>
                             <option value="fruits">{translations.fruits}</option>
-                            <option value="vegetables">{translations.vegetables}</option>
-                            <option value="root-crops">{translations.rootCrops}</option>
-                            <option value="gourds">{translations.gourds}</option>
+                            <option value="economic-trees">{translations.economicTrees}</option>
                         </select>
                     </div>
                 </div>
@@ -219,7 +217,17 @@ function ChooseCrop() {
                                             : 'bg-slate-600 text-white hover:bg-slate-500'
                                     }`}
                                 >
-                                    <div className="mb-2 text-2xl">{plant.icon}</div>
+                                    <div className="mb-2 flex items-center justify-center">
+                                        <img
+                                            src={plant.icon}
+                                            alt={getTranslatedPlantName(plant.name, translations)}
+                                            className="h-12 w-12 object-contain md:h-16 md:w-16"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
                                     <div className="text-sm md:text-base">
                                         {getTranslatedPlantName(plant.name, translations)}
                                     </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
-import { GardenPlant, getTranslatedPlantName } from './utils/freeCrop';
+import { GardenPlant, getTranslatedPlantName, getPlantImagePath } from './utils/freeCrop';
 // import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
 import { getTranslations } from './utils/language';
@@ -17,6 +17,7 @@ interface MapOptions {
     mapTypeControlOptions?: {
         style: unknown;
         position: unknown;
+        mapTypeIds?: string[];
     };
     styles?: Array<{
         featureType: string;
@@ -140,18 +141,14 @@ function FreeMap() {
     const drawingManagerRef = useRef<unknown>(null);
     const mapInstanceRef = useRef<unknown>(null);
     const [mapInitialized, setMapInitialized] = useState(false);
+    // Keep track of all pipe overlays to ensure they can be cleared on reset
+    const allPipeOverlaysRef = useRef<Array<google.maps.Polyline>>([]);
     // Remove plant points that overlap a given position within a small radius
     const removeOverlappedPlantPoints = useCallback(
         (position: { lat: number; lng: number }, radiusMeters: number = 5) => {
-            console.log(
-                `🔍 Removing overlapped plant points within ${radiusMeters}m of position:`,
-                position
-            );
             const geometry = window.google?.maps?.geometry;
 
             setPlantPoints((prevPlantPoints) => {
-                console.log(`📊 Current plant points count: ${prevPlantPoints.length}`);
-
                 const updated = prevPlantPoints.filter((point) => {
                     if (!geometry?.spherical) {
                         // Rough fallback: 2m ≈ 0.00002 degrees
@@ -161,10 +158,6 @@ function FreeMap() {
                             Math.abs(point.position.lng - position.lng) <= degTol;
                         if (close && point.marker) {
                             (point.marker as { setMap: (map: unknown) => void }).setMap(null);
-                            console.log(
-                                '❌ Removed plant point (fallback method):',
-                                point.position
-                            );
                         }
                         return !close;
                     }
@@ -174,21 +167,13 @@ function FreeMap() {
                     const overlapped = dist <= radiusMeters;
                     if (overlapped && point.marker) {
                         (point.marker as { setMap: (map: unknown) => void }).setMap(null);
-                        console.log(
-                            `❌ Removed plant point at distance ${dist.toFixed(2)}m:`,
-                            point.position
-                        );
                     }
                     return !overlapped;
                 });
 
-                console.log(`📊 After filtering: ${updated.length} plant points remaining`);
-                console.log(`🗑️ Removed ${prevPlantPoints.length - updated.length} plant points`);
-
                 if (updated.length !== prevPlantPoints.length) {
                     const stored = updated.map((pp) => ({ id: pp.id, position: pp.position }));
                     localStorage.setItem('plantPoints', JSON.stringify(stored));
-                    console.log('💾 Updated localStorage with new plant points');
                 }
 
                 return updated;
@@ -569,25 +554,19 @@ function FreeMap() {
 
                     if (isWithinShape) {
                         // Create plant point marker
+                        const plantImagePath = getPlantImagePath(plantData.name);
                         const marker = new window.google.maps.Marker({
                             position: position,
                             map: map,
                             title: `${getTranslatedPlantName(plantData.name, translations)} Plant`,
                             icon: {
-                                url:
-                                    'data:image/svg+xml;charset=UTF-8,' +
-                                    encodeURIComponent(`
-                                <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                    <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData.icon}</text>
-                                </svg>
-                            `),
-                                scaledSize: new window.google.maps.Size(16, 16),
-                                anchor: new window.google.maps.Point(8, 8),
+                                url: plantImagePath,
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 12),
                             },
                             draggable: false,
                             clickable: false,
-                            zIndex: 500, // Between area and zones
+                            zIndex: 2000, // Above pipes, highest priority
                         });
 
                         plantPoints.push({
@@ -675,12 +654,42 @@ function FreeMap() {
                 return;
             }
 
+            // Check if script is already being loaded or exists in DOM
+            const existingScript = document.querySelector(
+                'script[src*="maps.googleapis.com/maps/api/js"]'
+            );
+            if (existingScript) {
+                // Script already exists, wait for it to load
+                if (existingScript.getAttribute('data-loaded') === 'true') {
+                    // Script already loaded, initialize map
+                    if (isMounted) {
+                        setApiLoading(false);
+                        setMapLoaded(true);
+                        initializeMap();
+                    }
+                } else {
+                    // Script is loading, wait for it
+                    existingScript.addEventListener('load', () => {
+                        setTimeout(() => {
+                            if (isMounted) {
+                                setApiLoading(false);
+                                setMapLoaded(true);
+                                initializeMap();
+                            }
+                        }, 100);
+                    });
+                }
+                return;
+            }
+
             const script = document.createElement('script');
             // Include geometry library for distance/area calculations used in summary
             script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&libraries=places,drawing,geometry`;
             script.async = true;
             script.defer = true;
             script.onload = () => {
+                // Mark script as loaded
+                script.setAttribute('data-loaded', 'true');
                 // Wait a bit more to ensure all libraries are fully loaded
                 setTimeout(() => {
                     if (
@@ -749,14 +758,24 @@ function FreeMap() {
                 }
             }
 
+            // Determine map type control position based on screen size
+            const isMobile = window.innerWidth < 768; // Mobile breakpoint
+            const mapTypeControlPosition = isMobile
+                ? window.google.maps.ControlPosition.MIDDLE_LEFT
+                : window.google.maps.ControlPosition.TOP_RIGHT;
+
             const mapOptions: MapOptions = {
                 zoom: startZoom,
                 center: startCenter,
                 mapTypeId: window.google.maps.MapTypeId.SATELLITE,
-                mapTypeControl: false,
+                mapTypeControl: true,
                 mapTypeControlOptions: {
                     style: window.google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                    position: window.google.maps.ControlPosition.TOP_CENTER,
+                    position: mapTypeControlPosition,
+                    mapTypeIds: [
+                        window.google.maps.MapTypeId.SATELLITE, // ภาพดาวเทียมไม่มีรายละเอียดสถานที่
+                        window.google.maps.MapTypeId.HYBRID, // ภาพดาวเทียมมีรายละเอียดสถานที่
+                    ],
                 },
                 // Allow scroll wheel zoom without holding Ctrl
                 gestureHandling: 'greedy',
@@ -850,7 +869,6 @@ function FreeMap() {
 
                     drawingManager.setMap(map);
                     drawingManagerRef.current = drawingManager;
-                    console.log('✅ DrawingManager initialized successfully');
                 } catch (error) {
                     console.error('❌ Failed to initialize DrawingManager:', error);
                     // Retry after a longer delay
@@ -936,6 +954,7 @@ function FreeMap() {
 
                 plantPoints.forEach((point) => {
                     if (point.position && !point.marker) {
+                        const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                         const marker = new window.google.maps.Marker({
                             position: point.position,
                             map: map,
@@ -943,20 +962,13 @@ function FreeMap() {
                                 ? `${getTranslatedPlantName(plantData.name, translations)} Plant`
                                 : 'Plant',
                             icon: {
-                                url:
-                                    'data:image/svg+xml;charset=UTF-8,' +
-                                    encodeURIComponent(`
-                                    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                        <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                    </svg>
-                                `),
-                                scaledSize: new window.google.maps.Size(16, 16),
-                                anchor: new window.google.maps.Point(8, 8),
+                                url: plantImagePath,
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 12),
                             },
                             draggable: false,
                             clickable: false,
-                            zIndex: 500, // Between area and zones
+                            zIndex: 2000, // Above pipes, highest priority
                         });
                         setPlantPoints((prev) =>
                             prev.map((p) => (p.id === point.id ? { ...p, marker } : p))
@@ -975,10 +987,11 @@ function FreeMap() {
                             strokeColor: '#DC2626', // Red color for main pipes
                             strokeOpacity: 0.8,
                             strokeWeight: 4, // Thicker line for main pipes
-                            zIndex: 1200, // Between zones and center markers
+                            zIndex: 1500, // Above zones but below plant points
                         });
 
                         polyline.setMap(map);
+                        allPipeOverlaysRef.current.push(polyline); // Track for reset
                         setMainPipes((prev) =>
                             prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                         );
@@ -996,10 +1009,11 @@ function FreeMap() {
                             strokeColor: '#8B5CF6', // Purple color for sub-main pipes
                             strokeOpacity: 0.7,
                             strokeWeight: 3, // Slightly thinner than main pipes
-                            zIndex: 1100, // Between main pipes and zones
+                            zIndex: 1500, // Above zones but below plant points
                         });
 
                         polyline.setMap(map);
+                        allPipeOverlaysRef.current.push(polyline); // Track for reset
                         setSubMainPipes((prev) =>
                             prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                         );
@@ -1017,10 +1031,11 @@ function FreeMap() {
                             strokeColor: '#FCD34D', // Yellow color for lateral pipes
                             strokeOpacity: 0.8,
                             strokeWeight: 2, // Thinner than sub-main pipes
-                            zIndex: 1000, // Below sub-main pipes
+                            zIndex: 1500, // Above zones but below plant points
                         });
 
                         polyline.setMap(map);
+                        allPipeOverlaysRef.current.push(polyline); // Track for reset
                         setLateralPipes((prev) =>
                             prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                         );
@@ -1153,14 +1168,6 @@ function FreeMap() {
                                                 JSON.stringify(waterSourcesForStorage)
                                             );
 
-                                            console.log(
-                                                '✅ Water source placed successfully:',
-                                                newWaterSource
-                                            );
-                                            console.log(
-                                                '💾 Saved to localStorage:',
-                                                waterSourcesForStorage
-                                            );
 
                                             // Auto-advance to Place Pump step after placing water source
                                             setCompletedSteps((prev) => {
@@ -1176,13 +1183,6 @@ function FreeMap() {
                                                     JSON.stringify(progressData)
                                                 );
 
-                                                console.log(
-                                                    'Auto-advanced to Place Pump step after placing water source'
-                                                );
-                                                console.log(
-                                                    'Saved progress to localStorage:',
-                                                    progressData
-                                                );
 
                                                 return newCompletedSteps;
                                             });
@@ -1295,7 +1295,6 @@ function FreeMap() {
                 (event: { overlay: unknown; type: string }) => {
                     const overlay = event.overlay;
                     const type = event.type;
-                    console.log('🔍 Google Maps API sent type:', type, 'typeof:', typeof type);
 
                     // Extract data from overlay for storage
                     let overlayData: {
@@ -1417,14 +1416,6 @@ function FreeMap() {
                                         JSON.stringify(waterSourcesForStorage)
                                     );
 
-                                    console.log(
-                                        '✅ Water source placed successfully:',
-                                        newWaterSource
-                                    );
-                                    console.log(
-                                        '💾 Saved to localStorage:',
-                                        waterSourcesForStorage
-                                    );
 
                                     // Auto-advance to Place Pump step after placing water source
                                     setCompletedSteps((prev) => {
@@ -1440,13 +1431,6 @@ function FreeMap() {
                                             JSON.stringify(progressData)
                                         );
 
-                                        console.log(
-                                            'Auto-advanced to Place Pump step after placing water source'
-                                        );
-                                        console.log(
-                                            'Saved progress to localStorage:',
-                                            progressData
-                                        );
 
                                         return newCompletedSteps;
                                     });
@@ -1549,6 +1533,10 @@ function FreeMap() {
         return () => {
             isMounted = false;
         };
+        // Note: createPumpPlacementPoints, createWaterSourceMarkerSimple, createZoneCenterMarker, and translations
+        // are declared later in the file but are used within event listeners that are created after component mount.
+        // They are safe to use here because event listeners capture the function references at creation time.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         mapInitialized,
         completedSteps,
@@ -1562,7 +1550,7 @@ function FreeMap() {
         subMainPipes,
         lateralPipes,
         createPlantPoints,
-    ]); // eslint-disable-line react-hooks/exhaustive-deps
+    ]);
 
     // 4. Handlers
 
@@ -1681,6 +1669,7 @@ function FreeMap() {
 
             plantPoints.forEach((point) => {
                 if (!point.marker) {
+                    const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                     const marker = new window.google.maps.Marker({
                         position: point.position,
                         map: map,
@@ -1688,20 +1677,13 @@ function FreeMap() {
                             ? `${getTranslatedPlantName(plantData.name, translations)} Plant`
                             : 'Plant',
                         icon: {
-                            url:
-                                'data:image/svg+xml;charset=UTF-8,' +
-                                encodeURIComponent(`
-                                <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                    <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                </svg>
-                            `),
-                            scaledSize: new window.google.maps.Size(16, 16),
-                            anchor: new window.google.maps.Point(8, 8),
+                            url: plantImagePath,
+                            scaledSize: new window.google.maps.Size(24, 24),
+                            anchor: new window.google.maps.Point(12, 12),
                         },
                         draggable: false,
                         clickable: false,
-                        zIndex: 500,
+                        zIndex: 2000, // Above pipes, highest priority
                     });
                     setPlantPoints((prev) =>
                         prev.map((p) => (p.id === point.id ? { ...p, marker } : p))
@@ -1720,9 +1702,10 @@ function FreeMap() {
                         strokeColor: '#DC2626',
                         strokeOpacity: 0.8,
                         strokeWeight: 4,
-                        zIndex: 1200,
+                        zIndex: 1500, // Above zones but below plant points
                     });
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setMainPipes((prev) =>
                         prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                     );
@@ -1739,9 +1722,10 @@ function FreeMap() {
                         strokeColor: '#8B5CF6',
                         strokeOpacity: 0.7,
                         strokeWeight: 3,
-                        zIndex: 1100,
+                        zIndex: 1500, // Above zones but below plant points
                     });
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setSubMainPipes((prev) =>
                         prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                     );
@@ -1758,9 +1742,10 @@ function FreeMap() {
                         strokeColor: '#FCD34D',
                         strokeOpacity: 0.8,
                         strokeWeight: 2,
-                        zIndex: 1000,
+                        zIndex: 1500, // Above zones but below plant points
                     });
                     polyline.setMap(map);
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setLateralPipes((prev) =>
                         prev.map((p) => (p.id === pipe.id ? { ...p, overlay: polyline } : p))
                     );
@@ -1865,12 +1850,6 @@ function FreeMap() {
                     if (projectIndex >= 0) {
                         projects[projectIndex].projectName = newName;
                         localStorage.setItem('freePlanProjects', JSON.stringify(projects));
-                        console.log(
-                            '✅ Updated project name in saved projects:',
-                            oldName.trim(),
-                            '→',
-                            newName
-                        );
                     }
                 }
             } catch (error) {
@@ -1890,6 +1869,15 @@ function FreeMap() {
     const handleReset = () => {
         // Clear all overlays from the map first
         if (mapInstanceRef.current) {
+            // FIRST: Clear all pipes from the tracking ref (includes pipes created by useEffect)
+            // This ensures we remove pipes that might not be in state yet
+            allPipeOverlaysRef.current.forEach((polyline) => {
+                if (polyline) {
+                    polyline.setMap(null);
+                }
+            });
+            allPipeOverlaysRef.current = []; // Clear the ref
+
             // Clear all drawn shapes overlays
             drawnShapes.forEach((shape) => {
                 if (shape.overlay) {
@@ -1928,21 +1916,21 @@ function FreeMap() {
                 }
             });
 
-            // Clear all main pipes
+            // Clear all main pipes from state
             mainPipes.forEach((pipe) => {
                 if (pipe.overlay) {
                     (pipe.overlay as { setMap: (map: unknown) => void }).setMap(null);
                 }
             });
 
-            // Clear all sub-main pipes
+            // Clear all sub-main pipes from state
             subMainPipes.forEach((pipe) => {
                 if (pipe.overlay) {
                     (pipe.overlay as { setMap: (map: unknown) => void }).setMap(null);
                 }
             });
 
-            // Clear all lateral pipes
+            // Clear all lateral pipes from state
             lateralPipes.forEach((pipe) => {
                 if (pipe.overlay) {
                     (pipe.overlay as { setMap: (map: unknown) => void }).setMap(null);
@@ -1969,7 +1957,19 @@ function FreeMap() {
             ).setOptions({ drawingControl: false });
         }
 
-        // Reset all state
+        // Clear localStorage FIRST to prevent useEffect from recreating pipes
+        // Clear step progress, drawn shapes, water sources, pumps, zones, plant points, main pipes, sub-main pipes, and lateral pipes from localStorage, keep plant data
+        localStorage.removeItem('mapStepProgress');
+        localStorage.removeItem('drawnShapes');
+        localStorage.removeItem('waterSources');
+        localStorage.removeItem('pumps');
+        localStorage.removeItem('zones');
+        localStorage.removeItem('plantPoints');
+        localStorage.removeItem('mainPipes');
+        localStorage.removeItem('subMainPipes');
+        localStorage.removeItem('lateralPipes');
+
+        // Reset all state AFTER clearing localStorage
         setCurrentStep(0);
         setCompletedSteps([]);
         setDrawnShapes([]);
@@ -1982,17 +1982,6 @@ function FreeMap() {
         setSubMainPipes([]);
         setLateralPipes([]);
         setIsDrawingMode(false);
-
-        // Clear step progress, drawn shapes, water sources, pumps, zones, plant points, main pipes, sub-main pipes, and lateral pipes from localStorage, keep plant data
-        localStorage.removeItem('mapStepProgress');
-        localStorage.removeItem('drawnShapes');
-        localStorage.removeItem('waterSources');
-        localStorage.removeItem('pumps');
-        localStorage.removeItem('zones');
-        localStorage.removeItem('plantPoints');
-        localStorage.removeItem('mainPipes');
-        localStorage.removeItem('subMainPipes');
-        localStorage.removeItem('lateralPipes');
     };
     const handleNext = async () => {
         try {
@@ -2048,7 +2037,6 @@ function FreeMap() {
             // Check if Water step (step 1) has water sources before proceeding
             if (stepIndex === 1) {
                 if (waterSources.length === 0) {
-                    console.log('❌ Cannot complete Water step: No water sources placed');
                     alert('กรุณาวางแหล่งน้ำก่อนไปขั้นตอนถัดไป');
                     return;
                 }
@@ -2057,7 +2045,6 @@ function FreeMap() {
             // Handle Zones step (step 3) - show zone modal
             if (stepIndex === 3) {
                 if (drawnShapes.length === 0) {
-                    console.log('❌ Cannot create zones: No drawn area');
                     alert('กรุณาวาดพื้นที่ก่อนแบ่งโซน');
                     return;
                 }
@@ -2069,7 +2056,6 @@ function FreeMap() {
 
             // For Generate Pipe System (step 4), generate main pipes
             if (stepIndex === 4) {
-                console.log(`Executed step ${stepIndex + 1}: ${getStepName(stepIndex)}`);
                 const map = mapInstanceRef.current as google.maps.Map;
                 if (map) {
                     generateMainPipes(map);
@@ -2092,8 +2078,6 @@ function FreeMap() {
                 };
                 localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
 
-                console.log(`Completed step ${stepIndex + 1}: ${getStepName(stepIndex)}`);
-                console.log('Saved step progress to localStorage:', progressData);
 
                 return newCompletedSteps;
             });
@@ -2121,13 +2105,11 @@ function FreeMap() {
                 ).setOptions({ drawingControl: false });
             }
             setIsDrawingMode(false);
-            console.log('Exited drawing mode');
         } else {
             // Clear existing shapes before entering drawing mode
             if (drawnShapes.length > 0) {
                 setDrawnShapes([]);
                 localStorage.removeItem('drawnShapes');
-                console.log('Cleared existing shapes before drawing new one');
             }
 
             // Enter drawing mode
@@ -2139,20 +2121,9 @@ function FreeMap() {
                 ).setOptions({ drawingControl: true });
             }
             setIsDrawingMode(true);
-            console.log('Entered drawing mode - use the drawing tools on the map');
         }
     };
 
-    const getStepName = (stepIndex: number): string => {
-        const stepNames = [
-            translations.drawingModeActive,
-            translations.placingWaterSource,
-            translations.placingWaterPump,
-            translations.zones,
-            translations.generatePipeSystem,
-        ];
-        return stepNames[stepIndex] || '';
-    };
 
     // Function to handle pump placement click
     const handlePumpPlacementClick = useCallback(
@@ -2195,9 +2166,6 @@ function FreeMap() {
                 // Auto-advance to Zones step after placing pump
                 setCompletedSteps((prev) => {
                     const newCompletedSteps = [...prev, 2]; // Mark step 2 (Place Pump) as completed
-                    console.log('=== Auto-advance to Zones ===');
-                    console.log('Previous completed steps:', prev);
-                    console.log('New completed steps:', newCompletedSteps);
 
                     // Save progress to localStorage
                     const progressData = {
@@ -2206,8 +2174,6 @@ function FreeMap() {
                     };
                     localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
 
-                    console.log('Auto-advanced to Zones step after placing pump');
-                    console.log('Saved progress to localStorage:', progressData);
 
                     return newCompletedSteps;
                 });
@@ -2262,18 +2228,18 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: `Pump Placement Point (Corner ${index + 1})`,
+                    title: 'คลิกเพื่อวางปั๊มน้ำ (มุม)',
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="8" cy="8" r="6" fill="#EF4444" stroke="#DC2626" stroke-width="1"/>
-                            <circle cx="8" cy="8" r="2" fill="#FFFFFF"/>
+                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="10" cy="10" r="8" fill="#3B82F6" fill-opacity="0.2" stroke="#3B82F6" stroke-width="2"/>
+                            <circle cx="10" cy="10" r="4" fill="#3B82F6"/>
                         </svg>
                     `),
-                        scaledSize: new window.google.maps.Size(16, 16),
-                        anchor: new window.google.maps.Point(8, 8),
+                        scaledSize: new window.google.maps.Size(20, 20),
+                        anchor: new window.google.maps.Point(10, 10),
                     },
                     draggable: false,
                     clickable: true,
@@ -2289,7 +2255,6 @@ function FreeMap() {
 
                 // Add click listener to corner point
                 window.google.maps.event.addListener(marker, 'click', () => {
-                    console.log('🎯 Corner pump placement point clicked:', position);
                     handlePumpPlacementClick(position, map);
                 });
             });
@@ -2299,18 +2264,18 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: `Pump Placement Point (Midpoint ${index + 1})`,
+                    title: 'คลิกเพื่อวางปั๊มน้ำ (กลาง)',
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                        <svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="7" cy="7" r="5" fill="#F59E0B" stroke="#D97706" stroke-width="1"/>
-                            <circle cx="7" cy="7" r="2" fill="#FFFFFF"/>
+                        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="9" cy="9" r="7" fill="#60A5FA" fill-opacity="0.2" stroke="#60A5FA" stroke-width="2"/>
+                            <circle cx="9" cy="9" r="3.5" fill="#60A5FA"/>
                         </svg>
                     `),
-                        scaledSize: new window.google.maps.Size(14, 14),
-                        anchor: new window.google.maps.Point(7, 7),
+                        scaledSize: new window.google.maps.Size(18, 18),
+                        anchor: new window.google.maps.Point(9, 9),
                     },
                     draggable: false,
                     clickable: true,
@@ -2326,65 +2291,21 @@ function FreeMap() {
 
                 // Add click listener to midpoint
                 window.google.maps.event.addListener(marker, 'click', () => {
-                    console.log('🎯 Midpoint pump placement point clicked:', position);
                     handlePumpPlacementClick(position, map);
                 });
             });
 
-            console.log('✅ Created pump placement points:', placementPoints.length);
             return placementPoints;
         },
         [handlePumpPlacementClick]
     );
 
     // Function to create water source marker (simple version for useEffect)
-    const createWaterSourceMarkerSimple = (
-        position: { lat: number; lng: number },
-        map: google.maps.Map
-    ) => {
-        console.log('🔧 Creating water source marker at:', position);
-        console.log('🔧 Map instance:', map);
-
-        try {
-            const marker = new window.google.maps.Marker({
-                position: position,
-                map: map,
-                title: 'Water Source',
-                icon: {
-                    url:
-                        'data:image/svg+xml;charset=UTF-8,' +
-                        encodeURIComponent(`
-                        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="4" y="4" width="40" height="40" rx="8" fill="#3B82F6" stroke="#1E40AF" stroke-width="3"/>
-                            <rect x="12" y="12" width="24" height="24" rx="4" fill="#FFFFFF"/>
-                            <path d="M24 16 L28 24 L24 32 L20 24 Z" fill="#3B82F6"/>
-                            <circle cx="24" cy="24" r="4" fill="#3B82F6"/>
-                        </svg>
-                    `),
-                    scaledSize: new window.google.maps.Size(48, 48),
-                    anchor: new window.google.maps.Point(24, 24),
-                },
-                draggable: false,
-                clickable: true,
-                zIndex: 2000, // Higher than zones and plant points
-            });
-
-            // Remove overlapped plant points at water source position (4 meters radius)
-            removeOverlappedPlantPoints(position, 4);
-
-            console.log('✅ Water source marker created successfully:', marker);
-            return marker;
-        } catch (error) {
-            console.error('❌ Error creating water source marker:', error);
-            return null;
-        }
-    };
-
-    // Function to create water source marker (with drag functionality)
-    const createWaterSourceMarker = useCallback(
-        (position: { lat: number; lng: number }, map: google.maps.Map) => {
-            console.log('🔧 Creating water source marker at:', position);
-            console.log('🔧 Map instance:', map);
+    const createWaterSourceMarkerSimple = useCallback(
+        (
+            position: { lat: number; lng: number },
+            map: google.maps.Map
+        ) => {
 
             try {
                 const marker = new window.google.maps.Marker({
@@ -2396,10 +2317,12 @@ function FreeMap() {
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
                         <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                            <rect x="4" y="4" width="40" height="40" rx="8" fill="#3B82F6" stroke="#1E40AF" stroke-width="3"/>
-                            <rect x="12" y="12" width="24" height="24" rx="4" fill="#FFFFFF"/>
-                            <path d="M24 16 L28 24 L24 32 L20 24 Z" fill="#3B82F6"/>
-                            <circle cx="24" cy="24" r="4" fill="#3B82F6"/>
+                            <!-- Outer circle background -->
+                            <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
+                            <!-- Water drop shape -->
+                            <path d="M24 8 Q20 8 18 12 Q16 16 16 20 Q16 24 18 28 Q20 32 24 36 Q28 32 30 28 Q32 24 32 20 Q32 16 30 12 Q28 8 24 8 Z" fill="#60A5FA" stroke="#2563EB" stroke-width="1.5"/>
+                            <!-- Highlight -->
+                            <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                         </svg>
                     `),
                         scaledSize: new window.google.maps.Size(48, 48),
@@ -2413,7 +2336,48 @@ function FreeMap() {
                 // Remove overlapped plant points at water source position (4 meters radius)
                 removeOverlappedPlantPoints(position, 4);
 
-                console.log('✅ Water source marker created successfully:', marker);
+                return marker;
+            } catch (error) {
+                console.error('❌ Error creating water source marker:', error);
+                return null;
+            }
+        },
+        [removeOverlappedPlantPoints]
+    );
+
+    // Function to create water source marker (with drag functionality)
+    const createWaterSourceMarker = useCallback(
+        (position: { lat: number; lng: number }, map: google.maps.Map) => {
+
+            try {
+                const marker = new window.google.maps.Marker({
+                    position: position,
+                    map: map,
+                    title: 'Water Source',
+                    icon: {
+                        url:
+                            'data:image/svg+xml;charset=UTF-8,' +
+                            encodeURIComponent(`
+                        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Outer circle background -->
+                            <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
+                            <!-- Water drop shape -->
+                            <path d="M24 8 Q20 8 18 12 Q16 16 16 20 Q16 24 18 28 Q20 32 24 36 Q28 32 30 28 Q32 24 32 20 Q32 16 30 12 Q28 8 24 8 Z" fill="#60A5FA" stroke="#2563EB" stroke-width="1.5"/>
+                            <!-- Highlight -->
+                            <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
+                        </svg>
+                    `),
+                        scaledSize: new window.google.maps.Size(48, 48),
+                        anchor: new window.google.maps.Point(24, 24),
+                    },
+                    draggable: false,
+                    clickable: true,
+                    zIndex: 2000, // Higher than zones and plant points
+                });
+
+                // Remove overlapped plant points at water source position (4 meters radius)
+                removeOverlappedPlantPoints(position, 4);
+
                 return marker;
             } catch (error) {
                 console.error('❌ Error creating water source marker:', error);
@@ -2456,16 +2420,9 @@ function FreeMap() {
     useEffect(() => {
         if (!mapInitialized || !drawingManagerRef.current) return;
 
-        console.log('=== Auto-activate Step ===');
-        console.log('Current step:', currentStep);
-        console.log('Completed steps:', completedSteps);
-        console.log('Drawn shapes:', drawnShapes.length);
-        console.log('Water sources:', waterSources.length);
-        console.log('Pumps:', pumps.length);
 
         // Step 0: Draw Area - Auto-activate drawing when page loads or when step 0 is current
         if (currentStep === 0 && !completedSteps.includes(0)) {
-            console.log('🎯 Auto-activating Draw Area step');
             if (drawingManagerRef.current) {
                 (
                     drawingManagerRef.current as {
@@ -2477,7 +2434,6 @@ function FreeMap() {
         }
         // Step 1: Water - Auto-activate when step 0 is completed and step 1 is current
         else if (currentStep === 1 && completedSteps.includes(0) && !completedSteps.includes(1)) {
-            console.log('🎯 Auto-activating Water step');
             if (drawingManagerRef.current) {
                 (
                     drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
@@ -2494,7 +2450,6 @@ function FreeMap() {
         }
         // Step 2: Place Pump - Auto-activate when step 1 is completed and step 2 is current
         else if (currentStep === 2 && completedSteps.includes(1) && !completedSteps.includes(2)) {
-            console.log('🎯 Auto-activating Place Pump step');
             if (drawingManagerRef.current) {
                 (
                     drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
@@ -2514,7 +2469,6 @@ function FreeMap() {
         }
         // Step 3: Zones - Auto-activate when step 2 is completed and step 3 is current
         else if (currentStep === 3 && completedSteps.includes(2) && !completedSteps.includes(3)) {
-            console.log('🎯 Auto-activating Zones step');
             if (drawingManagerRef.current) {
                 (
                     drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
@@ -2531,7 +2485,6 @@ function FreeMap() {
 
             // Hide pump placement points when moving to zones step
             if (pumpPlacementPoints.length > 0) {
-                console.log('🎯 Hiding pump placement points');
                 pumpPlacementPoints.forEach((point) => {
                     if (point.marker) {
                         (point.marker as { setMap: (map: unknown) => void }).setMap(null);
@@ -2557,7 +2510,6 @@ function FreeMap() {
             setIsDrawingMode(false);
         }
 
-        console.log('=== End Auto-activate Step ===');
     }, [
         currentStep,
         completedSteps,
@@ -2571,8 +2523,6 @@ function FreeMap() {
 
     // Function to create pump marker
     const createPumpMarker = (position: { lat: number; lng: number }, map: google.maps.Map) => {
-        console.log('🔧 Creating pump marker at:', position);
-        console.log('🔧 Map instance:', map);
 
         try {
             const marker = new window.google.maps.Marker({
@@ -2589,7 +2539,6 @@ function FreeMap() {
                 zIndex: 2000, // Higher than zones and plant points
             });
 
-            console.log('✅ Pump marker created successfully:', marker);
             return marker;
         } catch (error) {
             console.error('❌ Error creating pump marker:', error);
@@ -2982,7 +2931,6 @@ function FreeMap() {
 
         // Note: Area bounds not needed for Voronoi tessellation as it's based on plant positions
 
-        console.log(`🎯 Creating ${numberOfZones} Voronoi zones based on plant positions`);
 
         // Use K-means clustering to find optimal zone centers based on plant positions
         const plantPositions = plantPoints.map((p) => ({
@@ -2995,7 +2943,6 @@ function FreeMap() {
             return;
         }
 
-        console.log(`📊 Found ${plantPositions.length} plant positions for Voronoi tessellation`);
 
         // Perform K-means clustering to find zone centers
         const plantLocations = plantPoints.map((p) => ({
@@ -3011,7 +2958,6 @@ function FreeMap() {
         }));
         const zoneCenters = performKMeansClustering(plantLocations, numberOfZones);
 
-        console.log(`📊 Generated ${zoneCenters.length} zone centers using K-means clustering`);
 
         // Generate zone colors
         const zoneColors = generateZoneColors(numberOfZones);
@@ -3093,7 +3039,6 @@ function FreeMap() {
             const zoneName = `Zone ${zoneIdx + 1}`;
             const centerMarker = createZoneCenterMarker(map, center, zoneName, zoneColors[zoneIdx]);
 
-            console.log(`✅ ${zoneName}: ${plantsInZone.length} plants`);
 
             newZones.push({
                 id: Date.now() + zoneIdx,
@@ -3121,7 +3066,6 @@ function FreeMap() {
         }));
         localStorage.setItem('zones', JSON.stringify(zonesForStorage));
 
-        console.log('✅ Voronoi zones created successfully:', newZones.length);
         return newZones;
     };
 
@@ -3134,17 +3078,11 @@ function FreeMap() {
             return plants.map((plant) => [plant]);
         }
 
-        console.log(
-            `🎯 Starting Balanced K-means clustering for ${plants.length} plants into ${k} zones`
-        );
 
         // Calculate target size for each cluster (balanced distribution)
         const targetSize = Math.floor(plants.length / k);
         const remainder = plants.length % k;
 
-        console.log(
-            `📊 Target size per zone: ${targetSize} plants (${remainder} zones will have ${targetSize + 1})`
-        );
 
         // Initialize centroids using k-means++ for better initial distribution
         const centroids: Array<{ lat: number; lng: number }> = [];
@@ -3264,23 +3202,13 @@ function FreeMap() {
             }
 
             if (converged) {
-                console.log(`✅ Converged after ${iteration + 1} iterations`);
                 break;
             }
             iteration++;
         }
 
-        // Log final distribution
+        // Filter out empty clusters
         const finalClusters = clusters.filter((cluster) => cluster.length > 0);
-        console.log(`📊 Final distribution:`);
-        finalClusters.forEach((cluster, idx) => {
-            console.log(`   Zone ${idx + 1}: ${cluster.length} plants`);
-        });
-
-        const minSize = Math.min(...finalClusters.map((c) => c.length));
-        const maxSize = Math.max(...finalClusters.map((c) => c.length));
-        const variance = maxSize - minSize;
-        console.log(`📈 Balance: min=${minSize}, max=${maxSize}, variance=${variance}`);
 
         return finalClusters;
     };
@@ -3306,8 +3234,6 @@ function FreeMap() {
     // Function to divide area into zones (legacy rectangular method) - UNUSED
     /*
     const divideAreaIntoZones = (map: google.maps.Map, numberOfZones: number = 2) => {
-        console.log(`🔧 Dividing area into ${numberOfZones} zones`);
-        
         if (drawnShapes.length === 0) {
             console.error('❌ No drawn area to divide');
             return;
@@ -3350,7 +3276,6 @@ function FreeMap() {
             return;
         }
 
-        console.log('🔧 Original bounds:', originalBounds);
 
         // Generate unique colors for zones
         const zoneColors = generateZoneColors(numberOfZones);
@@ -3430,8 +3355,6 @@ function FreeMap() {
         }));
         localStorage.setItem('zones', JSON.stringify(zonesForStorage));
 
-        console.log(`✅ ${numberOfZones} zones created successfully:`, newZones);
-        console.log('💾 Saved to localStorage:', zonesForStorage);
 
         return newZones;
     };
@@ -3439,10 +3362,8 @@ function FreeMap() {
 
     // Function to handle zone generation from modal
     const handleGenerateZones = () => {
-        console.log(`🎯 Generating ${zoneCount} zones`);
 
         if (drawnShapes.length === 0) {
-            console.log('❌ Cannot create zones: No drawn area');
             alert('กรุณาวาดพื้นที่ก่อนแบ่งโซน');
             return;
         }
@@ -3451,7 +3372,6 @@ function FreeMap() {
         const newZones = createVoronoiZones(mapInstanceRef.current as google.maps.Map, zoneCount);
 
         if (newZones && newZones.length > 0) {
-            console.log('✅ Zones created successfully:', newZones.length);
 
             // Close modal
             setShowZoneModal(false);
@@ -3468,7 +3388,6 @@ function FreeMap() {
                 };
                 localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
 
-                console.log('Saved progress to localStorage:', progressData);
 
                 return newCompletedSteps;
             });
@@ -3558,7 +3477,6 @@ function FreeMap() {
 
     // Function to generate main pipes from pumps to zone centers
     const generateMainPipes = (map: google.maps.Map) => {
-        console.log('🔧 Generating main pipes from pumps to zone centers');
 
         // Check if pipe system already generated
         const existingMainPipes = localStorage.getItem('mainPipes');
@@ -3576,7 +3494,6 @@ function FreeMap() {
                     subMainPipesData.length > 0 &&
                     lateralPipesData.length > 0
                 ) {
-                    console.log('⚠️ Pipe system already generated');
                     alert('ระบบท่อถูกสร้างแล้ว กรุณากดรีเซ็ตก่อนสร้างใหม่');
                     return;
                 }
@@ -3650,10 +3567,11 @@ function FreeMap() {
                 strokeColor: '#DC2626',
                 strokeOpacity: 0.8,
                 strokeWeight: 4,
-                zIndex: 1200,
+                zIndex: 1500, // Above zones but below plant points
             });
 
             polyline.setMap(map);
+            allPipeOverlaysRef.current.push(polyline); // Track for reset
 
             newMainPipes.push({
                 id: pipeId,
@@ -3676,8 +3594,6 @@ function FreeMap() {
         }));
         localStorage.setItem('mainPipes', JSON.stringify(pipesForStorage));
 
-        console.log(`✅ ${newMainPipes.length} main pipes created successfully`);
-        console.log('💾 Saved main pipes to localStorage:', pipesForStorage);
 
         // Generate sub-main pipes after main pipes
         const generatedSubMainPipes = generateSubMainPipes(map);
@@ -3956,7 +3872,6 @@ function FreeMap() {
                     savedAt: new Date().toISOString(),
                 };
                 localStorage.setItem('freePlanSummary', JSON.stringify(summary));
-                console.log('💾 Saved freePlanSummary:', summary);
             } catch (e) {
                 console.error('Failed to compute/save free plan summary:', e);
             }
@@ -3967,7 +3882,6 @@ function FreeMap() {
 
     // Function to generate sub-main pipes connecting through main pipes
     const generateSubMainPipes = (map: google.maps.Map) => {
-        console.log('🔧 Generating sub-main pipes through main pipes');
 
         if (zones.length === 0) {
             console.error('❌ No zones available for sub-main pipe generation');
@@ -3995,8 +3909,7 @@ function FreeMap() {
         }> = [];
 
         // Create sub-main pipes for each zone
-        zones.forEach((zone, index) => {
-            console.log(`🔍 Processing zone ${index + 1}:`, zone);
+        zones.forEach((zone) => {
 
             // Find plant points in this zone to determine the actual tree boundaries
             const zonePlantPoints = plantPoints.filter(
@@ -4008,18 +3921,23 @@ function FreeMap() {
             );
 
             if (zonePlantPoints.length === 0) {
-                console.log(
-                    `⚠️ No plant points found in zone ${index + 1}, skipping sub-main pipe`
-                );
                 return;
             }
 
-            // Calculate actual pipe boundaries that stay strictly within zone polygon
-            // For polygon zones, we need to find intersection points with zone boundaries
-            let westLng = zone.bounds.west;
-            let eastLng = zone.bounds.east;
-
-            // If zone has coordinates (polygon), find actual intersection points
+            // Calculate actual pipe boundaries based on actual tree positions
+            // Find the westernmost and easternmost trees in this zone
+            const treeLngs = zonePlantPoints.map((point) => point.position.lng);
+            
+            // Find westernmost and easternmost tree positions
+            const westmostTreeLng = Math.min(...treeLngs);
+            const eastmostTreeLng = Math.max(...treeLngs);
+            
+            // Use tree positions as primary boundaries for the pipe
+            // Pipe should not extend beyond the actual tree range
+            let westLng = westmostTreeLng;
+            let eastLng = eastmostTreeLng;
+            
+            // If zone has coordinates (polygon), ensure pipe doesn't exceed polygon boundaries
             if (zone.coordinates && zone.coordinates.length > 0) {
                 const pipeLat = zone.center.lat;
 
@@ -4069,37 +3987,29 @@ function FreeMap() {
                     }
                 });
 
-                // Find westernmost and easternmost intersection points
+                // If polygon intersections exist, clamp pipe to be within both tree range and polygon
                 if (uniqueIntersections.length >= 2) {
-                    const lngs = uniqueIntersections.map((i) => i.lng);
-                    westLng = Math.min(...lngs);
-                    eastLng = Math.max(...lngs);
-                } else if (uniqueIntersections.length === 1) {
-                    // Only one intersection (edge case), use bounds as fallback
-                    westLng = Math.max(zone.bounds.west, uniqueIntersections[0].lng - 0.0001);
-                    eastLng = Math.min(zone.bounds.east, uniqueIntersections[0].lng + 0.0001);
-                } else {
-                    // No intersections found, use bounds but ensure we're conservative
-                    westLng = zone.bounds.west;
-                    eastLng = zone.bounds.east;
+                    const polygonLngs = uniqueIntersections.map((i) => i.lng);
+                    const polygonWestLng = Math.min(...polygonLngs);
+                    const polygonEastLng = Math.max(...polygonLngs);
+                    
+                    // Pipe should be within tree range, but also not exceed polygon boundaries
+                    // Take the intersection of tree range and polygon range
+                    westLng = Math.max(westmostTreeLng, polygonWestLng);
+                    eastLng = Math.min(eastmostTreeLng, polygonEastLng);
                 }
-            } else {
-                // For rectangle zones, use bounds directly
-                westLng = zone.bounds.west;
-                eastLng = zone.bounds.east;
+                // If no intersections or only one, use tree positions (already set above)
             }
 
             // Final safety check: ensure pipe doesn't exceed zone bounds
+            // But pipe should primarily be limited by tree positions (not extending beyond trees)
             westLng = Math.max(westLng, zone.bounds.west);
             eastLng = Math.min(eastLng, zone.bounds.east);
+            
+            // Most importantly: ensure pipe doesn't extend beyond the actual tree range
+            westLng = Math.max(westLng, westmostTreeLng);
+            eastLng = Math.min(eastLng, eastmostTreeLng);
 
-            console.log(`🌳 Zone ${index + 1} has ${zonePlantPoints.length} plant points`);
-            console.log(
-                `🌳 Zone bounds: west=${zone.bounds.west.toFixed(6)}, east=${zone.bounds.east.toFixed(6)}`
-            );
-            console.log(
-                `🌳 Sub-main pipe bounds: west=${westLng.toFixed(6)}, east=${eastLng.toFixed(6)}`
-            );
 
             // Create horizontal sub-main pipe within zone boundaries
             // This ensures the pipe never exceeds zone boundaries
@@ -4108,7 +4018,6 @@ function FreeMap() {
                 { lat: zone.center.lat, lng: eastLng }, // Eastern boundary (within zone)
             ];
 
-            console.log(`📍 Sub-main pipe path (strictly within zone polygon):`, pipePath);
 
             // Create polyline for sub-main pipe
             const polyline = new window.google.maps.Polyline({
@@ -4117,12 +4026,12 @@ function FreeMap() {
                 strokeColor: '#8B5CF6', // Purple color for sub-main pipes
                 strokeOpacity: 0.8,
                 strokeWeight: 3, // Slightly thinner than main pipes
-                zIndex: 1100, // Between main pipes and zones
+                zIndex: 1500, // Above zones but below plant points
             });
 
             // Add to map
             polyline.setMap(map);
-            console.log(`✅ Created sub-main pipe for zone ${zone.id}`);
+            allPipeOverlaysRef.current.push(polyline); // Track for reset
 
             newSubMainPipes.push({
                 id: Date.now() + zone.id,
@@ -4143,9 +4052,6 @@ function FreeMap() {
             if (zoneCenter.lng >= westLng && zoneCenter.lng <= eastLng) {
                 // Zone center is directly on the sub-main pipe line - use it as connection point
                 closestPointOnSubMain = { lat: zoneCenter.lat, lng: zoneCenter.lng };
-                console.log(
-                    `📍 Zone center is on sub-main pipe, using zone center as connection point`
-                );
             } else {
                 // Zone center is outside sub-main pipe range - find closest endpoint
                 const westEndpoint = { lat: zone.center.lat, lng: westLng };
@@ -4190,9 +4096,6 @@ function FreeMap() {
 
                 // Choose the closest endpoint
                 closestPointOnSubMain = distToWest < distToEast ? westEndpoint : eastEndpoint;
-                console.log(
-                    `📍 Zone center is outside sub-main pipe, closest endpoint: ${distToWest < distToEast ? 'west' : 'east'}`
-                );
             }
 
             // Check if connection point is different from zone center (needs connection)
@@ -4203,23 +4106,38 @@ function FreeMap() {
             if (needsConnection) {
                 // Create extended path that includes connection from zone center to closest point on sub-main pipe
                 // Build path: zone center -> closest point -> rest of sub-main pipe
+                // IMPORTANT: Use tree boundaries (westmostTreeLng, eastmostTreeLng) to ensure pipe doesn't extend beyond actual trees
                 let finalPath: Array<{ lat: number; lng: number }>;
 
-                // Determine the order of points in the final path
-                if (closestPointOnSubMain.lng === westLng) {
-                    // Connection point is at west end - path: zone center -> west -> east
+                // Check if there's only one tree (westmostTreeLng === eastmostTreeLng)
+                const isSingleTree = Math.abs(westmostTreeLng - eastmostTreeLng) < 0.000001;
+                
+                if (isSingleTree) {
+                    // If only one tree, pipe should only go from zone center to that tree position
+                    // Don't extend beyond the single tree
                     finalPath = [
                         zoneCenter,
-                        closestPointOnSubMain,
-                        { lat: zone.center.lat, lng: eastLng },
+                        { lat: zone.center.lat, lng: westmostTreeLng }, // Single tree position
                     ];
                 } else {
-                    // Connection point is at east end - path: zone center -> east -> west
-                    finalPath = [
-                        zoneCenter,
-                        closestPointOnSubMain,
-                        { lat: zone.center.lat, lng: westLng },
-                    ];
+                    // Multiple trees - extend pipe to cover tree range
+                    // Determine the order of points in the final path
+                    // Use tree boundaries instead of westLng/eastLng to ensure pipe doesn't extend beyond actual trees
+                    if (closestPointOnSubMain.lng === westLng || Math.abs(closestPointOnSubMain.lng - westmostTreeLng) < 0.000001) {
+                        // Connection point is at west end - path: zone center -> west -> east (but only to eastmost tree)
+                        finalPath = [
+                            zoneCenter,
+                            closestPointOnSubMain,
+                            { lat: zone.center.lat, lng: eastmostTreeLng }, // Use tree boundary, not eastLng
+                        ];
+                    } else {
+                        // Connection point is at east end - path: zone center -> east -> west (but only to westmost tree)
+                        finalPath = [
+                            zoneCenter,
+                            closestPointOnSubMain,
+                            { lat: zone.center.lat, lng: westmostTreeLng }, // Use tree boundary, not westLng
+                        ];
+                    }
                 }
 
                 // Update the sub-main pipe overlay with extended path
@@ -4231,13 +4149,8 @@ function FreeMap() {
                     newSubMainPipes[pipeIndex].path = finalPath;
                 }
 
-                console.log(
-                    `✅ Created connection from zone center to sub-main pipe for zone ${zone.id}`
-                );
             } else {
-                console.log(
-                    `📍 Zone center is already connected to sub-main pipe for zone ${zone.id}`
-                );
+                // Zone center is already connected
             }
         });
 
@@ -4252,8 +4165,6 @@ function FreeMap() {
         }));
         localStorage.setItem('subMainPipes', JSON.stringify(pipesForStorage));
 
-        console.log(`✅ ${newSubMainPipes.length} sub-main pipes created successfully`);
-        console.log('💾 Saved sub-main pipes to localStorage:', pipesForStorage);
 
         return newSubMainPipes;
     };
@@ -4278,11 +4189,9 @@ function FreeMap() {
         });
 
         if (treesInZone.length === 0) {
-            console.log('❌ No trees found in zone bounds:', zoneBounds);
             return [];
         }
 
-        console.log(`📍 Found ${treesInZone.length} trees in zone`);
 
         // First, sort all trees by longitude to make grouping easier
         const sortedTrees = [...treesInZone].sort((a, b) => a.position.lng - b.position.lng);
@@ -4290,13 +4199,13 @@ function FreeMap() {
         // Group trees by longitude (columns)
         const treeColumns: Array<Array<{ lat: number; lng: number }>> = [];
 
-        // Calculate dynamic tolerance based on zone width
-        const zoneWidth = zoneBounds.east - zoneBounds.west;
-        const tolerance = Math.max(0.00002, zoneWidth * 0.05); // 5% of zone width, minimum 0.0005
+        // Use fixed distance tolerance (approximately 0.75 meters)
+        // 1 degree ≈ 111,000 meters, so 0.75m ≈ 0.00000675 degrees
+        // Using 0.00001 degrees (approximately 1.1 meters) for better tolerance
+        const tolerance = 0.00001; // Fixed tolerance: ~1.1 meters
 
-        console.log(`📏 Zone width: ${zoneWidth.toFixed(6)}, tolerance: ${tolerance.toFixed(6)}`);
 
-        sortedTrees.forEach((tree, index) => {
+        sortedTrees.forEach((tree) => {
             const lng = tree.position.lng;
             let foundColumn = false;
 
@@ -4306,9 +4215,6 @@ function FreeMap() {
                 if (Math.abs(lng - columnLng) <= tolerance) {
                     treeColumns[i].push(tree.position);
                     foundColumn = true;
-                    console.log(
-                        `📍 Tree ${index + 1} added to existing column ${i + 1} (lng: ${lng.toFixed(6)})`
-                    );
                     break;
                 }
             }
@@ -4316,84 +4222,18 @@ function FreeMap() {
             // If no existing column found, create a new one
             if (!foundColumn) {
                 treeColumns.push([tree.position]);
-                console.log(
-                    `📍 Tree ${index + 1} created new column ${treeColumns.length} (lng: ${lng.toFixed(6)})`
-                );
             }
         });
 
         // Sort each column by latitude
-        treeColumns.forEach((column, index) => {
+        treeColumns.forEach((column) => {
             column.sort((a, b) => a.lat - b.lat);
-            console.log(
-                `📏 Column ${index + 1}: ${column.length} trees, lng: ${column[0].lng.toFixed(6)}`
-            );
         });
 
         // Sort columns by longitude
         treeColumns.sort((a, b) => a[0].lng - b[0].lng);
 
-        console.log(`✅ Total columns found: ${treeColumns.length}`);
         return treeColumns;
-    };
-
-    // Helper function: Calculate distance from a point to a line segment
-    const distanceToLineSegment = (
-        point: { lat: number; lng: number },
-        segmentStart: { lat: number; lng: number },
-        segmentEnd: { lat: number; lng: number },
-        geometry?: {
-            spherical?: {
-                computeDistanceBetween: (
-                    from: google.maps.LatLng,
-                    to: google.maps.LatLng
-                ) => number;
-            };
-        }
-    ): number => {
-        // Calculate parameter t (0 to 1 means point is on segment)
-        const A = point.lat - segmentStart.lat;
-        const B = point.lng - segmentStart.lng;
-        const C = segmentEnd.lat - segmentStart.lat;
-        const D = segmentEnd.lng - segmentStart.lng;
-
-        const dot = A * C + B * D;
-        const lenSq = C * C + D * D;
-
-        // If segment has zero length, calculate distance to start point
-        if (lenSq === 0) {
-            if (geometry?.spherical) {
-                const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
-                const startLatLng = new window.google.maps.LatLng(
-                    segmentStart.lat,
-                    segmentStart.lng
-                );
-                return geometry.spherical.computeDistanceBetween(pointLatLng, startLatLng);
-            }
-            return Math.sqrt(A * A + B * B) * 111000; // Convert to meters (rough approximation)
-        }
-
-        // Calculate parameter t (clamped to [0, 1])
-        const t = Math.max(0, Math.min(1, dot / lenSq));
-
-        // Calculate closest point on segment
-        const closestPoint = {
-            lat: segmentStart.lat + t * C,
-            lng: segmentStart.lng + t * D,
-        };
-
-        // Calculate distance from point to closest point on segment
-        if (geometry?.spherical) {
-            const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
-            const closestLatLng = new window.google.maps.LatLng(closestPoint.lat, closestPoint.lng);
-            return geometry.spherical.computeDistanceBetween(pointLatLng, closestLatLng);
-        }
-
-        // Fallback: use simple distance calculation
-        const dist = Math.sqrt(
-            Math.pow(point.lat - closestPoint.lat, 2) + Math.pow(point.lng - closestPoint.lng, 2)
-        );
-        return dist * 111000; // Convert to meters (rough approximation)
     };
 
     // Helper function: Find the closest point on a line segment to a given point
@@ -4425,51 +4265,357 @@ function FreeMap() {
         };
     };
 
-    // Helper function: Get intersection latitude on polyline at a given longitude
-    // Returns the latitude where the polyline intersects a vertical line at the given longitude
-    // Returns null if no intersection is found
-    const getIntersectionLatOnPolyline = (
+    // Helper function: Project a point onto a polyline (find closest point on any segment)
+    // Returns the closest point on the polyline and the distance to it
+    const projectPointOntoPolyline = (
+        point: { lat: number; lng: number },
         polylinePath: Array<{ lat: number; lng: number }>,
-        targetLng: number,
-        tolerance: number = 0.00001
-    ): number | null => {
+        geometry?: {
+            spherical?: {
+                computeDistanceBetween: (
+                    from: google.maps.LatLng,
+                    to: google.maps.LatLng
+                ) => number;
+            };
+        }
+    ): { point: { lat: number; lng: number }; distance: number } | null => {
         if (!polylinePath || polylinePath.length < 2) {
             return null;
         }
+
+        let minDistance = Number.POSITIVE_INFINITY;
+        let closestPoint: { lat: number; lng: number } | null = null;
 
         // Check each segment of the polyline
         for (let i = 0; i < polylinePath.length - 1; i++) {
             const segStart = polylinePath[i];
             const segEnd = polylinePath[i + 1];
 
-            // Check if this segment crosses the vertical line at targetLng
-            const lngMin = Math.min(segStart.lng, segEnd.lng);
-            const lngMax = Math.max(segStart.lng, segEnd.lng);
+            // Find closest point on this segment
+            const projectedPoint = closestPointOnLineSegment(point, segStart, segEnd);
 
-            // Check intersection with tolerance
-            if (
-                targetLng >= lngMin - tolerance &&
-                targetLng <= lngMax + tolerance &&
-                Math.abs(lngMax - lngMin) > tolerance
-            ) {
-                // Calculate intersection point
-                const t = (targetLng - segStart.lng) / (segEnd.lng - segStart.lng);
-                const intersectionLat = segStart.lat + t * (segEnd.lat - segStart.lat);
-
-                return intersectionLat;
+            // Calculate distance
+            let distance = 0;
+            if (geometry?.spherical) {
+                const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                const projectedLatLng = new window.google.maps.LatLng(
+                    projectedPoint.lat,
+                    projectedPoint.lng
+                );
+                distance = geometry.spherical.computeDistanceBetween(pointLatLng, projectedLatLng);
+            } else {
+                // Fallback: simple distance calculation
+                distance = Math.sqrt(
+                    Math.pow(point.lat - projectedPoint.lat, 2) +
+                        Math.pow(point.lng - projectedPoint.lng, 2)
+                ) * 111000; // Convert to meters (rough approximation)
             }
 
-            // Also check if segment endpoints are close to targetLng
-            if (Math.abs(segStart.lng - targetLng) < tolerance) {
-                return segStart.lat;
-            }
-            if (Math.abs(segEnd.lng - targetLng) < tolerance) {
-                return segEnd.lat;
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = projectedPoint;
             }
         }
 
-        // No intersection found
+        if (closestPoint) {
+            return { point: closestPoint, distance: minDistance };
+        }
+
         return null;
+    };
+
+    // Helper function: Check if point is inside zone (including boundary)
+    const isPointInZone = (
+        point: { lat: number; lng: number },
+        zone: {
+            bounds: { north: number; south: number; east: number; west: number };
+            coordinates?: Array<{ lat: number; lng: number }>;
+        }
+    ): boolean => {
+        // First check bounds (include boundary with <= and >=)
+        if (
+            point.lat < zone.bounds.south ||
+            point.lat > zone.bounds.north ||
+            point.lng < zone.bounds.west ||
+            point.lng > zone.bounds.east
+        ) {
+            return false;
+        }
+
+        // If zone has polygon coordinates, check if point is inside polygon or on boundary
+        if (zone.coordinates && zone.coordinates.length > 0) {
+            // Check if point is exactly on polygon boundary
+            const tolerance = 0.000001; // Very small tolerance for boundary check
+            for (let i = 0; i < zone.coordinates.length; i++) {
+                const p1 = zone.coordinates[i];
+                const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
+                
+                // Check if point is on this edge
+                const edgeLength = Math.sqrt(
+                    Math.pow(p2.lat - p1.lat, 2) + Math.pow(p2.lng - p1.lng, 2)
+                );
+                if (edgeLength < tolerance) continue; // Skip zero-length edges
+                
+                // Distance from point to line segment
+                const A = point.lat - p1.lat;
+                const B = point.lng - p1.lng;
+                const C = p2.lat - p1.lat;
+                const D = p2.lng - p1.lng;
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                const t = Math.max(0, Math.min(1, dot / lenSq));
+                
+                const closestPoint = {
+                    lat: p1.lat + t * C,
+                    lng: p1.lng + t * D,
+                };
+                
+                const dist = Math.sqrt(
+                    Math.pow(point.lat - closestPoint.lat, 2) +
+                    Math.pow(point.lng - closestPoint.lng, 2)
+                );
+                
+                // If point is very close to edge, consider it on boundary
+                if (dist < tolerance) {
+                    return true;
+                }
+            }
+            
+            // Check if point is inside polygon
+            return isPointInPolygon(point, zone.coordinates);
+        }
+
+        // For rectangle zones, bounds check is sufficient (point is on or inside)
+        return true;
+    };
+
+    // Helper function: Find intersection point between line segment and zone boundary
+    const findZoneBoundaryIntersection = (
+        start: { lat: number; lng: number },
+        end: { lat: number; lng: number },
+        zone: {
+            bounds: { north: number; south: number; east: number; west: number };
+            coordinates?: Array<{ lat: number; lng: number }>;
+        }
+    ): { lat: number; lng: number } | null => {
+        const startInside = isPointInZone(start, zone);
+        const endInside = isPointInZone(end, zone);
+
+        // If both points are inside, no intersection needed
+        if (startInside && endInside) {
+            return null;
+        }
+
+        // If both points are outside, find intersection with zone boundary
+        if (!startInside && !endInside) {
+            // Check if line segment intersects zone bounds
+            const dx = end.lng - start.lng;
+            const dy = end.lat - start.lat;
+
+            // Check intersection with each boundary edge
+            const intersections: Array<{ lat: number; lng: number }> = [];
+
+            // Top edge
+            if (dy !== 0) {
+                const t = (zone.bounds.north - start.lat) / dy;
+                if (t >= 0 && t <= 1) {
+                    const lng = start.lng + t * dx;
+                    if (lng >= zone.bounds.west && lng <= zone.bounds.east) {
+                        intersections.push({ lat: zone.bounds.north, lng });
+                    }
+                }
+            }
+
+            // Bottom edge
+            if (dy !== 0) {
+                const t = (zone.bounds.south - start.lat) / dy;
+                if (t >= 0 && t <= 1) {
+                    const lng = start.lng + t * dx;
+                    if (lng >= zone.bounds.west && lng <= zone.bounds.east) {
+                        intersections.push({ lat: zone.bounds.south, lng });
+                    }
+                }
+            }
+
+            // Left edge
+            if (dx !== 0) {
+                const t = (zone.bounds.west - start.lng) / dx;
+                if (t >= 0 && t <= 1) {
+                    const lat = start.lat + t * dy;
+                    if (lat >= zone.bounds.south && lat <= zone.bounds.north) {
+                        intersections.push({ lat, lng: zone.bounds.west });
+                    }
+                }
+            }
+
+            // Right edge
+            if (dx !== 0) {
+                const t = (zone.bounds.east - start.lng) / dx;
+                if (t >= 0 && t <= 1) {
+                    const lat = start.lat + t * dy;
+                    if (lat >= zone.bounds.south && lat <= zone.bounds.north) {
+                        intersections.push({ lat, lng: zone.bounds.east });
+                    }
+                }
+            }
+
+            // For polygon zones, also check polygon edges
+            if (zone.coordinates && zone.coordinates.length > 0) {
+                for (let i = 0; i < zone.coordinates.length; i++) {
+                    const p1 = zone.coordinates[i];
+                    const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
+
+                    // Line segment intersection
+                    const denom = (p2.lat - p1.lat) * (end.lng - start.lng) - (p2.lng - p1.lng) * (end.lat - start.lat);
+                    if (Math.abs(denom) > 0.000001) {
+                        const t1 = ((p1.lng - start.lng) * (end.lat - start.lat) - (p1.lat - start.lat) * (end.lng - start.lng)) / denom;
+                        const t2 = ((p1.lng - start.lng) * (p2.lat - p1.lat) - (p1.lat - start.lat) * (p2.lng - p1.lng)) / denom;
+
+                        if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
+                            const lat = p1.lat + t1 * (p2.lat - p1.lat);
+                            const lng = p1.lng + t1 * (p2.lng - p1.lng);
+                            intersections.push({ lat, lng });
+                        }
+                    }
+                }
+            }
+
+            // Return the closest intersection to start point
+            if (intersections.length > 0) {
+                let closest = intersections[0];
+                let minDist = getDistanceFromLatLonInMeters(start, closest);
+                for (let i = 1; i < intersections.length; i++) {
+                    const dist = getDistanceFromLatLonInMeters(start, intersections[i]);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = intersections[i];
+                    }
+                }
+                return closest;
+            }
+        }
+
+        // If one point is inside and one is outside, find intersection
+        if (startInside && !endInside) {
+            // Start is inside, end is outside - find where it exits
+            const dx = end.lng - start.lng;
+            const dy = end.lat - start.lat;
+
+            // Binary search for intersection point
+            let low = 0;
+            let high = 1;
+            let intersection: { lat: number; lng: number } | null = null;
+
+            for (let iter = 0; iter < 20; iter++) {
+                const mid = (low + high) / 2;
+                const testPoint = {
+                    lat: start.lat + mid * dy,
+                    lng: start.lng + mid * dx,
+                };
+
+                if (isPointInZone(testPoint, zone)) {
+                    low = mid;
+                    intersection = testPoint;
+                } else {
+                    high = mid;
+                }
+            }
+
+            return intersection;
+        }
+
+        if (!startInside && endInside) {
+            // Start is outside, end is inside - find where it enters
+            const dx = end.lng - start.lng;
+            const dy = end.lat - start.lat;
+
+            // Binary search for intersection point
+            let low = 0;
+            let high = 1;
+            let intersection: { lat: number; lng: number } | null = null;
+
+            for (let iter = 0; iter < 20; iter++) {
+                const mid = (low + high) / 2;
+                const testPoint = {
+                    lat: start.lat + mid * dy,
+                    lng: start.lng + mid * dx,
+                };
+
+                if (isPointInZone(testPoint, zone)) {
+                    high = mid;
+                    intersection = testPoint;
+                } else {
+                    low = mid;
+                }
+            }
+
+            return intersection;
+        }
+
+        return null;
+    };
+
+    // Helper function: Clip pipe path to stay within zone boundaries
+    const clipPipePathToZone = (
+        pipePath: Array<{ lat: number; lng: number }>,
+        zone: {
+            bounds: { north: number; south: number; east: number; west: number };
+            coordinates?: Array<{ lat: number; lng: number }>;
+        }
+    ): Array<{ lat: number; lng: number }> => {
+        if (pipePath.length === 0) {
+            return pipePath;
+        }
+
+        const clippedPath: Array<{ lat: number; lng: number }> = [];
+        let lastPointInside = false;
+
+        for (let i = 0; i < pipePath.length; i++) {
+            const point = pipePath[i];
+            const isInside = isPointInZone(point, zone);
+
+            if (i === 0) {
+                // First point
+                if (isInside) {
+                    clippedPath.push(point);
+                    lastPointInside = true;
+                } else {
+                    // First point is outside, find entry point
+                    if (i + 1 < pipePath.length) {
+                        const intersection = findZoneBoundaryIntersection(point, pipePath[i + 1], zone);
+                        if (intersection) {
+                            clippedPath.push(intersection);
+                            lastPointInside = true;
+                        }
+                    }
+                }
+            } else {
+                const prevPoint = pipePath[i - 1];
+
+                if (isInside) {
+                    if (!lastPointInside) {
+                        // Entering zone, add intersection point first
+                        const intersection = findZoneBoundaryIntersection(prevPoint, point, zone);
+                        if (intersection) {
+                            clippedPath.push(intersection);
+                        }
+                    }
+                    clippedPath.push(point);
+                    lastPointInside = true;
+                } else {
+                    if (lastPointInside) {
+                        // Exiting zone, add intersection point
+                        const intersection = findZoneBoundaryIntersection(prevPoint, point, zone);
+                        if (intersection) {
+                            clippedPath.push(intersection);
+                        }
+                    }
+                    lastPointInside = false;
+                }
+            }
+        }
+
+        return clippedPath.length > 0 ? clippedPath : pipePath;
     };
 
     // Function to generate lateral pipes perpendicular to sub-main pipes
@@ -4482,9 +4628,6 @@ function FreeMap() {
             zoneId: number;
         }>
     ) => {
-        console.log(
-            '🔧 Generating lateral pipes perpendicular to sub-main pipes following tree columns'
-        );
 
         if (zones.length === 0) {
             console.error('❌ No zones available for lateral pipe generation');
@@ -4519,34 +4662,25 @@ function FreeMap() {
                   ? subMainPipes
                   : [];
 
-        console.log(
-            `📊 Using ${currentSubMainPipes.length} sub-main pipes for lateral pipe generation`
-        );
 
         // Create lateral pipes for each zone
-        zones.forEach((zone, index) => {
-            console.log(`🔍 Processing zone ${index + 1} for lateral pipes:`, zone);
-            console.log(`🔍 Zone bounds:`, zone.bounds);
+        zones.forEach((zone) => {
 
             // Find sub-main pipe for this zone
             const zoneSubMainPipe = currentSubMainPipes.find((pipe) => pipe.zoneId === zone.id);
 
             if (!zoneSubMainPipe || !zoneSubMainPipe.path || zoneSubMainPipe.path.length < 2) {
-                console.log(
-                    `⚠️ No sub-main pipe found for zone ${zone.id}, skipping lateral pipes`
-                );
                 return;
             }
-
-            // Get sub-main pipe latitude (horizontal line)
-            const subMainLat = zoneSubMainPipe.path[0].lat;
-            console.log(`📍 Sub-main pipe at latitude: ${subMainLat.toFixed(6)}`);
 
             // Find tree columns in this zone
             const treeColumns = findTreeColumns(zone.bounds);
 
+            // Track which trees are already connected to avoid duplicate connections
+            const connectedTreeIds = new Set<number>();
+
             if (treeColumns.length > 0) {
-                console.log(`📍 Found ${treeColumns.length} tree columns in zone ${zone.id}`);
+                const geometry = window.google?.maps?.geometry;
 
                 // Create lateral pipes for each tree column
                 treeColumns.forEach((column, columnIndex) => {
@@ -4612,27 +4746,26 @@ function FreeMap() {
                         });
 
                         // Find northernmost and southernmost intersection points
-                        // These are the ONLY valid boundaries - they are guaranteed to be within polygon
                         if (uniqueIntersections.length >= 2) {
                             const lats = uniqueIntersections.map((i) => i.lat);
                             const intersectionNorth = Math.max(...lats);
                             const intersectionSouth = Math.min(...lats);
 
-                            // Use intersections as strict boundaries (these are polygon boundaries)
-                            // Only extend to plants if they are within the intersection range
+                            // Use intersections as boundaries
                             topLat = intersectionNorth;
                             bottomLat = intersectionSouth;
 
-                            // Only extend to plant positions if they are within intersection range
+                            // Extend to plant positions if they are at or within intersection range
+                            const boundaryTolerance = 0.000001;
                             if (
-                                northernmostLat <= intersectionNorth &&
-                                northernmostLat >= intersectionSouth
+                                northernmostLat <= intersectionNorth + boundaryTolerance &&
+                                northernmostLat >= intersectionSouth - boundaryTolerance
                             ) {
                                 topLat = northernmostLat;
                             }
                             if (
-                                southernmostLat >= intersectionSouth &&
-                                southernmostLat <= intersectionNorth
+                                southernmostLat >= intersectionSouth - boundaryTolerance &&
+                                southernmostLat <= intersectionNorth + boundaryTolerance
                             ) {
                                 bottomLat = southernmostLat;
                             }
@@ -4641,13 +4774,7 @@ function FreeMap() {
                             topLat = Math.min(topLat, zone.bounds.north);
                             bottomLat = Math.max(bottomLat, zone.bounds.south);
                         } else if (uniqueIntersections.length === 1) {
-                            // Only one intersection - use it and extend to plant positions with bounds as fallback
                             const singleIntersection = uniqueIntersections[0];
-                            console.log(
-                                `⚠️ Column ${columnIndex + 1} has only one intersection, using fallback bounds`
-                            );
-
-                            // Use intersection as anchor, extend to plants within zone bounds
                             topLat = Math.min(
                                 Math.max(northernmostLat, singleIntersection.lat),
                                 zone.bounds.north
@@ -4656,18 +4783,7 @@ function FreeMap() {
                                 Math.min(southernmostLat, singleIntersection.lat),
                                 zone.bounds.south
                             );
-
-                            // Ensure we have a valid range
-                            if (topLat <= bottomLat) {
-                                // Use bounds as fallback
-                                topLat = Math.min(northernmostLat, zone.bounds.north);
-                                bottomLat = Math.max(southernmostLat, zone.bounds.south);
-                            }
                         } else {
-                            // No intersections found - use plant positions with zone bounds as fallback
-                            console.log(
-                                `⚠️ Column ${columnIndex + 1} does not intersect zone boundary, using fallback bounds`
-                            );
                             topLat = Math.min(northernmostLat, zone.bounds.north);
                             bottomLat = Math.max(southernmostLat, zone.bounds.south);
                         }
@@ -4681,386 +4797,168 @@ function FreeMap() {
                     topLat = Math.min(topLat, zone.bounds.north);
                     bottomLat = Math.max(bottomLat, zone.bounds.south);
 
-                    // Ensure topLat is greater than bottomLat
-                    if (topLat <= bottomLat) {
-                        // Try to fix by using a minimum height
-                        const minHeight = 0.0001; // Approximately 10 meters
-                        const centerLat = (topLat + bottomLat) / 2;
-                        topLat = centerLat + minHeight / 2;
-                        bottomLat = centerLat - minHeight / 2;
-
-                        // Final check - if still invalid, use plant positions directly
-                        if (topLat <= bottomLat) {
-                            console.log(
-                                `⚠️ Invalid pipe bounds for column ${columnIndex + 1}, using plant positions directly`
-                            );
-                            topLat = Math.max(northernmostLat, zone.bounds.south + minHeight);
-                            bottomLat = Math.min(southernmostLat, zone.bounds.north - minHeight);
-                        }
-
-                        // If still invalid, skip
-                        if (topLat <= bottomLat) {
-                            console.log(
-                                `⚠️ Cannot create valid pipe bounds for column ${columnIndex + 1}, skipping lateral pipe`
-                            );
-                            return; // Skip this column
-                        }
-                    }
-
-                    // Define lateral pipe endpoints
+                    // Define lateral pipe endpoints (vertical line at columnLng)
                     const lateralTopPoint = { lat: topLat, lng: columnLng };
                     const lateralBottomPoint = { lat: bottomLat, lng: columnLng };
 
-                    // Use new helper function to find intersection latitude on sub-main pipe
-                    const latTolerance = 0.00001; // Approximately 1 meter
-                    const actualIntersectionLat = getIntersectionLatOnPolyline(
+                    // Use PROJECTION instead of intersection: find closest point on sub-main pipe
+                    // Project the midpoint of the lateral pipe onto the sub-main pipe
+                    const lateralMidPoint = {
+                        lat: (topLat + bottomLat) / 2,
+                        lng: columnLng,
+                    };
+
+                    const projection = projectPointOntoPolyline(
+                        lateralMidPoint,
                         zoneSubMainPipe.path,
-                        columnLng
+                        geometry
                     );
 
-                    // Determine pipe path
-                    let pipePath: Array<{ lat: number; lng: number }>;
-
-                    if (actualIntersectionLat !== null) {
-                        // Found intersection - check if it's within lateral pipe range
-                        if (
-                            actualIntersectionLat >= bottomLat - latTolerance &&
-                            actualIntersectionLat <= topLat + latTolerance
-                        ) {
-                            // Sub-main pipe intersects the vertical line - create vertical connection
-                            const intersectionPoint = {
-                                lat: actualIntersectionLat,
-                                lng: columnLng,
-                            };
-                            console.log(
-                                `📍 Sub-main pipe intersects lateral pipe at (${actualIntersectionLat.toFixed(6)}, ${columnLng.toFixed(6)})`
-                            );
-
-                            if (
-                                topLat > actualIntersectionLat &&
-                                bottomLat < actualIntersectionLat
-                            ) {
-                                // Plants on both sides of sub-main pipe
-                                pipePath = [lateralTopPoint, intersectionPoint, lateralBottomPoint];
-                                console.log(
-                                    `📏 Lateral pipe crosses sub-main (plants on both sides)`
-                                );
-                            } else if (topLat <= actualIntersectionLat) {
-                                // All plants below sub-main pipe
-                                pipePath = [intersectionPoint, lateralBottomPoint];
-                                console.log(`📏 Lateral pipe extends downward from sub-main`);
-                            } else {
-                                // All plants above sub-main pipe
-                                pipePath = [intersectionPoint, lateralTopPoint];
-                                console.log(`📏 Lateral pipe extends upward from sub-main`);
-                            }
-                        } else {
-                            // Intersection found but outside lateral pipe range - use diagonal connection
-                            console.log(
-                                `📍 Intersection found but outside lateral pipe range, using diagonal connection`
-                            );
-                            // Fall through to diagonal connection logic below
-                            const geometry = window.google?.maps?.geometry;
-
-                            // Find which endpoint of lateral pipe is closest to sub-main pipe
-                            let closestLateralEndpoint: { lat: number; lng: number };
-                            let farthestLateralEndpoint: { lat: number; lng: number };
-
-                            // Calculate distances from both endpoints to sub-main pipe
-                            let minDistTop = Number.POSITIVE_INFINITY;
-                            let minDistBottom = Number.POSITIVE_INFINITY;
-                            let closestPointOnSubMainTop: { lat: number; lng: number } | null =
-                                null;
-                            let closestPointOnSubMainBottom: { lat: number; lng: number } | null =
-                                null;
-
-                            // Check all segments of sub-main pipe
-                            for (let i = 0; i < zoneSubMainPipe.path.length - 1; i++) {
-                                const segStart = zoneSubMainPipe.path[i];
-                                const segEnd = zoneSubMainPipe.path[i + 1];
-
-                                // Calculate distance from top endpoint to this segment
-                                const distTop = distanceToLineSegment(
-                                    lateralTopPoint,
-                                    segStart,
-                                    segEnd,
-                                    geometry
-                                );
-                                if (distTop < minDistTop) {
-                                    minDistTop = distTop;
-                                    closestPointOnSubMainTop = closestPointOnLineSegment(
-                                        lateralTopPoint,
-                                        segStart,
-                                        segEnd
-                                    );
-                                }
-
-                                // Calculate distance from bottom endpoint to this segment
-                                const distBottom = distanceToLineSegment(
-                                    lateralBottomPoint,
-                                    segStart,
-                                    segEnd,
-                                    geometry
-                                );
-                                if (distBottom < minDistBottom) {
-                                    minDistBottom = distBottom;
-                                    closestPointOnSubMainBottom = closestPointOnLineSegment(
-                                        lateralBottomPoint,
-                                        segStart,
-                                        segEnd
-                                    );
-                                }
-                            }
-
-                            // Determine which endpoint is closer to sub-main pipe
-                            if (minDistTop < minDistBottom) {
-                                closestLateralEndpoint = lateralTopPoint;
-                                farthestLateralEndpoint = lateralBottomPoint;
-                            } else {
-                                closestLateralEndpoint = lateralBottomPoint;
-                                farthestLateralEndpoint = lateralTopPoint;
-                            }
-
-                            // Ensure we have valid connection points
-                            if (!closestPointOnSubMainTop || !closestPointOnSubMainBottom) {
-                                console.log(
-                                    `⚠️ Failed to find connection point on sub-main pipe for column ${columnIndex + 1}, skipping`
-                                );
-                                return; // Skip this column
-                            }
-
-                            const closestPointOnSubMain =
-                                minDistTop < minDistBottom
-                                    ? closestPointOnSubMainTop
-                                    : closestPointOnSubMainBottom;
-
-                            console.log(
-                                `📍 Closest endpoint: ${minDistTop < minDistBottom ? 'top' : 'bottom'}, distance: ${Math.min(minDistTop, minDistBottom).toFixed(2)}m`
-                            );
-                            console.log(
-                                `📍 Connection point on sub-main: (${closestPointOnSubMain.lat.toFixed(6)}, ${closestPointOnSubMain.lng.toFixed(6)})`
-                            );
-
-                            // Build path: farthest endpoint -> closest endpoint -> connection point on sub-main
-                            pipePath = [
-                                farthestLateralEndpoint,
-                                closestLateralEndpoint,
-                                closestPointOnSubMain,
-                            ];
-
-                            console.log(
-                                `📏 Lateral pipe with diagonal connection: ${farthestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> ${closestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> sub-main`
-                            );
-                        }
-                    } else {
-                        // No intersection found - sub-main pipe does NOT intersect - use diagonal connection
+                    if (!projection) {
                         console.log(
-                            `📍 Sub-main pipe does NOT intersect lateral pipe, creating diagonal connection`
-                        );
-
-                        const geometry = window.google?.maps?.geometry;
-
-                        // Find which endpoint of lateral pipe is closest to sub-main pipe
-                        let closestLateralEndpoint: { lat: number; lng: number };
-                        let farthestLateralEndpoint: { lat: number; lng: number };
-
-                        // Calculate distances from both endpoints to sub-main pipe
-                        let minDistTop = Number.POSITIVE_INFINITY;
-                        let minDistBottom = Number.POSITIVE_INFINITY;
-                        let closestPointOnSubMainTop: { lat: number; lng: number } | null = null;
-                        let closestPointOnSubMainBottom: { lat: number; lng: number } | null = null;
-
-                        // Check all segments of sub-main pipe
-                        for (let i = 0; i < zoneSubMainPipe.path.length - 1; i++) {
-                            const segStart = zoneSubMainPipe.path[i];
-                            const segEnd = zoneSubMainPipe.path[i + 1];
-
-                            // Calculate distance from top endpoint to this segment
-                            const distTop = distanceToLineSegment(
-                                lateralTopPoint,
-                                segStart,
-                                segEnd,
-                                geometry
-                            );
-                            if (distTop < minDistTop) {
-                                minDistTop = distTop;
-                                closestPointOnSubMainTop = closestPointOnLineSegment(
-                                    lateralTopPoint,
-                                    segStart,
-                                    segEnd
-                                );
-                            }
-
-                            // Calculate distance from bottom endpoint to this segment
-                            const distBottom = distanceToLineSegment(
-                                lateralBottomPoint,
-                                segStart,
-                                segEnd,
-                                geometry
-                            );
-                            if (distBottom < minDistBottom) {
-                                minDistBottom = distBottom;
-                                closestPointOnSubMainBottom = closestPointOnLineSegment(
-                                    lateralBottomPoint,
-                                    segStart,
-                                    segEnd
-                                );
-                            }
-                        }
-
-                        // Determine which endpoint is closer to sub-main pipe
-                        if (minDistTop < minDistBottom) {
-                            closestLateralEndpoint = lateralTopPoint;
-                            farthestLateralEndpoint = lateralBottomPoint;
-                        } else {
-                            closestLateralEndpoint = lateralBottomPoint;
-                            farthestLateralEndpoint = lateralTopPoint;
-                        }
-
-                        // Ensure we have valid connection points
-                        if (!closestPointOnSubMainTop || !closestPointOnSubMainBottom) {
-                            console.log(
-                                `⚠️ Failed to find connection point on sub-main pipe for column ${columnIndex + 1}, skipping`
-                            );
-                            return; // Skip this column
-                        }
-
-                        const closestPointOnSubMain =
-                            minDistTop < minDistBottom
-                                ? closestPointOnSubMainTop
-                                : closestPointOnSubMainBottom;
-
-                        console.log(
-                            `📍 Closest endpoint: ${minDistTop < minDistBottom ? 'top' : 'bottom'}, distance: ${Math.min(minDistTop, minDistBottom).toFixed(2)}m`
-                        );
-                        console.log(
-                            `📍 Connection point on sub-main: (${closestPointOnSubMain.lat.toFixed(6)}, ${closestPointOnSubMain.lng.toFixed(6)})`
-                        );
-
-                        // Build path: farthest endpoint -> closest endpoint -> connection point on sub-main
-                        pipePath = [
-                            farthestLateralEndpoint,
-                            closestLateralEndpoint,
-                            closestPointOnSubMain,
-                        ];
-
-                        console.log(
-                            `📏 Lateral pipe with diagonal connection: ${farthestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> ${closestLateralEndpoint === lateralTopPoint ? 'top' : 'bottom'} -> sub-main`
-                        );
-                    }
-
-                    // Final verification: ensure lateral pipe endpoints are within zone bounds (with tolerance)
-                    // Note: connection point on sub-main may be outside zone bounds (that's OK)
-                    const boundsTolerance = 0.00005; // Approximately 5 meters tolerance
-                    const lateralEndpointsValid = pipePath
-                        .slice(0, -1)
-                        .every(
-                            (point) =>
-                                point.lat >= zone.bounds.south - boundsTolerance &&
-                                point.lat <= zone.bounds.north + boundsTolerance &&
-                                point.lng >= zone.bounds.west - boundsTolerance &&
-                                point.lng <= zone.bounds.east + boundsTolerance
-                        );
-
-                    if (!lateralEndpointsValid) {
-                        // Try to clamp endpoints to valid bounds instead of skipping
-                        console.log(
-                            `⚠️ Lateral pipe endpoints exceed zone bounds for column ${columnIndex + 1}, clamping to bounds`
-                        );
-                        console.log(`   Original pipe path:`, pipePath);
-
-                        // Clamp lateral endpoints to zone bounds
-                        const clampedPath = pipePath.map((point, idx) => {
-                            if (idx < pipePath.length - 1) {
-                                // Clamp lateral endpoints
-                                return {
-                                    lat: Math.max(
-                                        zone.bounds.south,
-                                        Math.min(zone.bounds.north, point.lat)
-                                    ),
-                                    lng: Math.max(
-                                        zone.bounds.west,
-                                        Math.min(zone.bounds.east, point.lng)
-                                    ),
-                                };
-                            } else {
-                                // Keep connection point as is (may be outside bounds)
-                                return point;
-                            }
-                        });
-
-                        // Verify clamped path is still valid
-                        const clampedEndpointsValid = clampedPath
-                            .slice(0, -1)
-                            .every(
-                                (point) =>
-                                    point.lat >= zone.bounds.south &&
-                                    point.lat <= zone.bounds.north &&
-                                    point.lng >= zone.bounds.west &&
-                                    point.lng <= zone.bounds.east
-                            );
-
-                        if (!clampedEndpointsValid) {
-                            console.log(
-                                `⚠️ Cannot clamp lateral pipe endpoints for column ${columnIndex + 1}, skipping`
-                            );
-                            return; // Skip this column
-                        }
-
-                        pipePath = clampedPath;
-                        console.log(`   Clamped pipe path:`, pipePath);
-                    }
-
-                    // Verify that connection point is valid (not NaN or Infinity)
-                    const connectionPoint = pipePath[pipePath.length - 1];
-                    if (!isFinite(connectionPoint.lat) || !isFinite(connectionPoint.lng)) {
-                        console.log(
-                            `⚠️ Invalid connection point for column ${columnIndex + 1}, skipping`
+                            `⚠️ Failed to project point onto sub-main pipe for column ${columnIndex + 1}, skipping`
                         );
                         return; // Skip this column
                     }
 
-                    console.log(
-                        `📏 Creating lateral pipe ${columnIndex + 1}/${treeColumns.length} for zone ${zone.id}`
+                    const connectionPoint = projection.point;
+
+                    // Build pipe path: from top to bottom, connecting to sub-main pipe
+                    let pipePath: Array<{ lat: number; lng: number }>;
+
+                    // Determine if connection point is within the lateral pipe range
+                    const connectionLat = connectionPoint.lat;
+                    const isConnectionWithinRange =
+                        connectionLat >= bottomLat - 0.00001 &&
+                        connectionLat <= topLat + 0.00001;
+
+                    if (isConnectionWithinRange) {
+                        // Connection point is within lateral pipe range - create vertical connection
+                        if (topLat > connectionLat && bottomLat < connectionLat) {
+                            // Plants on both sides of connection point
+                            pipePath = [lateralTopPoint, connectionPoint, lateralBottomPoint];
+                        } else if (topLat <= connectionLat) {
+                            // All plants below connection point
+                            pipePath = [connectionPoint, lateralBottomPoint];
+                        } else {
+                            // All plants above connection point
+                            pipePath = [connectionPoint, lateralTopPoint];
+                        }
+                    } else {
+                        // Connection point is outside lateral pipe range - use diagonal connection
+                        // Find which endpoint is closer to connection point
+                        let distToTop = 0;
+                        let distToBottom = 0;
+
+                        if (geometry?.spherical) {
+                            const topLatLng = new window.google.maps.LatLng(
+                                lateralTopPoint.lat,
+                                lateralTopPoint.lng
+                            );
+                            const bottomLatLng = new window.google.maps.LatLng(
+                                lateralBottomPoint.lat,
+                                lateralBottomPoint.lng
+                            );
+                            const connectionLatLng = new window.google.maps.LatLng(
+                                connectionPoint.lat,
+                                connectionPoint.lng
+                            );
+
+                            distToTop = geometry.spherical.computeDistanceBetween(
+                                topLatLng,
+                                connectionLatLng
+                            );
+                            distToBottom = geometry.spherical.computeDistanceBetween(
+                                bottomLatLng,
+                                connectionLatLng
+                            );
+                        } else {
+                            // Fallback
+                            distToTop = Math.sqrt(
+                                Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                            distToBottom = Math.sqrt(
+                                Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                        }
+
+                        if (distToTop < distToBottom) {
+                            // Top is closer - path: bottom -> top -> connection
+                            pipePath = [lateralBottomPoint, lateralTopPoint, connectionPoint];
+                        } else {
+                            // Bottom is closer - path: top -> bottom -> connection
+                            pipePath = [lateralTopPoint, lateralBottomPoint, connectionPoint];
+                        }
+                    }
+
+                    // Verify that connection point is valid (not NaN or Infinity)
+                    if (
+                        !isFinite(connectionPoint.lat) ||
+                        !isFinite(connectionPoint.lng)
+                    ) {
+                        return; // Skip this column
+                    }
+
+                    // Clip pipe path to stay within zone boundaries
+                    const clippedPath = clipPipePathToZone(pipePath, zone);
+
+                    // Skip if clipped path is empty or has less than 2 points
+                    if (clippedPath.length < 2) {
+                        return; // Skip this column
+                    }
+
+                    // Check if trees in this column are already connected
+                    const treesInColumn = plantPoints.filter((point) => {
+                        const lat = point.position.lat;
+                        const lng = point.position.lng;
+                        return (
+                            Math.abs(lng - columnLng) < 0.00001 &&
+                            lat >= bottomLat &&
+                            lat <= topLat
+                        );
+                    });
+
+                    // Check if any tree in this column is already connected
+                    const hasUnconnectedTrees = treesInColumn.some(
+                        (tree) => !connectedTreeIds.has(tree.id)
                     );
-                    console.log(
-                        `📏 Column ${columnIndex + 1} has ${column.length} trees at lng: ${columnLng.toFixed(6)}`
-                    );
-                    console.log(
-                        `📏 Lateral pipe bounds: top=${topLat.toFixed(6)}, bottom=${bottomLat.toFixed(6)}`
-                    );
-                    console.log(`📏 Lateral pipe path:`, pipePath);
+
+                    if (!hasUnconnectedTrees && treesInColumn.length > 0) {
+                        // All trees in this column are already connected, skip
+                        return;
+                    }
+
+                    // Mark trees in this column as connected
+                    treesInColumn.forEach((tree) => {
+                        connectedTreeIds.add(tree.id);
+                    });
 
                     // Create polyline for lateral pipe
                     const polyline = new window.google.maps.Polyline({
-                        path: pipePath,
+                        path: clippedPath,
                         geodesic: true,
                         strokeColor: '#FCD34D', // Yellow color for lateral pipes
                         strokeOpacity: 0.8,
                         strokeWeight: 2, // Thinner than sub-main pipes
-                        zIndex: 1000, // Below sub-main pipes
+                        zIndex: 1500, // Above zones but below plant points
                     });
 
                     // Add to map
                     polyline.setMap(map);
-                    console.log(
-                        `✅ Successfully created lateral pipe ${columnIndex + 1} for zone ${zone.id}`
-                    );
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
 
                     newLateralPipes.push({
                         id: Date.now() + zone.id + columnIndex,
-                        path: pipePath,
+                        path: clippedPath,
                         overlay: polyline,
                         zoneId: zone.id,
                     });
                 });
 
                 // Verify all columns have lateral pipes
-                console.log(
-                    `🔍 Verification: Expected ${treeColumns.length} lateral pipes, created ${newLateralPipes.filter((pipe) => pipe.zoneId === zone.id).length}`
-                );
 
-                console.log(`✅ Zone ${zone.id}: Created ${treeColumns.length} lateral pipes`);
 
                 // Find trees that are not connected to any lateral pipe
                 const zoneLateralPipes = newLateralPipes.filter((pipe) => pipe.zoneId === zone.id);
@@ -5149,15 +5047,13 @@ function FreeMap() {
                     return !isConnected;
                 });
 
-                console.log(
-                    `🔍 Found ${unconnectedTrees.length} unconnected trees in zone ${zone.id}`
-                );
 
                 // Group unconnected trees by longitude (columns)
                 const unconnectedTreeColumns: Array<
                     Array<{ id: number; position: { lat: number; lng: number } }>
                 > = [];
-                const columnTolerance = 0.00005; // 5% of typical zone width or minimum 0.00005
+                // Use same fixed tolerance as findTreeColumns (~1.1 meters)
+                const columnTolerance = 0.00001;
 
                 unconnectedTrees.forEach((tree) => {
                     const lng = tree.position.lng;
@@ -5184,13 +5080,20 @@ function FreeMap() {
                     column.sort((a, b) => b.position.lat - a.position.lat); // Sort descending (north to south)
                 });
 
-                console.log(
-                    `🔍 Found ${unconnectedTreeColumns.length} unconnected tree columns in zone ${zone.id}`
-                );
 
-                // Create lateral pipes for unconnected tree columns
+                // Create lateral pipes for unconnected tree columns using projection
                 unconnectedTreeColumns.forEach((column, columnIndex) => {
                     if (column.length === 0) return;
+
+                    // Check if any tree in this column is already connected
+                    const hasUnconnectedTrees = column.some(
+                        (tree) => !connectedTreeIds.has(tree.id)
+                    );
+
+                    if (!hasUnconnectedTrees) {
+                        // All trees in this column are already connected, skip
+                        return;
+                    }
 
                     const columnLng = column[0].position.lng;
 
@@ -5257,20 +5160,21 @@ function FreeMap() {
                             const intersectionNorth = Math.max(...lats);
                             const intersectionSouth = Math.min(...lats);
 
-                            // Use intersections as strict boundaries
+                            // Use intersections as boundaries (including boundary)
                             topLat = intersectionNorth;
                             bottomLat = intersectionSouth;
 
-                            // Only extend to plant positions if they are within intersection range
+                            // Extend to plant positions if they are at or within intersection range
+                            const boundaryTolerance = 0.000001;
                             if (
-                                northernmostLat <= intersectionNorth &&
-                                northernmostLat >= intersectionSouth
+                                northernmostLat <= intersectionNorth + boundaryTolerance &&
+                                northernmostLat >= intersectionSouth - boundaryTolerance
                             ) {
                                 topLat = northernmostLat;
                             }
                             if (
-                                southernmostLat >= intersectionSouth &&
-                                southernmostLat <= intersectionNorth
+                                southernmostLat >= intersectionSouth - boundaryTolerance &&
+                                southernmostLat <= intersectionNorth + boundaryTolerance
                             ) {
                                 bottomLat = southernmostLat;
                             }
@@ -5280,15 +5184,9 @@ function FreeMap() {
                             bottomLat = Math.max(bottomLat, zone.bounds.south);
                         } else if (uniqueIntersections.length === 1) {
                             // Only one intersection - skip this column
-                            console.log(
-                                `⚠️ Unconnected column ${columnIndex + 1} has only one intersection, skipping`
-                            );
                             return;
                         } else {
                             // No intersections - skip this column
-                            console.log(
-                                `⚠️ Unconnected column ${columnIndex + 1} does not intersect zone boundary, skipping`
-                            );
                             return;
                         }
                     } else {
@@ -5301,73 +5199,134 @@ function FreeMap() {
                     topLat = Math.min(topLat, zone.bounds.north);
                     bottomLat = Math.max(bottomLat, zone.bounds.south);
 
-                    // Ensure topLat is greater than bottomLat
-                    if (topLat <= bottomLat) {
-                        console.log(
-                            `⚠️ Invalid pipe bounds for unconnected column ${columnIndex + 1}, skipping`
-                        );
+                    // Define lateral pipe endpoints (vertical line at columnLng)
+                    const lateralTopPoint = { lat: topLat, lng: columnLng };
+                    const lateralBottomPoint = { lat: bottomLat, lng: columnLng };
+
+                    // Use PROJECTION: find closest point on sub-main pipe
+                    const lateralMidPoint = {
+                        lat: (topLat + bottomLat) / 2,
+                        lng: columnLng,
+                    };
+
+                    const projection = projectPointOntoPolyline(
+                        lateralMidPoint,
+                        zoneSubMainPipe.path,
+                        geometry
+                    );
+
+                    if (!projection) {
+                        return; // Skip this column
+                    }
+
+                    const connectionPoint = projection.point;
+
+                    // Build pipe path: from top to bottom, connecting to sub-main pipe
+                    let pipePath: Array<{ lat: number; lng: number }>;
+
+                    // Determine if connection point is within the lateral pipe range
+                    const connectionLat = connectionPoint.lat;
+                    const isConnectionWithinRange =
+                        connectionLat >= bottomLat - 0.00001 &&
+                        connectionLat <= topLat + 0.00001;
+
+                    if (isConnectionWithinRange) {
+                        // Connection point is within lateral pipe range
+                        if (topLat > connectionLat && bottomLat < connectionLat) {
+                            pipePath = [lateralTopPoint, connectionPoint, lateralBottomPoint];
+                        } else if (topLat <= connectionLat) {
+                            pipePath = [connectionPoint, lateralBottomPoint];
+                        } else {
+                            pipePath = [connectionPoint, lateralTopPoint];
+                        }
+                    } else {
+                        // Connection point is outside lateral pipe range - use diagonal connection
+                        let distToTop = 0;
+                        let distToBottom = 0;
+
+                        if (geometry?.spherical) {
+                            const topLatLng = new window.google.maps.LatLng(
+                                lateralTopPoint.lat,
+                                lateralTopPoint.lng
+                            );
+                            const bottomLatLng = new window.google.maps.LatLng(
+                                lateralBottomPoint.lat,
+                                lateralBottomPoint.lng
+                            );
+                            const connectionLatLng = new window.google.maps.LatLng(
+                                connectionPoint.lat,
+                                connectionPoint.lng
+                            );
+
+                            distToTop = geometry.spherical.computeDistanceBetween(
+                                topLatLng,
+                                connectionLatLng
+                            );
+                            distToBottom = geometry.spherical.computeDistanceBetween(
+                                bottomLatLng,
+                                connectionLatLng
+                            );
+                        } else {
+                            // Fallback
+                            distToTop = Math.sqrt(
+                                Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                            distToBottom = Math.sqrt(
+                                Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                        }
+
+                        if (distToTop < distToBottom) {
+                            pipePath = [lateralBottomPoint, lateralTopPoint, connectionPoint];
+                        } else {
+                            pipePath = [lateralTopPoint, lateralBottomPoint, connectionPoint];
+                        }
+                    }
+
+                    // Verify that connection point is valid
+                    if (!isFinite(connectionPoint.lat) || !isFinite(connectionPoint.lng)) {
+                        return; // Skip this column
+                    }
+
+                    // Clip pipe path to stay within zone boundaries
+                    const clippedPath = clipPipePathToZone(pipePath, zone);
+
+                    // Skip if clipped path is empty or has less than 2 points
+                    if (clippedPath.length < 2) {
                         return;
                     }
 
-                    // Create pipe path from top to bottom
-                    const pipePath = [
-                        { lat: topLat, lng: columnLng }, // Top boundary (within zone)
-                        { lat: bottomLat, lng: columnLng }, // Bottom boundary (within zone)
-                    ];
-
-                    // Final verification: ensure all points are within zone bounds
-                    const allPointsValid = pipePath.every(
-                        (point) =>
-                            point.lat >= zone.bounds.south &&
-                            point.lat <= zone.bounds.north &&
-                            point.lng >= zone.bounds.west &&
-                            point.lng <= zone.bounds.east
-                    );
-
-                    if (!allPointsValid) {
-                        console.log(`⚠️ Unconnected lateral pipe exceeds zone bounds, skipping`);
-                        return;
-                    }
-
-                    console.log(
-                        `📏 Creating lateral pipe for unconnected column ${columnIndex + 1}/${unconnectedTreeColumns.length}`
-                    );
-                    console.log(
-                        `📏 Column has ${column.length} trees at lng: ${columnLng.toFixed(6)}`
-                    );
-                    console.log(
-                        `📏 Pipe bounds: top=${topLat.toFixed(6)}, bottom=${bottomLat.toFixed(6)}`
-                    );
+                    // Mark trees in this column as connected
+                    column.forEach((tree) => {
+                        connectedTreeIds.add(tree.id);
+                    });
 
                     // Create polyline for lateral pipe
                     const polyline = new window.google.maps.Polyline({
-                        path: pipePath,
+                        path: clippedPath,
                         geodesic: true,
                         strokeColor: '#FCD34D', // Yellow color for lateral pipes
                         strokeOpacity: 0.8,
                         strokeWeight: 2,
-                        zIndex: 1000,
+                        zIndex: 1500, // Above zones but below plant points
                     });
 
                     // Add to map
                     polyline.setMap(map);
-                    console.log(
-                        `✅ Successfully created lateral pipe for unconnected column ${columnIndex + 1}`
-                    );
+                    allPipeOverlaysRef.current.push(polyline); // Track for reset
 
                     newLateralPipes.push({
                         id: Date.now() + zone.id + columnIndex + 10000, // Use higher ID to distinguish
-                        path: pipePath,
+                        path: clippedPath,
                         overlay: polyline,
                         zoneId: zone.id,
                     });
                 });
 
-                console.log(
-                    `✅ Zone ${zone.id}: Created ${treeColumns.length} main lateral pipes + ${unconnectedTreeColumns.length} additional pipes for unconnected trees`
-                );
             } else {
-                console.log(`❌ Zone ${zone.id} has no tree columns - no lateral pipes created`);
+                // Zone center is already connected
             }
         });
 
@@ -5382,16 +5341,11 @@ function FreeMap() {
         }));
         localStorage.setItem('lateralPipes', JSON.stringify(pipesForStorage));
 
-        console.log(`✅ ${newLateralPipes.length} lateral pipes created successfully`);
-        console.log('💾 Saved lateral pipes to localStorage:', pipesForStorage);
 
         return newLateralPipes;
     };
 
     const getButtonState = (stepIndex: number) => {
-        console.log(
-            `getButtonState(${stepIndex}): currentStep=${currentStep}, completedSteps=[${completedSteps.join(',')}]`
-        );
 
         // Generate Pipe System (step 4) - check if already generated
         if (stepIndex === 4) {
@@ -5411,7 +5365,6 @@ function FreeMap() {
                         subMainPipesData.length > 0 &&
                         lateralPipesData.length > 0
                     ) {
-                        console.log(`Step ${stepIndex} state: disabled (already generated)`);
                         return 'disabled';
                     }
                 } catch (e) {
@@ -5419,19 +5372,14 @@ function FreeMap() {
                 }
             }
 
-            const state = stepIndex === currentStep ? 'active' : 'disabled';
-            console.log(`Step ${stepIndex} state: ${state} (special case for step 4)`);
-            return state;
+            return stepIndex === currentStep ? 'active' : 'disabled';
         }
 
         if (completedSteps.includes(stepIndex)) {
-            console.log(`Step ${stepIndex} state: completed`);
             return 'completed';
         } else if (stepIndex === currentStep) {
-            console.log(`Step ${stepIndex} state: active`);
             return 'active';
         } else {
-            console.log(`Step ${stepIndex} state: disabled`);
             return 'disabled';
         }
     };
@@ -5506,7 +5454,7 @@ function FreeMap() {
                 </div>
 
                 {/* Google Maps Container */}
-                <div className="relative mb-4 h-[420px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40">
+                <div className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40 md:h-[420px]">
                     {/* Search Component */}
                     <div className="absolute left-32 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
                         <div className="relative">
@@ -5557,7 +5505,7 @@ function FreeMap() {
                         </div>
                     </div>
 
-                    <div ref={mapRef} className="h-full w-full" style={{ minHeight: '420px' }} />
+                    <div ref={mapRef} className="h-full w-full min-h-[350px] md:min-h-[420px]" />
                     {!mapLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-700/40 backdrop-blur-sm">
                             <div className="text-center text-sky-300">
@@ -5585,12 +5533,22 @@ function FreeMap() {
                 {/* Tools + Info Panel */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                     {/* Left tools */}
-                    <div className="space-y-3 md:col-span-2">
+                    <div className="relative h-14 overflow-visible rounded-lg md:h-auto md:flex-col md:space-y-3 md:overflow-visible md:col-span-2">
                         {/* Step 1: Draw Area */}
                         <button
                             onClick={() => !isStepCompleted(0) && handleStepClick(0)}
                             disabled={getButtonState(0) === 'disabled' || isStepCompleted(0)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 0 ? 50 : currentStep > 0 ? 40 - currentStep * 10 : 0,
+                                transform: currentStep === 0 ? 'translateX(0)' : currentStep > 0 ? `translateX(${currentStep * 8}px)` : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 0
+                                    ? 'w-full opacity-100'
+                                    : currentStep > 0
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(0) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(0) === 'active'
@@ -5600,18 +5558,30 @@ function FreeMap() {
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                         >
-                            {getButtonState(0) === 'completed'
-                                ? translations.drawAreaCompleted
-                                : isDrawingMode
-                                  ? translations.drawing
-                                  : translations.drawArea}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(0) === 'completed'
+                                    ? translations.drawAreaCompleted
+                                    : isDrawingMode
+                                      ? translations.drawing
+                                      : translations.drawArea}
+                            </span>
                         </button>
 
                         {/* Step 2: Water */}
                         <button
                             onClick={() => !isStepCompleted(1) && handleStepClick(1)}
                             disabled={getButtonState(1) === 'disabled' || isStepCompleted(1)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 1 ? 50 : currentStep > 1 ? 40 - (currentStep - 1) * 10 : currentStep < 1 ? 10 : 0,
+                                transform: currentStep === 1 ? 'translateX(0)' : currentStep > 1 ? `translateX(${(currentStep - 1) * 8}px)` : currentStep < 1 ? 'translateX(8px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 1
+                                    ? 'w-full opacity-100'
+                                    : currentStep !== 1
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(1) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(1) === 'active'
@@ -5626,18 +5596,30 @@ function FreeMap() {
                                     : ''
                             }
                         >
-                            {getButtonState(1) === 'completed'
-                                ? translations.waterCompleted
-                                : currentStep === 1 && waterSources.length === 0
-                                  ? translations.placingWater
-                                  : translations.water}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(1) === 'completed'
+                                    ? translations.waterCompleted
+                                    : currentStep === 1 && waterSources.length === 0
+                                      ? translations.placingWater
+                                      : translations.water}
+                            </span>
                         </button>
 
                         {/* Step 3: Place Pump */}
                         <button
                             onClick={() => !isStepCompleted(2) && handleStepClick(2)}
                             disabled={getButtonState(2) === 'disabled' || isStepCompleted(2)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 2 ? 50 : currentStep > 2 ? 40 - (currentStep - 2) * 10 : currentStep < 2 ? 20 : 0,
+                                transform: currentStep === 2 ? 'translateX(0)' : currentStep > 2 ? `translateX(${(currentStep - 2) * 8}px)` : currentStep < 2 ? 'translateX(16px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 2
+                                    ? 'w-full opacity-100'
+                                    : currentStep !== 2
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(2) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(2) === 'active'
@@ -5652,18 +5634,30 @@ function FreeMap() {
                                     : ''
                             }
                         >
-                            {getButtonState(2) === 'completed'
-                                ? translations.placePumpCompleted
-                                : currentStep === 2 && pumps.length === 0
-                                  ? translations.placingWaterPump
-                                  : translations.placePump}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(2) === 'completed'
+                                    ? translations.placePumpCompleted
+                                    : currentStep === 2 && pumps.length === 0
+                                      ? translations.placingWaterPump
+                                      : translations.placePump}
+                            </span>
                         </button>
 
                         {/* Step 4: Zones */}
                         <button
                             onClick={() => !isStepCompleted(3) && handleStepClick(3)}
                             disabled={getButtonState(3) === 'disabled' || isStepCompleted(3)}
-                            className={`w-full rounded-lg px-4 py-3 text-white transition-colors ${
+                            style={{
+                                zIndex: currentStep === 3 ? 50 : currentStep > 3 ? 40 - (currentStep - 3) * 10 : currentStep < 3 ? 30 : 0,
+                                transform: currentStep === 3 ? 'translateX(0)' : currentStep > 3 ? `translateX(${(currentStep - 3) * 8}px)` : currentStep < 3 ? 'translateX(24px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 3
+                                    ? 'w-full opacity-100'
+                                    : currentStep !== 3
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
                                 getButtonState(3) === 'completed'
                                     ? 'cursor-not-allowed bg-green-600'
                                     : getButtonState(3) === 'active'
@@ -5678,11 +5672,40 @@ function FreeMap() {
                                     : ''
                             }
                         >
-                            {getButtonState(3) === 'completed'
-                                ? `${translations.zones} ✓`
-                                : currentStep === 3 && zones.length === 0
-                                  ? translations.clickToDivideZones
-                                  : translations.zones}
+                            <span className="whitespace-nowrap">
+                                {getButtonState(3) === 'completed'
+                                    ? `${translations.zones} ✓`
+                                    : currentStep === 3 && zones.length === 0
+                                      ? translations.clickToDivideZones
+                                      : translations.zones}
+                            </span>
+                        </button>
+
+                        {/* Step 5: Generate Pipe System */}
+                        <button
+                            onClick={() => handleStepClick(4)}
+                            disabled={getButtonState(4) === 'disabled'}
+                            style={{
+                                zIndex: currentStep === 4 ? 50 : currentStep < 4 ? 40 : 0,
+                                transform: currentStep === 4 ? 'translateX(0)' : currentStep < 4 ? 'translateX(32px)' : 'translateX(0)',
+                            }}
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 font-medium text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                                currentStep === 4
+                                    ? 'w-full opacity-100'
+                                    : currentStep < 4
+                                      ? 'w-12 opacity-60'
+                                      : 'w-12 opacity-40'
+                            } ${
+                                getButtonState(4) === 'completed'
+                                    ? 'cursor-not-allowed bg-green-600'
+                                    : getButtonState(4) === 'active'
+                                      ? 'bg-blue-600 hover:bg-blue-700'
+                                      : 'cursor-not-allowed bg-slate-400'
+                            }`}
+                        >
+                            <span className="whitespace-nowrap">
+                                {translations.generatePipeSystem}
+                            </span>
                         </button>
                     </div>
 
@@ -5788,7 +5811,7 @@ function FreeMap() {
                                 </div>
                             )}
                         </div>
-                        <div className="mt-3">
+                        <div className="mt-3 hidden md:block">
                             {/* Step 5: Generate Pipe System */}
                             <button
                                 onClick={() => handleStepClick(4)}

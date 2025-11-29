@@ -1,5 +1,41 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { Ziggy } from './ziggy';
+
+// Handle browser extension errors (ignore "Extension context invalidated" errors)
+if (typeof window !== 'undefined') {
+    // Catch unhandled errors from browser extensions
+    window.addEventListener('error', (event) => {
+        // Ignore errors from browser extensions
+        if (
+            event.message?.includes('Extension context invalidated') ||
+            event.message?.includes('content.js') ||
+            event.filename?.includes('chrome-extension://') ||
+            event.filename?.includes('moz-extension://')
+        ) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        }
+    });
+
+    // Catch unhandled promise rejections from browser extensions
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        const errorMessage =
+            typeof reason === 'string' ? reason : reason?.message || String(reason);
+
+        // Ignore errors from browser extensions
+        if (
+            errorMessage?.includes('Extension context invalidated') ||
+            errorMessage?.includes('content.js') ||
+            errorMessage?.includes('chrome-extension://') ||
+            errorMessage?.includes('moz-extension://')
+        ) {
+            event.preventDefault();
+            return false;
+        }
+    });
+}
 
 // Set up axios defaults
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -54,8 +90,11 @@ export const refreshCsrfToken = async () => {
 };
 
 // Function to handle CSRF token mismatch errors
-export const handleCsrfError = async (error: any) => {
-    if (error.response?.status === 419 || error.response?.data?.message?.includes('CSRF')) {
+export const handleCsrfError = async (error: AxiosError) => {
+    const errorMessage = error.response?.data && typeof error.response.data === 'object' && 'message' in error.response.data
+        ? String((error.response.data as { message?: string }).message)
+        : '';
+    if (error.response?.status === 419 || errorMessage?.includes('CSRF')) {
         console.log('CSRF token mismatch detected, refreshing token...');
         const newToken = await refreshCsrfToken();
         if (newToken) {

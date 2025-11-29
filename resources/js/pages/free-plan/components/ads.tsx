@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, usePage, router } from '@inertiajs/react';
 import FreeNav from './freeNav';
 import axios from 'axios';
 
@@ -8,6 +8,7 @@ interface User {
     id: number;
     name: string;
     email: string;
+    is_admin?: boolean;
 }
 
 interface Advertisement {
@@ -30,7 +31,8 @@ interface PageProps {
 }
 
 function Ads() {
-    usePage<PageProps>();
+    const page = usePage<PageProps>();
+    const isAdmin = page.props.auth?.user?.is_admin || false;
 
     const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -45,10 +47,20 @@ function Ads() {
         image: null as File | null,
     });
 
-    // Load advertisements on component mount
+    // Check if user is admin on component mount
     useEffect(() => {
-        loadAdvertisements();
-    }, []);
+        if (!isAdmin) {
+            // Redirect to account page if not admin
+            router.visit('/free-plan/account');
+        }
+    }, [isAdmin]);
+
+    // Load advertisements only if admin
+    useEffect(() => {
+        if (isAdmin) {
+            loadAdvertisements();
+        }
+    }, [isAdmin]);
 
     const loadAdvertisements = async () => {
         try {
@@ -163,6 +175,30 @@ function Ads() {
             alert('Error deleting advertisement');
         }
     };
+
+    // If not admin, show access denied message
+    if (!isAdmin) {
+        return (
+            <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
+                <Head title="Access Denied" />
+                <FreeNav />
+                <div className="mx-auto max-w-4xl px-4 py-4 md:px-6 md:py-6">
+                    <div className="rounded-lg bg-slate-600/30 p-6 text-center text-white">
+                        <h2 className="mb-4 text-2xl font-bold">Access Denied</h2>
+                        <p className="mb-4 text-slate-300">
+                            คุณไม่มีสิทธิ์เข้าถึงหน้านี้
+                        </p>
+                        <button
+                            onClick={() => router.visit('/free-plan/account')}
+                            className="rounded-lg bg-blue-600 px-6 py-2 font-semibold text-white hover:bg-blue-700"
+                        >
+                            กลับไปหน้าบัญชี
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
