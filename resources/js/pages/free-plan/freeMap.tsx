@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
-import { GardenPlant, getTranslatedPlantName } from './utils/freeCrop';
+import { GardenPlant, getTranslatedPlantName, getPlantImagePath } from './utils/freeCrop';
 // import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
 import { getTranslations } from './utils/language';
@@ -17,6 +17,7 @@ interface MapOptions {
     mapTypeControlOptions?: {
         style: unknown;
         position: unknown;
+        mapTypeIds?: string[];
     };
     styles?: Array<{
         featureType: string;
@@ -553,21 +554,15 @@ function FreeMap() {
 
                     if (isWithinShape) {
                         // Create plant point marker
+                        const plantImagePath = getPlantImagePath(plantData.name);
                         const marker = new window.google.maps.Marker({
                             position: position,
                             map: map,
                             title: `${getTranslatedPlantName(plantData.name, translations)} Plant`,
                             icon: {
-                                url:
-                                    'data:image/svg+xml;charset=UTF-8,' +
-                                    encodeURIComponent(`
-                                <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                    <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData.icon}</text>
-                                </svg>
-                            `),
-                                scaledSize: new window.google.maps.Size(16, 16),
-                                anchor: new window.google.maps.Point(8, 8),
+                                url: plantImagePath,
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 12),
                             },
                             draggable: false,
                             clickable: false,
@@ -763,14 +758,24 @@ function FreeMap() {
                 }
             }
 
+            // Determine map type control position based on screen size
+            const isMobile = window.innerWidth < 768; // Mobile breakpoint
+            const mapTypeControlPosition = isMobile
+                ? window.google.maps.ControlPosition.MIDDLE_LEFT
+                : window.google.maps.ControlPosition.TOP_RIGHT;
+
             const mapOptions: MapOptions = {
                 zoom: startZoom,
                 center: startCenter,
                 mapTypeId: window.google.maps.MapTypeId.SATELLITE,
-                mapTypeControl: false,
+                mapTypeControl: true,
                 mapTypeControlOptions: {
                     style: window.google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                    position: window.google.maps.ControlPosition.TOP_CENTER,
+                    position: mapTypeControlPosition,
+                    mapTypeIds: [
+                        window.google.maps.MapTypeId.SATELLITE, // ภาพดาวเทียมไม่มีรายละเอียดสถานที่
+                        window.google.maps.MapTypeId.HYBRID, // ภาพดาวเทียมมีรายละเอียดสถานที่
+                    ],
                 },
                 // Allow scroll wheel zoom without holding Ctrl
                 gestureHandling: 'greedy',
@@ -949,6 +954,7 @@ function FreeMap() {
 
                 plantPoints.forEach((point) => {
                     if (point.position && !point.marker) {
+                        const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                         const marker = new window.google.maps.Marker({
                             position: point.position,
                             map: map,
@@ -956,16 +962,9 @@ function FreeMap() {
                                 ? `${getTranslatedPlantName(plantData.name, translations)} Plant`
                                 : 'Plant',
                             icon: {
-                                url:
-                                    'data:image/svg+xml;charset=UTF-8,' +
-                                    encodeURIComponent(`
-                                    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                        <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                        <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                    </svg>
-                                `),
-                                scaledSize: new window.google.maps.Size(16, 16),
-                                anchor: new window.google.maps.Point(8, 8),
+                                url: plantImagePath,
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 12),
                             },
                             draggable: false,
                             clickable: false,
@@ -1670,6 +1669,7 @@ function FreeMap() {
 
             plantPoints.forEach((point) => {
                 if (!point.marker) {
+                    const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                     const marker = new window.google.maps.Marker({
                         position: point.position,
                         map: map,
@@ -1677,16 +1677,9 @@ function FreeMap() {
                             ? `${getTranslatedPlantName(plantData.name, translations)} Plant`
                             : 'Plant',
                         icon: {
-                            url:
-                                'data:image/svg+xml;charset=UTF-8,' +
-                                encodeURIComponent(`
-                                <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                    <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                </svg>
-                            `),
-                            scaledSize: new window.google.maps.Size(16, 16),
-                            anchor: new window.google.maps.Point(8, 8),
+                            url: plantImagePath,
+                            scaledSize: new window.google.maps.Size(24, 24),
+                            anchor: new window.google.maps.Point(12, 12),
                         },
                         draggable: false,
                         clickable: false,
@@ -4206,9 +4199,10 @@ function FreeMap() {
         // Group trees by longitude (columns)
         const treeColumns: Array<Array<{ lat: number; lng: number }>> = [];
 
-        // Calculate dynamic tolerance based on zone width
-        const zoneWidth = zoneBounds.east - zoneBounds.west;
-        const tolerance = Math.max(0.00002, zoneWidth * 0.05); // 5% of zone width, minimum 0.0005
+        // Use fixed distance tolerance (approximately 0.75 meters)
+        // 1 degree ≈ 111,000 meters, so 0.75m ≈ 0.00000675 degrees
+        // Using 0.00001 degrees (approximately 1.1 meters) for better tolerance
+        const tolerance = 0.00001; // Fixed tolerance: ~1.1 meters
 
 
         sortedTrees.forEach((tree) => {
@@ -4242,65 +4236,6 @@ function FreeMap() {
         return treeColumns;
     };
 
-    // Helper function: Calculate distance from a point to a line segment
-    const distanceToLineSegment = (
-        point: { lat: number; lng: number },
-        segmentStart: { lat: number; lng: number },
-        segmentEnd: { lat: number; lng: number },
-        geometry?: {
-            spherical?: {
-                computeDistanceBetween: (
-                    from: google.maps.LatLng,
-                    to: google.maps.LatLng
-                ) => number;
-            };
-        }
-    ): number => {
-        // Calculate parameter t (0 to 1 means point is on segment)
-        const A = point.lat - segmentStart.lat;
-        const B = point.lng - segmentStart.lng;
-        const C = segmentEnd.lat - segmentStart.lat;
-        const D = segmentEnd.lng - segmentStart.lng;
-
-        const dot = A * C + B * D;
-        const lenSq = C * C + D * D;
-
-        // If segment has zero length, calculate distance to start point
-        if (lenSq === 0) {
-            if (geometry?.spherical) {
-                const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
-                const startLatLng = new window.google.maps.LatLng(
-                    segmentStart.lat,
-                    segmentStart.lng
-                );
-                return geometry.spherical.computeDistanceBetween(pointLatLng, startLatLng);
-            }
-            return Math.sqrt(A * A + B * B) * 111000; // Convert to meters (rough approximation)
-        }
-
-        // Calculate parameter t (clamped to [0, 1])
-        const t = Math.max(0, Math.min(1, dot / lenSq));
-
-        // Calculate closest point on segment
-        const closestPoint = {
-            lat: segmentStart.lat + t * C,
-            lng: segmentStart.lng + t * D,
-        };
-
-        // Calculate distance from point to closest point on segment
-        if (geometry?.spherical) {
-            const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
-            const closestLatLng = new window.google.maps.LatLng(closestPoint.lat, closestPoint.lng);
-            return geometry.spherical.computeDistanceBetween(pointLatLng, closestLatLng);
-        }
-
-        // Fallback: use simple distance calculation
-        const dist = Math.sqrt(
-            Math.pow(point.lat - closestPoint.lat, 2) + Math.pow(point.lng - closestPoint.lng, 2)
-        );
-        return dist * 111000; // Convert to meters (rough approximation)
-    };
-
     // Helper function: Find the closest point on a line segment to a given point
     const closestPointOnLineSegment = (
         point: { lat: number; lng: number },
@@ -4330,50 +4265,62 @@ function FreeMap() {
         };
     };
 
-    // Helper function: Get intersection latitude on polyline at a given longitude
-    // Returns the latitude where the polyline intersects a vertical line at the given longitude
-    // Returns null if no intersection is found
-    const getIntersectionLatOnPolyline = (
+    // Helper function: Project a point onto a polyline (find closest point on any segment)
+    // Returns the closest point on the polyline and the distance to it
+    const projectPointOntoPolyline = (
+        point: { lat: number; lng: number },
         polylinePath: Array<{ lat: number; lng: number }>,
-        targetLng: number,
-        tolerance: number = 0.00001
-    ): number | null => {
+        geometry?: {
+            spherical?: {
+                computeDistanceBetween: (
+                    from: google.maps.LatLng,
+                    to: google.maps.LatLng
+                ) => number;
+            };
+        }
+    ): { point: { lat: number; lng: number }; distance: number } | null => {
         if (!polylinePath || polylinePath.length < 2) {
             return null;
         }
+
+        let minDistance = Number.POSITIVE_INFINITY;
+        let closestPoint: { lat: number; lng: number } | null = null;
 
         // Check each segment of the polyline
         for (let i = 0; i < polylinePath.length - 1; i++) {
             const segStart = polylinePath[i];
             const segEnd = polylinePath[i + 1];
 
-            // Check if this segment crosses the vertical line at targetLng
-            const lngMin = Math.min(segStart.lng, segEnd.lng);
-            const lngMax = Math.max(segStart.lng, segEnd.lng);
+            // Find closest point on this segment
+            const projectedPoint = closestPointOnLineSegment(point, segStart, segEnd);
 
-            // Check intersection with tolerance
-            if (
-                targetLng >= lngMin - tolerance &&
-                targetLng <= lngMax + tolerance &&
-                Math.abs(lngMax - lngMin) > tolerance
-            ) {
-                // Calculate intersection point
-                const t = (targetLng - segStart.lng) / (segEnd.lng - segStart.lng);
-                const intersectionLat = segStart.lat + t * (segEnd.lat - segStart.lat);
-
-                return intersectionLat;
+            // Calculate distance
+            let distance = 0;
+            if (geometry?.spherical) {
+                const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                const projectedLatLng = new window.google.maps.LatLng(
+                    projectedPoint.lat,
+                    projectedPoint.lng
+                );
+                distance = geometry.spherical.computeDistanceBetween(pointLatLng, projectedLatLng);
+            } else {
+                // Fallback: simple distance calculation
+                distance = Math.sqrt(
+                    Math.pow(point.lat - projectedPoint.lat, 2) +
+                        Math.pow(point.lng - projectedPoint.lng, 2)
+                ) * 111000; // Convert to meters (rough approximation)
             }
 
-            // Also check if segment endpoints are close to targetLng
-            if (Math.abs(segStart.lng - targetLng) < tolerance) {
-                return segStart.lat;
-            }
-            if (Math.abs(segEnd.lng - targetLng) < tolerance) {
-                return segEnd.lat;
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = projectedPoint;
             }
         }
 
-        // No intersection found
+        if (closestPoint) {
+            return { point: closestPoint, distance: minDistance };
+        }
+
         return null;
     };
 
@@ -4729,7 +4676,11 @@ function FreeMap() {
             // Find tree columns in this zone
             const treeColumns = findTreeColumns(zone.bounds);
 
+            // Track which trees are already connected to avoid duplicate connections
+            const connectedTreeIds = new Set<number>();
+
             if (treeColumns.length > 0) {
+                const geometry = window.google?.maps?.geometry;
 
                 // Create lateral pipes for each tree column
                 treeColumns.forEach((column, columnIndex) => {
@@ -4795,19 +4746,16 @@ function FreeMap() {
                         });
 
                         // Find northernmost and southernmost intersection points
-                        // These are the ONLY valid boundaries - they are guaranteed to be within polygon
                         if (uniqueIntersections.length >= 2) {
                             const lats = uniqueIntersections.map((i) => i.lat);
                             const intersectionNorth = Math.max(...lats);
                             const intersectionSouth = Math.min(...lats);
 
-                            // Use intersections as boundaries (these are polygon boundaries)
-                            // Allow plants at or within the intersection range (including boundary)
+                            // Use intersections as boundaries
                             topLat = intersectionNorth;
                             bottomLat = intersectionSouth;
 
                             // Extend to plant positions if they are at or within intersection range
-                            // Use small tolerance to include boundary cases
                             const boundaryTolerance = 0.000001;
                             if (
                                 northernmostLat <= intersectionNorth + boundaryTolerance &&
@@ -4826,10 +4774,7 @@ function FreeMap() {
                             topLat = Math.min(topLat, zone.bounds.north);
                             bottomLat = Math.max(bottomLat, zone.bounds.south);
                         } else if (uniqueIntersections.length === 1) {
-                            // Only one intersection - use it and extend to plant positions with bounds as fallback
                             const singleIntersection = uniqueIntersections[0];
-
-                            // Use intersection as anchor, extend to plants within zone bounds
                             topLat = Math.min(
                                 Math.max(northernmostLat, singleIntersection.lat),
                                 zone.bounds.north
@@ -4838,10 +4783,7 @@ function FreeMap() {
                                 Math.min(southernmostLat, singleIntersection.lat),
                                 zone.bounds.south
                             );
-
-                            // Note: topLat can equal bottomLat for single tree columns - that's OK
                         } else {
-                            // No intersections found - use plant positions with zone bounds as fallback
                             topLat = Math.min(northernmostLat, zone.bounds.north);
                             bottomLat = Math.max(southernmostLat, zone.bounds.south);
                         }
@@ -4855,268 +4797,107 @@ function FreeMap() {
                     topLat = Math.min(topLat, zone.bounds.north);
                     bottomLat = Math.max(bottomLat, zone.bounds.south);
 
-                    // Note: topLat can equal bottomLat for single tree columns - that's OK
-                    // The pipe path logic below can handle this case correctly
-
-                    // Define lateral pipe endpoints
+                    // Define lateral pipe endpoints (vertical line at columnLng)
                     const lateralTopPoint = { lat: topLat, lng: columnLng };
                     const lateralBottomPoint = { lat: bottomLat, lng: columnLng };
 
-                    // Use new helper function to find intersection latitude on sub-main pipe
-                    const latTolerance = 0.00001; // Approximately 1 meter
-                    const actualIntersectionLat = getIntersectionLatOnPolyline(
+                    // Use PROJECTION instead of intersection: find closest point on sub-main pipe
+                    // Project the midpoint of the lateral pipe onto the sub-main pipe
+                    const lateralMidPoint = {
+                        lat: (topLat + bottomLat) / 2,
+                        lng: columnLng,
+                    };
+
+                    const projection = projectPointOntoPolyline(
+                        lateralMidPoint,
                         zoneSubMainPipe.path,
-                        columnLng
+                        geometry
                     );
 
-                    // Determine pipe path
-                    let pipePath: Array<{ lat: number; lng: number }>;
-
-                    if (actualIntersectionLat !== null) {
-                        // Found intersection - check if it's within lateral pipe range
-                        if (
-                            actualIntersectionLat >= bottomLat - latTolerance &&
-                            actualIntersectionLat <= topLat + latTolerance
-                        ) {
-                            // Sub-main pipe intersects the vertical line - create vertical connection
-                            const intersectionPoint = {
-                                lat: actualIntersectionLat,
-                                lng: columnLng,
-                            };
-
-                            if (
-                                topLat > actualIntersectionLat &&
-                                bottomLat < actualIntersectionLat
-                            ) {
-                                // Plants on both sides of sub-main pipe
-                                pipePath = [lateralTopPoint, intersectionPoint, lateralBottomPoint];
-                            } else if (topLat <= actualIntersectionLat) {
-                                // All plants below sub-main pipe
-                                pipePath = [intersectionPoint, lateralBottomPoint];
-                            } else {
-                                // All plants above sub-main pipe
-                                pipePath = [intersectionPoint, lateralTopPoint];
-                            }
-                        } else {
-                            // Intersection found but outside lateral pipe range - use diagonal connection
-                            // Fall through to diagonal connection logic below
-                            const geometry = window.google?.maps?.geometry;
-
-                            // Find which endpoint of lateral pipe is closest to sub-main pipe
-                            let closestLateralEndpoint: { lat: number; lng: number };
-                            let farthestLateralEndpoint: { lat: number; lng: number };
-
-                            // Calculate distances from both endpoints to sub-main pipe
-                            let minDistTop = Number.POSITIVE_INFINITY;
-                            let minDistBottom = Number.POSITIVE_INFINITY;
-                            let closestPointOnSubMainTop: { lat: number; lng: number } | null =
-                                null;
-                            let closestPointOnSubMainBottom: { lat: number; lng: number } | null =
-                                null;
-
-                            // Check all segments of sub-main pipe
-                            for (let i = 0; i < zoneSubMainPipe.path.length - 1; i++) {
-                                const segStart = zoneSubMainPipe.path[i];
-                                const segEnd = zoneSubMainPipe.path[i + 1];
-
-                                // Calculate distance from top endpoint to this segment
-                                const distTop = distanceToLineSegment(
-                                    lateralTopPoint,
-                                    segStart,
-                                    segEnd,
-                                    geometry
-                                );
-                                if (distTop < minDistTop) {
-                                    minDistTop = distTop;
-                                    closestPointOnSubMainTop = closestPointOnLineSegment(
-                                        lateralTopPoint,
-                                        segStart,
-                                        segEnd
-                                    );
-                                }
-
-                                // Calculate distance from bottom endpoint to this segment
-                                const distBottom = distanceToLineSegment(
-                                    lateralBottomPoint,
-                                    segStart,
-                                    segEnd,
-                                    geometry
-                                );
-                                if (distBottom < minDistBottom) {
-                                    minDistBottom = distBottom;
-                                    closestPointOnSubMainBottom = closestPointOnLineSegment(
-                                        lateralBottomPoint,
-                                        segStart,
-                                        segEnd
-                                    );
-                                }
-                            }
-
-                            // Determine which endpoint is closer to sub-main pipe
-                            if (minDistTop < minDistBottom) {
-                                closestLateralEndpoint = lateralTopPoint;
-                                farthestLateralEndpoint = lateralBottomPoint;
-                            } else {
-                                closestLateralEndpoint = lateralBottomPoint;
-                                farthestLateralEndpoint = lateralTopPoint;
-                            }
-
-                            // Ensure we have valid connection points
-                            if (!closestPointOnSubMainTop || !closestPointOnSubMainBottom) {
-                                return; // Skip this column
-                            }
-
-                            const closestPointOnSubMain =
-                                minDistTop < minDistBottom
-                                    ? closestPointOnSubMainTop
-                                    : closestPointOnSubMainBottom;
-
-
-                            // Build path: farthest endpoint -> closest endpoint -> connection point on sub-main
-                            pipePath = [
-                                farthestLateralEndpoint,
-                                closestLateralEndpoint,
-                                closestPointOnSubMain,
-                            ];
-
-                        }
-                    } else {
-                        // No intersection found - sub-main pipe does NOT intersect - use diagonal connection
-
-                        const geometry = window.google?.maps?.geometry;
-
-                        // Find which endpoint of lateral pipe is closest to sub-main pipe
-                        let closestLateralEndpoint: { lat: number; lng: number };
-                        let farthestLateralEndpoint: { lat: number; lng: number };
-
-                        // Calculate distances from both endpoints to sub-main pipe
-                        let minDistTop = Number.POSITIVE_INFINITY;
-                        let minDistBottom = Number.POSITIVE_INFINITY;
-                        let closestPointOnSubMainTop: { lat: number; lng: number } | null = null;
-                        let closestPointOnSubMainBottom: { lat: number; lng: number } | null = null;
-
-                        // Check all segments of sub-main pipe
-                        for (let i = 0; i < zoneSubMainPipe.path.length - 1; i++) {
-                            const segStart = zoneSubMainPipe.path[i];
-                            const segEnd = zoneSubMainPipe.path[i + 1];
-
-                            // Calculate distance from top endpoint to this segment
-                            const distTop = distanceToLineSegment(
-                                lateralTopPoint,
-                                segStart,
-                                segEnd,
-                                geometry
-                            );
-                            if (distTop < minDistTop) {
-                                minDistTop = distTop;
-                                closestPointOnSubMainTop = closestPointOnLineSegment(
-                                    lateralTopPoint,
-                                    segStart,
-                                    segEnd
-                                );
-                            }
-
-                            // Calculate distance from bottom endpoint to this segment
-                            const distBottom = distanceToLineSegment(
-                                lateralBottomPoint,
-                                segStart,
-                                segEnd,
-                                geometry
-                            );
-                            if (distBottom < minDistBottom) {
-                                minDistBottom = distBottom;
-                                closestPointOnSubMainBottom = closestPointOnLineSegment(
-                                    lateralBottomPoint,
-                                    segStart,
-                                    segEnd
-                                );
-                            }
-                        }
-
-                        // Determine which endpoint is closer to sub-main pipe
-                        if (minDistTop < minDistBottom) {
-                            closestLateralEndpoint = lateralTopPoint;
-                            farthestLateralEndpoint = lateralBottomPoint;
-                        } else {
-                            closestLateralEndpoint = lateralBottomPoint;
-                            farthestLateralEndpoint = lateralTopPoint;
-                        }
-
-                        // Ensure we have valid connection points
-                        if (!closestPointOnSubMainTop || !closestPointOnSubMainBottom) {
-                            console.log(
-                                `⚠️ Failed to find connection point on sub-main pipe for column ${columnIndex + 1}, skipping`
-                            );
-                            return; // Skip this column
-                        }
-
-                        const closestPointOnSubMain =
-                            minDistTop < minDistBottom
-                                ? closestPointOnSubMainTop
-                                : closestPointOnSubMainBottom;
-
-
-                        // Build path: farthest endpoint -> closest endpoint -> connection point on sub-main
-                        pipePath = [
-                            farthestLateralEndpoint,
-                            closestLateralEndpoint,
-                            closestPointOnSubMain,
-                        ];
-
+                    if (!projection) {
+                        console.log(
+                            `⚠️ Failed to project point onto sub-main pipe for column ${columnIndex + 1}, skipping`
+                        );
+                        return; // Skip this column
                     }
 
-                    // Final verification: ensure lateral pipe endpoints are within or on zone bounds
-                    // Note: connection point on sub-main may be outside zone bounds (that's OK)
-                    // Use isPointInZone to check if points are inside or on boundary
-                    const lateralEndpointsValid = pipePath
-                        .slice(0, -1)
-                        .every((point) => isPointInZone(point, zone));
+                    const connectionPoint = projection.point;
 
-                    if (!lateralEndpointsValid) {
-                        // Try to clamp endpoints to valid bounds instead of skipping
-                        // Clamp lateral endpoints to zone bounds (including boundary)
-                        const clampedPath = pipePath.map((point, idx) => {
-                            if (idx < pipePath.length - 1) {
-                                // Clamp lateral endpoints to zone bounds (inclusive)
-                                const clampedPoint = {
-                                    lat: Math.max(
-                                        zone.bounds.south,
-                                        Math.min(zone.bounds.north, point.lat)
-                                    ),
-                                    lng: Math.max(
-                                        zone.bounds.west,
-                                        Math.min(zone.bounds.east, point.lng)
-                                    ),
-                                };
-                                
-                                // Verify clamped point is in zone (including boundary)
-                                if (isPointInZone(clampedPoint, zone)) {
-                                    return clampedPoint;
-                                }
-                                
-                                // If clamping failed, try original point
-                                return point;
-                            } else {
-                                // Keep connection point as is (may be outside bounds)
-                                return point;
-                            }
-                        });
+                    // Build pipe path: from top to bottom, connecting to sub-main pipe
+                    let pipePath: Array<{ lat: number; lng: number }>;
 
-                        // Verify clamped path endpoints are valid (inside or on boundary)
-                        const clampedEndpointsValid = clampedPath
-                            .slice(0, -1)
-                            .every((point) => isPointInZone(point, zone));
+                    // Determine if connection point is within the lateral pipe range
+                    const connectionLat = connectionPoint.lat;
+                    const isConnectionWithinRange =
+                        connectionLat >= bottomLat - 0.00001 &&
+                        connectionLat <= topLat + 0.00001;
 
-                        if (!clampedEndpointsValid) {
-                            return; // Skip this column
+                    if (isConnectionWithinRange) {
+                        // Connection point is within lateral pipe range - create vertical connection
+                        if (topLat > connectionLat && bottomLat < connectionLat) {
+                            // Plants on both sides of connection point
+                            pipePath = [lateralTopPoint, connectionPoint, lateralBottomPoint];
+                        } else if (topLat <= connectionLat) {
+                            // All plants below connection point
+                            pipePath = [connectionPoint, lateralBottomPoint];
+                        } else {
+                            // All plants above connection point
+                            pipePath = [connectionPoint, lateralTopPoint];
+                        }
+                    } else {
+                        // Connection point is outside lateral pipe range - use diagonal connection
+                        // Find which endpoint is closer to connection point
+                        let distToTop = 0;
+                        let distToBottom = 0;
+
+                        if (geometry?.spherical) {
+                            const topLatLng = new window.google.maps.LatLng(
+                                lateralTopPoint.lat,
+                                lateralTopPoint.lng
+                            );
+                            const bottomLatLng = new window.google.maps.LatLng(
+                                lateralBottomPoint.lat,
+                                lateralBottomPoint.lng
+                            );
+                            const connectionLatLng = new window.google.maps.LatLng(
+                                connectionPoint.lat,
+                                connectionPoint.lng
+                            );
+
+                            distToTop = geometry.spherical.computeDistanceBetween(
+                                topLatLng,
+                                connectionLatLng
+                            );
+                            distToBottom = geometry.spherical.computeDistanceBetween(
+                                bottomLatLng,
+                                connectionLatLng
+                            );
+                        } else {
+                            // Fallback
+                            distToTop = Math.sqrt(
+                                Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                            distToBottom = Math.sqrt(
+                                Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
                         }
 
-                        pipePath = clampedPath;
+                        if (distToTop < distToBottom) {
+                            // Top is closer - path: bottom -> top -> connection
+                            pipePath = [lateralBottomPoint, lateralTopPoint, connectionPoint];
+                        } else {
+                            // Bottom is closer - path: top -> bottom -> connection
+                            pipePath = [lateralTopPoint, lateralBottomPoint, connectionPoint];
+                        }
                     }
 
                     // Verify that connection point is valid (not NaN or Infinity)
-                    const connectionPoint = pipePath[pipePath.length - 1];
-                    if (!isFinite(connectionPoint.lat) || !isFinite(connectionPoint.lng)) {
+                    if (
+                        !isFinite(connectionPoint.lat) ||
+                        !isFinite(connectionPoint.lng)
+                    ) {
                         return; // Skip this column
                     }
 
@@ -5127,6 +4908,32 @@ function FreeMap() {
                     if (clippedPath.length < 2) {
                         return; // Skip this column
                     }
+
+                    // Check if trees in this column are already connected
+                    const treesInColumn = plantPoints.filter((point) => {
+                        const lat = point.position.lat;
+                        const lng = point.position.lng;
+                        return (
+                            Math.abs(lng - columnLng) < 0.00001 &&
+                            lat >= bottomLat &&
+                            lat <= topLat
+                        );
+                    });
+
+                    // Check if any tree in this column is already connected
+                    const hasUnconnectedTrees = treesInColumn.some(
+                        (tree) => !connectedTreeIds.has(tree.id)
+                    );
+
+                    if (!hasUnconnectedTrees && treesInColumn.length > 0) {
+                        // All trees in this column are already connected, skip
+                        return;
+                    }
+
+                    // Mark trees in this column as connected
+                    treesInColumn.forEach((tree) => {
+                        connectedTreeIds.add(tree.id);
+                    });
 
                     // Create polyline for lateral pipe
                     const polyline = new window.google.maps.Polyline({
@@ -5245,7 +5052,8 @@ function FreeMap() {
                 const unconnectedTreeColumns: Array<
                     Array<{ id: number; position: { lat: number; lng: number } }>
                 > = [];
-                const columnTolerance = 0.00005; // 5% of typical zone width or minimum 0.00005
+                // Use same fixed tolerance as findTreeColumns (~1.1 meters)
+                const columnTolerance = 0.00001;
 
                 unconnectedTrees.forEach((tree) => {
                     const lng = tree.position.lng;
@@ -5273,9 +5081,19 @@ function FreeMap() {
                 });
 
 
-                // Create lateral pipes for unconnected tree columns
+                // Create lateral pipes for unconnected tree columns using projection
                 unconnectedTreeColumns.forEach((column, columnIndex) => {
                     if (column.length === 0) return;
+
+                    // Check if any tree in this column is already connected
+                    const hasUnconnectedTrees = column.some(
+                        (tree) => !connectedTreeIds.has(tree.id)
+                    );
+
+                    if (!hasUnconnectedTrees) {
+                        // All trees in this column are already connected, skip
+                        return;
+                    }
 
                     const columnLng = column[0].position.lng;
 
@@ -5347,7 +5165,6 @@ function FreeMap() {
                             bottomLat = intersectionSouth;
 
                             // Extend to plant positions if they are at or within intersection range
-                            // Use small tolerance to include boundary cases
                             const boundaryTolerance = 0.000001;
                             if (
                                 northernmostLat <= intersectionNorth + boundaryTolerance &&
@@ -5382,14 +5199,96 @@ function FreeMap() {
                     topLat = Math.min(topLat, zone.bounds.north);
                     bottomLat = Math.max(bottomLat, zone.bounds.south);
 
-                    // Note: topLat can equal bottomLat for single tree columns - that's OK
-                    // The pipe path logic below can handle this case correctly
+                    // Define lateral pipe endpoints (vertical line at columnLng)
+                    const lateralTopPoint = { lat: topLat, lng: columnLng };
+                    const lateralBottomPoint = { lat: bottomLat, lng: columnLng };
 
-                    // Create pipe path from top to bottom
-                    const pipePath = [
-                        { lat: topLat, lng: columnLng }, // Top boundary (within zone)
-                        { lat: bottomLat, lng: columnLng }, // Bottom boundary (within zone)
-                    ];
+                    // Use PROJECTION: find closest point on sub-main pipe
+                    const lateralMidPoint = {
+                        lat: (topLat + bottomLat) / 2,
+                        lng: columnLng,
+                    };
+
+                    const projection = projectPointOntoPolyline(
+                        lateralMidPoint,
+                        zoneSubMainPipe.path,
+                        geometry
+                    );
+
+                    if (!projection) {
+                        return; // Skip this column
+                    }
+
+                    const connectionPoint = projection.point;
+
+                    // Build pipe path: from top to bottom, connecting to sub-main pipe
+                    let pipePath: Array<{ lat: number; lng: number }>;
+
+                    // Determine if connection point is within the lateral pipe range
+                    const connectionLat = connectionPoint.lat;
+                    const isConnectionWithinRange =
+                        connectionLat >= bottomLat - 0.00001 &&
+                        connectionLat <= topLat + 0.00001;
+
+                    if (isConnectionWithinRange) {
+                        // Connection point is within lateral pipe range
+                        if (topLat > connectionLat && bottomLat < connectionLat) {
+                            pipePath = [lateralTopPoint, connectionPoint, lateralBottomPoint];
+                        } else if (topLat <= connectionLat) {
+                            pipePath = [connectionPoint, lateralBottomPoint];
+                        } else {
+                            pipePath = [connectionPoint, lateralTopPoint];
+                        }
+                    } else {
+                        // Connection point is outside lateral pipe range - use diagonal connection
+                        let distToTop = 0;
+                        let distToBottom = 0;
+
+                        if (geometry?.spherical) {
+                            const topLatLng = new window.google.maps.LatLng(
+                                lateralTopPoint.lat,
+                                lateralTopPoint.lng
+                            );
+                            const bottomLatLng = new window.google.maps.LatLng(
+                                lateralBottomPoint.lat,
+                                lateralBottomPoint.lng
+                            );
+                            const connectionLatLng = new window.google.maps.LatLng(
+                                connectionPoint.lat,
+                                connectionPoint.lng
+                            );
+
+                            distToTop = geometry.spherical.computeDistanceBetween(
+                                topLatLng,
+                                connectionLatLng
+                            );
+                            distToBottom = geometry.spherical.computeDistanceBetween(
+                                bottomLatLng,
+                                connectionLatLng
+                            );
+                        } else {
+                            // Fallback
+                            distToTop = Math.sqrt(
+                                Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                            distToBottom = Math.sqrt(
+                                Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                        }
+
+                        if (distToTop < distToBottom) {
+                            pipePath = [lateralBottomPoint, lateralTopPoint, connectionPoint];
+                        } else {
+                            pipePath = [lateralTopPoint, lateralBottomPoint, connectionPoint];
+                        }
+                    }
+
+                    // Verify that connection point is valid
+                    if (!isFinite(connectionPoint.lat) || !isFinite(connectionPoint.lng)) {
+                        return; // Skip this column
+                    }
 
                     // Clip pipe path to stay within zone boundaries
                     const clippedPath = clipPipePathToZone(pipePath, zone);
@@ -5398,6 +5297,11 @@ function FreeMap() {
                     if (clippedPath.length < 2) {
                         return;
                     }
+
+                    // Mark trees in this column as connected
+                    column.forEach((tree) => {
+                        connectedTreeIds.add(tree.id);
+                    });
 
                     // Create polyline for lateral pipe
                     const polyline = new window.google.maps.Polyline({

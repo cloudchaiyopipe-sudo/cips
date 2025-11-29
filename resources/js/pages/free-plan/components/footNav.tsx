@@ -108,7 +108,7 @@ function FootNav() {
     };
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-600 bg-slate-800/95 backdrop-blur-sm md:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-600 bg-slate-800/95 backdrop-blur-sm md:hidden shadow-lg">
             <div className="flex h-16 items-center justify-around">
                 {navItems.map((item) => {
                     const isAddField = item.id === 'add-field';

@@ -101,6 +101,15 @@ export interface LanguageTranslations {
     teak: string;
     yangNa: string;
     payung: string;
+    cassava: string;
+    sweetPotato: string;
+    potato: string;
+    radish: string;
+    carrot: string;
+    cucumber: string;
+    watermelon: string;
+    pumpkin: string;
+    winterMelon: string;
 
     // FreeFooter page
     kanokProducts: string;
@@ -204,19 +213,15 @@ export interface LanguageTranslations {
     longest: string;
     waterNeedPerSession: string;
     pipeInformation: string;
-    plant: string;
     waterSource: string;
     waterPump: string;
     untitledProject: string;
     mapSnapshot: string;
-    selectedPlantInformation: string;
     waterNeed: string;
     plantSpacing: string;
     rowSpacing: string;
     totalWaterNeed: string;
     plantsLabel: string;
-    flowRateLabel: string;
-    outletsLabel: string;
     lPerSession: string;
     lPerDayPerPlant: string;
     projectSavedSuccessfully: string;
@@ -279,9 +284,7 @@ export interface LanguageTranslations {
     zoneFlowRate: string;
     pipeLength: string;
     longestPipe: string;
-    outletsLabel: string;
     pipeTypeRecommendations: string;
-    selectedPlantInformation: string;
     irrigationTime: string;
     waterNeedPerSessionLabel: string;
     totalWaterVolume: string;
@@ -347,7 +350,6 @@ export interface LanguageTranslations {
     waterDepthResult: string;
     requiredIrrigationRate: string;
     areaLabel: string;
-    flowRateLabel: string;
     equipment: string;
     specifications: string;
     details: string;
@@ -412,6 +414,27 @@ export interface LanguageTranslations {
     productImage: string;
     savingProduct: string;
     saveProduct: string;
+
+    // Manual page
+    welcomeToFreePlan: string;
+    manualDescription: string;
+    gettingStarted: string;
+    step1SelectCrop: string;
+    selectCrop: string;
+    selectCropDescription: string;
+    step2DrawMap: string;
+    drawMap: string;
+    drawMapDescription: string;
+    step3PlacePlants: string;
+    placePlants: string;
+    placePlantsDescription: string;
+    step4PlacePipes: string;
+    placePipes: string;
+    placePipesDescription: string;
+    skip: string;
+    finish: string;
+    dontShowAgainManual: string;
+    noImage: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -636,19 +659,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longest: 'Longest',
         waterNeedPerSession: 'Water Need per Session',
         pipeInformation: 'Pipe Information',
-        plant: 'Plant',
         waterSource: 'Water Source',
         waterPump: 'Water Pump',
         untitledProject: 'Untitled Project',
         mapSnapshot: 'Map snapshot',
-        selectedPlantInformation: 'Selected Plant Information',
         waterNeed: 'Water Need:',
         plantSpacing: 'Plant Spacing:',
         rowSpacing: 'Row Spacing:',
         totalWaterNeed: 'Total Water Need:',
         plantsLabel: 'plants',
-        flowRateLabel: 'Flow Rate',
-        outletsLabel: 'outlets',
         lPerSession: 'L/session',
         lPerDayPerPlant: 'L/day/plant',
         projectSavedSuccessfully: 'Project saved successfully!',
@@ -711,9 +730,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         zoneFlowRate: 'Zone Flow Rate:',
         pipeLength: 'Pipe Length:',
         longestPipe: 'Longest Pipe:',
-        outletsLabel: 'Outlets:',
         pipeTypeRecommendations: 'Pipe Type Recommendations:',
-        selectedPlantInformation: 'Selected Plant Information',
         irrigationTime: 'Irrigation Time',
         waterNeedPerSessionLabel: 'Water Need per Session',
         totalWaterVolume: 'Total Water Volume',
@@ -780,7 +797,6 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         waterDepthResult: 'Water Depth (Result)',
         requiredIrrigationRate: 'Required Irrigation Rate',
         areaLabel: 'Area',
-        flowRateLabel: 'Flow Rate:',
         equipment: 'Equipment',
         specifications: 'Specifications',
         details: 'Details',
@@ -845,6 +861,27 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         productImage: 'Product Image:',
         savingProduct: 'Saving...',
         saveProduct: 'Save Product',
+
+        // Manual page
+        welcomeToFreePlan: 'Welcome to Free Plan',
+        manualDescription: 'Automated drip irrigation system design for farmers',
+        gettingStarted: 'Getting Started',
+        step1SelectCrop: 'Step 1: Select Crop',
+        selectCrop: 'Select Crop',
+        selectCropDescription: 'Select the crop you want to plant',
+        step2DrawMap: 'Step 2: Draw Map',
+        drawMap: 'Draw Map',
+        drawMapDescription: 'Draw your farm area on the map',
+        step3PlacePlants: 'Step 3: Place Plants',
+        placePlants: 'Place Plants',
+        placePlantsDescription: 'Place plants on the map',
+        step4PlacePipes: 'Step 4: Place Pipes',
+        placePipes: 'Place Pipes',
+        placePipesDescription: 'Place main pipe, sub-main pipe, and lateral pipe',
+        skip: 'Skip',
+        finish: 'Finish',
+        dontShowAgainManual: "Don't show this manual again",
+        noImage: 'No image',
     },
     TH: {
         // FreeHome page
@@ -1062,19 +1099,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         longest: 'ยาวที่สุด',
         waterNeedPerSession: 'ความต้องการน้ำต่อรอบ',
         pipeInformation: 'ข้อมูลท่อ',
-        plant: 'พืช',
         waterSource: 'แหล่งน้ำ',
         waterPump: 'ปั๊มน้ำ',
         untitledProject: 'โปรเจคที่ยังไม่มีชื่อ',
         mapSnapshot: 'ภาพแผนที่',
-        selectedPlantInformation: 'ข้อมูลพืชที่เลือก',
         waterNeed: 'ความต้องการน้ำ:',
         plantSpacing: 'ระยะห่างระหว่างพืช:',
         rowSpacing: 'ระยะห่างระหว่างแถว:',
         totalWaterNeed: 'ความต้องการน้ำรวม:',
         plantsLabel: 'พืช',
-        flowRateLabel: 'อัตราการไหล',
-        outletsLabel: 'จุดจ่าย',
         lPerSession: 'ลิตร/รอบ',
         lPerDayPerPlant: 'ลิตร/วัน/พืช',
         projectSavedSuccessfully: 'บันทึกโปรเจคสำเร็จ!',
@@ -1137,9 +1170,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         zoneFlowRate: 'อัตราการไหลโซน:',
         pipeLength: 'ความยาวท่อ:',
         longestPipe: 'ท่อยาวที่สุด:',
-        outletsLabel: 'จุดจ่าย:',
         pipeTypeRecommendations: 'คำแนะนำประเภทท่อ:',
-        selectedPlantInformation: 'ข้อมูลพืชที่เลือก',
         irrigationTime: 'เวลาน้ำ',
         waterNeedPerSessionLabel: 'ความต้องการน้ำต่อรอบ',
         totalWaterVolume: 'ปริมาณน้ำทั้งหมด',
@@ -1206,7 +1237,6 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         waterDepthResult: 'ความลึกน้ำ (ผลลัพธ์)',
         requiredIrrigationRate: 'อัตราการให้น้ำที่ต้องการ',
         areaLabel: 'พื้นที่',
-        flowRateLabel: 'อัตราการไหล:',
         equipment: 'อุปกรณ์',
         specifications: 'ข้อมูลจำเพาะ',
         details: 'รายละเอียด',
@@ -1271,6 +1301,27 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         productImage: 'รูปภาพสินค้า:',
         savingProduct: 'กำลังบันทึก...',
         saveProduct: 'บันทึกสินค้า',
+
+        // Manual page
+        welcomeToFreePlan: 'ยินดีต้อนรับสู่ Free Plan',
+        manualDescription: 'ระบบออกแบบระบบน้ำหยดอัตโนมัติสำหรับเกษตรกร',
+        gettingStarted: 'เริ่มต้นใช้งาน',
+        step1SelectCrop: 'ขั้นตอนที่ 1: เลือกพืช',
+        selectCrop: 'เลือกพืช',
+        selectCropDescription: 'เลือกพืชที่คุณต้องการปลูก',
+        step2DrawMap: 'ขั้นตอนที่ 2: วาดแผนที่',
+        drawMap: 'วาดแผนที่',
+        drawMapDescription: 'วาดพื้นที่แปลงเกษตรของคุณบนแผนที่',
+        step3PlacePlants: 'ขั้นตอนที่ 3: วางตำแหน่งพืช',
+        placePlants: 'วางตำแหน่งพืช',
+        placePlantsDescription: 'วางตำแหน่งพืชบนแผนที่',
+        step4PlacePipes: 'ขั้นตอนที่ 4: วางท่อ',
+        placePipes: 'วางท่อ',
+        placePipesDescription: 'วางท่อเมน ท่อย่อย และท่อแขนง',
+        skip: 'ข้าม',
+        finish: 'เสร็จสิ้น',
+        dontShowAgainManual: 'ไม่แสดงคู่มือนี้อีก',
+        noImage: 'ไม่มีรูปภาพ',
     },
 };
 

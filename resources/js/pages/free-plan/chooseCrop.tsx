@@ -217,7 +217,17 @@ function ChooseCrop() {
                                             : 'bg-slate-600 text-white hover:bg-slate-500'
                                     }`}
                                 >
-                                    <div className="mb-2 text-2xl">{plant.icon}</div>
+                                    <div className="mb-2 flex items-center justify-center">
+                                        <img
+                                            src={plant.icon}
+                                            alt={getTranslatedPlantName(plant.name, translations)}
+                                            className="h-12 w-12 object-contain md:h-16 md:w-16"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                            }}
+                                        />
+                                    </div>
                                     <div className="text-sm md:text-base">
                                         {getTranslatedPlantName(plant.name, translations)}
                                     </div>

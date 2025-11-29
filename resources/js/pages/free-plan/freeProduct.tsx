@@ -10,6 +10,7 @@ import {
 } from './utils/pipeSelection';
 import { calculatePumpRequirements, PumpRecommendation } from './utils/pumpSelection';
 import { getTranslations } from './utils/language';
+import { getPlantImagePath } from './utils/freeCrop';
 
 // 2. Component
 function FreeProduct() {
@@ -996,21 +997,15 @@ function FreeProduct() {
                             position: { lat: number; lng: number };
                         }>;
                         plantPoints.forEach((point) => {
+                            const plantImagePath = plantData && plantData.name ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                             new window.google.maps.Marker({
                                 position: point.position,
                                 map,
                                 title: plantData ? `${plantData.name} ${translations.plant}` : translations.plant,
                                 icon: {
-                                    url:
-                                        'data:image/svg+xml;charset=UTF-8,' +
-                                        encodeURIComponent(`
-                                            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                                <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                            </svg>
-                                        `),
-                                    scaledSize: new window.google.maps.Size(16, 16),
-                                    anchor: new window.google.maps.Point(8, 8),
+                                    url: plantImagePath,
+                                    scaledSize: new window.google.maps.Size(24, 24),
+                                    anchor: new window.google.maps.Point(12, 12),
                                 },
                                 clickable: false,
                             });
@@ -1446,7 +1441,7 @@ function FreeProduct() {
                                                     selectedZone.mainOutlets > 0 && (
                                                         <div className="text-xs text-red-300">
                                                             {selectedZone.mainOutlets}{' '}
-                                                            {translations.outletsLabel.toLowerCase()}
+                                                            {translations.outlets?.toLowerCase() || 'outlets'}
                                                         </div>
                                                     )}
                                             </div>
@@ -1473,7 +1468,7 @@ function FreeProduct() {
                                                     selectedZone.subMainOutlets > 0 && (
                                                         <div className="text-xs text-purple-300">
                                                             {selectedZone.subMainOutlets}{' '}
-                                                            {translations.outletsLabel.toLowerCase()}
+                                                            {translations.outlets?.toLowerCase() || 'outlets'}
                                                         </div>
                                                     )}
                                             </div>
@@ -1500,7 +1495,7 @@ function FreeProduct() {
                                                     selectedZone.lateralOutlets > 0 && (
                                                         <div className="text-xs text-yellow-300">
                                                             {selectedZone.lateralOutlets}{' '}
-                                                            {translations.outletsLabel.toLowerCase()}
+                                                            {translations.outlets?.toLowerCase() || 'outlets'}
                                                         </div>
                                                     )}
                                             </div>

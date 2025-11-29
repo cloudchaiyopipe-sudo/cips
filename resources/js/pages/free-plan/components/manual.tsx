@@ -1,16 +1,16 @@
 // Manual/Tutorial Component
-import { useState } from 'react';
-import { getTranslations } from '../utils/language';
+import { useState, useEffect } from 'react';
+import { getTranslations, LanguageTranslations } from '../utils/language';
 
 interface ManualProps {
     onClose: () => void;
 }
 
-// Manual pages content
-const manualPages = [
+// Function to create manual pages content
+const createManualPages = (translations: LanguageTranslations) => [
     {
-        title: 'ยินดีต้อนรับสู่ Free Plan',
-        description: 'ระบบออกแบบระบบน้ำหยดอัตโนมัติสำหรับเกษตรกร',
+        title: translations.welcomeToFreePlan,
+        description: translations.manualDescription,
         image: '/freePlanImg/freeManual/manual_1.jpg',
         content: (
             <div className="space-y-4">
@@ -18,25 +18,25 @@ const manualPages = [
                     <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_1.jpg"
-                            alt="เริ่มต้นใช้งาน"
+                            alt={translations.gettingStarted}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
                                 if (target.parentElement) {
-                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                    target.parentElement.innerHTML = `<div class="flex h-full w-full items-center justify-center text-slate-400">${translations.noImage}</div>`;
                                 }
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">เริ่มต้นใช้งาน</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.gettingStarted}</h3>
                 </div>
             </div>
         ),
     },
     {
-        title: 'ขั้นตอนที่ 1: เลือกพืช',
-        description: 'เลือกพืชที่คุณต้องการปลูก',
+        title: translations.step1SelectCrop,
+        description: translations.selectCropDescription,
         image: '/freePlanImg/freeManual/manual_2.jpg',
         content: (
             <div className="space-y-4">
@@ -44,25 +44,25 @@ const manualPages = [
                     <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_2.jpg"
-                            alt="เลือกพืช"
+                            alt={translations.selectCrop}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
                                 if (target.parentElement) {
-                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                    target.parentElement.innerHTML = `<div class="flex h-full w-full items-center justify-center text-slate-400">${translations.noImage}</div>`;
                                 }
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">เลือกพืช</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.selectCrop}</h3>
                 </div>
             </div>
         ),
     },
     {
-        title: 'ขั้นตอนที่ 2: วาดแผนที่',
-        description: 'วาดพื้นที่แปลงเกษตรของคุณบนแผนที่',
+        title: translations.step2DrawMap,
+        description: translations.drawMapDescription,
         image: '/freePlanImg/freeManual/manual_3.jpg',
         content: (
             <div className="space-y-4">
@@ -70,25 +70,25 @@ const manualPages = [
                     <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_3.jpg"
-                            alt="วาดแผนที่"
+                            alt={translations.drawMap}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
                                 if (target.parentElement) {
-                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                    target.parentElement.innerHTML = `<div class="flex h-full w-full items-center justify-center text-slate-400">${translations.noImage}</div>`;
                                 }
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">วาดแผนที่</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.drawMap}</h3>
                 </div>
             </div>
         ),
     },
     {
-        title: 'ขั้นตอนที่ 3: วางตำแหน่งพืช',
-        description: 'วางตำแหน่งพืชบนแผนที่',
+        title: translations.step3PlacePlants,
+        description: translations.placePlantsDescription,
         image: '/freePlanImg/freeManual/manual_4.jpg',
         content: (
             <div className="space-y-4">
@@ -96,25 +96,25 @@ const manualPages = [
                     <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_4.jpg"
-                            alt="วางตำแหน่งพืช"
+                            alt={translations.placePlants}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
                                 if (target.parentElement) {
-                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                    target.parentElement.innerHTML = `<div class="flex h-full w-full items-center justify-center text-slate-400">${translations.noImage}</div>`;
                                 }
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">วางตำแหน่งพืช</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.placePlants}</h3>
                 </div>
             </div>
         ),
     },
     {
-        title: 'ขั้นตอนที่ 4: วางท่อ',
-        description: 'วางท่อเมน ท่อย่อย และท่อแขนง',
+        title: translations.step4PlacePipes,
+        description: translations.placePipesDescription,
         image: '/freePlanImg/freeManual/manual_5.jpg',
         content: (
             <div className="space-y-4">
@@ -122,18 +122,18 @@ const manualPages = [
                     <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
                         <img
                             src="/freePlanImg/freeManual/manual_5.jpg"
-                            alt="วางท่อ"
+                            alt={translations.placePipes}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
                                 if (target.parentElement) {
-                                    target.parentElement.innerHTML = '<div class="flex h-full w-full items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>';
+                                    target.parentElement.innerHTML = `<div class="flex h-full w-full items-center justify-center text-slate-400">${translations.noImage}</div>`;
                                 }
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">วางท่อ</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.placePipes}</h3>
                 </div>
             </div>
         ),
@@ -143,7 +143,31 @@ const manualPages = [
 function Manual({ onClose }: ManualProps) {
     const [currentPage, setCurrentPage] = useState(0);
     const [dontShowAgain, setDontShowAgain] = useState(false);
-    const [translations] = useState(getTranslations());
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            setTranslations(getTranslations());
+        };
+
+        // Listen for storage changes (when language is changed in other components)
+        window.addEventListener('storage', handleLanguageChange);
+
+        // Listen for custom language change event
+        window.addEventListener('languageChanged', handleLanguageChange);
+
+        // Also check on focus (when user comes back to tab)
+        window.addEventListener('focus', handleLanguageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
+
+    const manualPages = createManualPages(translations);
 
     const handleNext = () => {
         if (currentPage < manualPages.length - 1) {
@@ -220,14 +244,14 @@ function Manual({ onClose }: ManualProps) {
                                 : 'bg-slate-600 hover:bg-slate-700'
                         }`}
                     >
-                        {translations.back || 'ย้อนกลับ'}
+                        {translations.back}
                     </button>
 
                     <button
                         onClick={handleSkip}
                         className="rounded px-4 py-2 text-sm text-slate-400 transition-colors hover:text-white"
                     >
-                        ข้าม
+                        {translations.skip}
                     </button>
 
                     <button
@@ -235,8 +259,8 @@ function Manual({ onClose }: ManualProps) {
                         className="rounded bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700"
                     >
                         {currentPage === manualPages.length - 1
-                            ? 'เสร็จสิ้น'
-                            : translations.next || 'ถัดไป'}
+                            ? translations.finish
+                            : translations.next}
                     </button>
                 </div>
 
@@ -253,7 +277,7 @@ function Manual({ onClose }: ManualProps) {
                         htmlFor="dontShowAgain"
                         className="cursor-pointer select-none text-sm text-slate-300"
                     >
-                        ไม่แสดงคู่มือนี้อีก
+                        {translations.dontShowAgainManual}
                     </label>
                 </div>
             </div>

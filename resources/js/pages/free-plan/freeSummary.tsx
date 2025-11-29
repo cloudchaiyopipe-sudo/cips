@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { getTranslations } from './utils/language';
+import { getPlantImagePath } from './utils/freeCrop';
 
 // 2. Component
 function FreeSummary() {
@@ -400,21 +401,15 @@ function FreeSummary() {
                             position: { lat: number; lng: number };
                         }>;
                         plantPoints.forEach((point) => {
+                            const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                             new window.google.maps.Marker({
                                 position: point.position,
                                 map,
                                 title: plantData ? `${plantData.name} ${translations.plant}` : translations.plant,
                                 icon: {
-                                    url:
-                                        'data:image/svg+xml;charset=UTF-8,' +
-                                        encodeURIComponent(`
-                                            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                                <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                            </svg>
-                                        `),
-                                    scaledSize: new window.google.maps.Size(16, 16),
-                                    anchor: new window.google.maps.Point(8, 8),
+                                    url: plantImagePath,
+                                    scaledSize: new window.google.maps.Size(24, 24),
+                                    anchor: new window.google.maps.Point(12, 12),
                                 },
                                 clickable: false,
                             });
@@ -982,9 +977,15 @@ function FreeSummary() {
                             </h3>
                             <div className="rounded-lg bg-slate-700/40 p-3">
                                 <div className="mb-2 flex items-center gap-2">
-                                    <span className="text-2xl">
-                                        {summaryData.selectedPlant.icon}
-                                    </span>
+                                    <img
+                                        src={getPlantImagePath(summaryData.selectedPlant.name)}
+                                        alt={summaryData.selectedPlant.name}
+                                        className="h-8 w-8 object-contain"
+                                        onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.style.display = 'none';
+                                        }}
+                                    />
                                     <span className="text-lg font-semibold">
                                         {summaryData.selectedPlant.name}
                                     </span>
@@ -1581,7 +1582,19 @@ function FreeSummary() {
                                 {/* Total plants */}
                                 <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
                                     <div className="mb-1 flex justify-center">
-                                        <span className="text-sm sm:text-lg">🌱</span>
+                                        {summaryData?.selectedPlant ? (
+                                            <img
+                                                src={getPlantImagePath(summaryData.selectedPlant.name)}
+                                                alt={summaryData.selectedPlant.name}
+                                                className="h-6 w-6 object-contain sm:h-8 sm:w-8"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                }}
+                                            />
+                                        ) : (
+                                            <span className="text-sm sm:text-lg">🌱</span>
+                                        )}
                                     </div>
                                     <div className="text-sm font-bold sm:text-lg">
                                         {summaryData?.plants.total || 0}
