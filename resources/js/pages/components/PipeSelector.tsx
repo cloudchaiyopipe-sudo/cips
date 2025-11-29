@@ -1068,7 +1068,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
     return (
         <div
-            className={`rounded-lg bg-${getPipeTypeName(pipeType) === 'ท่อย่อยแยก' ? 'green-300' : getPipeTypeName(pipeType) === 'ท่อย่อย' ? 'yellow-300' : getPipeTypeName(pipeType) === 'ท่อเมนรอง' ? 'purple-300' : 'red-300'} p-6`}
+            className={`rounded-lg bg-${getPipeTypeName(pipeType) === 'ท่อย่อยแยก' ? 'green-300' : getPipeTypeName(pipeType) === 'ท่อย่อย' ? 'yellow-300' : getPipeTypeName(pipeType) === 'ท่อเมนรอง' ? 'purple-400' : 'red-300'} p-6`}
         >
             <div>
                 <div className="mb-2 flex flex-row items-center justify-between gap-4">

@@ -83,11 +83,14 @@ import {
     findSubMainToLateralStartConnections,
     findSubMainToMainIntersections,
     findLateralToSubMainIntersections,
+    findMainToSubMainMidConnections,
+    calculateDistanceBetweenPoints,
 } from '../utils/lateralPipeUtils';
 
 import {
     getOverallStats,
     countConnectionPointsByZone,
+    countConnectionPointsByZoneFromFiltered,
     findBestMainPipeInZone,
     findBestSubMainPipeInZone,
     findBestBranchPipeInZone,
@@ -216,11 +219,13 @@ const GoogleMapsResultsOverlays: React.FC<{
         polylines: Map<string, google.maps.Polyline>;
         markers: Map<string, google.maps.Marker>;
         overlays: Map<string, google.maps.OverlayView>;
+        infoWindows: Map<string, google.maps.InfoWindow>;
     }>({
         polygons: new Map(),
         polylines: new Map(),
         markers: new Map(),
         overlays: new Map(),
+        infoWindows: new Map(),
     });
 
     const clearOverlays = useCallback(() => {
@@ -228,11 +233,13 @@ const GoogleMapsResultsOverlays: React.FC<{
         overlaysRef.current.polylines.forEach((polyline) => polyline.setMap(null));
         overlaysRef.current.markers.forEach((marker) => marker.setMap(null));
         overlaysRef.current.overlays.forEach((overlay) => overlay.setMap(null));
+        overlaysRef.current.infoWindows.forEach((infoWindow) => infoWindow.close());
 
         overlaysRef.current.polygons.clear();
         overlaysRef.current.polylines.clear();
         overlaysRef.current.markers.clear();
         overlaysRef.current.overlays.clear();
+        overlaysRef.current.infoWindows.clear();
     }, []);
 
 
@@ -496,6 +503,113 @@ const GoogleMapsResultsOverlays: React.FC<{
         });
 
         if (projectData.mainPipes && projectData.subMainPipes) {
+            // ใช้ระบบเดียวกับหน้า Planner: merge และ filter connection points
+            interface UnifiedConnectionPoint {
+                position: { lat: number; lng: number };
+                types: string[];
+                data: any[];
+                zIndex: number;
+                color: string;
+                title: string;
+            }
+
+            const getConnectionPriority = (type: string): number => {
+                switch (type) {
+                    case 'end-to-end':
+                        return 1;
+                    case 'main-to-submain':
+                        return 2;
+                    case 'main-to-submain-mid':
+                        return 3;
+                    case 'submain-to-main-intersection':
+                        return 4;
+                    case 'lateral-to-submain-intersection':
+                        return 5;
+                    case 'submain-to-lateral':
+                        return 6;
+                    case 'submain-to-main-mid':
+                        return 7;
+                    default:
+                        return 99;
+                }
+            };
+
+            const arePointsClose = (
+                point1: { lat: number; lng: number },
+                point2: { lat: number; lng: number },
+                thresholdMeters: number = 3
+            ): boolean => {
+                const distance = calculateDistanceBetweenPoints(point1, point2);
+                return distance <= thresholdMeters;
+            };
+
+            const mergedConnectionPointsMap = new Map<string, UnifiedConnectionPoint>();
+            const existingMainSubMainPairs = new Set<string>();
+
+            const addConnectionPoint = (
+                position: { lat: number; lng: number },
+                type: string,
+                data: any,
+                zIndex: number,
+                color: string,
+                title: string
+            ) => {
+                const positionKey = `${position.lat.toFixed(6)}_${position.lng.toFixed(6)}`;
+                const priority = getConnectionPriority(type);
+
+                let merged = false;
+                let bestMatch: { key: string; point: UnifiedConnectionPoint } | null = null;
+                let bestMatchPriority = 999;
+
+                for (const [key, mergedPoint] of mergedConnectionPointsMap.entries()) {
+                    if (arePointsClose(mergedPoint.position, position, 3)) {
+                        const existingPriority = Math.min(...mergedPoint.types.map(getConnectionPriority));
+                        if (existingPriority < bestMatchPriority) {
+                            bestMatchPriority = existingPriority;
+                            bestMatch = { key, point: mergedPoint };
+                        }
+                    }
+                }
+
+                if (bestMatch) {
+                    const mergedPoint = bestMatch.point;
+                    const existingPriority = Math.min(...mergedPoint.types.map(getConnectionPriority));
+
+                    if (priority < existingPriority) {
+                        mergedPoint.types = [type];
+                        mergedPoint.data = [data];
+                        mergedPoint.zIndex = zIndex;
+                        mergedPoint.color = color;
+                        mergedPoint.title = title;
+                        mergedPoint.position = position;
+                    } else if (priority === existingPriority) {
+                        if (!mergedPoint.types.includes(type)) {
+                            mergedPoint.types.push(type);
+                        }
+                        if (!mergedPoint.data.find((d) => d.id === data.id)) {
+                            mergedPoint.data.push(data);
+                        }
+                        mergedPoint.zIndex = Math.max(mergedPoint.zIndex, zIndex);
+                        if (mergedPoint.data.length > 1) {
+                            mergedPoint.title = `จุดเชื่อมต่อ (${mergedPoint.data.length} จุด)`;
+                        }
+                    }
+                    merged = true;
+                }
+
+                if (!merged) {
+                    mergedConnectionPointsMap.set(positionKey, {
+                        position,
+                        types: [type],
+                        data: [data],
+                        zIndex,
+                        color,
+                        title,
+                    });
+                }
+            };
+
+            // 1. end-to-end connections (สีแดง)
             const endToEndConnections = findEndToEndConnections(
                 projectData.mainPipes,
                 projectData.subMainPipes,
@@ -503,43 +617,25 @@ const GoogleMapsResultsOverlays: React.FC<{
                 irrigationZones,
             );
 
-            endToEndConnections.forEach((connection, index) => {
-                const connectionMarker = new google.maps.Marker({
-                    position: new google.maps.LatLng(
-                        connection.connectionPoint.lat,
-                        connection.connectionPoint.lng
-                    ),
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
-                        fillColor: '#DC2626',
-                        fillOpacity: 1.0,
-                        strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+            endToEndConnections.forEach((connection) => {
+                const pairKey = `${connection.mainPipeId}-${connection.subMainPipeId}`;
+                existingMainSubMainPairs.add(pairKey);
+                addConnectionPoint(
+                    connection.connectionPoint,
+                    'end-to-end',
+                    {
+                        id: `end-to-end-${connection.mainPipeId}-${connection.subMainPipeId}`,
+                        mainPipeId: connection.mainPipeId,
+                        subMainPipeId: connection.subMainPipeId,
+                        type: 'end-to-end',
                     },
-                    zIndex: 2001,
-                    title: `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`,
-                });
-                overlaysRef.current.markers.set(`end-to-end-connection-${index}`, connectionMarker);
-
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div class="p-2 min-w-[200px]">
-                            <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
-                            <div class="space-y-1 text-sm">
-                                <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
-                                <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
-                            </div>
-                        </div>
-                    `,
-                });
-
-                connectionMarker.addListener('click', () => {
-                    infoWindow.open(map, connectionMarker);
-                });
+                    2001,
+                    '#DC2626',
+                    `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`
+                );
             });
 
+            // 2. main-to-submain connections (สีน้ำเงิน)
             const mainToSubMainConnections = findMainToSubMainConnections(
                 projectData.mainPipes,
                 projectData.subMainPipes,
@@ -547,50 +643,59 @@ const GoogleMapsResultsOverlays: React.FC<{
                 irrigationZones,
             );
 
-            mainToSubMainConnections.forEach((connection, index) => {
-                const connectionMarker = new google.maps.Marker({
-                    position: new google.maps.LatLng(
-                        connection.connectionPoint.lat,
-                        connection.connectionPoint.lng
-                    ),
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
-                        fillColor: '#3B82F6',
-                        fillOpacity: 1.0,
-                        strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+            mainToSubMainConnections.forEach((connection) => {
+                const pairKey = `${connection.mainPipeId}-${connection.subMainPipeId}`;
+                if (existingMainSubMainPairs.has(pairKey)) {
+                    return;
+                }
+                existingMainSubMainPairs.add(pairKey);
+                addConnectionPoint(
+                    connection.connectionPoint,
+                    'main-to-submain',
+                    {
+                        id: `main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`,
+                        mainPipeId: connection.mainPipeId,
+                        subMainPipeId: connection.subMainPipeId,
+                        type: 'main-to-submain',
                     },
-                    zIndex: 2001,
-                    title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`,
-                });
-                overlaysRef.current.markers.set(
-                    `main-submain-end-connection-${index}`,
-                    connectionMarker
+                    2001,
+                    '#3B82F6',
+                    `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`
                 );
-
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div class="p-2 min-w-[200px]">
-                            <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
-                            <div class="space-y-1 text-sm">
-                                <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
-                                <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
-                                <p class="text-xs text-gray-600">เชื่อมปลายท่อเมน → เริ่มท่อเมนรอง</p>
-                            </div>
-                        </div>
-                    `,
-                });
-
-                connectionMarker.addListener('click', () => {
-                    infoWindow.open(map, connectionMarker);
-                });
             });
-        }
 
-        if (projectData.subMainPipes && projectData.mainPipes) {
-            const midConnections = findMidConnections(
+            // 3. main-to-submain-mid connections (สีน้ำเงิน - ปลายท่อ main กับกลางท่อ submain)
+            const mainToSubMainMidConnections = findMainToSubMainMidConnections(
+                projectData.mainPipes,
+                projectData.subMainPipes,
+                20,
+                projectData.zones,
+                irrigationZones
+            );
+
+            mainToSubMainMidConnections.forEach((connection) => {
+                const pairKey = `${connection.mainPipeId}-${connection.subMainPipeId}`;
+                if (existingMainSubMainPairs.has(pairKey)) {
+                    return;
+                }
+                existingMainSubMainPairs.add(pairKey);
+                addConnectionPoint(
+                    connection.connectionPoint,
+                    'main-to-submain-mid',
+                    {
+                        id: `main-submainmid-${connection.mainPipeId}-${connection.subMainPipeId}`,
+                        mainPipeId: connection.mainPipeId,
+                        subMainPipeId: connection.subMainPipeId,
+                        type: 'main-to-submain-mid',
+                    },
+                    2001,
+                    '#3B82F6',
+                    `จุดเชื่อมต่อท่อเมน → กลางท่อเมนรอง`
+                );
+            });
+
+            // 4. submain-to-main-mid connections (สีม่วง)
+            const subMainToMainMidConnections = findMidConnections(
                 projectData.subMainPipes,
                 projectData.mainPipes,
                 20,
@@ -598,45 +703,156 @@ const GoogleMapsResultsOverlays: React.FC<{
                 irrigationZones
             );
 
-            midConnections.forEach((connection, index) => {
-                const midConnectionMarker = new google.maps.Marker({
+            subMainToMainMidConnections.forEach((connection) => {
+                const pairKey = `${connection.targetPipeId}-${connection.sourcePipeId}`;
+                if (existingMainSubMainPairs.has(pairKey)) {
+                    return;
+                }
+                addConnectionPoint(
+                    connection.connectionPoint,
+                    'submain-to-main-mid',
+                    {
+                        id: `submain-mainmid-${connection.sourcePipeId}-${connection.targetPipeId}`,
+                        sourcePipeId: connection.sourcePipeId,
+                        targetPipeId: connection.targetPipeId,
+                        mainPipeId: connection.targetPipeId,
+                        subMainPipeId: connection.sourcePipeId,
+                        type: 'submain-to-main-mid',
+                    },
+                    2004,
+                    '#8B5CF6',
+                    `จุดเชื่อมท่อเมนรอง → กลางท่อเมน`
+                );
+            });
+
+            // 5. submain-to-main-intersections (สีน้ำเงิน)
+            const subMainToMainIntersections = findSubMainToMainIntersections(
+                projectData.subMainPipes,
+                projectData.mainPipes,
+                projectData.zones,
+                irrigationZones
+            );
+
+            subMainToMainIntersections.forEach((intersection) => {
+                const pairKey = `${intersection.mainPipeId}-${intersection.subMainPipeId}`;
+                if (existingMainSubMainPairs.has(pairKey)) {
+                    return;
+                }
+                addConnectionPoint(
+                    intersection.intersectionPoint,
+                    'submain-to-main-intersection',
+                    {
+                        id: `submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`,
+                        subMainPipeId: intersection.subMainPipeId,
+                        mainPipeId: intersection.mainPipeId,
+                        type: 'submain-to-main-intersection',
+                    },
+                    2003,
+                    '#3B82F6',
+                    `จุดตัดท่อเมนรอง ↔ ท่อเมน`
+                );
+            });
+
+            // Filter และสร้าง markers
+            const filteredConnectionPoints = new Map<string, UnifiedConnectionPoint>();
+            const mainPipeUsed = new Set<string>();
+            const subMainPipeUsed = new Set<string>();
+
+            const sortedPoints = Array.from(mergedConnectionPointsMap.entries()).sort((a, b) => {
+                const priorityA = Math.min(...a[1].types.map(getConnectionPriority));
+                const priorityB = Math.min(...b[1].types.map(getConnectionPriority));
+                if (priorityA !== priorityB) {
+                    return priorityA - priorityB;
+                }
+                return 0;
+            });
+
+            for (const [key, mergedPoint] of sortedPoints) {
+                let hasMainPipe = false;
+                let hasSubMainPipe = false;
+                let mainPipeId: string | null = null;
+                let subMainPipeId: string | null = null;
+
+                for (const item of mergedPoint.data) {
+                    if (item.mainPipeId) {
+                        hasMainPipe = true;
+                        mainPipeId = item.mainPipeId;
+                    }
+                    if (item.subMainPipeId) {
+                        hasSubMainPipe = true;
+                        subMainPipeId = item.subMainPipeId;
+                    }
+                }
+
+                if (hasMainPipe && hasSubMainPipe && mainPipeId && subMainPipeId) {
+                    if (mainPipeUsed.has(mainPipeId) || subMainPipeUsed.has(subMainPipeId)) {
+                        continue;
+                    }
+                    mainPipeUsed.add(mainPipeId);
+                    subMainPipeUsed.add(subMainPipeId);
+                }
+
+                filteredConnectionPoints.set(key, mergedPoint);
+            }
+
+            // สร้าง markers
+            filteredConnectionPoints.forEach((mergedPoint, index) => {
+                const connectionMarker = new google.maps.Marker({
                     position: new google.maps.LatLng(
-                        connection.connectionPoint.lat,
-                        connection.connectionPoint.lng
+                        mergedPoint.position.lat,
+                        mergedPoint.position.lng
                     ),
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
-                        fillColor: '#8B5CF6',
+                        scale: mergedPoint.data.length > 1 ? Math.min(5, 3 + mergedPoint.data.length) : 3,
+                        fillColor: mergedPoint.color,
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
                         strokeWeight: 2,
                     },
-                    zIndex: 2004,
-                    title: `จุดเชื่อมท่อเมนรอง → กลางท่อเมน`,
+                    zIndex: mergedPoint.zIndex,
+                    title: mergedPoint.title,
                 });
-                overlaysRef.current.markers.set(
-                    `submain-mainmid-connection-${index}`,
-                    midConnectionMarker
-                );
+
+                const connectionId = `connection-merged-${index}`;
+                overlaysRef.current.markers.set(connectionId, connectionMarker);
+
+                let infoContent = `
+                    <div class="p-3 min-w-[250px]">
+                        <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อ</h4>
+                        <p class="text-sm text-gray-600 mb-2">จำนวน: ${mergedPoint.data.length} จุด</p>
+                        <hr class="my-2">
+                `;
+
+                mergedPoint.data.forEach((item, itemIndex) => {
+                    infoContent += `
+                        <div class="mb-2 ${itemIndex > 0 ? 'mt-2 pt-2 border-t' : ''}">
+                            <p class="font-semibold text-sm">${item.type || 'connection'}</p>
+                    `;
+                    if (item.mainPipeId) {
+                        infoContent += `<p class="text-xs"><strong>ท่อเมน:</strong> ${item.mainPipeId}</p>`;
+                    }
+                    if (item.subMainPipeId) {
+                        infoContent += `<p class="text-xs"><strong>ท่อเมนรอง:</strong> ${item.subMainPipeId}</p>`;
+                    }
+                    if (item.lateralPipeId) {
+                        infoContent += `<p class="text-xs"><strong>ท่อย่อย:</strong> ${item.lateralPipeId}</p>`;
+                    }
+                    infoContent += `</div>`;
+                });
+
+                infoContent += `</div>`;
 
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div class="p-2 min-w-[200px]">
-                            <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมกลางท่อ</h4>
-                            <div class="space-y-1 text-sm">
-                                <p><strong>ท่อเมนรอง:</strong> ${connection.sourcePipeId}</p>
-                                <p><strong>ท่อเมน:</strong> ${connection.targetPipeId}</p>
-                                <p class="text-xs text-gray-600">เชื่อมกับตรงกลางท่อเมน</p>
-                            </div>
-                        </div>
-                    `,
+                    content: infoContent,
                 });
 
-                midConnectionMarker.addListener('click', () => {
-                    infoWindow.open(map, midConnectionMarker);
+                connectionMarker.addListener('click', () => {
+                    infoWindow.open(map, connectionMarker);
                 });
+
+                overlaysRef.current.infoWindows.set(connectionId, infoWindow);
             });
         }
 
@@ -2122,32 +2338,29 @@ function EnhancedHorticultureResultsPageContent() {
                                 </h4>
                                 <div className="space-y-3">
                                     {(() => {
-                                        const connectionStats = countConnectionPointsByZone(
+                                        // ใช้ฟังก์ชันใหม่ที่นับจาก connection points ที่แสดงจริงบนแผนที่
+                                        const connectionStats = countConnectionPointsByZoneFromFiltered(
                                             projectData,
                                             irrigationZones
                                         );
 
                                         const totalStats = connectionStats.reduce(
                                             (acc, zone) => ({
-                                                mainToSubMain:
-                                                    acc.mainToSubMain + zone.mainToSubMain,
-                                                subMainToMainMid:
-                                                    acc.subMainToMainMid + zone.subMainToMainMid,
-                                                subMainToLateral:
-                                                    acc.subMainToLateral + zone.subMainToLateral,
-                                                subMainToMainIntersection:
-                                                    acc.subMainToMainIntersection +
-                                                    zone.subMainToMainIntersection,
+                                                endToEnd: acc.endToEnd + zone.endToEnd,
+                                                // mainToSubMain = main-to-submain + main-to-submain-mid + submain-to-main-intersection (สีน้ำเงิน - รวมเป็นอันเดียวกัน)
+                                                mainToSubMain: acc.mainToSubMain + zone.mainToSubMain,
+                                                subMainToMainMid: acc.subMainToMainMid + zone.subMainToMainMid,
+                                                subMainToLateral: acc.subMainToLateral + zone.subMainToLateral,
                                                 lateralToSubMainIntersection:
                                                     acc.lateralToSubMainIntersection +
                                                     zone.lateralToSubMainIntersection,
                                                 total: acc.total + zone.total,
                                             }),
                                             {
+                                                endToEnd: 0,
                                                 mainToSubMain: 0,
                                                 subMainToMainMid: 0,
                                                 subMainToLateral: 0,
-                                                subMainToMainIntersection: 0,
                                                 lateralToSubMainIntersection: 0,
                                                 total: 0,
                                             }
@@ -2170,7 +2383,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                             ></div>
                                                             <span>
                                                                 {t('ปลาย-ปลาย')}:{' '}
-                                                                {totalStats.mainToSubMain}{' '}
+                                                                {totalStats.endToEnd}{' '}
                                                                 {t('จุด')}
                                                             </span>
                                                         </div>
@@ -2183,7 +2396,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                             ></div>
                                                             <span>
                                                                 {t('ปลายเมน-ระหว่างเมนรอง')}:{' '}
-                                                                {totalStats.subMainToMainMid}{' '}
+                                                                {totalStats.mainToSubMain}{' '}
                                                                 {t('จุด')}
                                                             </span>
                                                         </div>
@@ -2196,7 +2409,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                             ></div>
                                                             <span>
                                                                 {t('เมนรอง-กลางเมน')}:{' '}
-                                                                {totalStats.subMainToLateral}{' '}
+                                                                {totalStats.subMainToMainMid}{' '}
                                                                 {t('จุด')}
                                                             </span>
                                                         </div>
@@ -2209,9 +2422,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                             ></div>
                                                             <span>
                                                                 {t('เมนรอง-ท่อย่อย')}:{' '}
-                                                                {
-                                                                    totalStats.subMainToMainIntersection
-                                                                }{' '}
+                                                                {totalStats.subMainToLateral}{' '}
                                                                 {t('จุด')}
                                                             </span>
                                                         </div>
@@ -2265,7 +2476,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                         ></div>
                                                                         <span title="ปลาย-ปลาย">
                                                                             {
-                                                                                zoneStats.mainToSubMain
+                                                                                zoneStats.endToEnd
                                                                             }
                                                                         </span>
                                                                     </div>
@@ -2279,7 +2490,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                         ></div>
                                                                         <span title="ปลายเมน-ระหว่างเมนรอง">
                                                                             {
-                                                                                zoneStats.subMainToMainMid
+                                                                                zoneStats.mainToSubMain
                                                                             }
                                                                         </span>
                                                                     </div>
@@ -2293,7 +2504,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                         ></div>
                                                                         <span title="เมนรอง-กลางเมน">
                                                                             {
-                                                                                zoneStats.subMainToLateral
+                                                                                zoneStats.subMainToMainMid
                                                                             }
                                                                         </span>
                                                                     </div>
@@ -2307,7 +2518,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                         ></div>
                                                                         <span title="เมนรอง-ท่อย่อย">
                                                                             {
-                                                                                zoneStats.subMainToMainIntersection
+                                                                                zoneStats.subMainToLateral
                                                                             }
                                                                         </span>
                                                                     </div>

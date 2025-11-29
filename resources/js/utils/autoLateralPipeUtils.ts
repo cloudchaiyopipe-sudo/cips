@@ -212,8 +212,25 @@ export const generateThroughSubMainPipes = (
         }
 
         // หา Sub Main pipe ที่อยู่ในโซนนี้
-        // ตรวจสอบทุก segment ของท่อเพื่อให้แน่ใจว่าท่อผ่านโซนจริงๆ
+        // ต้องกรองให้เหลือเฉพาะท่อที่มี zoneId ตรงกับโซนที่กำลังประมวลผลเท่านั้น
+        // ห้ามใช้ท่อ SubMain ของโซนอื่นแม้ว่าจะผ่านโซนนี้ก็ตาม
         const relevantSubMainPipes = subMainPipes.filter((subMainPipe) => {
+            // ตรวจสอบ zoneId ก่อน - ถ้ามี zoneId ต้องตรงกับโซนที่กำลังประมวลผลเท่านั้น
+            if (subMainPipe.zoneId) {
+                if (subMainPipe.zoneId !== zone.id) {
+                    console.log(
+                        `⚠️ [THROUGH_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ไม่ตรงกับโซน ${zone.id}, ข้ามทันที`
+                    );
+                    return false; // ข้ามท่อที่ zoneId ไม่ตรงกันทันที - ห้ามใช้ท่อของโซนอื่น
+                }
+                // ถ้า zoneId ตรงกัน ให้ใช้ท่อนี้
+                console.log(
+                    `✅ [THROUGH_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ตรงกับโซน ${zone.id}, ใช้ท่อนี้`
+                );
+                return true;
+            }
+
+            // ถ้าไม่มี zoneId (กรณีท่อสร้างก่อนวาดโซน) ให้ตรวจสอบด้วยพิกัด
             // ตรวจสอบว่ามี segment ใดที่ผ่านโซนหรือไม่
             for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
                 const segmentStart = subMainPipe.coordinates[i];
@@ -245,17 +262,54 @@ export const generateThroughSubMainPipes = (
             continue;
         }
 
-        // ใช้ทิศทางหลักของ Sub Main สำหรับการจัดกลุ่มต้นไม้เบื้องต้น
-        // แต่จะใช้ทิศทาง local ของแต่ละ segment เมื่อหาจุดตัด
-        const primarySubMainDirection = getSubMainDirection(relevantSubMainPipes[0]);
+        // หา segment ที่ผ่านโซนเพื่อใช้ทิศทางในการจัดกลุ่มต้นไม้
+        // ใช้ทิศทางของ segment ที่ตัดกันจริงๆ แทนทิศทางหลัก
+        let segmentDirectionForGrouping: 'horizontal' | 'vertical' = 'horizontal';
+        let foundSegment = false;
 
-        // จัดกลุ่มต้นไม้ให้ตั้งฉากกับทิศทางหลักของ Sub Main
+        // หา segment แรกที่ผ่านโซนเพื่อใช้ทิศทาง
+        for (const subMainPipe of relevantSubMainPipes) {
+            for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+                const segmentStart = subMainPipe.coordinates[i];
+                const segmentEnd = subMainPipe.coordinates[i + 1];
+                const segmentMidPoint = {
+                    lat: (segmentStart.lat + segmentEnd.lat) / 2,
+                    lng: (segmentStart.lng + segmentEnd.lng) / 2,
+                };
+                const segmentInZone =
+                    isPointInZone(segmentStart, zone) ||
+                    isPointInZone(segmentEnd, zone) ||
+                    isPointInZone(segmentMidPoint, zone);
+
+                if (segmentInZone) {
+                    segmentDirectionForGrouping = getSegmentDirection(segmentStart, segmentEnd);
+                    foundSegment = true;
+                    console.log(
+                        `🔍 Zone ${zone.name}: ใช้ทิศทางของ segment ${i} ของท่อ ${subMainPipe.id}: ${segmentDirectionForGrouping}`
+                    );
+                    break;
+                }
+            }
+            if (foundSegment) break;
+        }
+
+        // ถ้าไม่พบ segment ให้ใช้ทิศทางหลักของท่อเมนรอง
+        if (!foundSegment) {
+            segmentDirectionForGrouping = getSubMainDirection(relevantSubMainPipes[0]);
+            console.log(
+                `⚠️ Zone ${zone.name}: ไม่พบ segment ในโซน ใช้ทิศทางหลัก: ${segmentDirectionForGrouping}`
+            );
+        }
+
+        // จัดกลุ่มต้นไม้ให้ตั้งฉากกับทิศทางของ segment ที่ตัดกัน
+        // ถ้า SubMain แนวตั้ง (vertical) → ท่อย่อยแนวนอน (rows)
+        // ถ้า SubMain แนวนอน (horizontal) → ท่อย่อยแนวตั้ง (columns)
         const plantGroups = groupPlantsPerpendicularToSubMain(
             plantsInZone,
-            primarySubMainDirection
+            segmentDirectionForGrouping
         );
 
-        console.log(`🔍 Zone ${zone.name}: Created ${plantGroups.length} plant groups`);
+        console.log(`🔍 Zone ${zone.name}: Created ${plantGroups.length} plant groups (ทิศทาง SubMain: ${segmentDirectionForGrouping})`);
 
         for (const row of plantGroups) {
             if (row.length < 1) {
@@ -264,12 +318,13 @@ export const generateThroughSubMainPipes = (
             }
 
             // ใช้ createPerpendicularLateralPipe เพื่อคำนวณทิศทางที่ถูกต้องตามแนวต้นไม้
+            // ใช้ทิศทางของ segment ที่ตัดกันจริงๆ
             let pipeStart: Coordinate;
             let pipeEnd: Coordinate;
             let pipeLength: number;
 
             try {
-                const pipeData = createPerpendicularLateralPipe(row, primarySubMainDirection);
+                const pipeData = createPerpendicularLateralPipe(row, segmentDirectionForGrouping);
                 pipeStart = pipeData.start;
                 pipeEnd = pipeData.end;
                 pipeLength = pipeData.length;
@@ -349,7 +404,7 @@ export const generateThroughSubMainPipes = (
                             isFinite(intersection.lng)
                         ) {
                             // กรอง plants ที่มีข้อมูลครบถ้วน
-                            const validPlants = row.filter(
+                            let validPlants = row.filter(
                                 (p) =>
                                     p &&
                                     p.position &&
@@ -358,7 +413,34 @@ export const generateThroughSubMainPipes = (
                                     p.plantData
                             );
 
-                            if (validPlants.length === 0) continue;
+                            // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain
+                            // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
+                            if (subMainPipe.zoneId) {
+                                const originalCount = validPlants.length;
+                                validPlants = validPlants.filter((plant) => {
+                                    // ตรวจสอบว่า plant อยู่ในโซนเดียวกับท่อ SubMain หรือไม่
+                                    const plantInZone = isPointInZone(plant.position, zone);
+                                    if (!plantInZone) {
+                                        console.log(
+                                            `⚠️ [THROUGH_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${subMainPipe.zoneId})`
+                                        );
+                                    }
+                                    return plantInZone;
+                                });
+                                
+                                if (validPlants.length < originalCount) {
+                                    console.log(
+                                        `🔍 [THROUGH_SUBMAIN] กรองต้นไม้ออก ${originalCount - validPlants.length} ต้น (เหลือ ${validPlants.length} ต้นในโซน ${zone.id})`
+                                    );
+                                }
+                            }
+
+                            if (validPlants.length === 0) {
+                                console.log(
+                                    `⚠️ [THROUGH_SUBMAIN] ไม่มีต้นไม้ที่อยู่ในโซน ${zone.id} หลังจากกรองแล้ว, ข้าม`
+                                );
+                                continue;
+                            }
 
                             // ใช้ตำแหน่งต้นไม้จริง (ต้นแรกและสุดท้าย) แทน pipeStart/pipeEnd เพื่อไม่ให้ลากเกินต้นไม้
                             // เรียงต้นไม้ตามแนวท่อ
@@ -814,18 +896,25 @@ export const generateFromSubMainPipes = (
         }
 
         // หา Sub Main pipe ที่เกี่ยวข้องกับโซนนี้
-        // ตรวจสอบทุก segment ของท่อเพื่อให้แน่ใจว่าท่อผ่านโซนจริงๆ
-        // สำหรับโซนที่วาดเอง ไม่ควรใช้ zoneId เป็นตัวกรอง เพราะท่ออาจสร้างก่อนวาดโซน
+        // ต้องกรองให้เหลือเฉพาะท่อที่มี zoneId ตรงกับโซนที่กำลังประมวลผลเท่านั้น
+        // ห้ามใช้ท่อ SubMain ของโซนอื่นแม้ว่าจะผ่านโซนนี้ก็ตาม
         const relevantSubMainPipes = subMainPipes.filter((subMainPipe) => {
-            // ถ้ามี zoneId และตรงกัน ให้ใช้ทันที (กรณีท่อสร้างหลังวาดโซน)
-            if (subMainPipe.zoneId && subMainPipe.zoneId === zone.id) {
+            // ตรวจสอบ zoneId ก่อน - ถ้ามี zoneId ต้องตรงกับโซนที่กำลังประมวลผลเท่านั้น
+            if (subMainPipe.zoneId) {
+                if (subMainPipe.zoneId !== zone.id) {
+                    console.log(
+                        `⚠️ [FROM_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ไม่ตรงกับโซน ${zone.id}, ข้ามทันที`
+                    );
+                    return false; // ข้ามท่อที่ zoneId ไม่ตรงกันทันที - ห้ามใช้ท่อของโซนอื่น
+                }
+                // ถ้า zoneId ตรงกัน ให้ใช้ท่อนี้
                 console.log(
-                    `✅ [FROM_SUBMAIN] SubMain ${subMainPipe.id}: zoneId matches (${subMainPipe.zoneId})`
+                    `✅ [FROM_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ตรงกับโซน ${zone.id}, ใช้ท่อนี้`
                 );
                 return true;
             }
 
-            // ถ้า zoneId ไม่ตรงกัน หรือไม่มี zoneId ให้ตรวจสอบด้วยพิกัด
+            // ถ้าไม่มี zoneId (กรณีท่อสร้างก่อนวาดโซน) ให้ตรวจสอบด้วยพิกัด
             // (กรณีท่อสร้างก่อนวาดโซน หรือท่อที่อาจผ่านหลายโซน)
             let hasSegmentInZone = false;
 
@@ -873,18 +962,55 @@ export const generateFromSubMainPipes = (
             continue;
         }
 
-        // ใช้ทิศทางหลักของ Sub Main แรกสำหรับการจัดกลุ่มต้นไม้
-        // แต่จะพิจารณาทิศทาง local ของแต่ละ segment เมื่อหาจุดตัด
-        const primarySubMainDirection = getSubMainDirection(relevantSubMainPipes[0]);
+        // หา segment ที่ผ่านโซนเพื่อใช้ทิศทางในการจัดกลุ่มต้นไม้
+        // ใช้ทิศทางของ segment ที่ตัดกันจริงๆ แทนทิศทางหลัก
+        let segmentDirectionForGrouping: 'horizontal' | 'vertical' = 'horizontal';
+        let foundSegment = false;
 
-        // จัดกลุ่มต้นไม้ให้ตั้งฉากกับทิศทางหลักของ Sub Main
+        // หา segment แรกที่ผ่านโซนเพื่อใช้ทิศทาง
+        for (const subMainPipe of relevantSubMainPipes) {
+            for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+                const segmentStart = subMainPipe.coordinates[i];
+                const segmentEnd = subMainPipe.coordinates[i + 1];
+                const segmentMidPoint = {
+                    lat: (segmentStart.lat + segmentEnd.lat) / 2,
+                    lng: (segmentStart.lng + segmentEnd.lng) / 2,
+                };
+                const segmentInZone =
+                    isPointInZone(segmentStart, zone) ||
+                    isPointInZone(segmentEnd, zone) ||
+                    isPointInZone(segmentMidPoint, zone);
+
+                if (segmentInZone) {
+                    segmentDirectionForGrouping = getSegmentDirection(segmentStart, segmentEnd);
+                    foundSegment = true;
+                    console.log(
+                        `🔍 [FROM_SUBMAIN] Zone ${zone.name}: ใช้ทิศทางของ segment ${i} ของท่อ ${subMainPipe.id}: ${segmentDirectionForGrouping}`
+                    );
+                    break;
+                }
+            }
+            if (foundSegment) break;
+        }
+
+        // ถ้าไม่พบ segment ให้ใช้ทิศทางหลักของท่อเมนรอง
+        if (!foundSegment) {
+            segmentDirectionForGrouping = getSubMainDirection(relevantSubMainPipes[0]);
+            console.log(
+                `⚠️ [FROM_SUBMAIN] Zone ${zone.name}: ไม่พบ segment ในโซน ใช้ทิศทางหลัก: ${segmentDirectionForGrouping}`
+            );
+        }
+
+        // จัดกลุ่มต้นไม้ให้ตั้งฉากกับทิศทางของ segment ที่ตัดกัน
+        // ถ้า SubMain แนวตั้ง (vertical) → ท่อย่อยแนวนอน (rows)
+        // ถ้า SubMain แนวนอน (horizontal) → ท่อย่อยแนวตั้ง (columns)
         const plantGroups = groupPlantsPerpendicularToSubMain(
             plantsInZone,
-            primarySubMainDirection
+            segmentDirectionForGrouping
         );
 
         console.log(
-            `🔍 [FROM_SUBMAIN] Zone ${zone.name}: Created ${plantGroups.length} plant groups (primarySubMainDirection: ${primarySubMainDirection})`
+            `🔍 [FROM_SUBMAIN] Zone ${zone.name}: Created ${plantGroups.length} plant groups (ทิศทาง SubMain: ${segmentDirectionForGrouping})`
         );
 
         for (let groupIdx = 0; groupIdx < plantGroups.length; groupIdx++) {
@@ -899,7 +1025,7 @@ export const generateFromSubMainPipes = (
             console.log(`🔍 [FROM_SUBMAIN] Processing group ${groupIdx} with ${row.length} plants`);
 
             // กรอง plants ที่มีข้อมูลครบถ้วนก่อน
-            const validPlants = row.filter(
+            let validPlants = row.filter(
                 (p) =>
                     p &&
                     p.position &&
@@ -911,6 +1037,33 @@ export const generateFromSubMainPipes = (
             console.log(
                 `🔍 [FROM_SUBMAIN] Group ${groupIdx}: Valid plants: ${validPlants.length} / ${row.length}`
             );
+
+            // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain
+            // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
+            // หาท่อ SubMain ที่เกี่ยวข้องกับโซนนี้ (ควรมี zoneId ตรงกัน)
+            const relevantSubMainForZone = relevantSubMainPipes.find(
+                (sm) => sm.zoneId === zone.id
+            );
+
+            if (relevantSubMainForZone && relevantSubMainForZone.zoneId) {
+                const originalCount = validPlants.length;
+                validPlants = validPlants.filter((plant) => {
+                    // ตรวจสอบว่า plant อยู่ในโซนเดียวกับท่อ SubMain หรือไม่
+                    const plantInZone = isPointInZone(plant.position, zone);
+                    if (!plantInZone) {
+                        console.log(
+                            `⚠️ [FROM_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${relevantSubMainForZone.zoneId})`
+                        );
+                    }
+                    return plantInZone;
+                });
+                
+                if (validPlants.length < originalCount) {
+                    console.log(
+                        `🔍 [FROM_SUBMAIN] กรองต้นไม้ออก ${originalCount - validPlants.length} ต้น (เหลือ ${validPlants.length} ต้นในโซน ${zone.id})`
+                    );
+                }
+            }
 
             if (validPlants.length < 1) {
                 console.log(
@@ -926,7 +1079,7 @@ export const generateFromSubMainPipes = (
             try {
                 const pipeData = createPerpendicularLateralPipe(
                     validPlants,
-                    primarySubMainDirection
+                    segmentDirectionForGrouping
                 );
                 pipeStart = pipeData.start;
                 pipeEnd = pipeData.end;
@@ -1111,13 +1264,32 @@ export const generateFromSubMainPipes = (
                     // กรณีต้นไม้อยู่ฝั่งเดียว: สร้างท่อย่อยจากจุดเชื่อมต่อบนท่อเมนรองไปหาต้นไม้ทั้งหมด
                     // ใช้เส้นตรงที่คำนวณจาก createPerpendicularLateralPipe เพื่อให้ท่อตรงแนวต้นไม้
 
+                    // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain
+                    // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
+                    const plantsInSubMainZoneForSingle = validPlants.filter((plant) => {
+                        const plantInZone = isPointInZone(plant.position, zone);
+                        if (!plantInZone) {
+                            console.log(
+                                `⚠️ [FROM_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${subMainPipe.zoneId})`
+                            );
+                        }
+                        return plantInZone;
+                    });
+
+                    if (plantsInSubMainZoneForSingle.length === 0) {
+                        console.log(
+                            `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: ไม่มีต้นไม้ที่อยู่ในโซน ${zone.id} หลังจากกรองแล้ว, ข้าม`
+                        );
+                        continue;
+                    }
+
                     // หาจุดบนเส้นท่อ (pipeStart-pipeEnd) ที่ควรเป็นจุดสิ้นสุด
                     // โดยหาจุดบนเส้นตรงที่ผ่านต้นไม้ที่ไกลจาก closestPoint ที่สุด
                     let farthestPlantOnLine: Coordinate | null = null;
                     let maxDistanceFromConnection = 0;
 
-                    // หาต้นไม้ที่ไกลจากจุดเชื่อมต่อที่สุด
-                    for (const plant of validPlants) {
+                    // หาต้นไม้ที่ไกลจากจุดเชื่อมต่อที่สุด (ใช้เฉพาะต้นไม้ที่อยู่ในโซน)
+                    for (const plant of plantsInSubMainZoneForSingle) {
                         const distFromConnection = calculateDistance(closestPoint, plant.position);
 
                         // หาจุดบนเส้นท่อที่ใกล้ต้นไม้นี้ที่สุด (เพื่อให้ท่อตรงแนวต้นไม้)
@@ -1152,9 +1324,9 @@ export const generateFromSubMainPipes = (
                             id: `auto-lateral-single-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                             coordinates: [closestPoint, finalEnd],
                             length: pipeLength,
-                            plants: validPlants,
+                            plants: plantsInSubMainZoneForSingle, // ใช้เฉพาะต้นไม้ที่อยู่ในโซน
                             placementMode: 'over_plants',
-                            totalWaterNeed: validPlants.reduce(
+                            totalWaterNeed: plantsInSubMainZoneForSingle.reduce(
                                 (sum, plant) => sum + (plant?.plantData?.waterNeed || 0),
                                 0
                             ),
@@ -1188,8 +1360,26 @@ export const generateFromSubMainPipes = (
                     const leftPlants: PlantLocation[] = [];
                     const rightPlants: PlantLocation[] = [];
 
-                    // แยกต้นไม้ตามตำแหน่งเทียบกับจุดเชื่อมต่อบนเส้นท่อ
-                    for (const plant of validPlants) {
+                    // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain ก่อน
+                    const plantsInSubMainZone = validPlants.filter((plant) => {
+                        const plantInZone = isPointInZone(plant.position, zone);
+                        if (!plantInZone) {
+                            console.log(
+                                `⚠️ [FROM_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${subMainPipe.zoneId})`
+                            );
+                        }
+                        return plantInZone;
+                    });
+
+                    if (plantsInSubMainZone.length === 0) {
+                        console.log(
+                            `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: ไม่มีต้นไม้ที่อยู่ในโซน ${zone.id} หลังจากกรองแล้ว, ข้าม`
+                        );
+                        continue;
+                    }
+
+                    // แยกต้นไม้ตามตำแหน่งเทียบกับจุดเชื่อมต่อบนเส้นท่อ (ใช้เฉพาะต้นไม้ที่อยู่ในโซน)
+                    for (const plant of plantsInSubMainZone) {
                         const distToStart = calculateDistance(closestPointOnPipe, pipeStart);
                         const distToEnd = calculateDistance(closestPointOnPipe, pipeEnd);
 
@@ -1485,28 +1675,100 @@ export const createAutoLateralConnectionPoints = (
     pipes: AutoLateralPipeResult[]
 ): AutoLateralConnectionPoint[] => {
     const connectionPoints: AutoLateralConnectionPoint[] = [];
-    const connectionMap = new Map<string, AutoLateralConnectionPoint>();
+    
+    // ตรวจสอบว่ามีท่อหรือไม่
+    if (!pipes || pipes.length === 0) {
+        return connectionPoints;
+    }
 
-    for (const pipe of pipes) {
-        if (!pipe.intersectionData) continue;
+    // ใช้ threshold 3 เมตรสำหรับการรวมจุดที่ใกล้กัน (ลดจาก 5 เมตรเพื่อความแม่นยำ)
+    const MERGE_THRESHOLD_METERS = 3; // 3 meters
 
-        const { point, subMainPipeId } = pipe.intersectionData;
+    // ฟังก์ชันตรวจสอบว่าจุดสองจุดอยู่ใกล้กันมากพอที่จะรวมกันหรือไม่
+    const arePointsClose = (
+        point1: Coordinate,
+        point2: Coordinate,
+        thresholdMeters: number = MERGE_THRESHOLD_METERS
+    ): boolean => {
+        const distance = calculateDistance(point1, point2);
+        return distance <= thresholdMeters;
+    };
+
+    // ฟังก์ชันหาจุดเชื่อมต่อที่ใกล้ที่สุด (ปรับปรุงให้ครอบคลุมมากขึ้น)
+    const findNearbyConnectionPoint = (
+        point: Coordinate,
+        zoneId: string,
+        connectionType: 'through_submain' | 'from_submain',
+        subMainPipeId: string
+    ): AutoLateralConnectionPoint | null => {
+        for (const existingPoint of connectionPoints) {
+            // ตรวจสอบว่าจุดอยู่ใกล้กัน
+            if (!arePointsClose(existingPoint.position, point, MERGE_THRESHOLD_METERS)) {
+                continue;
+            }
+
+            // ตรวจสอบว่าเป็นโซนเดียวกัน, โหมดเดียวกัน, และท่อเมนรองเดียวกัน
+            if (
+                existingPoint.zoneId === zoneId &&
+                existingPoint.type === connectionType &&
+                existingPoint.subMainPipeId === subMainPipeId
+            ) {
+                return existingPoint;
+            }
+
+            // ถ้าจุดอยู่ใกล้กันมาก (ภายใน 1 เมตร) แม้จะเป็น type ต่างกันหรือ subMainPipeId ต่างกัน
+            // ให้ merge ถ้าเป็นโซนเดียวกัน (เพื่อหลีกเลี่ยงจุดซ้ำ)
+            if (
+                arePointsClose(existingPoint.position, point, 1) &&
+                existingPoint.zoneId === zoneId
+            ) {
+                return existingPoint;
+            }
+        }
+        return null;
+    };
+
+    // ตรวจสอบและกรองท่อที่มี intersectionData
+    const validPipes = pipes.filter((pipe) => {
+        if (!pipe.intersectionData) return false;
+        if (!pipe.intersectionData.point) return false;
+        if (!pipe.intersectionData.subMainPipeId) return false;
+        if (!pipe.zoneId) return false;
+        return true;
+    });
+
+    for (const pipe of validPipes) {
+        const { point, subMainPipeId } = pipe.intersectionData!;
         const connectionType = pipe.connectionType || 'from_submain';
 
-        // สร้าง key ที่รวมโซนและโหมดการลากท่อย่อย เพื่อแยกจุดเชื่อมต่อตามโซนและโหมด
-        const pointKey = `${point.lat.toFixed(6)}-${point.lng.toFixed(6)}-${pipe.zoneId}-${connectionType}`;
+        // ตรวจสอบว่าจุดมีข้อมูลครบถ้วน
+        if (!point || !subMainPipeId || !pipe.zoneId) {
+            console.warn('Invalid pipe data for connection point:', pipe);
+            continue;
+        }
 
-        if (connectionMap.has(pointKey)) {
-            const existingPoint = connectionMap.get(pointKey)!;
-            existingPoint.connectedLaterals.push(pipe.id);
+        // หาจุดเชื่อมต่อที่ใกล้ที่สุด
+        const nearbyPoint = findNearbyConnectionPoint(
+            point,
+            pipe.zoneId,
+            connectionType,
+            subMainPipeId
+        );
 
-            // อัปเดต title ให้แสดงจำนวนท่อที่เชื่อมต่อ
-            if (connectionType === 'through_submain') {
-                existingPoint.title = `จุดข้ามท่อเมนย่อย (ลากผ่าน) - ${existingPoint.connectedLaterals.length} ท่อ`;
-            } else {
-                existingPoint.title = `จุดเชื่อมต่อท่อเมนย่อย (เริ่มจาก) - ${existingPoint.connectedLaterals.length} ท่อ`;
+        if (nearbyPoint) {
+            // รวมท่อเข้ากับจุดที่มีอยู่แล้ว
+            if (!nearbyPoint.connectedLaterals.includes(pipe.id)) {
+                nearbyPoint.connectedLaterals.push(pipe.id);
+
+                // อัปเดต title ให้แสดงจำนวนท่อที่เชื่อมต่อ
+                if (connectionType === 'through_submain') {
+                    nearbyPoint.title = `จุดข้ามท่อเมนย่อย (ลากผ่าน) - ${nearbyPoint.connectedLaterals.length} ท่อ`;
+                } else {
+                    nearbyPoint.title = `จุดเชื่อมต่อท่อเมนย่อย (เริ่มจาก) - ${nearbyPoint.connectedLaterals.length} ท่อ`;
+                }
             }
         } else {
+            // สร้างจุดเชื่อมต่อใหม่
             const color = connectionType === 'through_submain' ? '#4CAF50' : '#FFD700'; // เขียว : เหลือง
             const title =
                 connectionType === 'through_submain'
@@ -1514,7 +1776,7 @@ export const createAutoLateralConnectionPoints = (
                     : 'จุดเชื่อมต่อท่อเมนย่อย (เริ่มจาก) - 1 ท่อ';
 
             const connectionPoint: AutoLateralConnectionPoint = {
-                id: `auto-connection-${pointKey}`,
+                id: `auto-connection-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 position: point,
                 connectedLaterals: [pipe.id],
                 subMainPipeId,
@@ -1524,10 +1786,48 @@ export const createAutoLateralConnectionPoints = (
                 title,
             };
 
-            connectionMap.set(pointKey, connectionPoint);
             connectionPoints.push(connectionPoint);
         }
     }
 
-    return connectionPoints;
+    // ตรวจสอบและลบจุดที่ซ้ำกันซ้ำอีกครั้ง (เพื่อความแน่ใจ)
+    const finalPoints: AutoLateralConnectionPoint[] = [];
+    const seenPositions = new Map<string, AutoLateralConnectionPoint>();
+
+    for (const point of connectionPoints) {
+        const positionKey = `${point.position.lat.toFixed(6)}_${point.position.lng.toFixed(6)}`;
+        const existingPoint = seenPositions.get(positionKey);
+
+        if (existingPoint) {
+            // ถ้ามีจุดอยู่ที่ตำแหน่งเดียวกัน ให้ merge ท่อเข้าด้วยกัน
+            for (const lateralId of point.connectedLaterals) {
+                if (!existingPoint.connectedLaterals.includes(lateralId)) {
+                    existingPoint.connectedLaterals.push(lateralId);
+                }
+            }
+
+            // อัปเดต title
+            if (existingPoint.type === 'through_submain') {
+                existingPoint.title = `จุดข้ามท่อเมนย่อย (ลากผ่าน) - ${existingPoint.connectedLaterals.length} ท่อ`;
+            } else {
+                existingPoint.title = `จุดเชื่อมต่อท่อเมนย่อย (เริ่มจาก) - ${existingPoint.connectedLaterals.length} ท่อ`;
+            }
+        } else {
+            // เพิ่มจุดใหม่
+            finalPoints.push(point);
+            seenPositions.set(positionKey, point);
+        }
+    }
+
+    return finalPoints;
 };
+
+
+
+
+
+
+
+
+
+
