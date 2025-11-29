@@ -169,7 +169,7 @@ export default function Login({ status }: LoginProps) {
                                     onChange={(e) => setData('email', e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     placeholder="example@company.com"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 text-black transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
                             <InputError message={errors.email} />
@@ -206,7 +206,7 @@ export default function Login({ status }: LoginProps) {
                                     onChange={(e) => setData('password', e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     placeholder="รหัสผ่านของคุณ"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 text-black transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                                 <button
                                     type="button"
