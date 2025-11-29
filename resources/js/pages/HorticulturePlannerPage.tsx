@@ -7273,6 +7273,46 @@ export default function EnhancedHorticulturePlannerPage() {
         },
     ];
 
+    // Navigation functions for tabs
+    const canGoToNextTab = () => {
+        if (activeTab === 'area') {
+            // ต้องมีโซนก่อน (irrigationZones หรือ zones)
+            const hasZones =
+                (history.present.irrigationZones && history.present.irrigationZones.length > 0) ||
+                (history.present.zones && history.present.zones.length > 0);
+            return hasZones;
+        }
+        if (activeTab === 'water') {
+            // ต้องมีท่อย่อยก่อน
+            return (
+                history.present.subMainPipes && history.present.subMainPipes.length > 0
+            );
+        }
+        return true; // summary tab ไม่มีเงื่อนไข
+    };
+
+    const handleNextTab = () => {
+        if (!canGoToNextTab()) {
+            if (activeTab === 'area') {
+                alert(t('กรุณาแบ่งโซนก่อนไปยังแท็บถัดไป'));
+            } else if (activeTab === 'water') {
+                alert(t('กรุณาวางท่อย่อยก่อนไปยังแท็บถัดไป'));
+            }
+            return;
+        }
+        const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+        if (currentIndex < tabs.length - 1) {
+            setActiveTab(tabs[currentIndex + 1].id);
+        }
+    };
+
+    const handlePreviousTab = () => {
+        const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+        if (currentIndex > 0) {
+            setActiveTab(tabs[currentIndex - 1].id);
+        }
+    };
+
     const handleSelectItem = useCallback(
         (id: string, type: 'plants' | 'pipes' | 'zones') => {
             const currentSelection = history.present.selectedItems[type];
@@ -15075,6 +15115,28 @@ export default function EnhancedHorticulturePlannerPage() {
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Navigation buttons for area tab */}
+                                    <div className="mt-6 space-y-2 border-t border-gray-700 pt-4">
+                                        {!canGoToNextTab() && (
+                                            <div className="rounded-lg border border-yellow-500 bg-yellow-900 bg-opacity-50 p-2 text-sm text-yellow-200">
+                                                ⚠️ {t('กรุณาแบ่งโซนก่อนไปยังแท็บถัดไป')}
+                                            </div>
+                                        )}
+                                        <div className="flex justify-end space-x-2">
+                                            <button
+                                                onClick={handleNextTab}
+                                                disabled={!canGoToNextTab()}
+                                                className={`rounded-lg px-6 py-2 font-medium text-white transition-colors ${
+                                                    canGoToNextTab()
+                                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                                        : 'cursor-not-allowed bg-gray-500 opacity-50'
+                                                }`}
+                                            >
+                                                {t('ถัดไป')} →
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -15491,6 +15553,34 @@ export default function EnhancedHorticulturePlannerPage() {
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Navigation buttons for water tab */}
+                                    <div className="mt-6 space-y-2 border-t border-gray-700 pt-4">
+                                        {!canGoToNextTab() && (
+                                            <div className="rounded-lg border border-yellow-500 bg-yellow-900 bg-opacity-50 p-2 text-sm text-yellow-200">
+                                                ⚠️ {t('กรุณาวางท่อย่อยก่อนไปยังแท็บถัดไป')}
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between space-x-2">
+                                            <button
+                                                onClick={handlePreviousTab}
+                                                className="rounded-lg bg-gray-600 px-6 py-2 font-medium text-white transition-colors hover:bg-gray-700"
+                                            >
+                                                ← {t('ย้อนกลับ')}
+                                            </button>
+                                            <button
+                                                onClick={handleNextTab}
+                                                disabled={!canGoToNextTab()}
+                                                className={`rounded-lg px-6 py-2 font-medium text-white transition-colors ${
+                                                    canGoToNextTab()
+                                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                                        : 'cursor-not-allowed bg-gray-500 opacity-50'
+                                                }`}
+                                            >
+                                                {t('ถัดไป')} →
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -15688,6 +15778,21 @@ export default function EnhancedHorticulturePlannerPage() {
                                                 </div>
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Navigation buttons for summary tab */}
+                                    <div className="mt-6 space-y-2 border-t border-gray-700 pt-4">
+                                        <div className="rounded-lg border border-green-500 bg-green-900 bg-opacity-50 p-3 text-sm text-green-200">
+                                            ✅ {t('ถ้าเสร็จแล้ว ให้กดปุ่ม สรุปโครงการ')}
+                                        </div>
+                                        <div className="flex justify-start space-x-2">
+                                            <button
+                                                onClick={handlePreviousTab}
+                                                className="rounded-lg bg-gray-600 px-6 py-2 font-medium text-white transition-colors hover:bg-gray-700"
+                                            >
+                                                ← {t('ย้อนกลับ')}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
