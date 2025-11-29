@@ -16,9 +16,9 @@ function ChooseCrop() {
     // State
     const [searchValue, setSearchValue] = useState('');
     const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<
-        'all' | 'fruits' | 'economic-trees'
-    >('all');
+    const [selectedCategory, setSelectedCategory] = useState<'all' | 'fruits' | 'economic-trees'>(
+        'all'
+    );
 
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());

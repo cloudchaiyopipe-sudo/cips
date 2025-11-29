@@ -35,19 +35,19 @@ function AcCount() {
 
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());
-    
+
     // State for change password modal
     const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-    
+
     // State for edit profile mode
     const [isEditingProfile, setIsEditingProfile] = useState(false);
-    
+
     // State for email verification
     const [verificationStatus, setVerificationStatus] = useState<string | null>(
         page.props.status === 'verification-link-sent' ? 'sent' : null
     );
     const [sendingVerification, setSendingVerification] = useState(false);
-    
+
     // Check for status from session on mount
     useEffect(() => {
         if (page.props.status === 'verification-link-sent') {
@@ -58,27 +58,26 @@ function AcCount() {
             }, 5000);
         }
     }, [page.props.status]);
-    
+
     // Form for changing password
     const { data, setData, put, processing, errors, reset, recentlySuccessful } = useForm({
         current_password: '',
         password: '',
         password_confirmation: '',
     });
-    
+
     // Form for editing profile (name only)
-    const { 
-        data: profileData, 
-        setData: setProfileData, 
-        patch: patchProfile, 
-        processing: profileProcessing, 
-        errors: profileErrors, 
+    const {
+        data: profileData,
+        setData: setProfileData,
+        patch: patchProfile,
+        processing: profileProcessing,
+        errors: profileErrors,
         reset: resetProfile,
-        recentlySuccessful: profileRecentlySuccessful
+        recentlySuccessful: profileRecentlySuccessful,
     } = useForm({
         name: user?.name || '',
     });
-    
 
     // Listen for language changes
     useEffect(() => {
@@ -110,14 +109,17 @@ function AcCount() {
             router.visit('/free-plan');
             return;
         }
-        
+
         // ตรวจสอบ referrer ว่ามาจากหน้า /admin/articles หรือไม่
         const referrer = document.referrer;
-        if (referrer && (referrer.includes('/admin/articles') || referrer.includes('/admin/articles/create'))) {
+        if (
+            referrer &&
+            (referrer.includes('/admin/articles') || referrer.includes('/admin/articles/create'))
+        ) {
             router.visit('/free-plan');
             return;
         }
-        
+
         // ถ้ามี history ให้กลับไปหน้าก่อนหน้า
         if (window.history.length > 1) {
             window.history.back();
@@ -137,35 +139,39 @@ function AcCount() {
     };
     const handleChangePassword = () => setShowChangePasswordModal(true);
     const handleManageAds = () => router.visit('/free-plan/ads');
-    
+
     const handleSendVerificationEmail = () => {
         setSendingVerification(true);
         setVerificationStatus(null);
-        
-        router.post(route('verification.send'), {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setVerificationStatus('sent');
-                setSendingVerification(false);
-                // Clear status after 5 seconds
-                setTimeout(() => {
-                    setVerificationStatus(null);
-                }, 5000);
-            },
-            onError: () => {
-                setVerificationStatus('error');
-                setSendingVerification(false);
-                // Clear error after 5 seconds
-                setTimeout(() => {
-                    setVerificationStatus(null);
-                }, 5000);
-            },
-        });
+
+        router.post(
+            route('verification.send'),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setVerificationStatus('sent');
+                    setSendingVerification(false);
+                    // Clear status after 5 seconds
+                    setTimeout(() => {
+                        setVerificationStatus(null);
+                    }, 5000);
+                },
+                onError: () => {
+                    setVerificationStatus('error');
+                    setSendingVerification(false);
+                    // Clear error after 5 seconds
+                    setTimeout(() => {
+                        setVerificationStatus(null);
+                    }, 5000);
+                },
+            }
+        );
     };
-    
+
     const updatePassword: FormEventHandler = (e) => {
         e.preventDefault();
-        
+
         put(route('password.update'), {
             preserveScroll: true,
             onSuccess: () => {
@@ -184,10 +190,10 @@ function AcCount() {
             },
         });
     };
-    
+
     const updateProfile: FormEventHandler = (e) => {
         e.preventDefault();
-        
+
         patchProfile(route('profile.update'), {
             preserveScroll: true,
             onSuccess: () => {
@@ -257,7 +263,7 @@ function AcCount() {
                             <input
                                 type="text"
                                 disabled={!isEditingProfile}
-                                value={isEditingProfile ? profileData.name : (user?.name || 'User')}
+                                value={isEditingProfile ? profileData.name : user?.name || 'User'}
                                 onChange={(e) => setProfileData('name', e.target.value)}
                                 className={`w-full rounded px-3 py-2 text-sm ${
                                     isEditingProfile
@@ -270,7 +276,8 @@ function AcCount() {
                             )}
                             {profileRecentlySuccessful && isEditingProfile && (
                                 <p className="mt-1 text-xs text-green-400">
-                                    {translations.passwordChangedSuccessfully || 'บันทึกเรียบร้อยแล้ว'}
+                                    {translations.passwordChangedSuccessfully ||
+                                        'บันทึกเรียบร้อยแล้ว'}
                                 </p>
                             )}
                         </div>
@@ -353,7 +360,9 @@ function AcCount() {
                 {/* Advertisement Management - แสดงเฉพาะ Admin */}
                 {isAdmin && (
                     <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
-                        <div className="mb-2 font-semibold">{translations.advertisementManagement}</div>
+                        <div className="mb-2 font-semibold">
+                            {translations.advertisementManagement}
+                        </div>
                         <div className="mb-3 text-sm text-slate-300">
                             {translations.uploadManageAds}
                         </div>
@@ -394,55 +403,63 @@ function AcCount() {
                 {/* Account Security */}
                 <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
                     <div className="mb-2 font-semibold">{translations.accountSecurity}</div>
-                    
+
                     {/* Email Verification Status */}
                     {user && (
                         <div className="mb-4 rounded-lg bg-slate-700/50 p-3">
                             <div className="mb-2 flex items-center justify-between">
-                                <span className="text-sm text-slate-300">{translations.emailStatus || 'Email Status'}:</span>
-                                <span className={`text-sm font-semibold ${
-                                    user.email_verified_at 
-                                        ? 'text-green-400' 
-                                        : 'text-yellow-400'
-                                }`}>
-                                    {user.email_verified_at 
-                                        ? `✓ ${translations.verified || 'Verified'}` 
+                                <span className="text-sm text-slate-300">
+                                    {translations.emailStatus || 'Email Status'}:
+                                </span>
+                                <span
+                                    className={`text-sm font-semibold ${
+                                        user.email_verified_at
+                                            ? 'text-green-400'
+                                            : 'text-yellow-400'
+                                    }`}
+                                >
+                                    {user.email_verified_at
+                                        ? `✓ ${translations.verified || 'Verified'}`
                                         : `⚠ ${translations.unverified || 'Unverified'}`}
                                 </span>
                             </div>
-                            
+
                             {!user.email_verified_at && (
                                 <div className="mt-3 space-y-2">
                                     <p className="text-xs text-slate-400">
-                                        {translations.sendVerificationEmail || 'Please verify your email address to secure your account.'}
+                                        {translations.sendVerificationEmail ||
+                                            'Please verify your email address to secure your account.'}
                                     </p>
-                                    
+
                                     {verificationStatus === 'sent' && (
                                         <div className="rounded bg-green-900/30 p-2 text-xs text-green-300">
-                                            {translations.verificationEmailSent || 'Verification email sent. Please check your email.'}
+                                            {translations.verificationEmailSent ||
+                                                'Verification email sent. Please check your email.'}
                                         </div>
                                     )}
-                                    
+
                                     {verificationStatus === 'error' && (
                                         <div className="rounded bg-red-900/30 p-2 text-xs text-red-300">
-                                            {translations.errorSendingEmail || 'Failed to send verification email. Please try again.'}
+                                            {translations.errorSendingEmail ||
+                                                'Failed to send verification email. Please try again.'}
                                         </div>
                                     )}
-                                    
+
                                     <button
                                         onClick={handleSendVerificationEmail}
                                         disabled={sendingVerification}
-                                        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                        {sendingVerification 
-                                            ? `${translations.sending || 'Sending'}...` 
-                                            : translations.sendVerificationEmail || 'Send Verification Email'}
+                                        {sendingVerification
+                                            ? `${translations.sending || 'Sending'}...`
+                                            : translations.sendVerificationEmail ||
+                                              'Send Verification Email'}
                                     </button>
                                 </div>
                             )}
                         </div>
                     )}
-                    
+
                     {/* Security Actions */}
                     <div className="flex flex-col gap-3 md:flex-row md:flex-nowrap md:items-center">
                         <button
@@ -460,7 +477,7 @@ function AcCount() {
                     </div>
                 </div>
             </div>
-            
+
             {/* Change Password Modal */}
             {showChangePasswordModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -475,12 +492,12 @@ function AcCount() {
                         >
                             ✕
                         </button>
-                        
+
                         {/* Modal Title */}
                         <h2 className="mb-4 text-xl font-semibold text-white">
                             {translations.changePassword}
                         </h2>
-                        
+
                         {/* Form */}
                         <form onSubmit={updatePassword} className="space-y-4">
                             {/* Current Password */}
@@ -497,10 +514,12 @@ function AcCount() {
                                     autoComplete="current-password"
                                 />
                                 {errors.current_password && (
-                                    <p className="mt-1 text-sm text-red-400">{errors.current_password}</p>
+                                    <p className="mt-1 text-sm text-red-400">
+                                        {errors.current_password}
+                                    </p>
                                 )}
                             </div>
-                            
+
                             {/* New Password */}
                             <div>
                                 <label className="mb-1 block text-sm text-slate-300">
@@ -518,7 +537,7 @@ function AcCount() {
                                     <p className="mt-1 text-sm text-red-400">{errors.password}</p>
                                 )}
                             </div>
-                            
+
                             {/* Confirm Password */}
                             <div>
                                 <label className="mb-1 block text-sm text-slate-300">
@@ -527,23 +546,30 @@ function AcCount() {
                                 <input
                                     type="password"
                                     value={data.password_confirmation}
-                                    onChange={(e) => setData('password_confirmation', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('password_confirmation', e.target.value)
+                                    }
                                     className="w-full rounded bg-slate-700 px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                    placeholder={translations.confirmPassword || 'ยืนยันรหัสผ่านใหม่'}
+                                    placeholder={
+                                        translations.confirmPassword || 'ยืนยันรหัสผ่านใหม่'
+                                    }
                                     autoComplete="new-password"
                                 />
                                 {errors.password_confirmation && (
-                                    <p className="mt-1 text-sm text-red-400">{errors.password_confirmation}</p>
+                                    <p className="mt-1 text-sm text-red-400">
+                                        {errors.password_confirmation}
+                                    </p>
                                 )}
                             </div>
-                            
+
                             {/* Success Message */}
                             {recentlySuccessful && (
                                 <p className="text-sm text-green-400">
-                                    {translations.passwordChangedSuccessfully || 'รหัสผ่านถูกเปลี่ยนเรียบร้อยแล้ว'}
+                                    {translations.passwordChangedSuccessfully ||
+                                        'รหัสผ่านถูกเปลี่ยนเรียบร้อยแล้ว'}
                                 </p>
                             )}
-                            
+
                             {/* Buttons */}
                             <div className="flex gap-3 pt-2">
                                 <button

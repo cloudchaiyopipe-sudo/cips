@@ -5,11 +5,7 @@ import { CalculationResults } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { formatWaterFlow } from '../utils/calculations';
 import { useLanguage } from '@/contexts/LanguageContext';
-import {
-    loadSprinklerConfig,
-    formatFlowRate,
-    formatPressure,
-} from '../../utils/sprinklerUtils';
+import { loadSprinklerConfig, formatFlowRate, formatPressure } from '../../utils/sprinklerUtils';
 import SearchableDropdown from './SearchableDropdown';
 import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
 
@@ -101,14 +97,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
-
     const getMinValue = (value: any): number => {
         if (Array.isArray(value)) {
             return Math.min(value[0], value[1]);
         }
         return parseFloat(String(value)) || 0;
     };
-
 
     const getMaxValue = (value: any): number => {
         if (Array.isArray(value)) {
@@ -117,14 +111,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
-
     const isValueInRange = (value: any, target: number): boolean => {
         if (Array.isArray(value)) {
             return target >= value[0] && target <= value[1];
         }
         return Math.abs(value - target) < 0.01;
     };
-
 
     useEffect(() => {
         if (
@@ -172,7 +164,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             flowRatePerMinute: flowRate,
                             pressureBar: pressureBar,
                         };
-
                     } else {
                         sprinklerConfig = {
                             flowRatePerMinute: 10.0,
@@ -305,7 +296,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         flowRatePerMinute: flowRate,
                         pressureBar: pressureBar,
                     };
-
                 } else {
                     sprinklerConfig = {
                         flowRatePerMinute: 10.0,
@@ -354,13 +344,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 onSprinklerChange(bestSprinkler);
             }
         }
-    }, [
-        projectMode,
-        selectedSprinkler,
-        analyzedSprinklers,
-        sortedSprinklers,
-        onSprinklerChange,
-    ]);
+    }, [projectMode, selectedSprinkler, analyzedSprinklers, sortedSprinklers, onSprinklerChange]);
 
     const formatRangeValue = (value: any) => {
         if (Array.isArray(value)) return `${value[0]}-${value[1]}`;
@@ -452,39 +436,40 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             if (storedData) {
                                 const summaryData = JSON.parse(storedData);
 
-                    const flowRate = summaryData?.sprinklerFlowRate || 10.0;
-                    const pressureBar = summaryData?.sprinklerPressure || 2.0;
+                                const flowRate = summaryData?.sprinklerFlowRate || 10.0;
+                                const pressureBar = summaryData?.sprinklerPressure || 2.0;
 
-                    sprinklerConfig = {
-                        flowRatePerMinute: flowRate,
-                        pressureBar: pressureBar,
-                    };
-
-                } else {
-
-                    sprinklerConfig = {
-                        flowRatePerMinute: 10.0,
-                        pressureBar: 2.0,
-                    };
-                }
-            } catch (error) {
-                sprinklerConfig = {
-                    flowRatePerMinute: 10.0,
-                    pressureBar: 2.0,
-                };
-            }
-                    } else if (projectMode === 'field-crop') {
-                            if (fieldCropData && fieldCropData.irrigationSettings) {
                                 sprinklerConfig = {
-                                    flowRatePerMinute: fieldCropData.irrigationSettings.sprinkler_system?.flow ?? 0,
-                                    pressureBar: fieldCropData.irrigationSettings.sprinkler_system?.pressure ?? 0,
+                                    flowRatePerMinute: flowRate,
+                                    pressureBar: pressureBar,
                                 };
                             } else {
                                 sprinklerConfig = {
-                                    flowRatePerMinute: 0,
-                                    pressureBar: 0,
+                                    flowRatePerMinute: 10.0,
+                                    pressureBar: 2.0,
                                 };
                             }
+                        } catch (error) {
+                            sprinklerConfig = {
+                                flowRatePerMinute: 10.0,
+                                pressureBar: 2.0,
+                            };
+                        }
+                    } else if (projectMode === 'field-crop') {
+                        if (fieldCropData && fieldCropData.irrigationSettings) {
+                            sprinklerConfig = {
+                                flowRatePerMinute:
+                                    fieldCropData.irrigationSettings.sprinkler_system?.flow ?? 0,
+                                pressureBar:
+                                    fieldCropData.irrigationSettings.sprinkler_system?.pressure ??
+                                    0,
+                            };
+                        } else {
+                            sprinklerConfig = {
+                                flowRatePerMinute: 0,
+                                pressureBar: 0,
+                            };
+                        }
                     }
                     return sprinklerConfig ? (
                         <div className="mb-4 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
@@ -653,7 +638,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                     if (projectMode === 'horticulture') {
                                         const config = loadSprinklerConfig();
                                         const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                                        return (results.totalSprinklers * sprinklersPerTree).toLocaleString();
+                                        return (
+                                            results.totalSprinklers * sprinklersPerTree
+                                        ).toLocaleString();
                                     }
                                     return results.totalSprinklers.toLocaleString();
                                 })()}{' '}
@@ -670,12 +657,17 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                     {(() => {
                                         if (projectMode === 'horticulture') {
                                             const config = loadSprinklerConfig();
-                                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                            const sprinklersPerTree =
+                                                config?.sprinklersPerTree || 1;
                                             return (
-                                                selectedSprinkler.price * results.totalSprinklers * sprinklersPerTree
+                                                selectedSprinkler.price *
+                                                results.totalSprinklers *
+                                                sprinklersPerTree
                                             ).toLocaleString();
                                         }
-                                        return (selectedSprinkler.price * results.totalSprinklers).toLocaleString();
+                                        return (
+                                            selectedSprinkler.price * results.totalSprinklers
+                                        ).toLocaleString();
                                     })()}
                                 </span>{' '}
                                 {t('บาท')}
@@ -690,7 +682,6 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </p>
                         </div>
                     )}
-
                 </div>
             )}
 

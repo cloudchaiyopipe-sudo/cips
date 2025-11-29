@@ -18,28 +18,28 @@ export const getPlantImagePath = (plantName: string | undefined | null): string 
 
     // Mapping plant names to image file names
     const imageNameMap: Record<string, string> = {
-        'Durian': 'durian.png',
-        'Mangosteen': 'mangosteen.png',
-        'Longan': 'longan.png',
-        'Lychee': 'lychee.png',
-        'Rambutan': 'rambutan.png',
-        'Mango': 'mango.png',
-        'Jackfruit': 'jackfruit.png',
-        'Pomelo': 'pomelo.png',
-        'Longkong': 'longkong.png',
+        Durian: 'durian.png',
+        Mangosteen: 'mangosteen.png',
+        Longan: 'longan.png',
+        Lychee: 'lychee.png',
+        Rambutan: 'rambutan.png',
+        Mango: 'mango.png',
+        Jackfruit: 'jackfruit.png',
+        Pomelo: 'pomelo.png',
+        Longkong: 'longkong.png',
         'Mayong Chit': 'mayong chit.png',
-        'Avocado': 'avocado.png',
-        'Tamarind': 'tamarind.png',
+        Avocado: 'avocado.png',
+        Tamarind: 'tamarind.png',
         'Bitter Bean': 'bitter bean.png',
-        'Coconut': 'coconut.png',
+        Coconut: 'coconut.png',
         'Coconut Cooking': 'coconut.png',
         'Coconut Fragrant': 'coconut.png',
         'Oil Palm': 'oil palm.png',
-        'Rubber': 'rubber.png',
-        'Bamboo': 'bamboo.png',
-        'Teak': 'teak.png',
+        Rubber: 'rubber.png',
+        Bamboo: 'bamboo.png',
+        Teak: 'teak.png',
         'Yang Na': 'yang na.png',
-        'Payung': 'payung.png',
+        Payung: 'payung.png',
     };
 
     const imageName = imageNameMap[plantName] || 'coconut.png'; // fallback
@@ -69,7 +69,7 @@ export const plantNameMap: Record<string, string> = {
     Bamboo: 'bamboo',
     Teak: 'teak',
     'Yang Na': 'yangNa',
-    'Payung': 'payung',
+    Payung: 'payung',
 };
 
 // Thai Garden Plants Database
@@ -254,9 +254,7 @@ export const searchGardenPlants = (query: string): GardenPlant[] => {
     return gardenPlants.filter((plant) => plant.name.toLowerCase().includes(lowercaseQuery));
 };
 
-export const getGardenPlantsByCategory = (
-    category: 'fruits' | 'economic-trees'
-): GardenPlant[] => {
+export const getGardenPlantsByCategory = (category: 'fruits' | 'economic-trees'): GardenPlant[] => {
     const categoryMap: Record<string, string[]> = {
         fruits: [
             'Durian',
@@ -276,14 +274,7 @@ export const getGardenPlantsByCategory = (
             'Coconut Cooking',
             'Coconut Fragrant',
         ],
-        'economic-trees': [
-            'Oil Palm',
-            'Rubber',
-            'Bamboo',
-            'Teak',
-            'Yang Na',
-            'Payung',
-        ],
+        'economic-trees': ['Oil Palm', 'Rubber', 'Bamboo', 'Teak', 'Yang Na', 'Payung'],
     };
 
     const plantNames = categoryMap[category] || [];

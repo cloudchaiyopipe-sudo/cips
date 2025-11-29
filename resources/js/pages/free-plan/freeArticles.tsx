@@ -67,12 +67,7 @@ function FreeArticles() {
                     onClick={handleBack}
                     className="mb-6 flex items-center gap-2 text-slate-300 transition-colors hover:text-white"
                 >
-                    <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -83,7 +78,7 @@ function FreeArticles() {
                     <span className="font-medium">กลับไปหน้าข่าวสาร</span>
                 </button>
 
-                <article className="rounded-xl bg-slate-800/80 backdrop-blur-sm p-6 md:p-8">
+                <article className="rounded-xl bg-slate-800/80 p-6 backdrop-blur-sm md:p-8">
                     {/* Article Header */}
                     <div className="mb-6">
                         {/* Category Tag */}
@@ -171,4 +166,3 @@ function FreeArticles() {
 
 // 6. Export
 export default FreeArticles;
-

@@ -1,9 +1,9 @@
 export interface SprinklerConfig {
-    flowRatePerMinute: number; 
-    pressureBar: number; 
+    flowRatePerMinute: number;
+    pressureBar: number;
     sprinklersPerTree: number; // จำนวนสปริงเกอร์ต่อต้นไม้ 1 ต้น
-    createdAt: string; 
-    updatedAt: string; 
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface SprinklerFormData {
@@ -13,7 +13,6 @@ export interface SprinklerFormData {
 }
 
 export const SPRINKLER_STORAGE_KEY = 'sprinklerConfig';
-
 
 export const saveSprinklerConfig = (
     config: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'>
@@ -60,7 +59,11 @@ export const clearSprinklerConfig = (): void => {
     }
 };
 
-export const calculateTotalFlowRate = (plantCount: number, flowRatePerMinute: number, sprinklersPerTree: number = 1): number => {
+export const calculateTotalFlowRate = (
+    plantCount: number,
+    flowRatePerMinute: number,
+    sprinklersPerTree: number = 1
+): number => {
     if (plantCount <= 0 || flowRatePerMinute <= 0) return 0;
     return plantCount * flowRatePerMinute * sprinklersPerTree;
 };
@@ -75,7 +78,6 @@ export const calculateDailyWaterUsage = (
 ): number => {
     return flowRatePerMinute * 60 * hoursPerDay;
 };
-
 
 export const validateSprinklerConfig = (
     config: SprinklerFormData
@@ -127,7 +129,11 @@ export const formatPressure = (pressure: number): string => {
 export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: number) => {
     const sprinklersPerTree = config.sprinklersPerTree || 1;
     const totalSprinklers = plantCount * sprinklersPerTree;
-    const totalFlowRate = calculateTotalFlowRate(plantCount, config.flowRatePerMinute, sprinklersPerTree);
+    const totalFlowRate = calculateTotalFlowRate(
+        plantCount,
+        config.flowRatePerMinute,
+        sprinklersPerTree
+    );
     const dailyUsage = calculateDailyWaterUsage(totalFlowRate);
 
     return {
@@ -145,7 +151,7 @@ export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: nu
 };
 
 export const DEFAULT_SPRINKLER_CONFIG: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'> = {
-    flowRatePerMinute: 2.5, 
+    flowRatePerMinute: 2.5,
     pressureBar: 2.0,
     sprinklersPerTree: 1, // จำนวนสปริงเกอร์ต่อต้นไม้ 1 ต้น (ค่าเริ่มต้น)
 };

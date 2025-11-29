@@ -827,12 +827,19 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             Object.keys(zoneSprinklers).length > 1
         ) {
             // ใช้ zoneInputs และ zoneSprinklers โดยตรงเพื่อให้ครอบคลุมทุกโซน
-            const zonesToProcess = projectData?.useZones && projectData.zones.length > 1
-                ? projectData.zones
-                : Object.keys(zoneInputs).length > 0
-                ? Object.keys(zoneInputs).map((zoneId) => ({ id: zoneId, plantCount: zoneInputs[zoneId]?.totalTrees || 0 }))
-                : Object.keys(zoneSprinklers).map((zoneId) => ({ id: zoneId, plantCount: 0 }));
-            
+            const zonesToProcess =
+                projectData?.useZones && projectData.zones.length > 1
+                    ? projectData.zones
+                    : Object.keys(zoneInputs).length > 0
+                      ? Object.keys(zoneInputs).map((zoneId) => ({
+                            id: zoneId,
+                            plantCount: zoneInputs[zoneId]?.totalTrees || 0,
+                        }))
+                      : Object.keys(zoneSprinklers).map((zoneId) => ({
+                            id: zoneId,
+                            plantCount: 0,
+                        }));
+
             zonesToProcess.forEach((zone: any) => {
                 const zoneSprinkler = zoneSprinklers[zone.id];
                 const zonePipes = selectedPipes[zone.id] || {};

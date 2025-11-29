@@ -98,7 +98,7 @@ function FootNav() {
         },
     ];
 
-    const handleNavClick = (item: typeof navItems[0]) => {
+    const handleNavClick = (item: (typeof navItems)[0]) => {
         if (item.id === 'add-field') {
             // Navigate directly to choose-crop page (same as add field action)
             router.visit('/free-plan/choose-crop');
@@ -108,7 +108,7 @@ function FootNav() {
     };
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-600 bg-slate-800/95 backdrop-blur-sm md:hidden shadow-lg">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-600 bg-slate-800/95 shadow-lg backdrop-blur-sm md:hidden">
             <div className="flex h-16 items-center justify-around">
                 {navItems.map((item) => {
                     const isAddField = item.id === 'add-field';
@@ -116,11 +116,11 @@ function FootNav() {
                         <button
                             key={item.id}
                             onClick={() => handleNavClick(item)}
-                            className={`flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors ${
+                            className={`flex h-full flex-1 flex-col items-center justify-center gap-1 transition-colors ${
                                 item.isActive
                                     ? isAddField
-                                        ? 'text-green-500 bg-slate-700/50'
-                                        : 'text-blue-500 bg-slate-700/50'
+                                        ? 'bg-slate-700/50 text-green-500'
+                                        : 'bg-slate-700/50 text-blue-500'
                                     : 'text-slate-400 hover:text-slate-200'
                             }`}
                         >
@@ -141,4 +141,3 @@ function FootNav() {
 }
 
 export default FootNav;
-

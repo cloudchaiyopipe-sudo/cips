@@ -129,10 +129,7 @@ export const createSubMainToMainIntersectionPoints = (
 };
 
 // ฟังก์ชันคำนวณระยะห่างระหว่างสองจุด (ใช้ Haversine formula สำหรับความแม่นยำ)
-const calculateDistanceBetweenPoints = (
-    point1: Coordinate,
-    point2: Coordinate
-): number => {
+const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coordinate): number => {
     const R = 6371000; // Earth's radius in meters
     const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
     const dLng = ((point2.lng - point1.lng) * Math.PI) / 180;
@@ -141,10 +138,7 @@ const calculateDistanceBetweenPoints = (
 
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1Rad) *
-            Math.cos(lat2Rad) *
-            Math.sin(dLng / 2) *
-            Math.sin(dLng / 2);
+        Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     const c = 2 * Math.atan2(Math.sqrt(Math.max(0, a)), Math.sqrt(Math.max(0, 1 - a)));
 
     return R * c; // Distance in meters
@@ -278,10 +272,10 @@ export const createAllConnectionPoints = (
     // เพิ่มจุดเชื่อมต่อตามลำดับความสำคัญ
     // 1. Main to SubMain (สำคัญที่สุด)
     mainToSubMainPoints.forEach(addPointIfNotDuplicate);
-    
+
     // 2. SubMain to Main Intersection
     subMainToMainIntersectionPoints.forEach(addPointIfNotDuplicate);
-    
+
     // 3. SubMain to Main Mid (ถ้ามี)
     subMainToMainMidPoints.forEach(addPointIfNotDuplicate);
 

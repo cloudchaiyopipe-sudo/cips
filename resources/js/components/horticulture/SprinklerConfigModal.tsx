@@ -253,9 +253,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                             {errors.sprinklersPerTree && (
                                 <p className="text-sm text-red-600">{errors.sprinklersPerTree}</p>
                             )}
-                            <p className="text-xs text-white">
-                                จำนวนหัวฉีดที่ใช้ต่อต้นไม้ 1 ต้น
-                            </p>
+                            <p className="text-xs text-white">จำนวนหัวฉีดที่ใช้ต่อต้นไม้ 1 ต้น</p>
                         </div>
                     </div>
 

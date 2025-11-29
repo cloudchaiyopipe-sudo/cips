@@ -11,7 +11,9 @@ function PaymentQR() {
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [paymentStatus, setPaymentStatus] = useState<'pending' | 'successful' | 'failed' | null>(null);
+    const [paymentStatus, setPaymentStatus] = useState<'pending' | 'successful' | 'failed' | null>(
+        null
+    );
     const [amount, setAmount] = useState<number>(599); // Default amount
     const [chargeId, setChargeId] = useState<string | null>(null);
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -27,7 +29,7 @@ function PaymentQR() {
         pollingIntervalRef.current = setInterval(async () => {
             try {
                 const response = await axios.get(`/payment/status/${chargeId}`);
-                
+
                 if (response.data.status === 'successful' || response.data.paid === true) {
                     setPaymentStatus('successful');
                     if (pollingIntervalRef.current) {
@@ -35,7 +37,9 @@ function PaymentQR() {
                     }
                     // Show success message and redirect after a delay
                     setTimeout(() => {
-                        alert('Payment successful! Your Pro Plan subscription will be activated soon.');
+                        alert(
+                            'Payment successful! Your Pro Plan subscription will be activated soon.'
+                        );
                         router.visit('/free-plan/account');
                     }, 2000);
                 } else if (response.data.status === 'failed') {
@@ -59,9 +63,9 @@ function PaymentQR() {
             try {
                 setLoading(true);
                 setError(null);
-                
+
                 const response = await axios.post('/payment/qr');
-                
+
                 if (response.data.status === 'success') {
                     setQrCodeUrl(response.data.qrCodeUrl);
                     // Set amount if provided
@@ -80,7 +84,12 @@ function PaymentQR() {
                 console.error('Error generating QR code:', err);
                 let errorMessage = 'Failed to generate QR code. Please try again.';
                 if (err && typeof err === 'object') {
-                    if ('response' in err && err.response && typeof err.response === 'object' && 'data' in err.response) {
+                    if (
+                        'response' in err &&
+                        err.response &&
+                        typeof err.response === 'object' &&
+                        'data' in err.response
+                    ) {
                         const responseData = err.response.data as { message?: string };
                         if (responseData?.message) {
                             errorMessage = responseData.message;
@@ -189,8 +198,8 @@ function PaymentQR() {
                                 Scan QR Code with PromptPay
                             </div>
                             <p className="text-sm text-slate-300">
-                                Use your mobile banking app with PromptPay to scan the QR code below to complete
-                                the payment securely
+                                Use your mobile banking app with PromptPay to scan the QR code below
+                                to complete the payment securely
                             </p>
                         </div>
 
@@ -200,13 +209,17 @@ function PaymentQR() {
                                 <div className="flex h-[300px] w-[300px] items-center justify-center rounded-lg bg-white p-6 shadow-lg">
                                     <div className="text-center">
                                         <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-                                        <p className="text-sm text-gray-600">Generating QR Code...</p>
+                                        <p className="text-sm text-gray-600">
+                                            Generating QR Code...
+                                        </p>
                                     </div>
                                 </div>
                             ) : error ? (
                                 <div className="flex h-[300px] w-[300px] items-center justify-center rounded-lg bg-red-50 p-6 shadow-lg">
                                     <div className="text-center">
-                                        <p className="mb-2 text-sm font-semibold text-red-600">Error</p>
+                                        <p className="mb-2 text-sm font-semibold text-red-600">
+                                            Error
+                                        </p>
                                         <p className="text-xs text-red-500">{error}</p>
                                         <button
                                             onClick={() => window.location.reload()}
@@ -270,16 +283,24 @@ function PaymentQR() {
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-slate-300">Status:</span>
-                                    <span className={`font-semibold ${
-                                        paymentStatus === 'successful' ? 'text-green-400' :
-                                        paymentStatus === 'failed' ? 'text-red-400' :
-                                        paymentStatus === 'pending' ? 'text-yellow-400' :
-                                        'text-slate-400'
-                                    }`}>
-                                        {paymentStatus === 'successful' ? 'Paid' :
-                                         paymentStatus === 'failed' ? 'Failed' :
-                                         paymentStatus === 'pending' ? 'Waiting...' :
-                                         'Pending'}
+                                    <span
+                                        className={`font-semibold ${
+                                            paymentStatus === 'successful'
+                                                ? 'text-green-400'
+                                                : paymentStatus === 'failed'
+                                                  ? 'text-red-400'
+                                                  : paymentStatus === 'pending'
+                                                    ? 'text-yellow-400'
+                                                    : 'text-slate-400'
+                                        }`}
+                                    >
+                                        {paymentStatus === 'successful'
+                                            ? 'Paid'
+                                            : paymentStatus === 'failed'
+                                              ? 'Failed'
+                                              : paymentStatus === 'pending'
+                                                ? 'Waiting...'
+                                                : 'Pending'}
                                     </span>
                                 </div>
                             </div>
@@ -304,7 +325,9 @@ function PaymentQR() {
                                 Payment Instructions
                             </h4>
                             <ol className="list-inside list-decimal space-y-2 text-xs text-blue-200">
-                                <li>Open your mobile banking app (any bank that supports PromptPay)</li>
+                                <li>
+                                    Open your mobile banking app (any bank that supports PromptPay)
+                                </li>
                                 <li>Select "Scan QR Code" or "PromptPay" option</li>
                                 <li>Scan the QR code displayed above</li>
                                 <li>Verify the payment amount (฿{amount.toLocaleString()})</li>
@@ -326,7 +349,8 @@ function PaymentQR() {
                             ) : (
                                 <div className="rounded-lg border border-yellow-700/30 bg-yellow-900/20 p-4 text-center">
                                     <p className="text-sm text-yellow-200">
-                                        ⏳ Waiting for payment confirmation. Please complete the payment using the QR code above.
+                                        ⏳ Waiting for payment confirmation. Please complete the
+                                        payment using the QR code above.
                                     </p>
                                 </div>
                             )}
@@ -343,9 +367,9 @@ function PaymentQR() {
                     {/* Additional Info */}
                     <div className="mt-6 rounded-lg bg-slate-700/30 p-4 text-center text-white">
                         <p className="text-sm text-slate-300">
-                            Payment is processed securely through Omise. Your Pro Plan subscription will be activated
-                            automatically once payment is confirmed. If you have any questions, please contact our support
-                            team.
+                            Payment is processed securely through Omise. Your Pro Plan subscription
+                            will be activated automatically once payment is confirmed. If you have
+                            any questions, please contact our support team.
                         </p>
                         {chargeId && (
                             <p className="mt-2 text-xs text-slate-400">

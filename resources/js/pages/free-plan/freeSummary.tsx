@@ -401,11 +401,15 @@ function FreeSummary() {
                             position: { lat: number; lng: number };
                         }>;
                         plantPoints.forEach((point) => {
-                            const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
+                            const plantImagePath = plantData
+                                ? getPlantImagePath(plantData.name)
+                                : '/freePlanImg/fruits/coconut.png';
                             new window.google.maps.Marker({
                                 position: point.position,
                                 map,
-                                title: plantData ? `${plantData.name} ${translations.plant}` : translations.plant,
+                                title: plantData
+                                    ? `${plantData.name} ${translations.plant}`
+                                    : translations.plant,
                                 icon: {
                                     url: plantImagePath,
                                     scaledSize: new window.google.maps.Size(24, 24),
@@ -714,13 +718,21 @@ function FreeSummary() {
         return () => {
             isMounted = false;
         };
-    }, [flowRateConfig.flowRatePerMin, flowRateConfig.waterPressure, flowRateConfig.radius, translations.plant, translations.waterSource, translations.waterPump]);
+    }, [
+        flowRateConfig.flowRatePerMin,
+        flowRateConfig.waterPressure,
+        flowRateConfig.radius,
+        translations.plant,
+        translations.waterSource,
+        translations.waterPump,
+    ]);
 
     // Handlers
     const handleSave = () => {
         try {
             // Get project name from localStorage or use default
-            const savedProjectName = localStorage.getItem('projectName') || translations.untitledProject;
+            const savedProjectName =
+                localStorage.getItem('projectName') || translations.untitledProject;
 
             // Collect all project data
             const projectData = {
@@ -923,7 +935,7 @@ function FreeSummary() {
 
                 {/* Interactive Google Map (read-only). Fallback to image if map can't load */}
                 <div className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40 md:h-[420px]">
-                    <div ref={mapRef} className="h-full w-full min-h-[350px] md:min-h-[420px]" />
+                    <div ref={mapRef} className="h-full min-h-[350px] w-full md:min-h-[420px]" />
                     {!window.google && imageUrl && (
                         <img
                             src={imageUrl}
@@ -992,25 +1004,34 @@ function FreeSummary() {
                                 </div>
                                 <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">{translations.waterNeed}</span>
+                                        <span className="text-slate-300">
+                                            {translations.waterNeed}
+                                        </span>
                                         <span className="font-semibold text-blue-400">
-                                            {summaryData.selectedPlant.waterNeed} {translations.lPerDayPerPlant}
+                                            {summaryData.selectedPlant.waterNeed}{' '}
+                                            {translations.lPerDayPerPlant}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">{translations.plantSpacing}</span>
+                                        <span className="text-slate-300">
+                                            {translations.plantSpacing}
+                                        </span>
                                         <span className="font-semibold text-green-400">
                                             {summaryData.selectedPlant.plantSpacing} cm
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">{translations.rowSpacing}</span>
+                                        <span className="text-slate-300">
+                                            {translations.rowSpacing}
+                                        </span>
                                         <span className="font-semibold text-green-400">
                                             {summaryData.selectedPlant.rowSpacing} cm
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-slate-300">{translations.totalWaterNeed}</span>
+                                        <span className="text-slate-300">
+                                            {translations.totalWaterNeed}
+                                        </span>
                                         <span className="font-semibold text-cyan-400">
                                             {Math.round(
                                                 summaryData.selectedPlant.waterNeed *
@@ -1044,7 +1065,8 @@ function FreeSummary() {
                                             LPM
                                         </div>
                                         <div className="text-xs text-slate-400">
-                                            {summaryData?.plants?.total || 0} {translations.plantsLabel} ×{' '}
+                                            {summaryData?.plants?.total || 0}{' '}
+                                            {translations.plantsLabel} ×{' '}
                                             {summaryData?.flowRate?.flowRatePerMin ||
                                                 flowRateConfig.flowRatePerMin}{' '}
                                             LPM
@@ -1205,7 +1227,8 @@ function FreeSummary() {
                                                 {zoneArea
                                                     ? `${zoneArea.areaRai.toFixed(2)} Rai`
                                                     : ''}{' '}
-                                                • {zonePlants?.plants || 0} {translations.plantsLabel}
+                                                • {zonePlants?.plants || 0}{' '}
+                                                {translations.plantsLabel}
                                             </div>
                                         </button>
 
@@ -1236,7 +1259,8 @@ function FreeSummary() {
                                                             LPM
                                                         </div>
                                                         <div className="text-[10px] text-slate-400">
-                                                            {zonePlants?.plants || 0} {translations.plantsLabel} ×{' '}
+                                                            {zonePlants?.plants || 0}{' '}
+                                                            {translations.plantsLabel} ×{' '}
                                                             {summaryData?.flowRate
                                                                 ?.flowRatePerMin ||
                                                                 flowRateConfig.flowRatePerMin}{' '}
@@ -1262,7 +1286,8 @@ function FreeSummary() {
                                                                 {translations.lPerSession}
                                                             </div>
                                                             <div className="text-[10px] text-slate-400">
-                                                                {zonePlants?.plants || 0} {translations.plantsLabel} ×{' '}
+                                                                {zonePlants?.plants || 0}{' '}
+                                                                {translations.plantsLabel} ×{' '}
                                                                 {
                                                                     summaryData.selectedPlant
                                                                         .waterNeed
@@ -1316,7 +1341,8 @@ function FreeSummary() {
                                                                 </div>
                                                                 {zone.mainOutlets !== undefined && (
                                                                     <div className="text-[10px] text-slate-400">
-                                                                        {zone.mainOutlets} {translations.outletsLabel}
+                                                                        {zone.mainOutlets}{' '}
+                                                                        {translations.outletsLabel}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1584,7 +1610,9 @@ function FreeSummary() {
                                     <div className="mb-1 flex justify-center">
                                         {summaryData?.selectedPlant ? (
                                             <img
-                                                src={getPlantImagePath(summaryData.selectedPlant.name)}
+                                                src={getPlantImagePath(
+                                                    summaryData.selectedPlant.name
+                                                )}
                                                 alt={summaryData.selectedPlant.name}
                                                 className="h-6 w-6 object-contain sm:h-8 sm:w-8"
                                                 onError={(e) => {

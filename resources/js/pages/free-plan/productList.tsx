@@ -63,9 +63,7 @@ function ProductList() {
     }, []);
 
     // Filter products based on active tab
-    const filteredProducts = (products || []).filter(
-        (product) => product.category === activeTab
-    );
+    const filteredProducts = (products || []).filter((product) => product.category === activeTab);
 
     // Handle back button
     const handleBack = () => {
@@ -90,7 +88,7 @@ function ProductList() {
     // Handle delete product
     const handleDelete = (e: React.MouseEvent, productId: number) => {
         e.stopPropagation(); // ป้องกันการ trigger handleProductClick
-        
+
         if (!confirm(translations.confirmDeleteProduct)) {
             return;
         }
@@ -122,12 +120,7 @@ function ProductList() {
                     onClick={handleBack}
                     className="mb-6 flex items-center gap-2 text-slate-300 transition-colors hover:text-white"
                 >
-                    <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -168,7 +161,7 @@ function ProductList() {
                         )}
                     </div>
                     {/* Gradient Separator */}
-                    <div className="h-1 w-full bg-gradient-to-r from-green-500 via-green-400 to-blue-500 rounded-full"></div>
+                    <div className="h-1 w-full rounded-full bg-gradient-to-r from-green-500 via-green-400 to-blue-500"></div>
                 </div>
 
                 {/* Tab Navigation */}
@@ -213,20 +206,42 @@ function ProductList() {
                                     <button
                                         onClick={(e) => handleDelete(e, product.id)}
                                         disabled={deletingId === product.id}
-                                        className={`absolute top-2 z-30 rounded-full bg-red-600 p-2 text-white transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                            product.category === 'promotion' && product.discount && product.discount > 0
+                                        className={`absolute top-2 z-30 rounded-full bg-red-600 p-2 text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 ${
+                                            product.category === 'promotion' &&
+                                            product.discount &&
+                                            product.discount > 0
                                                 ? 'right-20'
                                                 : 'right-2'
                                         }`}
                                         title={translations.deleteProduct}
                                     >
                                         {deletingId === product.id ? (
-                                            <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            <svg
+                                                className="h-4 w-4 animate-spin"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                                />
                                             </svg>
                                         ) : (
-                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            <svg
+                                                className="h-4 w-4"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                />
                                             </svg>
                                         )}
                                     </button>
@@ -249,13 +264,15 @@ function ProductList() {
                                 )}
 
                                 {/* Discount Badge - แสดงเฉพาะสินค้าโปรโมชั่น */}
-                                {product.category === 'promotion' && product.discount && product.discount > 0 && (
-                                    <div className="absolute right-4 top-2 z-20">
-                                        <span className="inline-flex items-center rounded-full bg-yellow-400 px-3 py-2 text-base font-bold text-black shadow-lg">
-                                            -{product.discount}%
-                                        </span>
-                                    </div>
-                                )}
+                                {product.category === 'promotion' &&
+                                    product.discount &&
+                                    product.discount > 0 && (
+                                        <div className="absolute right-4 top-2 z-20">
+                                            <span className="inline-flex items-center rounded-full bg-yellow-400 px-3 py-2 text-base font-bold text-black shadow-lg">
+                                                -{product.discount}%
+                                            </span>
+                                        </div>
+                                    )}
 
                                 {/* Product Image */}
                                 <div className="relative h-48 w-full overflow-hidden bg-slate-700/50">
@@ -298,11 +315,12 @@ function ProductList() {
                                     {/* Price */}
                                     <div className="flex items-center gap-2">
                                         {/* แสดงราคาเดิมและส่วนลดเฉพาะสินค้าโปรโมชั่น */}
-                                        {product.category === 'promotion' && product.originalPrice && (
-                                            <span className="text-sm text-slate-500 line-through">
-                                                {formatPrice(product.originalPrice)}
-                                            </span>
-                                        )}
+                                        {product.category === 'promotion' &&
+                                            product.originalPrice && (
+                                                <span className="text-sm text-slate-500 line-through">
+                                                    {formatPrice(product.originalPrice)}
+                                                </span>
+                                            )}
                                         <span className="text-xl font-bold text-green-400">
                                             {formatPrice(product.price)}
                                         </span>
@@ -333,4 +351,3 @@ function ProductList() {
 
 // 6. Export
 export default ProductList;
-

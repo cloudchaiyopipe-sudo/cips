@@ -5127,7 +5127,7 @@ const EquipmentCRUD: React.FC = () => {
                                                         {equipment.stock ? (
                                                             <span className="font-semibold text-blue-400">
                                                                 {equipment.stock.toLocaleString()}
-                                                            </span> 
+                                                            </span>
                                                         ) : (
                                                             '-'
                                                         )}

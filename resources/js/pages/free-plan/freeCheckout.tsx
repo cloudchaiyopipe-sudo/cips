@@ -162,7 +162,7 @@ function FreeCheckout() {
         try {
             // Dynamically import html2canvas
             const { default: html2canvas } = await import('html2canvas');
-            
+
             // Capture the QR code container
             const canvas = await html2canvas(qrCodeRef.current, {
                 backgroundColor: '#ffffff',
@@ -173,7 +173,7 @@ function FreeCheckout() {
             // Convert canvas to blob and create download link
             canvas.toBlob((blob) => {
                 if (!blob) return;
-                
+
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -205,9 +205,7 @@ function FreeCheckout() {
                     <h1 className="text-3xl font-bold text-white">
                         {translations.checkoutModalTitle}
                     </h1>
-                    <p className="mt-2 text-slate-300">
-                        {translations.checkoutModalMessage}
-                    </p>
+                    <p className="mt-2 text-slate-300">{translations.checkoutModalMessage}</p>
                 </div>
 
                 {/* Equipment Specifications Table */}
@@ -216,7 +214,7 @@ function FreeCheckout() {
                         <table className="w-full">
                             <thead className="bg-slate-700/50">
                                 <tr>
-                                    <th className="px-4 py-4 text-center text-sm font-semibold text-white w-24">
+                                    <th className="w-24 px-4 py-4 text-center text-sm font-semibold text-white">
                                         {translations.image}
                                     </th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-white">
@@ -271,7 +269,9 @@ function FreeCheckout() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
+                                            <span className="text-slate-400">
+                                                {translations.loading}
+                                            </span>
                                         )}
                                     </td>
                                 </tr>
@@ -298,21 +298,29 @@ function FreeCheckout() {
                                                 </span>
                                                 <span className="font-semibold text-rose-400">
                                                     {(() => {
-                                                        const pe = pipeTypeRecommendations?.main?.pe;
-                                                        const pvc = pipeTypeRecommendations?.main?.pvc;
+                                                        const pe =
+                                                            pipeTypeRecommendations?.main?.pe;
+                                                        const pvc =
+                                                            pipeTypeRecommendations?.main?.pvc;
                                                         const parts: string[] = [];
                                                         if (pvc) {
                                                             parts.push(`PVC: ${pvc.sizeInch}`);
                                                         }
                                                         if (pe) {
-                                                            parts.push(`PE: ${pe.sizeMM.toFixed(2)}mm`);
+                                                            parts.push(
+                                                                `PE: ${pe.sizeMM.toFixed(2)}mm`
+                                                            );
                                                         }
-                                                        return parts.length > 0 ? parts.join(', ') : `${pipeRecommendations.main.sizeMM.toFixed(2)}mm (${pipeRecommendations.main.sizeInch})`;
+                                                        return parts.length > 0
+                                                            ? parts.join(', ')
+                                                            : `${pipeRecommendations.main.sizeMM.toFixed(2)}mm (${pipeRecommendations.main.sizeInch})`;
                                                     })()}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
+                                            <span className="text-slate-400">
+                                                {translations.loading}
+                                            </span>
                                         )}
                                     </td>
                                 </tr>
@@ -339,21 +347,29 @@ function FreeCheckout() {
                                                 </span>
                                                 <span className="font-semibold text-violet-400">
                                                     {(() => {
-                                                        const pe = pipeTypeRecommendations?.subMain?.pe;
-                                                        const pvc = pipeTypeRecommendations?.subMain?.pvc;
+                                                        const pe =
+                                                            pipeTypeRecommendations?.subMain?.pe;
+                                                        const pvc =
+                                                            pipeTypeRecommendations?.subMain?.pvc;
                                                         const parts: string[] = [];
                                                         if (pvc) {
                                                             parts.push(`PVC: ${pvc.sizeInch}`);
                                                         }
                                                         if (pe) {
-                                                            parts.push(`PE: ${pe.sizeMM.toFixed(2)}mm`);
+                                                            parts.push(
+                                                                `PE: ${pe.sizeMM.toFixed(2)}mm`
+                                                            );
                                                         }
-                                                        return parts.length > 0 ? parts.join(', ') : `${pipeRecommendations.subMain.sizeMM.toFixed(2)}mm (${pipeRecommendations.subMain.sizeInch})`;
+                                                        return parts.length > 0
+                                                            ? parts.join(', ')
+                                                            : `${pipeRecommendations.subMain.sizeMM.toFixed(2)}mm (${pipeRecommendations.subMain.sizeInch})`;
                                                     })()}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
+                                            <span className="text-slate-400">
+                                                {translations.loading}
+                                            </span>
                                         )}
                                     </td>
                                 </tr>
@@ -380,21 +396,29 @@ function FreeCheckout() {
                                                 </span>
                                                 <span className="font-semibold text-amber-400">
                                                     {(() => {
-                                                        const pe = pipeTypeRecommendations?.lateral?.pe;
-                                                        const pvc = pipeTypeRecommendations?.lateral?.pvc;
+                                                        const pe =
+                                                            pipeTypeRecommendations?.lateral?.pe;
+                                                        const pvc =
+                                                            pipeTypeRecommendations?.lateral?.pvc;
                                                         const parts: string[] = [];
                                                         if (pvc) {
                                                             parts.push(`PVC: ${pvc.sizeInch}`);
                                                         }
                                                         if (pe) {
-                                                            parts.push(`PE: ${pe.sizeMM.toFixed(2)}mm`);
+                                                            parts.push(
+                                                                `PE: ${pe.sizeMM.toFixed(2)}mm`
+                                                            );
                                                         }
-                                                        return parts.length > 0 ? parts.join(', ') : `${pipeRecommendations.lateral.sizeMM.toFixed(2)}mm (${pipeRecommendations.lateral.sizeInch})`;
+                                                        return parts.length > 0
+                                                            ? parts.join(', ')
+                                                            : `${pipeRecommendations.lateral.sizeMM.toFixed(2)}mm (${pipeRecommendations.lateral.sizeInch})`;
                                                     })()}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
+                                            <span className="text-slate-400">
+                                                {translations.loading}
+                                            </span>
                                         )}
                                     </td>
                                 </tr>
@@ -442,7 +466,9 @@ function FreeCheckout() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
+                                            <span className="text-slate-400">
+                                                {translations.loading}
+                                            </span>
                                         )}
                                     </td>
                                 </tr>
@@ -457,9 +483,7 @@ function FreeCheckout() {
                         <h3 className="mb-2 text-xl font-semibold text-green-400">
                             {translations.addFriendOnLine}
                         </h3>
-                        <p className="text-sm text-green-300">
-                            {translations.scanQRCodeToContact}
-                        </p>
+                        <p className="text-sm text-green-300">{translations.scanQRCodeToContact}</p>
                     </div>
                     <div className="flex justify-center">
                         <div ref={qrCodeRef} className="rounded-lg bg-white p-4 shadow-lg">
@@ -504,4 +528,3 @@ function FreeCheckout() {
 
 // 3. Export
 export default FreeCheckout;
-

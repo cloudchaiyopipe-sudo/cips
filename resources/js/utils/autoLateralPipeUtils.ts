@@ -309,7 +309,9 @@ export const generateThroughSubMainPipes = (
             segmentDirectionForGrouping
         );
 
-        console.log(`🔍 Zone ${zone.name}: Created ${plantGroups.length} plant groups (ทิศทาง SubMain: ${segmentDirectionForGrouping})`);
+        console.log(
+            `🔍 Zone ${zone.name}: Created ${plantGroups.length} plant groups (ทิศทาง SubMain: ${segmentDirectionForGrouping})`
+        );
 
         for (const row of plantGroups) {
             if (row.length < 1) {
@@ -427,7 +429,7 @@ export const generateThroughSubMainPipes = (
                                     }
                                     return plantInZone;
                                 });
-                                
+
                                 if (validPlants.length < originalCount) {
                                     console.log(
                                         `🔍 [THROUGH_SUBMAIN] กรองต้นไม้ออก ${originalCount - validPlants.length} ต้น (เหลือ ${validPlants.length} ต้นในโซน ${zone.id})`
@@ -1041,9 +1043,7 @@ export const generateFromSubMainPipes = (
             // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain
             // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
             // หาท่อ SubMain ที่เกี่ยวข้องกับโซนนี้ (ควรมี zoneId ตรงกัน)
-            const relevantSubMainForZone = relevantSubMainPipes.find(
-                (sm) => sm.zoneId === zone.id
-            );
+            const relevantSubMainForZone = relevantSubMainPipes.find((sm) => sm.zoneId === zone.id);
 
             if (relevantSubMainForZone && relevantSubMainForZone.zoneId) {
                 const originalCount = validPlants.length;
@@ -1057,7 +1057,7 @@ export const generateFromSubMainPipes = (
                     }
                     return plantInZone;
                 });
-                
+
                 if (validPlants.length < originalCount) {
                     console.log(
                         `🔍 [FROM_SUBMAIN] กรองต้นไม้ออก ${originalCount - validPlants.length} ต้น (เหลือ ${validPlants.length} ต้นในโซน ${zone.id})`
@@ -1675,7 +1675,7 @@ export const createAutoLateralConnectionPoints = (
     pipes: AutoLateralPipeResult[]
 ): AutoLateralConnectionPoint[] => {
     const connectionPoints: AutoLateralConnectionPoint[] = [];
-    
+
     // ตรวจสอบว่ามีท่อหรือไม่
     if (!pipes || pipes.length === 0) {
         return connectionPoints;
@@ -1821,13 +1821,3 @@ export const createAutoLateralConnectionPoints = (
 
     return finalPoints;
 };
-
-
-
-
-
-
-
-
-
-

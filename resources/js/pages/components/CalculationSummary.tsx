@@ -62,8 +62,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualMainPipe = results.autoSelectedMainPipe;
     const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
-    useEffect(() => {
-    }, [
+    useEffect(() => {}, [
         projectMode,
         results.totalWaterRequiredLPM,
         results.totalSprinklers,
@@ -91,16 +90,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                     return {
                         branch: branchHeadLoss,
-                        secondary: secondaryHeadLoss, 
+                        secondary: secondaryHeadLoss,
                         main: mainHeadLoss,
-                        emitter: emitterHeadLoss, 
+                        emitter: emitterHeadLoss,
                         total: totalHeadLoss,
                     };
                 }
             }
 
             if (projectMode === 'field-crop') {
-                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                const fieldCropPipeCalculationsStr = localStorage.getItem(
+                    'field_crop_pipe_calculations'
+                );
                 if (fieldCropPipeCalculationsStr) {
                     const pipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
 
@@ -211,7 +212,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             if (currentHeadLossString !== newHeadLossString) {
                 setActualHeadLoss(newHeadLoss);
             }
-        }, 2000); 
+        }, 2000);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
@@ -291,11 +292,19 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             } catch (error) {
                 console.error('Error parsing horticulture system data:', error);
             }
-            
-            if (sprinklerPressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+
+            if (
+                sprinklerPressureBar === 2.5 &&
+                selectedSprinkler &&
+                selectedSprinkler.pressureBar
+            ) {
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    sprinklerPressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
@@ -310,20 +319,34 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 } else {
                     if (selectedSprinkler && selectedSprinkler.pressureBar) {
                         if (Array.isArray(selectedSprinkler.pressureBar)) {
-                            sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            sprinklerPressureBar =
+                                (selectedSprinkler.pressureBar[0] +
+                                    selectedSprinkler.pressureBar[1]) /
+                                2;
+                        } else if (
+                            typeof selectedSprinkler.pressureBar === 'string' &&
+                            selectedSprinkler.pressureBar.includes('-')
+                        ) {
                             const parts = selectedSprinkler.pressureBar.split('-');
-                            sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                            sprinklerPressureBar =
+                                (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                         } else {
-                            sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                            sprinklerPressureBar = parseFloat(
+                                String(selectedSprinkler.pressureBar)
+                            );
                         }
                     }
                 }
             } else {
                 if (selectedSprinkler && selectedSprinkler.pressureBar) {
                     if (Array.isArray(selectedSprinkler.pressureBar)) {
-                        sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                    } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                        sprinklerPressureBar =
+                            (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) /
+                            2;
+                    } else if (
+                        typeof selectedSprinkler.pressureBar === 'string' &&
+                        selectedSprinkler.pressureBar.includes('-')
+                    ) {
                         const parts = selectedSprinkler.pressureBar.split('-');
                         sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                     } else {
@@ -343,11 +366,19 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             } catch (error) {
                 console.error('Error parsing greenhouse summary data:', error);
             }
-            
-            if (sprinklerPressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+
+            if (
+                sprinklerPressureBar === 2.5 &&
+                selectedSprinkler &&
+                selectedSprinkler.pressureBar
+            ) {
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    sprinklerPressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
@@ -357,8 +388,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         } else {
             if (selectedSprinkler && selectedSprinkler.pressureBar) {
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    sprinklerPressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
@@ -367,7 +402,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             }
         }
 
-        return sprinklerPressureBar * 10; 
+        return sprinklerPressureBar * 10;
     };
 
     const sprinklerHeadLoss = calculateSprinklerHeadLoss();
@@ -380,67 +415,82 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         } else if (projectMode === 'field-crop') {
             // สำหรับ field-crop mode ให้ใช้ค่าเดียวกันกับ PipeSystemSummary.tsx
             let fieldCropSprinklerHeadLoss = 0;
-            
+
             if (fieldCropData && fieldCropData.irrigationSettings?.sprinkler_system?.pressure) {
-                fieldCropSprinklerHeadLoss = fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
-            }
-            else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                fieldCropSprinklerHeadLoss =
+                    fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
+            } else if (selectedSprinkler && selectedSprinkler.pressureBar) {
                 let pressureBar = 2.5; // default fallback
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    pressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
                     pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
                 }
                 fieldCropSprinklerHeadLoss = pressureBar * 10;
-            }
-            else {
+            } else {
                 fieldCropSprinklerHeadLoss = 2.5 * 10;
             }
-            
+
             let fieldCropPipeHeadLoss = 0;
             try {
-                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                const fieldCropPipeCalculationsStr = localStorage.getItem(
+                    'field_crop_pipe_calculations'
+                );
                 if (fieldCropPipeCalculationsStr) {
                     const fieldCropPipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
                     const branchHeadLoss = fieldCropPipeCalculations.branch?.headLoss || 0;
                     const secondaryHeadLoss = fieldCropPipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = fieldCropPipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = fieldCropPipeCalculations.emitter?.headLoss || 0;
-                    fieldCropPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    fieldCropPipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing field-crop pipe calculations:', error);
             }
-            
+
             if (fieldCropPipeHeadLoss === 0) {
                 fieldCropPipeHeadLoss = actualHeadLoss.total;
             }
-            
+
             const totalPumpHead = fieldCropPipeHeadLoss + fieldCropSprinklerHeadLoss;
             return totalPumpHead;
         } else if (projectMode === 'horticulture') {
             let horticultureSprinklerHeadLoss = 2.5 * 10; // default fallback
-            
+
             try {
                 const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
                 if (horticultureSystemDataStr) {
                     const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
                     if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
-                        horticultureSprinklerHeadLoss = horticultureSystemData.sprinklerConfig.pressureBar * 10;
+                        horticultureSprinklerHeadLoss =
+                            horticultureSystemData.sprinklerConfig.pressureBar * 10;
                     }
                 }
             } catch (error) {
                 console.error('Error parsing horticulture system data:', error);
             }
-            
-            if (horticultureSprinklerHeadLoss === 2.5 * 10 && selectedSprinkler && selectedSprinkler.pressureBar) {
+
+            if (
+                horticultureSprinklerHeadLoss === 2.5 * 10 &&
+                selectedSprinkler &&
+                selectedSprinkler.pressureBar
+            ) {
                 let pressureBar = 2.5; // default fallback
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    pressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
@@ -448,27 +498,31 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 }
                 horticultureSprinklerHeadLoss = pressureBar * 10;
             }
-            
+
             let horticulturePipeHeadLoss = 0;
             try {
-                const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                const horticulturePipeCalculationsStr = localStorage.getItem(
+                    'horticulture_pipe_calculations'
+                );
                 if (horticulturePipeCalculationsStr) {
-                    const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                    const horticulturePipeCalculations = JSON.parse(
+                        horticulturePipeCalculationsStr
+                    );
                     const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
                     const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
-                    horticulturePipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
-                    
+                    horticulturePipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing horticulture pipe calculations:', error);
             }
-            
+
             if (horticulturePipeHeadLoss === 0) {
                 horticulturePipeHeadLoss = actualHeadLoss.total;
             }
-            
+
             // เพิ่ม static head (ความสูงจากปั๊มไปจุดสูงสุด) จาก localStorage
             let staticHeadM = input.staticHeadM || 0;
             try {
@@ -482,10 +536,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             } catch (error) {
                 console.warn('Error reading elevation difference from localStorage:', error);
             }
-            
-            const totalPumpHead = horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
-            
-            
+
+            const totalPumpHead =
+                horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
+
             return totalPumpHead;
         }
         return actualHeadLoss.total + sprinklerHeadLoss;
@@ -495,7 +549,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     useEffect(() => {
         if (onPumpHeadCalculated && actualPumpHead > 0) {
-            const pumpHeadWithSafety = actualPumpHead + (actualPumpHead * 0.1);
+            const pumpHeadWithSafety = actualPumpHead + actualPumpHead * 0.1;
             onPumpHeadCalculated(pumpHeadWithSafety);
         }
     }, [actualPumpHead, onPumpHeadCalculated, projectMode, activeZone, selectedZones]);
@@ -504,73 +558,88 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         if (maxPumpHeadForProjectMode !== undefined && maxPumpHeadForProjectMode > 0) {
             return maxPumpHeadForProjectMode;
         }
-        
+
         if (projectMode === 'greenhouse') {
             const greenhouseTotalHeadLoss =
                 (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
             return greenhouseTotalHeadLoss + sprinklerHeadLoss;
         } else if (projectMode === 'field-crop') {
             let fieldCropSprinklerHeadLoss = 0;
-            
+
             if (fieldCropData && fieldCropData.irrigationSettings?.sprinkler_system?.pressure) {
-                fieldCropSprinklerHeadLoss = fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
-            }
-            else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                fieldCropSprinklerHeadLoss =
+                    fieldCropData.irrigationSettings.sprinkler_system.pressure * 10;
+            } else if (selectedSprinkler && selectedSprinkler.pressureBar) {
                 let pressureBar = 2.5; // default fallback
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    pressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
                     pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
                 }
                 fieldCropSprinklerHeadLoss = pressureBar * 10;
-            }
-            else {
+            } else {
                 fieldCropSprinklerHeadLoss = 2.5 * 10;
             }
-            
+
             let fieldCropPipeHeadLoss = 0;
             try {
-                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                const fieldCropPipeCalculationsStr = localStorage.getItem(
+                    'field_crop_pipe_calculations'
+                );
                 if (fieldCropPipeCalculationsStr) {
                     const fieldCropPipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
                     const branchHeadLoss = fieldCropPipeCalculations.branch?.headLoss || 0;
                     const secondaryHeadLoss = fieldCropPipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = fieldCropPipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = fieldCropPipeCalculations.emitter?.headLoss || 0;
-                    fieldCropPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    fieldCropPipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing field-crop pipe calculations:', error);
             }
-            
+
             if (fieldCropPipeHeadLoss === 0) {
                 fieldCropPipeHeadLoss = actualHeadLoss.total;
             }
-            
+
             return fieldCropPipeHeadLoss + fieldCropSprinklerHeadLoss;
         } else if (projectMode === 'horticulture') {
             let horticultureSprinklerHeadLoss = 2.5 * 10; // default fallback
-            
+
             try {
                 const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
                 if (horticultureSystemDataStr) {
                     const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
                     if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
-                        horticultureSprinklerHeadLoss = horticultureSystemData.sprinklerConfig.pressureBar * 10;
+                        horticultureSprinklerHeadLoss =
+                            horticultureSystemData.sprinklerConfig.pressureBar * 10;
                     }
                 }
             } catch (error) {
                 console.error('Error parsing horticulture system data:', error);
             }
-            
-            if (horticultureSprinklerHeadLoss === 2.5 * 10 && selectedSprinkler && selectedSprinkler.pressureBar) {
+
+            if (
+                horticultureSprinklerHeadLoss === 2.5 * 10 &&
+                selectedSprinkler &&
+                selectedSprinkler.pressureBar
+            ) {
                 let pressureBar = 2.5; // default fallback
                 if (Array.isArray(selectedSprinkler.pressureBar)) {
-                    pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                    pressureBar =
+                        (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                } else if (
+                    typeof selectedSprinkler.pressureBar === 'string' &&
+                    selectedSprinkler.pressureBar.includes('-')
+                ) {
                     const parts = selectedSprinkler.pressureBar.split('-');
                     pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                 } else {
@@ -578,26 +647,31 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 }
                 horticultureSprinklerHeadLoss = pressureBar * 10;
             }
-            
+
             let horticulturePipeHeadLoss = 0;
             try {
-                const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                const horticulturePipeCalculationsStr = localStorage.getItem(
+                    'horticulture_pipe_calculations'
+                );
                 if (horticulturePipeCalculationsStr) {
-                    const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                    const horticulturePipeCalculations = JSON.parse(
+                        horticulturePipeCalculationsStr
+                    );
                     const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
                     const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
-                    horticulturePipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    horticulturePipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing horticulture pipe calculations:', error);
             }
-            
+
             if (horticulturePipeHeadLoss === 0) {
                 horticulturePipeHeadLoss = actualHeadLoss.total;
             }
-            
+
             // เพิ่ม static head (ความสูงจากปั๊มไปจุดสูงสุด) จาก localStorage
             let staticHeadM = input.staticHeadM || 0;
             try {
@@ -611,11 +685,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             } catch (error) {
                 console.warn('Error reading elevation difference from localStorage:', error);
             }
-            
+
             return horticulturePipeHeadLoss + horticultureSprinklerHeadLoss + staticHeadM;
         } else if (projectMode === 'garden') {
             let gardenSprinklerHeadLoss = 2.5 * 10; // default fallback
-            
+
             if (gardenStats && activeZone) {
                 const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
                 if (currentZone) {
@@ -623,28 +697,45 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 } else {
                     if (selectedSprinkler && selectedSprinkler.pressureBar) {
                         if (Array.isArray(selectedSprinkler.pressureBar)) {
-                            gardenSprinklerHeadLoss = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2 * 10;
-                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            gardenSprinklerHeadLoss =
+                                ((selectedSprinkler.pressureBar[0] +
+                                    selectedSprinkler.pressureBar[1]) /
+                                    2) *
+                                10;
+                        } else if (
+                            typeof selectedSprinkler.pressureBar === 'string' &&
+                            selectedSprinkler.pressureBar.includes('-')
+                        ) {
                             const parts = selectedSprinkler.pressureBar.split('-');
-                            gardenSprinklerHeadLoss = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2 * 10;
+                            gardenSprinklerHeadLoss =
+                                ((parseFloat(parts[0]) + parseFloat(parts[1])) / 2) * 10;
                         } else {
-                            gardenSprinklerHeadLoss = parseFloat(String(selectedSprinkler.pressureBar)) * 10;
+                            gardenSprinklerHeadLoss =
+                                parseFloat(String(selectedSprinkler.pressureBar)) * 10;
                         }
                     }
                 }
             } else {
                 if (selectedSprinkler && selectedSprinkler.pressureBar) {
                     if (Array.isArray(selectedSprinkler.pressureBar)) {
-                        gardenSprinklerHeadLoss = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2 * 10;
-                    } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                        gardenSprinklerHeadLoss =
+                            ((selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) /
+                                2) *
+                            10;
+                    } else if (
+                        typeof selectedSprinkler.pressureBar === 'string' &&
+                        selectedSprinkler.pressureBar.includes('-')
+                    ) {
                         const parts = selectedSprinkler.pressureBar.split('-');
-                        gardenSprinklerHeadLoss = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2 * 10;
+                        gardenSprinklerHeadLoss =
+                            ((parseFloat(parts[0]) + parseFloat(parts[1])) / 2) * 10;
                     } else {
-                        gardenSprinklerHeadLoss = parseFloat(String(selectedSprinkler.pressureBar)) * 10;
+                        gardenSprinklerHeadLoss =
+                            parseFloat(String(selectedSprinkler.pressureBar)) * 10;
                     }
                 }
             }
-            
+
             let gardenPipeHeadLoss = 0;
             try {
                 const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
@@ -654,22 +745,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     const secondaryHeadLoss = gardenPipeCalculations.secondary?.headLoss || 0;
                     const mainHeadLoss = gardenPipeCalculations.main?.headLoss || 0;
                     const emitterHeadLoss = gardenPipeCalculations.emitter?.headLoss || 0;
-                    gardenPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    gardenPipeHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
                 }
             } catch (error) {
                 console.error('Error parsing garden pipe calculations:', error);
             }
-            
+
             if (gardenPipeHeadLoss === 0) {
                 gardenPipeHeadLoss = actualHeadLoss.total;
             }
-            
+
             return gardenPipeHeadLoss + gardenSprinklerHeadLoss;
         }
-        
+
         return actualHeadLoss.total + sprinklerHeadLoss;
     };
-
 
     const isMultiZone =
         selectedZones.length > 1 || (results.allZoneResults && results.allZoneResults.length > 1);
@@ -877,7 +968,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
         if (projectMode === 'greenhouse' && greenhouseData) {
             const totalPlotArea = greenhouseData.summary?.totalPlotArea || 0;
-            const totalAreaInRai = totalPlotArea / 1600; 
+            const totalAreaInRai = totalPlotArea / 1600;
 
             const plotStats = greenhouseData.summary?.plotStats || [];
             const totalPlants = plotStats.reduce(
@@ -906,12 +997,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             );
 
             return {
-                totalArea: totalAreaInRai, 
+                totalArea: totalAreaInRai,
                 totalZones: plotStats.length,
-                totalItems: totalPlants, 
-                totalWaterNeed: totalDailyWaterNeed, 
-                totalEstimatedYield: totalEstimatedYield, 
-                totalEstimatedIncome: totalEstimatedIncome, 
+                totalItems: totalPlants,
+                totalWaterNeed: totalDailyWaterNeed,
+                totalEstimatedYield: totalEstimatedYield,
+                totalEstimatedIncome: totalEstimatedIncome,
                 totalGreenhouseArea: greenhouseData.summary?.totalGreenhouseArea || 0,
                 totalEffectivePlantingArea: greenhouseData.summary?.totalEffectivePlantingArea || 0,
                 irrigationMethod: greenhouseData.projectInfo?.irrigationMethod || 'mini-sprinkler',
@@ -955,7 +1046,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {t('LPM')}
                         </p>
                         {currentZoneData && (
-                            <p className="text-xs text-blue-100">({currentZoneData.name.split(' (')[0]})</p>
+                            <p className="text-xs text-blue-100">
+                                ({currentZoneData.name.split(' (')[0]})
+                            </p>
                         )}
                     </div>
                     <div className="text-center">
@@ -963,31 +1056,47 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p
                             className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                         >
-                            {(() => {   
+                            {(() => {
                                 if (projectMode === 'greenhouse') {
                                     const greenhouseTotalHeadLoss =
                                         (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
                                     return greenhouseTotalHeadLoss.toFixed(1);
                                 } else if (projectMode === 'field-crop') {
-                                    const totalHeadLoss = (actualHeadLoss.main || 0) + 
-                                                         (actualHeadLoss.secondary || 0) + 
-                                                         (actualHeadLoss.branch || 0) + 
-                                                         (actualHeadLoss.emitter || 0);
+                                    const totalHeadLoss =
+                                        (actualHeadLoss.main || 0) +
+                                        (actualHeadLoss.secondary || 0) +
+                                        (actualHeadLoss.branch || 0) +
+                                        (actualHeadLoss.emitter || 0);
                                     return totalHeadLoss.toFixed(1);
                                 } else if (projectMode === 'horticulture') {
                                     try {
-                                        const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+                                        const horticulturePipeCalculationsStr =
+                                            localStorage.getItem('horticulture_pipe_calculations');
                                         if (horticulturePipeCalculationsStr) {
-                                            const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
-                                            const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
-                                            const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
-                                            const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
-                                            const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
-                                            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                                            const horticulturePipeCalculations = JSON.parse(
+                                                horticulturePipeCalculationsStr
+                                            );
+                                            const branchHeadLoss =
+                                                horticulturePipeCalculations.branch?.headLoss || 0;
+                                            const secondaryHeadLoss =
+                                                horticulturePipeCalculations.secondary?.headLoss ||
+                                                0;
+                                            const mainHeadLoss =
+                                                horticulturePipeCalculations.main?.headLoss || 0;
+                                            const emitterHeadLoss =
+                                                horticulturePipeCalculations.emitter?.headLoss || 0;
+                                            const totalHeadLoss =
+                                                branchHeadLoss +
+                                                secondaryHeadLoss +
+                                                mainHeadLoss +
+                                                emitterHeadLoss;
                                             return totalHeadLoss.toFixed(1);
                                         }
                                     } catch (error) {
-                                        console.error('Error parsing horticulture pipe calculations:', error);
+                                        console.error(
+                                            'Error parsing horticulture pipe calculations:',
+                                            error
+                                        );
                                     }
                                     return actualHeadLoss.total.toFixed(1);
                                 }
@@ -1011,52 +1120,87 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {(() => {
                                 if (projectMode === 'field-crop' && fieldCropData) {
                                     let pressureBar = 2.5; // default fallback - ใช้ค่าเริ่มต้นที่เหมาะสม
-                                    
-                                    if ((fieldCropData as any)?.irrigationSettings?.sprinkler_system?.pressure) {
-                                        pressureBar = (fieldCropData as any).irrigationSettings.sprinkler_system.pressure;
-                                    }
-                                    else if (selectedSprinkler && selectedSprinkler.pressureBar) {
+
+                                    if (
+                                        (fieldCropData as any)?.irrigationSettings?.sprinkler_system
+                                            ?.pressure
+                                    ) {
+                                        pressureBar = (fieldCropData as any).irrigationSettings
+                                            .sprinkler_system.pressure;
+                                    } else if (selectedSprinkler && selectedSprinkler.pressureBar) {
                                         if (Array.isArray(selectedSprinkler.pressureBar)) {
-                                            pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                            pressureBar =
+                                                (selectedSprinkler.pressureBar[0] +
+                                                    selectedSprinkler.pressureBar[1]) /
+                                                2;
+                                        } else if (
+                                            typeof selectedSprinkler.pressureBar === 'string' &&
+                                            selectedSprinkler.pressureBar.includes('-')
+                                        ) {
                                             const parts = selectedSprinkler.pressureBar.split('-');
-                                            pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                                            pressureBar =
+                                                (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                                         } else {
-                                            pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                                            pressureBar = parseFloat(
+                                                String(selectedSprinkler.pressureBar)
+                                            );
                                         }
                                     }
-                                    
+
                                     return (pressureBar * 10).toFixed(1);
                                 } else if (projectMode === 'horticulture') {
                                     let pressureBar = 2.5; // default fallback
-                                    
+
                                     try {
-                                        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                                        const horticultureSystemDataStr =
+                                            localStorage.getItem('horticultureSystemData');
                                         if (horticultureSystemDataStr) {
-                                            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
-                                            if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
-                                                pressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                                            const horticultureSystemData =
+                                                JSON.parse(horticultureSystemDataStr);
+                                            if (
+                                                horticultureSystemData?.sprinklerConfig?.pressureBar
+                                            ) {
+                                                pressureBar =
+                                                    horticultureSystemData.sprinklerConfig
+                                                        .pressureBar;
                                             }
                                         }
                                     } catch (error) {
-                                        console.error('Error parsing horticulture system data:', error);
+                                        console.error(
+                                            'Error parsing horticulture system data:',
+                                            error
+                                        );
                                     }
-                                    
-                                    if (pressureBar === 2.5 && selectedSprinkler && selectedSprinkler.pressureBar) {
+
+                                    if (
+                                        pressureBar === 2.5 &&
+                                        selectedSprinkler &&
+                                        selectedSprinkler.pressureBar
+                                    ) {
                                         if (Array.isArray(selectedSprinkler.pressureBar)) {
-                                            pressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                            pressureBar =
+                                                (selectedSprinkler.pressureBar[0] +
+                                                    selectedSprinkler.pressureBar[1]) /
+                                                2;
+                                        } else if (
+                                            typeof selectedSprinkler.pressureBar === 'string' &&
+                                            selectedSprinkler.pressureBar.includes('-')
+                                        ) {
                                             const parts = selectedSprinkler.pressureBar.split('-');
-                                            pressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                                            pressureBar =
+                                                (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                                         } else {
-                                            pressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                                            pressureBar = parseFloat(
+                                                String(selectedSprinkler.pressureBar)
+                                            );
                                         }
                                     }
-                                    
+
                                     return (pressureBar * 10).toFixed(1);
                                 }
                                 return sprinklerHeadLoss.toFixed(1);
-                            })()} m
+                            })()}{' '}
+                            m
                         </p>
                         <p className="text-xs text-yellow-100">{t('จากสูตร: แรงดัน(บาร์) × 10')}</p>
                     </div>
@@ -1067,11 +1211,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 {(() => {
                                     // ใช้ actualPumpHead + 10% (ค่าตามโซนที่เลือก - สลับไปมา)
                                     // ไม่ใช้ maxPumpHeadForProjectMode เพราะต้องการให้แสดงค่าตามโซนที่เลือก
-                                    const displayValue = actualPumpHead + (actualPumpHead * 0.1);
+                                    const displayValue = actualPumpHead + actualPumpHead * 0.1;
                                     return displayValue.toFixed(1);
-                                })()} m
+                                })()}{' '}
+                                m
                             </p>
-                            <p className="text-xs text-purple-100">(+ 10% + ความสูงจากปั๊มไปจุดสูงสุด)</p>
+                            <p className="text-xs text-purple-100">
+                                (+ 10% + ความสูงจากปั๊มไปจุดสูงสุด)
+                            </p>
                         </div>
                     )}
                     <div className="text-center">
@@ -1084,7 +1231,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 if (projectMode === 'horticulture') {
                                     const config = loadSprinklerConfig();
                                     const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                                    return (results.totalSprinklers * sprinklersPerTree).toLocaleString();
+                                    return (
+                                        results.totalSprinklers * sprinklersPerTree
+                                    ).toLocaleString();
                                 }
                                 return results.totalSprinklers.toLocaleString();
                             })()}{' '}
@@ -1098,7 +1247,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
                 </div>
             </div>
-
         </div>
     );
 };

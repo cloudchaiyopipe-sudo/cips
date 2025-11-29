@@ -665,11 +665,11 @@ export const calculatePipeRecommendationsWithTypes = (
     // ซึ่งอาจจะ overestimate ถ้า lateral line ที่ยาวที่สุดมี sprinklers น้อยกว่าค่าเฉลี่ย
     const lateralLongestFlowRate =
         zoneData?.lateralLongestFlowRate || lateralFlowRate * lateralOutlets;
-    
+
     if (!zoneData?.lateralLongestFlowRate) {
         console.warn(
             `⚠️ [Pipe Selection] Using fallback calculation for lateralLongestFlowRate: ${lateralLongestFlowRate.toFixed(2)} LPM (${lateralFlowRate.toFixed(2)} × ${lateralOutlets}). ` +
-            `This may overestimate. Please provide actual lateralLongestFlowRate from zone data.`
+                `This may overestimate. Please provide actual lateralLongestFlowRate from zone data.`
         );
     }
 
@@ -679,11 +679,11 @@ export const calculatePipeRecommendationsWithTypes = (
     // ซึ่งอาจจะ overestimate ถ้า lateral อื่นๆ มี flow rate น้อยกว่า
     const subMainLongestFlowRate =
         zoneData?.subMainLongestFlowRate || lateralLongestFlowRate * subMainOutlets;
-    
+
     if (!zoneData?.subMainLongestFlowRate) {
         console.warn(
             `⚠️ [Pipe Selection] Using fallback calculation for subMainLongestFlowRate: ${subMainLongestFlowRate.toFixed(2)} LPM (${lateralLongestFlowRate.toFixed(2)} × ${subMainOutlets}). ` +
-            `This may overestimate. Please provide actual subMainLongestFlowRate from zone data.`
+                `This may overestimate. Please provide actual subMainLongestFlowRate from zone data.`
         );
     }
 
@@ -693,11 +693,11 @@ export const calculatePipeRecommendationsWithTypes = (
     // ซึ่งอาจจะ overestimate ถ้า subMain อื่นๆ มี flow rate น้อยกว่า
     const mainLongestFlowRate =
         zoneData?.mainLongestFlowRate || subMainLongestFlowRate * mainOutlets;
-    
+
     if (!zoneData?.mainLongestFlowRate) {
         console.warn(
             `⚠️ [Pipe Selection] Using fallback calculation for mainLongestFlowRate: ${mainLongestFlowRate.toFixed(2)} LPM (${subMainLongestFlowRate.toFixed(2)} × ${mainOutlets}). ` +
-            `This may overestimate. Please provide actual mainLongestFlowRate from zone data.`
+                `This may overestimate. Please provide actual mainLongestFlowRate from zone data.`
         );
     }
 

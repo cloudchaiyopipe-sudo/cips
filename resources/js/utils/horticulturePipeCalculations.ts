@@ -164,7 +164,7 @@ export function calculateNewHeadLoss(
 
         const pressureLossResult = findPressureLoss(
             pipeTypeOrSelectedPipeType,
-            actualPressureClass, 
+            actualPressureClass,
             pipeSize,
             bestPipeInfo.waterFlowRate
         );
@@ -175,11 +175,15 @@ export function calculateNewHeadLoss(
 
         // สำหรับ branch pipe ใช้ sprinklerCount แทน count (ถ้ามี)
         // ใช้ actualPipeType ถ้ามี ถ้าไม่มีให้ตรวจสอบจาก pipeTypeOrSelectedPipeType
-        const isBranchPipe = actualPipeType === 'branch' || 
-            (actualPipeType === undefined && (pipeTypeOrSelectedPipeType === 'branch' || pipeTypeOrSelectedPipeType.toLowerCase().includes('branch')));
-        const outletCount = (isBranchPipe && bestPipeInfo.sprinklerCount) 
-            ? bestPipeInfo.sprinklerCount 
-            : bestPipeInfo.count;
+        const isBranchPipe =
+            actualPipeType === 'branch' ||
+            (actualPipeType === undefined &&
+                (pipeTypeOrSelectedPipeType === 'branch' ||
+                    pipeTypeOrSelectedPipeType.toLowerCase().includes('branch')));
+        const outletCount =
+            isBranchPipe && bestPipeInfo.sprinklerCount
+                ? bestPipeInfo.sprinklerCount
+                : bestPipeInfo.count;
 
         const correctionResult = findCorrectionFactor(outletCount);
 
@@ -242,8 +246,8 @@ export function calculateSprinklerPressure(sprinkler: any): SprinklerPressureInf
         pressureBar = parseFloat(String(sprinkler.pressureBar));
     }
 
-    const headM = pressureBar * 10; 
-    const head20PercentM = headM * 0.2; 
+    const headM = pressureBar * 10;
+    const head20PercentM = headM * 0.2;
 
     return {
         pressureBar,
@@ -463,10 +467,10 @@ export function validatePipeSizeHierarchy(
         }
 
         case 'branch':
-        case 'emitter': {   
+        case 'emitter': {
             const hasLargerPipes = mainSize > 0 || secondarySize > 0;
-            const isSmallerThanLargerPipes = !hasLargerPipes || 
-                currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
+            const isSmallerThanLargerPipes =
+                !hasLargerPipes || currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
             return isSmallerThanLargerPipes;
         }
 
@@ -492,7 +496,7 @@ export function selectBestPipeByHeadLoss(
     bestPipeInfo: BestPipeInfo,
     selectedPipeType: string,
     selectedPipeSizes: SelectedPipeSizes,
-    head20Percent: number,
+    head20Percent: number
 ): any | null {
     if (!availablePipes.length || !bestPipeInfo) {
         return null;
@@ -508,7 +512,7 @@ export function selectBestPipeByHeadLoss(
     }
 
     let targetHeadLossValue: number;
-    let isMaxLimitMode = false; 
+    let isMaxLimitMode = false;
 
     switch (pipeType) {
         case 'main':

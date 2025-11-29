@@ -139,7 +139,7 @@ export interface HorticultureProjectData {
             diameter: number;
             emitterType?: string;
         }[];
-    }[]; 
+    }[];
     exclusionAreas: ExclusionArea[];
     plants: PlantLocation[];
     useZones: boolean;
@@ -153,7 +153,7 @@ export interface HorticultureProjectData {
         totalWaterNeed: number;
         color: string;
         layoutIndex: number;
-    }[]; 
+    }[];
     createdAt: string;
     updatedAt: string;
 }
@@ -278,8 +278,8 @@ export interface BestPipeInfo {
     length: number;
     count: number; // จำนวนต้นไม้
     sprinklerCount?: number; // จำนวนหัวฉีดทั้งหมด (count * sprinklersPerTree)
-    waterFlowRate: number; 
-    details?: any; 
+    waterFlowRate: number;
+    details?: any;
 }
 
 export interface HeadLossResult {
@@ -303,26 +303,26 @@ export interface SprinklerConfig {
     updatedAt: string;
 }
 export const ZONE_COLORS = [
-    '#FF6B6B', 
-    '#9B59B6', 
-    '#F39C12', 
-    '#1ABC9C', 
-    '#3498DB', 
-    '#DDA0DD', 
-    '#98D8C8', 
-    '#F7DC6F', 
-    '#BB8FCE', 
-    '#85C1E9', 
-    '#F8C471', 
-    '#82E0AA', 
-    '#F1948A', 
-    '#AED6F1', 
-    '#D2B4DE', 
-    '#F9E79F', 
-    '#A9DFBF', 
-    '#FAD7A0', 
-    '#D5A6BD', 
-    '#B2DFDB', 
+    '#FF6B6B',
+    '#9B59B6',
+    '#F39C12',
+    '#1ABC9C',
+    '#3498DB',
+    '#DDA0DD',
+    '#98D8C8',
+    '#F7DC6F',
+    '#BB8FCE',
+    '#85C1E9',
+    '#F8C471',
+    '#82E0AA',
+    '#F1948A',
+    '#AED6F1',
+    '#D2B4DE',
+    '#F9E79F',
+    '#A9DFBF',
+    '#FAD7A0',
+    '#D5A6BD',
+    '#B2DFDB',
 ];
 
 export const EXCLUSION_COLORS = {
@@ -612,7 +612,6 @@ export const calculateProjectSummary = (
     const zoneDetails: ZoneSummaryData[] = [];
 
     if (projectData.zones && projectData.zones.length > 0 && projectData.useZones) {
-       
         for (const zone of projectData.zones) {
             const plantsInZone =
                 projectData.plants?.filter((plant) => plant.zoneId === zone.id) || [];
@@ -623,7 +622,6 @@ export const calculateProjectSummary = (
             const waterPerPlantInZone =
                 plantsInZone.length > 0 ? waterNeedInZone / plantsInZone.length : 0;
 
-            
             const mainPipesInZone =
                 projectData.mainPipes?.filter((pipe) => pipe.toZone === zone.id) || [];
             const subMainPipesInZone =
@@ -632,7 +630,6 @@ export const calculateProjectSummary = (
                 (subMain) => subMain.branchPipes || []
             );
 
-            
             const lateralPipesInZone =
                 projectData.lateralPipes?.filter((lateral) => {
                     // ใช้ zoneId โดยตรงถ้ามี (เร็วกว่าและแม่นยำกว่า)
@@ -644,12 +641,11 @@ export const calculateProjectSummary = (
                         const fullPlant = projectData.plants?.find((p) => p.id === plant.id);
                         return fullPlant?.zoneId === zone.id;
                     });
-                    return plantsInThisZone.length > lateral.plants.length / 2; 
+                    return plantsInThisZone.length > lateral.plants.length / 2;
                 }) || [];
 
-            
             const emitterPipesInZone = lateralPipesInZone
-                .filter((lateral) => lateral.placementMode === 'between_plants') 
+                .filter((lateral) => lateral.placementMode === 'between_plants')
                 .flatMap((lateral) => lateral.emitterLines || []);
 
             const mainPipeLengthsInZone = mainPipesInZone.map((pipe) => pipe.length);
@@ -693,7 +689,7 @@ export const calculateProjectSummary = (
             const zoneData: ZoneSummaryData = {
                 zoneId: zone.id,
                 zoneName: zone.name,
-                areaInRai: zone.area / 1600, 
+                areaInRai: zone.area / 1600,
                 plantCount: plantsInZone.length,
                 waterNeedPerSession: waterNeedInZone,
                 waterPerPlant: waterPerPlantInZone,
@@ -707,8 +703,6 @@ export const calculateProjectSummary = (
             zoneDetails.push(zoneData);
         }
     } else if (projectData.irrigationZones && projectData.irrigationZones.length > 0) {
-        
-
         for (const irrZone of projectData.irrigationZones) {
             const plantsInZone =
                 projectData.plants?.filter((plant) => plant.zoneId === irrZone.id) || [];
@@ -770,7 +764,7 @@ export const calculateProjectSummary = (
                 }) || [];
 
             const emitterPipesInZone = lateralPipesInZone
-                .filter((lateral) => lateral.placementMode === 'between_plants') 
+                .filter((lateral) => lateral.placementMode === 'between_plants')
                 .flatMap((lateral) => lateral.emitterLines || []);
 
             const mainPipesDataInZone = {
@@ -814,7 +808,7 @@ export const calculateProjectSummary = (
                 totalLength: emitterPipeLengthsInZone.reduce((sum, length) => sum + length, 0),
             };
 
-            const estimatedAreaInRai = plantsInZone.length * 0.01; 
+            const estimatedAreaInRai = plantsInZone.length * 0.01;
 
             const zoneData: ZoneSummaryData = {
                 zoneId: irrZone.id,
@@ -888,7 +882,7 @@ export const formatAreaInRai = (areaInRai: number): string => {
 
 export const formatDistance = (distance: number): string => {
     if (typeof distance !== 'number' || isNaN(distance) || distance < 0) return '0 ม.';
-        return `${distance.toFixed(2)} ม.`;
+    return `${distance.toFixed(2)} ม.`;
 };
 
 export const formatWaterVolume = (volume: number): string => {
@@ -941,7 +935,7 @@ export const clearProjectData = (): void => {
 export const generatePerpendicularDimensionLines = (
     exclusionArea: ExclusionArea,
     mainArea: Coordinate[],
-    angleOffset: number = 0 
+    angleOffset: number = 0
 ): { id: string; start: Coordinate; end: Coordinate; distance: number; angle: number }[] => {
     const lines: {
         id: string;
@@ -970,16 +964,15 @@ export const generatePerpendicularDimensionLines = (
         lat: (bounds.minLat + bounds.maxLat) / 2,
         lng: (bounds.minLng + bounds.maxLng) / 2,
     };
-    
+
     const directions = [
-        { name: 'north', angle: 0 + angleOffset }, 
-        { name: 'east', angle: 90 + angleOffset }, 
-        { name: 'south', angle: 180 + angleOffset }, 
-        { name: 'west', angle: 270 + angleOffset }, 
+        { name: 'north', angle: 0 + angleOffset },
+        { name: 'east', angle: 90 + angleOffset },
+        { name: 'south', angle: 180 + angleOffset },
+        { name: 'west', angle: 270 + angleOffset },
     ];
 
     directions.forEach((direction) => {
-        
         const startPoint = calculatePointOnExclusionBoundary(
             exclusionArea.coordinates,
             center,
@@ -1037,7 +1030,7 @@ const calculatePointOnExclusionBoundary = (
             const intersection = findLineSegmentIntersection(
                 center,
                 {
-                    lat: center.lat + directionVector.lat * 0.01, 
+                    lat: center.lat + directionVector.lat * 0.01,
                     lng: center.lng + directionVector.lng * 0.01,
                 },
                 segmentStart,
@@ -1079,7 +1072,7 @@ const findLineSegmentIntersection = (
         const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
 
         if (Math.abs(denominator) < 1e-10) {
-            return null; 
+            return null;
         }
 
         const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
@@ -1115,7 +1108,7 @@ const calculateIntersectionWithMainArea = (
         };
 
         const endPoint = {
-            lat: startPoint.lat + directionVector.lat * 0.1, 
+            lat: startPoint.lat + directionVector.lat * 0.1,
             lng: startPoint.lng + directionVector.lng * 0.1,
         };
 
@@ -1229,7 +1222,7 @@ export const snapMainPipeEndToSubMainPipe = (
         return null;
     };
 
-    const SNAP_THRESHOLD = 5.0; 
+    const SNAP_THRESHOLD = 5.0;
     let hasSnapped = false;
 
     const updatedMainPipes = mainPipes.map((mainPipe) => {
@@ -1238,10 +1231,10 @@ export const snapMainPipeEndToSubMainPipe = (
         }
 
         const mainPipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-        
+
         // ตรวจสอบโซนของจุดปลายท่อเมนก่อน
         const mainEndZone = findPipeZoneForPoint(mainPipeEnd);
-        
+
         // ถ้าไม่พบโซนของจุดปลายท่อเมน ให้ข้าม
         if (!mainEndZone) {
             return mainPipe;
@@ -1249,7 +1242,7 @@ export const snapMainPipeEndToSubMainPipe = (
 
         let closestPoint = mainPipeEnd;
         let minDistance = Infinity;
-        let snapType = 'none'; 
+        let snapType = 'none';
 
         const subMainStart = subMainPipeCoordinates[0];
         const subMainEnd = subMainPipeCoordinates[subMainPipeCoordinates.length - 1];

@@ -185,9 +185,7 @@ function Ads() {
                 <div className="mx-auto max-w-4xl px-4 py-4 md:px-6 md:py-6">
                     <div className="rounded-lg bg-slate-600/30 p-6 text-center text-white">
                         <h2 className="mb-4 text-2xl font-bold">Access Denied</h2>
-                        <p className="mb-4 text-slate-300">
-                            คุณไม่มีสิทธิ์เข้าถึงหน้านี้
-                        </p>
+                        <p className="mb-4 text-slate-300">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p>
                         <button
                             onClick={() => router.visit('/free-plan/account')}
                             className="rounded-lg bg-blue-600 px-6 py-2 font-semibold text-white hover:bg-blue-700"
