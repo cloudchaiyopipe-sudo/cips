@@ -33,7 +33,22 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('home', absolute: false));
+        $user = $request->user();
+        
+        // Clear any intended URL to prevent redirect to account page
+        $request->session()->forget('url.intended');
+        
+        // Redirect based on user role
+        if ($user->role === 'sales') {
+            return redirect()->route('equipment-crud');
+        }
+        
+        if ($user->isSuperUser()) {
+            return redirect()->route('fields');
+        }
+        
+        // Default: redirect to free-plan for regular users
+        return redirect()->route('free-plan');
     }
 
     /**

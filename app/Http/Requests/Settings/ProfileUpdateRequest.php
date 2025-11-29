@@ -20,6 +20,7 @@ class ProfileUpdateRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
 
             'email' => [
+                'sometimes',
                 'required',
                 'string',
                 'lowercase',

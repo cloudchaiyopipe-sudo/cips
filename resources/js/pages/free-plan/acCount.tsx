@@ -1,8 +1,10 @@
 // 1. Import
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage, useForm } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 import FreeNav from './components/freeNav';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEventHandler } from 'react';
 import { getTranslations } from './utils/language';
+import { SharedData } from '@/types';
 
 // Types
 interface User {
@@ -20,17 +22,63 @@ interface PageProps {
     auth: {
         user: User | null;
     };
+    status?: string;
     [key: string]: unknown;
 }
 
 // 2. Component
 function AcCount() {
     // Get user data from Inertia page props
-    const page = usePage<PageProps>();
+    const page = usePage<PageProps & SharedData>();
     const user = page.props.auth?.user;
+    const isAdmin = page.props.auth?.user?.is_admin || false;
 
     // State for translations
     const [translations, setTranslations] = useState(getTranslations());
+    
+    // State for change password modal
+    const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+    
+    // State for edit profile mode
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    
+    // State for email verification
+    const [verificationStatus, setVerificationStatus] = useState<string | null>(
+        page.props.status === 'verification-link-sent' ? 'sent' : null
+    );
+    const [sendingVerification, setSendingVerification] = useState(false);
+    
+    // Check for status from session on mount
+    useEffect(() => {
+        if (page.props.status === 'verification-link-sent') {
+            setVerificationStatus('sent');
+            // Clear status after 5 seconds
+            setTimeout(() => {
+                setVerificationStatus(null);
+            }, 5000);
+        }
+    }, [page.props.status]);
+    
+    // Form for changing password
+    const { data, setData, put, processing, errors, reset, recentlySuccessful } = useForm({
+        current_password: '',
+        password: '',
+        password_confirmation: '',
+    });
+    
+    // Form for editing profile (name only)
+    const { 
+        data: profileData, 
+        setData: setProfileData, 
+        patch: patchProfile, 
+        processing: profileProcessing, 
+        errors: profileErrors, 
+        reset: resetProfile,
+        recentlySuccessful: profileRecentlySuccessful
+    } = useForm({
+        name: user?.name || '',
+    });
+    
 
     // Listen for language changes
     useEffect(() => {
@@ -54,12 +102,101 @@ function AcCount() {
         };
     }, []);
 
-    const handleBack = () => window.history.back();
+    const handleBack = () => {
+        // ตรวจสอบ sessionStorage ว่ามาจากหน้า newsArticle หรือไม่
+        const fromNewsArticle = sessionStorage.getItem('fromNewsArticle');
+        if (fromNewsArticle === 'true') {
+            sessionStorage.removeItem('fromNewsArticle');
+            router.visit('/free-plan');
+            return;
+        }
+        
+        // ตรวจสอบ referrer ว่ามาจากหน้า /admin/articles หรือไม่
+        const referrer = document.referrer;
+        if (referrer && (referrer.includes('/admin/articles') || referrer.includes('/admin/articles/create'))) {
+            router.visit('/free-plan');
+            return;
+        }
+        
+        // ถ้ามี history ให้กลับไปหน้าก่อนหน้า
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            // ถ้าไม่มี history ให้ไปหน้า free-plan
+            router.visit('/free-plan');
+        }
+    };
     const handleUpgrade = () => router.visit('/free-plan/upgradePro');
-    const handleEditProfile = () => alert('Edit profile (demo)');
-    const handleChangePassword = () => alert('Change password (demo)');
-    const handleVerifyEmail = () => alert('Verify email (demo)');
+    const handleEditProfile = () => {
+        setIsEditingProfile(true);
+        setProfileData('name', user?.name || '');
+    };
+    const handleCancelEdit = () => {
+        setIsEditingProfile(false);
+        resetProfile();
+    };
+    const handleChangePassword = () => setShowChangePasswordModal(true);
     const handleManageAds = () => router.visit('/free-plan/ads');
+    
+    const handleSendVerificationEmail = () => {
+        setSendingVerification(true);
+        setVerificationStatus(null);
+        
+        router.post(route('verification.send'), {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setVerificationStatus('sent');
+                setSendingVerification(false);
+                // Clear status after 5 seconds
+                setTimeout(() => {
+                    setVerificationStatus(null);
+                }, 5000);
+            },
+            onError: () => {
+                setVerificationStatus('error');
+                setSendingVerification(false);
+                // Clear error after 5 seconds
+                setTimeout(() => {
+                    setVerificationStatus(null);
+                }, 5000);
+            },
+        });
+    };
+    
+    const updatePassword: FormEventHandler = (e) => {
+        e.preventDefault();
+        
+        put(route('password.update'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                setTimeout(() => {
+                    setShowChangePasswordModal(false);
+                }, 1500);
+            },
+            onError: (errors) => {
+                if (errors.password) {
+                    reset('password', 'password_confirmation');
+                }
+                if (errors.current_password) {
+                    reset('current_password');
+                }
+            },
+        });
+    };
+    
+    const updateProfile: FormEventHandler = (e) => {
+        e.preventDefault();
+        
+        patchProfile(route('profile.update'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setTimeout(() => {
+                    setIsEditingProfile(false);
+                }, 1500);
+            },
+        });
+    };
     const handleLogout = () => {
         router.post(
             '/logout',
@@ -112,16 +249,30 @@ function AcCount() {
                             </span>
                         </div>
                     </div>
-                    <div className="space-y-3">
+                    <form onSubmit={updateProfile} className="space-y-3">
                         <div>
                             <div className="mb-1 text-xs text-slate-300">
                                 {translations.fullName}
                             </div>
                             <input
-                                disabled
-                                value={user?.name || 'User'}
-                                className="w-full rounded bg-slate-800/60 px-3 py-2 text-sm"
+                                type="text"
+                                disabled={!isEditingProfile}
+                                value={isEditingProfile ? profileData.name : (user?.name || 'User')}
+                                onChange={(e) => setProfileData('name', e.target.value)}
+                                className={`w-full rounded px-3 py-2 text-sm ${
+                                    isEditingProfile
+                                        ? 'bg-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                        : 'bg-slate-800/60 text-slate-300'
+                                }`}
                             />
+                            {profileErrors.name && (
+                                <p className="mt-1 text-xs text-red-400">{profileErrors.name}</p>
+                            )}
+                            {profileRecentlySuccessful && isEditingProfile && (
+                                <p className="mt-1 text-xs text-green-400">
+                                    {translations.passwordChangedSuccessfully || 'บันทึกเรียบร้อยแล้ว'}
+                                </p>
+                            )}
                         </div>
                         <div>
                             <div className="mb-1 text-xs text-slate-300">
@@ -130,16 +281,38 @@ function AcCount() {
                             <input
                                 disabled
                                 value={user?.email || 'user@example.com'}
-                                className="w-full rounded bg-slate-800/60 px-3 py-2 text-sm"
+                                className="w-full rounded bg-slate-800/60 px-3 py-2 text-sm text-slate-300"
                             />
                         </div>
-                        <button
-                            onClick={handleEditProfile}
-                            className="rounded bg-slate-200 px-4 py-2 text-slate-900"
-                        >
-                            {translations.editProfile}
-                        </button>
-                    </div>
+                        {!isEditingProfile ? (
+                            <button
+                                type="button"
+                                onClick={handleEditProfile}
+                                className="rounded bg-slate-200 px-4 py-2 text-slate-900 hover:bg-slate-300"
+                            >
+                                {translations.editProfile}
+                            </button>
+                        ) : (
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    className="flex-1 rounded bg-slate-600 px-4 py-2 text-white hover:bg-slate-700"
+                                >
+                                    {translations.cancel || 'ยกเลิก'}
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={profileProcessing}
+                                    className="flex-1 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {profileProcessing
+                                        ? translations.saving || 'กำลังบันทึก...'
+                                        : translations.save || 'บันทึก'}
+                                </button>
+                            </div>
+                        )}
+                    </form>
                 </div>
 
                 {/* Subscription Plan */}
@@ -177,19 +350,37 @@ function AcCount() {
                     )}
                 </div>
 
-                {/* Advertisement Management */}
-                <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
-                    <div className="mb-2 font-semibold">{translations.advertisementManagement}</div>
-                    <div className="mb-3 text-sm text-slate-300">
-                        {translations.uploadManageAds}
+                {/* Advertisement Management - แสดงเฉพาะ Admin */}
+                {isAdmin && (
+                    <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
+                        <div className="mb-2 font-semibold">{translations.advertisementManagement}</div>
+                        <div className="mb-3 text-sm text-slate-300">
+                            {translations.uploadManageAds}
+                        </div>
+                        <button
+                            onClick={handleManageAds}
+                            className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
+                        >
+                            {translations.manageAdvertisements}
+                        </button>
                     </div>
-                    <button
-                        onClick={handleManageAds}
-                        className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
-                    >
-                        {translations.manageAdvertisements}
-                    </button>
-                </div>
+                )}
+
+                {/* Article Management - แสดงเฉพาะ Admin */}
+                {isAdmin && (
+                    <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
+                        <div className="mb-2 font-semibold">จัดการบทความ</div>
+                        <div className="mb-3 text-sm text-slate-300">
+                            จัดการและแก้ไขบทความที่แสดงในหน้าแรก
+                        </div>
+                        <button
+                            onClick={() => router.visit('/admin/articles')}
+                            className="w-full rounded-lg bg-purple-600 py-3 font-semibold text-white transition-colors hover:bg-purple-700"
+                        >
+                            📝 จัดการบทความ
+                        </button>
+                    </div>
+                )}
 
                 {/* Account Statistics */}
                 <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
@@ -198,33 +389,67 @@ function AcCount() {
                         {translations.memberSince}{' '}
                         {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                     </div>
-                    <div className="text-sm">
-                        {translations.emailStatus}{' '}
-                        {user?.email_verified_at ? translations.verified : translations.unverified}
-                    </div>
-                    <div className="text-sm">
-                        {translations.currentTokens} {user?.tokens || 0}
-                    </div>
-                    <div className="text-sm">
-                        {translations.monthlyTokens} {user?.monthly_tokens || 100}
-                    </div>
                 </div>
 
                 {/* Account Security */}
                 <div className="mt-4 rounded-lg bg-slate-600/30 p-4 text-white">
                     <div className="mb-2 font-semibold">{translations.accountSecurity}</div>
+                    
+                    {/* Email Verification Status */}
+                    {user && (
+                        <div className="mb-4 rounded-lg bg-slate-700/50 p-3">
+                            <div className="mb-2 flex items-center justify-between">
+                                <span className="text-sm text-slate-300">{translations.emailStatus || 'Email Status'}:</span>
+                                <span className={`text-sm font-semibold ${
+                                    user.email_verified_at 
+                                        ? 'text-green-400' 
+                                        : 'text-yellow-400'
+                                }`}>
+                                    {user.email_verified_at 
+                                        ? `✓ ${translations.verified || 'Verified'}` 
+                                        : `⚠ ${translations.unverified || 'Unverified'}`}
+                                </span>
+                            </div>
+                            
+                            {!user.email_verified_at && (
+                                <div className="mt-3 space-y-2">
+                                    <p className="text-xs text-slate-400">
+                                        {translations.sendVerificationEmail || 'Please verify your email address to secure your account.'}
+                                    </p>
+                                    
+                                    {verificationStatus === 'sent' && (
+                                        <div className="rounded bg-green-900/30 p-2 text-xs text-green-300">
+                                            {translations.verificationEmailSent || 'Verification email sent. Please check your email.'}
+                                        </div>
+                                    )}
+                                    
+                                    {verificationStatus === 'error' && (
+                                        <div className="rounded bg-red-900/30 p-2 text-xs text-red-300">
+                                            {translations.errorSendingEmail || 'Failed to send verification email. Please try again.'}
+                                        </div>
+                                    )}
+                                    
+                                    <button
+                                        onClick={handleSendVerificationEmail}
+                                        disabled={sendingVerification}
+                                        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {sendingVerification 
+                                            ? `${translations.sending || 'Sending'}...` 
+                                            : translations.sendVerificationEmail || 'Send Verification Email'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* Security Actions */}
                     <div className="flex flex-col gap-3 md:flex-row md:flex-nowrap md:items-center">
                         <button
                             onClick={handleChangePassword}
                             className="flex-1 rounded bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700"
                         >
                             {translations.changePassword}
-                        </button>
-                        <button
-                            onClick={handleVerifyEmail}
-                            className="flex-1 rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
-                        >
-                            {translations.verifyEmail}
                         </button>
                         <button
                             onClick={handleLogout}
@@ -235,6 +460,116 @@ function AcCount() {
                     </div>
                 </div>
             </div>
+            
+            {/* Change Password Modal */}
+            {showChangePasswordModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="relative mx-4 w-full max-w-md rounded-lg bg-slate-800 p-6 shadow-xl">
+                        {/* Close Button */}
+                        <button
+                            onClick={() => {
+                                setShowChangePasswordModal(false);
+                                reset();
+                            }}
+                            className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
+                        >
+                            ✕
+                        </button>
+                        
+                        {/* Modal Title */}
+                        <h2 className="mb-4 text-xl font-semibold text-white">
+                            {translations.changePassword}
+                        </h2>
+                        
+                        {/* Form */}
+                        <form onSubmit={updatePassword} className="space-y-4">
+                            {/* Current Password */}
+                            <div>
+                                <label className="mb-1 block text-sm text-slate-300">
+                                    {translations.currentPassword || 'รหัสผ่านปัจจุบัน'}
+                                </label>
+                                <input
+                                    type="password"
+                                    value={data.current_password}
+                                    onChange={(e) => setData('current_password', e.target.value)}
+                                    className="w-full rounded bg-slate-700 px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                    placeholder={translations.currentPassword || 'รหัสผ่านปัจจุบัน'}
+                                    autoComplete="current-password"
+                                />
+                                {errors.current_password && (
+                                    <p className="mt-1 text-sm text-red-400">{errors.current_password}</p>
+                                )}
+                            </div>
+                            
+                            {/* New Password */}
+                            <div>
+                                <label className="mb-1 block text-sm text-slate-300">
+                                    {translations.newPassword || 'รหัสผ่านใหม่'}
+                                </label>
+                                <input
+                                    type="password"
+                                    value={data.password}
+                                    onChange={(e) => setData('password', e.target.value)}
+                                    className="w-full rounded bg-slate-700 px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                    placeholder={translations.newPassword || 'รหัสผ่านใหม่'}
+                                    autoComplete="new-password"
+                                />
+                                {errors.password && (
+                                    <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                                )}
+                            </div>
+                            
+                            {/* Confirm Password */}
+                            <div>
+                                <label className="mb-1 block text-sm text-slate-300">
+                                    {translations.confirmPassword || 'ยืนยันรหัสผ่านใหม่'}
+                                </label>
+                                <input
+                                    type="password"
+                                    value={data.password_confirmation}
+                                    onChange={(e) => setData('password_confirmation', e.target.value)}
+                                    className="w-full rounded bg-slate-700 px-3 py-2 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                    placeholder={translations.confirmPassword || 'ยืนยันรหัสผ่านใหม่'}
+                                    autoComplete="new-password"
+                                />
+                                {errors.password_confirmation && (
+                                    <p className="mt-1 text-sm text-red-400">{errors.password_confirmation}</p>
+                                )}
+                            </div>
+                            
+                            {/* Success Message */}
+                            {recentlySuccessful && (
+                                <p className="text-sm text-green-400">
+                                    {translations.passwordChangedSuccessfully || 'รหัสผ่านถูกเปลี่ยนเรียบร้อยแล้ว'}
+                                </p>
+                            )}
+                            
+                            {/* Buttons */}
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowChangePasswordModal(false);
+                                        reset();
+                                    }}
+                                    className="flex-1 rounded bg-slate-600 px-4 py-2 text-white hover:bg-slate-700"
+                                >
+                                    {translations.cancel || 'ยกเลิก'}
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="flex-1 rounded bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700 disabled:opacity-50"
+                                >
+                                    {processing
+                                        ? translations.saving || 'กำลังบันทึก...'
+                                        : translations.save || 'บันทึก'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,7 +1,6 @@
 // 1. Import
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
-import QRCodeSVG from 'react-qr-code';
 import FreeNav from './components/freeNav';
 import {
     calculatePipeRecommendations,
@@ -11,13 +10,10 @@ import {
 } from './utils/pipeSelection';
 import { calculatePumpRequirements, PumpRecommendation } from './utils/pumpSelection';
 import { getTranslations } from './utils/language';
+import { getPlantImagePath } from './utils/freeCrop';
 
 // 2. Component
 function FreeProduct() {
-    // LINE Official Account ID - สามารถแก้ไขได้ที่นี่
-    const LINE_ID = '@fang.nitipoom';
-    const LINE_FRIEND_URL = `https://line.me/R/ti/p/${LINE_ID}`;
-
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<unknown>(null);
@@ -43,9 +39,7 @@ function FreeProduct() {
     const [showPipeZoneDropdown, setShowPipeZoneDropdown] = useState(false);
     const [selectedPumpZoneId, setSelectedPumpZoneId] = useState<'all' | 'single' | null>(null);
     const [showPumpZoneDropdown, setShowPumpZoneDropdown] = useState(false);
-    const [showCalculationDetails, setShowCalculationDetails] = useState(false);
     const [showPumpCalculationDetails, setShowPumpCalculationDetails] = useState(false);
-    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [sprinklerSpecs, setSprinklerSpecs] = useState<{
         flowRatePerMin: number;
         waterPressure: number;
@@ -315,11 +309,22 @@ function FreeProduct() {
 
     const handleBack = () => router.visit('/free-plan/summary');
     const handleCheckout = () => {
-        setShowCheckoutModal(true);
-    };
-
-    const handleCloseCheckoutModal = () => {
-        setShowCheckoutModal(false);
+        // Save current recommendations to localStorage for checkout page
+        if (pipeRecommendations) {
+            localStorage.setItem('pipeRecommendations', JSON.stringify(pipeRecommendations));
+        }
+        if (pipeTypeRecommendations) {
+            localStorage.setItem('pipeTypeRecommendations', JSON.stringify(pipeTypeRecommendations));
+        }
+        if (pumpRecommendations) {
+            localStorage.setItem('pumpRecommendations', JSON.stringify(pumpRecommendations));
+        }
+        if (calculatedSprinklerSpecs) {
+            localStorage.setItem('calculatedSprinklerSpecs', JSON.stringify(calculatedSprinklerSpecs));
+        }
+        localStorage.setItem('sprinklerMode', sprinklerMode);
+        
+        router.visit('/free-plan/checkout');
     };
 
     // Function to find zone with highest flow rate
@@ -838,19 +843,20 @@ function FreeProduct() {
         }
 
         // คำนวณ pressure loss จากท่อแยกตาม PE และ PVC
+        // Use pipeTypeRecs directly instead of pipeTypeRecommendations state to avoid infinite loop
         const pumpRecs = calculatePumpRequirements(
             pumpFlowRate,
             currentSpecs.waterPressure,
             {
                 pe: {
-                    mainLoss: pipeTypeRecommendations?.main?.pe?.pressureLoss ?? 0,
-                    subMainLoss: pipeTypeRecommendations?.subMain?.pe?.pressureLoss ?? 0,
-                    lateralLoss: pipeTypeRecommendations?.lateral?.pe?.pressureLoss ?? 0,
+                    mainLoss: pipeTypeRecs?.main?.pe?.pressureLoss ?? 0,
+                    subMainLoss: pipeTypeRecs?.subMain?.pe?.pressureLoss ?? 0,
+                    lateralLoss: pipeTypeRecs?.lateral?.pe?.pressureLoss ?? 0,
                 },
                 pvc: {
-                    mainLoss: pipeTypeRecommendations?.main?.pvc?.pressureLoss ?? 0,
-                    subMainLoss: pipeTypeRecommendations?.subMain?.pvc?.pressureLoss ?? 0,
-                    lateralLoss: pipeTypeRecommendations?.lateral?.pvc?.pressureLoss ?? 0,
+                    mainLoss: pipeTypeRecs?.main?.pvc?.pressureLoss ?? 0,
+                    subMainLoss: pipeTypeRecs?.subMain?.pvc?.pressureLoss ?? 0,
+                    lateralLoss: pipeTypeRecs?.lateral?.pvc?.pressureLoss ?? 0,
                 },
             },
             0, // staticHead (สามารถเพิ่มในอนาคต)
@@ -865,9 +871,9 @@ function FreeProduct() {
         selectedPumpZoneId,
         selectedPipeZoneId,
         longestPipes,
-        pipeTypeRecommendations,
-        calculateOptimalSprinklerSpecs,
         calculateLongestPipeFlowRates,
+        // Removed pipeTypeRecommendations from dependencies to prevent infinite loop
+        // It's set in this effect, so using the computed value (pipeTypeRecs) directly instead
     ]);
 
     // Load Google Maps and render an interactive, read-only map like freeMap
@@ -991,21 +997,15 @@ function FreeProduct() {
                             position: { lat: number; lng: number };
                         }>;
                         plantPoints.forEach((point) => {
+                            const plantImagePath = plantData && plantData.name ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                             new window.google.maps.Marker({
                                 position: point.position,
                                 map,
-                                title: plantData ? `${plantData.name} Plant` : 'Plant',
+                                title: plantData ? `${plantData.name} ${translations.plant}` : translations.plant,
                                 icon: {
-                                    url:
-                                        'data:image/svg+xml;charset=UTF-8,' +
-                                        encodeURIComponent(`
-                                            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="8" cy="8" r="6" fill="#10B981" stroke="#059669" stroke-width="1"/>
-                                                <text x="8" y="11" text-anchor="middle" font-size="8" fill="white">${plantData ? plantData.icon : '🌱'}</text>
-                                            </svg>
-                                        `),
-                                    scaledSize: new window.google.maps.Size(16, 16),
-                                    anchor: new window.google.maps.Point(8, 8),
+                                    url: plantImagePath,
+                                    scaledSize: new window.google.maps.Size(24, 24),
+                                    anchor: new window.google.maps.Point(12, 12),
                                 },
                                 clickable: false,
                             });
@@ -1032,19 +1032,22 @@ function FreeProduct() {
                             new window.google.maps.Marker({
                                 position: ws.position,
                                 map,
-                                title: 'Water Source',
+                                title: translations.waterSource,
                                 icon: {
                                     url:
                                         'data:image/svg+xml;charset=UTF-8,' +
                                         encodeURIComponent(`
                                             <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                                                <rect x="4" y="4" width="40" height="40" rx="8" fill="#3B82F6" stroke="#1E40AF" stroke-width="3"/>
-                                                <rect x="12" y="12" width="24" height="24" rx="4" fill="#FFFFFF"/>
-                                                <path d="M24 16C21 16 19 19 19 21.5C19 25 24 30 24 30C24 30 29 25 29 21.5C29 19 27 16 24 16ZM24 23C22.6 23 21.5 21.9 21.5 20.5C21.5 19.1 22.6 18 24 18C25.4 18 26.5 19.1 26.5 20.5C26.5 21.9 25.4 23 24 23Z" fill="#2563EB"/>
+                                                <!-- Outer circle background -->
+                                                <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
+                                                <!-- Water drop shape -->
+                                                <path d="M24 8 Q20 8 18 12 Q16 16 16 20 Q16 24 18 28 Q20 32 24 36 Q28 32 30 28 Q32 24 32 20 Q32 16 30 12 Q28 8 24 8 Z" fill="#60A5FA" stroke="#2563EB" stroke-width="1.5"/>
+                                                <!-- Highlight -->
+                                                <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                                             </svg>
                                         `),
-                                    scaledSize: new window.google.maps.Size(36, 36),
-                                    anchor: new window.google.maps.Point(18, 18),
+                                    scaledSize: new window.google.maps.Size(48, 48),
+                                    anchor: new window.google.maps.Point(24, 24),
                                 },
                             });
                             bounds.extend(
@@ -1067,7 +1070,7 @@ function FreeProduct() {
                             new window.google.maps.Marker({
                                 position: pump.position,
                                 map,
-                                title: 'Water Pump',
+                                title: translations.waterPump,
                                 icon: {
                                     url: '/images/water-pump.png',
                                     scaledSize: new window.google.maps.Size(32, 32),
@@ -1307,7 +1310,7 @@ function FreeProduct() {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [translations.plant, translations.waterSource, translations.waterPump, translations.mapSnapshot]);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
@@ -1327,7 +1330,7 @@ function FreeProduct() {
                             {!window.google && imageUrl && (
                                 <img
                                     src={imageUrl}
-                                    alt="Map snapshot"
+                                    alt={translations.mapSnapshot}
                                     className="h-full w-full object-cover"
                                 />
                             )}
@@ -1438,7 +1441,7 @@ function FreeProduct() {
                                                     selectedZone.mainOutlets > 0 && (
                                                         <div className="text-xs text-red-300">
                                                             {selectedZone.mainOutlets}{' '}
-                                                            {translations.outletsLabel.toLowerCase()}
+                                                            {translations.outlets?.toLowerCase() || 'outlets'}
                                                         </div>
                                                     )}
                                             </div>
@@ -1465,7 +1468,7 @@ function FreeProduct() {
                                                     selectedZone.subMainOutlets > 0 && (
                                                         <div className="text-xs text-purple-300">
                                                             {selectedZone.subMainOutlets}{' '}
-                                                            {translations.outletsLabel.toLowerCase()}
+                                                            {translations.outlets?.toLowerCase() || 'outlets'}
                                                         </div>
                                                     )}
                                             </div>
@@ -1492,7 +1495,7 @@ function FreeProduct() {
                                                     selectedZone.lateralOutlets > 0 && (
                                                         <div className="text-xs text-yellow-300">
                                                             {selectedZone.lateralOutlets}{' '}
-                                                            {translations.outletsLabel.toLowerCase()}
+                                                            {translations.outlets?.toLowerCase() || 'outlets'}
                                                         </div>
                                                     )}
                                             </div>
@@ -1535,13 +1538,7 @@ function FreeProduct() {
                         </div>
                         {sprinklerMode === 'preset' ? (
                             sprinklerSpecs ? (
-                                <div className="space-y-3 rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
-                                    {/* Mode Indicator */}
-                                    <div className="flex items-center gap-2 text-xs text-emerald-400">
-                                        <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                        <span>{translations.usingSettingsFromSummary}</span>
-                                    </div>
-
+                                <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
                                     {/* Basic Specifications */}
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                         <div className="flex items-center justify-between">
@@ -1549,7 +1546,7 @@ function FreeProduct() {
                                                 {translations.flowRateProduct}:
                                             </span>
                                             <span className="font-semibold text-emerald-400">
-                                                {sprinklerSpecs.flowRatePerMin} LPM/plant
+                                                {sprinklerSpecs.flowRatePerMin} LPM
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
@@ -1569,65 +1566,6 @@ function FreeProduct() {
                                             </span>
                                         </div>
                                     </div>
-
-                                    {/* System Overview */}
-                                    <div className="border-t border-emerald-800/50 pt-2">
-                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-emerald-300">
-                                                    {translations.totalPlants}:
-                                                </span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {summaryData?.plants?.total || 0}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-emerald-300">
-                                                    {translations.totalZones}
-                                                </span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {zones.length}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Flow Rate Summary */}
-                                    <div className="border-t border-emerald-800/50 pt-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-emerald-300">
-                                                {translations.totalFlowRateProduct}:
-                                            </span>
-                                            <span className="text-lg font-bold text-emerald-400">
-                                                {Math.round(sprinklerSpecs.totalLPM)} LPM
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-xs text-emerald-400">
-                                            {summaryData?.plants?.total || 0} plants ×{' '}
-                                            {sprinklerSpecs.flowRatePerMin} LPM/plant
-                                        </div>
-                                    </div>
-
-                                    {/* Additional Info */}
-                                    <div className="border-t border-emerald-800/50 pt-2">
-                                        <div className="text-xs text-emerald-300">
-                                            <div className="mb-1 flex items-center justify-between">
-                                                <span>{translations.flowRatePerHour}</span>
-                                                <span className="font-semibold">
-                                                    {Math.round(sprinklerSpecs.totalLPM * 60)} LPH
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span>{translations.coveragePerSprinkler}</span>
-                                                <span className="font-semibold">
-                                                    {(
-                                                        Math.PI * Math.pow(sprinklerSpecs.radius, 2)
-                                                    ).toFixed(1)}{' '}
-                                                    m²
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             ) : (
                                 <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
@@ -1635,486 +1573,32 @@ function FreeProduct() {
                                 </div>
                             )
                         ) : calculatedSprinklerSpecs ? (
-                            <div className="space-y-4 rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
-                                {/* Mode Indicator */}
-                                <div className="flex items-center gap-2 text-xs text-emerald-400">
-                                    <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                    <span>{translations.calculatedUsing5StepMethod}</span>
-                                </div>
-
-                                {/* Zone Information */}
-                                {calculatedSprinklerSpecs.calculationDetails?.zoneInfo && (
-                                    <div className="rounded bg-emerald-800/30 p-3">
-                                        <div className="mb-2 text-xs font-medium text-emerald-300">
-                                            {translations.basedOnZone}{' '}
-                                            {
-                                                calculatedSprinklerSpecs.calculationDetails.zoneInfo
-                                                    .zoneName
-                                            }
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div className="flex justify-between">
-                                                <span>Area:</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {calculatedSprinklerSpecs.calculationDetails.zoneInfo.zoneArea.toFixed(
-                                                        2
-                                                    )}{' '}
-                                                    Rai
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Plants:</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {
-                                                        calculatedSprinklerSpecs.calculationDetails
-                                                            .zoneInfo.zonePlants
-                                                    }
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Flow Rate:</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {
-                                                        calculatedSprinklerSpecs.calculationDetails
-                                                            .zoneInfo.zoneLPM
-                                                    }{' '}
-                                                    LPM
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>
-                                                    {translations.waterNeedPerSessionLabel}:
-                                                </span>
-                                                <span className="font-semibold text-cyan-400">
-                                                    {summaryData?.selectedPlant
-                                                        ? Math.round(
-                                                              calculatedSprinklerSpecs
-                                                                  .calculationDetails.zoneInfo
-                                                                  .zonePlants *
-                                                                  summaryData.selectedPlant
-                                                                      .waterNeed
-                                                          )
-                                                        : Math.round(
-                                                              calculatedSprinklerSpecs
-                                                                  .calculationDetails.zoneInfo
-                                                                  .zoneLPM * 30
-                                                          )}{' '}
-                                                    L/session
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>{translations.plantDensity}</span>
-                                                <span className="font-semibold text-emerald-400">
-                                                    {
-                                                        calculatedSprinklerSpecs.calculationDetails
-                                                            .step3.plantDensity
-                                                    }{' '}
-                                                    {translations.plantsPerRai}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Calculation Details Toggle */}
-                                <div className="flex items-center justify-between">
-                                    <div className="text-sm font-medium text-emerald-300">
-                                        {translations.fiveStepCalculationProcess}
-                                    </div>
-                                    <button
-                                        onClick={() =>
-                                            setShowCalculationDetails(!showCalculationDetails)
-                                        }
-                                        className="flex items-center gap-2 rounded-lg bg-emerald-800/50 px-3 py-1 text-xs text-emerald-300 transition-colors hover:bg-emerald-700/50"
-                                    >
-                                        <span>
-                                            {showCalculationDetails
-                                                ? translations.hideDetails
-                                                : translations.showDetails}
-                                        </span>
-                                        <span
-                                            className={`transition-transform duration-200 ${showCalculationDetails ? 'rotate-180' : ''}`}
-                                        >
-                                            ▼
-                                        </span>
-                                    </button>
-                                </div>
-
-                                {/* 5-Step Calculation Process - Collapsible */}
-                                {showCalculationDetails && (
-                                    <div className="space-y-4">
-                                        {/* Step 1: Water Depth */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step1 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        1
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.convertWaterVolumeToDepth}
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                        <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-emerald-300">
-                                                                {translations.irrigationTime}
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-emerald-400">
-                                                                {
-                                                                    calculatedSprinklerSpecs
-                                                                        .calculationDetails.step1
-                                                                        .irrigationTimeMinutes
-                                                                }{' '}
-                                                                min
-                                                            </div>
-                                                        </div>
-                                                        <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-emerald-300">
-                                                                {translations.area}
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-emerald-400">
-                                                                {calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(
-                                                                    1
-                                                                )}{' '}
-                                                                m²
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                        <div className="rounded-lg border border-cyan-700/30 bg-cyan-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-cyan-300">
-                                                                {
-                                                                    translations.waterNeedPerSessionLabel
-                                                                }
-                                                            </div>
-                                                            <div className="text-sm font-bold text-cyan-400">
-                                                                {summaryData?.selectedPlant
-                                                                    ? Math.round(
-                                                                          calculatedSprinklerSpecs
-                                                                              .calculationDetails
-                                                                              .zoneInfo.zonePlants *
-                                                                              summaryData
-                                                                                  .selectedPlant
-                                                                                  .waterNeed
-                                                                      )
-                                                                    : calculatedSprinklerSpecs
-                                                                          .calculationDetails.step1
-                                                                          .totalWaterVolumeLiters}{' '}
-                                                                L/session
-                                                            </div>
-                                                        </div>
-                                                        <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                            <div className="mb-1 text-xs text-emerald-300">
-                                                                {translations.totalWaterVolume}
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-emerald-400">
-                                                                {
-                                                                    calculatedSprinklerSpecs
-                                                                        .calculationDetails.step1
-                                                                        .totalWaterVolumeLiters
-                                                                }{' '}
-                                                                L
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.waterDepthResult}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step1
-                                                                    .waterDepthMm
-                                                            }{' '}
-                                                            mm
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 2: Irrigation Rate */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step2 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        2
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.calculateIrrigationRate}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                    <div className="mb-1 text-xs text-emerald-300">
-                                                        {translations.requiredIrrigationRate}
-                                                    </div>
-                                                    <div className="text-lg font-bold text-emerald-400">
-                                                        {
-                                                            calculatedSprinklerSpecs
-                                                                .calculationDetails.step2
-                                                                .irrigationRateMmPerHour
-                                                        }{' '}
-                                                        mm/hour
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 3: Sprinkler Layout */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step3 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        3
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.designSprinklerLayout}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.optimalRadius}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .optimalRadius
-                                                            }{' '}
-                                                            m
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.sprinklerSpacing}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .sprinklerSpacing
-                                                            }{' '}
-                                                            m
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.totalSprinklersCalculated}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .totalSprinklers
-                                                            }
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-emerald-500">
-                                                            Area ÷ Coverage ={' '}
-                                                            {calculatedSprinklerSpecs.calculationDetails.step1.areaSquareMeters.toFixed(
-                                                                0
-                                                            )}{' '}
-                                                            ÷{' '}
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerCoverageArea
-                                                            }{' '}
-                                                            ={' '}
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .totalSprinklers
-                                                            }
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.plantDensity}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .plantDensity
-                                                            }{' '}
-                                                            {translations.plantsPerRai}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 4: Flow Rate per Sprinkler */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step4 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        4
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.calculateFlowRatePerSprinkler}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.coverageAreaPerSprinkler}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerCoverageArea
-                                                            }{' '}
-                                                            m²
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-emerald-500">
-                                                            π × r² = π ×{' '}
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step3
-                                                                    .optimalRadius
-                                                            }
-                                                            ²
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.flowRateLPH}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerFlowRateLPH
-                                                            }{' '}
-                                                            LPH
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.flowRateLPMResult}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step4
-                                                                    .sprinklerFlowRateLPM
-                                                            }{' '}
-                                                            LPM
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Step 5: Pressure Requirements */}
-                                        {calculatedSprinklerSpecs.calculationDetails?.step5 && (
-                                            <div className="rounded-lg border border-emerald-700/30 bg-emerald-800/20 p-4">
-                                                <div className="mb-3 flex items-center gap-2">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
-                                                        5
-                                                    </div>
-                                                    <div className="text-sm font-medium text-emerald-400">
-                                                        {translations.selectPressureFromCatalog}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.requiredPressure}
-                                                        </div>
-                                                        <div className="text-lg font-bold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step5
-                                                                    .requiredPressure
-                                                            }{' '}
-                                                            Bar
-                                                        </div>
-                                                    </div>
-                                                    <div className="rounded-lg bg-emerald-900/30 p-3">
-                                                        <div className="mb-1 text-xs text-emerald-300">
-                                                            {translations.pressureCategory}
-                                                        </div>
-                                                        <div className="text-sm font-semibold text-emerald-400">
-                                                            {
-                                                                calculatedSprinklerSpecs
-                                                                    .calculationDetails.step5
-                                                                    .pressureCategory
-                                                            }
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
+                            <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
                                 {/* Final Specifications */}
-                                <div className="border-t border-emerald-800/50 pt-4">
-                                    <div className="mb-4 flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-                                        <div className="text-lg font-semibold text-emerald-300">
-                                            {translations.finalSprinklerSpecifications}
-                                        </div>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-emerald-300">
+                                            {translations.flowRateProduct}:
+                                        </span>
+                                        <span className="font-semibold text-emerald-400">
+                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} LPM
+                                        </span>
                                     </div>
-
-                                    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-4">
-                                            <div className="mb-1 text-xs text-emerald-300">
-                                                {translations.flowRateProduct}
-                                            </div>
-                                            <div className="text-xl font-bold text-emerald-400">
-                                                {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)}{' '}
-                                                LPM
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-4">
-                                            <div className="mb-1 text-xs text-emerald-300">
-                                                {translations.pressureProduct}
-                                            </div>
-                                            <div className="text-xl font-bold text-emerald-400">
-                                                {calculatedSprinklerSpecs.waterPressure} Bar
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-emerald-500/30 bg-emerald-600/20 p-4">
-                                            <div className="mb-1 text-xs text-emerald-300">
-                                                {translations.radiusProduct}
-                                            </div>
-                                            <div className="text-xl font-bold text-emerald-400">
-                                                {calculatedSprinklerSpecs.radius} m
-                                            </div>
-                                        </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-emerald-300">
+                                            {translations.pressureProduct}:
+                                        </span>
+                                        <span className="font-semibold text-emerald-400">
+                                            {calculatedSprinklerSpecs.waterPressure} Bar
+                                        </span>
                                     </div>
-
-                                    <div className="rounded-lg border border-emerald-600/30 bg-emerald-800/30 p-4">
-                                        <div className="mb-2 flex items-center justify-between">
-                                            <div className="text-sm font-medium text-emerald-300">
-                                                {translations.totalFlowRateProduct}
-                                            </div>
-                                            <div className="text-2xl font-bold text-emerald-400">
-                                                {Math.round(calculatedSprinklerSpecs.totalLPM)} LPM
-                                            </div>
-                                        </div>
-                                        <div className="text-xs text-emerald-400">
-                                            {calculatedSprinklerSpecs.calculationDetails?.step3
-                                                .totalSprinklers || 0}{' '}
-                                            sprinklers ×{' '}
-                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)}{' '}
-                                            LPM/sprinkler
-                                            <div className="mt-1 text-xs text-emerald-500">
-                                                Coverage:{' '}
-                                                {(calculatedSprinklerSpecs.calculationDetails?.step3
-                                                    .totalSprinklers || 0) *
-                                                    (calculatedSprinklerSpecs.calculationDetails
-                                                        ?.step4.sprinklerCoverageArea || 0)}{' '}
-                                                m²
-                                            </div>
-                                        </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-emerald-300">
+                                            {translations.radiusProduct}:
+                                        </span>
+                                        <span className="font-semibold text-emerald-400">
+                                            {calculatedSprinklerSpecs.radius} m
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -2138,8 +1622,8 @@ function FreeProduct() {
                                     <span className="text-xs">
                                         {selectedPipeZoneId
                                             ? zones.find((z) => z.id === selectedPipeZoneId)
-                                                  ?.name || 'Select Zone'
-                                            : 'Select Zone'}
+                                                  ?.name || translations.selectZone
+                                            : translations.selectZone}
                                     </span>
                                     <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
                                 </button>
@@ -2183,7 +1667,7 @@ function FreeProduct() {
                                                 {translations.recommendedSize}:
                                             </span>
                                             <span className="font-semibold text-rose-400">
-                                                {pipeRecommendations?.main.sizeMM}mm (
+                                                {pipeRecommendations?.main.sizeMM?.toFixed(2)}mm (
                                                 {pipeRecommendations?.main.sizeInch})
                                             </span>
                                         </div>
@@ -2195,22 +1679,22 @@ function FreeProduct() {
                                         {pipeTypeRecommendations?.main && (
                                             <div className="border-t border-rose-800/50 pt-2">
                                                 <div className="mb-2 text-xs font-medium text-rose-300">
-                                                    Pipe Type Recommendations:
+                                                    {translations.pipeTypeRecommendations}:
                                                 </div>
                                                 <div className="space-y-3">
                                                     {/* PE Recommendation */}
                                                     {pipeTypeRecommendations.main.pe && (
                                                         <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                             <div className="mb-1 text-xs font-medium text-blue-300">
-                                                                PE (Polyethylene)
+                                                                {translations.pePolyethylene}
                                                             </div>
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="flex justify-between">
-                                                                    <span>Size:</span>
+                                                                    <span>{translations.sizeLabel}</span>
                                                                     <span className="font-semibold text-blue-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .main.pe.sizeMM
+                                                                                .main.pe.sizeMM?.toFixed(2)
                                                                         }
                                                                         mm (
                                                                         {
@@ -2223,7 +1707,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.main.pe
                                                                     .calculationDetails && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Type:</span>
+                                                                        <span>{translations.typeLabel}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {
                                                                                 pipeTypeRecommendations
@@ -2237,7 +1721,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.main.pe
                                                                     .pressureLoss !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Pressure Loss:</span>
+                                                                        <span>{translations.pressureLoss}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {pipeTypeRecommendations.main.pe.pressureLoss.toFixed(
                                                                                 2
@@ -2249,7 +1733,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.main.pe
                                                                     .hf !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>HF:</span>
+                                                                        <span>{translations.hfLabel}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {pipeTypeRecommendations.main.pe.hf.toFixed(
                                                                                 3
@@ -2266,28 +1750,22 @@ function FreeProduct() {
                                                     {pipeTypeRecommendations.main.pvc && (
                                                         <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                             <div className="mb-1 text-xs font-medium text-green-300">
-                                                                PVC (Polyvinyl Chloride)
+                                                                {translations.pvcPolyvinylChloride}
                                                             </div>
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="flex justify-between">
-                                                                    <span>Size:</span>
+                                                                    <span>{translations.sizeLabel}</span>
                                                                     <span className="font-semibold text-green-400">
-                                                                        {
-                                                                            pipeTypeRecommendations
-                                                                                .main.pvc.sizeMM
-                                                                        }
-                                                                        mm (
                                                                         {
                                                                             pipeTypeRecommendations
                                                                                 .main.pvc.sizeInch
                                                                         }
-                                                                        )
                                                                     </span>
                                                                 </div>
                                                                 {pipeTypeRecommendations.main.pvc
                                                                     .calculationDetails && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Type:</span>
+                                                                        <span>{translations.typeLabel}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {
                                                                                 pipeTypeRecommendations
@@ -2301,7 +1779,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.main.pvc
                                                                     .pressureLoss !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Pressure Loss:</span>
+                                                                        <span>{translations.pressureLoss}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {pipeTypeRecommendations.main.pvc.pressureLoss.toFixed(
                                                                                 2
@@ -2313,7 +1791,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.main.pvc
                                                                     .hf !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>HF:</span>
+                                                                        <span>{translations.hfLabel}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {pipeTypeRecommendations.main.pvc.hf.toFixed(
                                                                                 3
@@ -2331,17 +1809,17 @@ function FreeProduct() {
 
                                         <div className="border-t border-rose-800/50 pt-2">
                                             <div className="mb-2 text-xs text-rose-300">
-                                                Zone Details:
+                                                {translations.zoneDetails}:
                                             </div>
                                             <div className="space-y-1 text-xs text-slate-300">
                                                 <div className="flex justify-between">
-                                                    <span>Zone Flow Rate:</span>
+                                                    <span>{translations.zoneFlowRate}:</span>
                                                     <span className="font-semibold text-rose-400">
                                                         {Math.round(selectedZone.lpm || 0)} LPM
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span>Pipe Length:</span>
+                                                    <span>{translations.pipeLength}:</span>
                                                     <span className="font-semibold text-rose-400">
                                                         {selectedZone.mainMeters?.toFixed(1) ||
                                                             '0.0'}{' '}
@@ -2351,7 +1829,7 @@ function FreeProduct() {
                                                 {longestPipes[selectedPipeZoneId]?.longestMain >
                                                     0 && (
                                                     <div className="flex justify-between">
-                                                        <span>Longest Pipe:</span>
+                                                        <span>{translations.longestPipe}:</span>
                                                         <span className="font-semibold text-rose-400">
                                                             {longestPipes[
                                                                 selectedPipeZoneId
@@ -2363,7 +1841,7 @@ function FreeProduct() {
                                                 {selectedZone.mainOutlets !== undefined &&
                                                     selectedZone.mainOutlets > 0 && (
                                                         <div className="flex justify-between">
-                                                            <span>Outlets:</span>
+                                                            <span>{translations.outletsLabel}:</span>
                                                             <span className="font-semibold text-rose-400">
                                                                 {selectedZone.mainOutlets}
                                                             </span>
@@ -2394,8 +1872,8 @@ function FreeProduct() {
                                     <span className="text-xs">
                                         {selectedPipeZoneId
                                             ? zones.find((z) => z.id === selectedPipeZoneId)
-                                                  ?.name || 'Select Zone'
-                                            : 'Select Zone'}
+                                                  ?.name || translations.selectZone
+                                            : translations.selectZone}
                                     </span>
                                     <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
                                 </button>
@@ -2439,7 +1917,7 @@ function FreeProduct() {
                                                 {translations.recommendedSize}:
                                             </span>
                                             <span className="font-semibold text-violet-400">
-                                                {pipeRecommendations?.subMain.sizeMM}mm (
+                                                {pipeRecommendations?.subMain.sizeMM?.toFixed(2)}mm (
                                                 {pipeRecommendations?.subMain.sizeInch})
                                             </span>
                                         </div>
@@ -2458,15 +1936,15 @@ function FreeProduct() {
                                                     {pipeTypeRecommendations.subMain.pe && (
                                                         <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                             <div className="mb-1 text-xs font-medium text-blue-300">
-                                                                PE (Polyethylene)
+                                                                {translations.pePolyethylene}
                                                             </div>
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="flex justify-between">
-                                                                    <span>Size:</span>
+                                                                    <span>{translations.sizeLabel}</span>
                                                                     <span className="font-semibold text-blue-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .subMain.pe.sizeMM
+                                                                                .subMain.pe.sizeMM?.toFixed(2)
                                                                         }
                                                                         mm (
                                                                         {
@@ -2479,7 +1957,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.subMain.pe
                                                                     .calculationDetails && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Type:</span>
+                                                                        <span>{translations.typeLabel}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {
                                                                                 pipeTypeRecommendations
@@ -2493,7 +1971,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.subMain.pe
                                                                     .pressureLoss !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Pressure Loss:</span>
+                                                                        <span>{translations.pressureLoss}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {pipeTypeRecommendations.subMain.pe.pressureLoss.toFixed(
                                                                                 2
@@ -2505,7 +1983,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.subMain.pe
                                                                     .hf !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>HF:</span>
+                                                                        <span>{translations.hfLabel}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {pipeTypeRecommendations.subMain.pe.hf.toFixed(
                                                                                 3
@@ -2522,29 +2000,23 @@ function FreeProduct() {
                                                     {pipeTypeRecommendations.subMain.pvc && (
                                                         <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                             <div className="mb-1 text-xs font-medium text-green-300">
-                                                                PVC (Polyvinyl Chloride)
+                                                                {translations.pvcPolyvinylChloride}
                                                             </div>
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="flex justify-between">
-                                                                    <span>Size:</span>
+                                                                    <span>{translations.sizeLabel}</span>
                                                                     <span className="font-semibold text-green-400">
-                                                                        {
-                                                                            pipeTypeRecommendations
-                                                                                .subMain.pvc.sizeMM
-                                                                        }
-                                                                        mm (
                                                                         {
                                                                             pipeTypeRecommendations
                                                                                 .subMain.pvc
                                                                                 .sizeInch
                                                                         }
-                                                                        )
                                                                     </span>
                                                                 </div>
                                                                 {pipeTypeRecommendations.subMain.pvc
                                                                     .calculationDetails && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Type:</span>
+                                                                        <span>{translations.typeLabel}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {
                                                                                 pipeTypeRecommendations
@@ -2558,7 +2030,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.subMain.pvc
                                                                     .pressureLoss !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Pressure Loss:</span>
+                                                                        <span>{translations.pressureLoss}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {pipeTypeRecommendations.subMain.pvc.pressureLoss.toFixed(
                                                                                 2
@@ -2570,7 +2042,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.subMain.pvc
                                                                     .hf !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>HF:</span>
+                                                                        <span>{translations.hfLabel}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {pipeTypeRecommendations.subMain.pvc.hf.toFixed(
                                                                                 3
@@ -2592,13 +2064,13 @@ function FreeProduct() {
                                             </div>
                                             <div className="space-y-1 text-xs text-slate-300">
                                                 <div className="flex justify-between">
-                                                    <span>Zone Flow Rate:</span>
+                                                    <span>{translations.zoneFlowRate}:</span>
                                                     <span className="font-semibold text-violet-400">
                                                         {Math.round(selectedZone.lpm || 0)} LPM
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span>Pipe Length:</span>
+                                                    <span>{translations.pipeLength}:</span>
                                                     <span className="font-semibold text-violet-400">
                                                         {selectedZone.subMainMeters?.toFixed(1) ||
                                                             '0.0'}{' '}
@@ -2608,7 +2080,7 @@ function FreeProduct() {
                                                 {longestPipes[selectedPipeZoneId]?.longestSubMain >
                                                     0 && (
                                                     <div className="flex justify-between">
-                                                        <span>Longest Pipe:</span>
+                                                        <span>{translations.longestPipe}:</span>
                                                         <span className="font-semibold text-violet-400">
                                                             {longestPipes[
                                                                 selectedPipeZoneId
@@ -2620,7 +2092,7 @@ function FreeProduct() {
                                                 {selectedZone.subMainOutlets !== undefined &&
                                                     selectedZone.subMainOutlets > 0 && (
                                                         <div className="flex justify-between">
-                                                            <span>Outlets:</span>
+                                                            <span>{translations.outletsLabel}:</span>
                                                             <span className="font-semibold text-violet-400">
                                                                 {selectedZone.subMainOutlets}
                                                             </span>
@@ -2651,8 +2123,8 @@ function FreeProduct() {
                                     <span className="text-xs">
                                         {selectedPipeZoneId
                                             ? zones.find((z) => z.id === selectedPipeZoneId)
-                                                  ?.name || 'Select Zone'
-                                            : 'Select Zone'}
+                                                  ?.name || translations.selectZone
+                                            : translations.selectZone}
                                     </span>
                                     <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
                                 </button>
@@ -2696,7 +2168,7 @@ function FreeProduct() {
                                                 {translations.recommendedSize}:
                                             </span>
                                             <span className="font-semibold text-amber-400">
-                                                {pipeRecommendations?.lateral.sizeMM}mm (
+                                                {pipeRecommendations?.lateral.sizeMM?.toFixed(2)}mm (
                                                 {pipeRecommendations?.lateral.sizeInch})
                                             </span>
                                         </div>
@@ -2715,15 +2187,15 @@ function FreeProduct() {
                                                     {pipeTypeRecommendations.lateral.pe && (
                                                         <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                             <div className="mb-1 text-xs font-medium text-blue-300">
-                                                                PE (Polyethylene)
+                                                                {translations.pePolyethylene}
                                                             </div>
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="flex justify-between">
-                                                                    <span>Size:</span>
+                                                                    <span>{translations.sizeLabel}</span>
                                                                     <span className="font-semibold text-blue-400">
                                                                         {
                                                                             pipeTypeRecommendations
-                                                                                .lateral.pe.sizeMM
+                                                                                .lateral.pe.sizeMM?.toFixed(2)
                                                                         }
                                                                         mm (
                                                                         {
@@ -2736,7 +2208,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.lateral.pe
                                                                     .calculationDetails && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Type:</span>
+                                                                        <span>{translations.typeLabel}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {
                                                                                 pipeTypeRecommendations
@@ -2750,7 +2222,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.lateral.pe
                                                                     .pressureLoss !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Pressure Loss:</span>
+                                                                        <span>{translations.pressureLoss}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {pipeTypeRecommendations.lateral.pe.pressureLoss.toFixed(
                                                                                 2
@@ -2762,7 +2234,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.lateral.pe
                                                                     .hf !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>HF:</span>
+                                                                        <span>{translations.hfLabel}</span>
                                                                         <span className="font-semibold text-blue-400">
                                                                             {pipeTypeRecommendations.lateral.pe.hf.toFixed(
                                                                                 3
@@ -2779,29 +2251,23 @@ function FreeProduct() {
                                                     {pipeTypeRecommendations.lateral.pvc && (
                                                         <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                             <div className="mb-1 text-xs font-medium text-green-300">
-                                                                PVC (Polyvinyl Chloride)
+                                                                {translations.pvcPolyvinylChloride}
                                                             </div>
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="flex justify-between">
-                                                                    <span>Size:</span>
+                                                                    <span>{translations.sizeLabel}</span>
                                                                     <span className="font-semibold text-green-400">
-                                                                        {
-                                                                            pipeTypeRecommendations
-                                                                                .lateral.pvc.sizeMM
-                                                                        }
-                                                                        mm (
                                                                         {
                                                                             pipeTypeRecommendations
                                                                                 .lateral.pvc
                                                                                 .sizeInch
                                                                         }
-                                                                        )
                                                                     </span>
                                                                 </div>
                                                                 {pipeTypeRecommendations.lateral.pvc
                                                                     .calculationDetails && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Type:</span>
+                                                                        <span>{translations.typeLabel}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {
                                                                                 pipeTypeRecommendations
@@ -2815,7 +2281,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.lateral.pvc
                                                                     .pressureLoss !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>Pressure Loss:</span>
+                                                                        <span>{translations.pressureLoss}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {pipeTypeRecommendations.lateral.pvc.pressureLoss.toFixed(
                                                                                 2
@@ -2827,7 +2293,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations.lateral.pvc
                                                                     .hf !== undefined && (
                                                                     <div className="flex justify-between">
-                                                                        <span>HF:</span>
+                                                                        <span>{translations.hfLabel}</span>
                                                                         <span className="font-semibold text-green-400">
                                                                             {pipeTypeRecommendations.lateral.pvc.hf.toFixed(
                                                                                 3
@@ -2849,13 +2315,13 @@ function FreeProduct() {
                                             </div>
                                             <div className="space-y-1 text-xs text-slate-300">
                                                 <div className="flex justify-between">
-                                                    <span>Zone Flow Rate:</span>
+                                                    <span>{translations.zoneFlowRate}:</span>
                                                     <span className="font-semibold text-amber-400">
                                                         {Math.round(selectedZone.lpm || 0)} LPM
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span>Pipe Length:</span>
+                                                    <span>{translations.pipeLength}:</span>
                                                     <span className="font-semibold text-amber-400">
                                                         {selectedZone.lateralMeters?.toFixed(1) ||
                                                             '0.0'}{' '}
@@ -2865,7 +2331,7 @@ function FreeProduct() {
                                                 {longestPipes[selectedPipeZoneId]?.longestLateral >
                                                     0 && (
                                                     <div className="flex justify-between">
-                                                        <span>Longest Pipe:</span>
+                                                        <span>{translations.longestPipe}:</span>
                                                         <span className="font-semibold text-amber-400">
                                                             {longestPipes[
                                                                 selectedPipeZoneId
@@ -2877,14 +2343,14 @@ function FreeProduct() {
                                                 {selectedZone.lateralOutlets !== undefined &&
                                                     selectedZone.lateralOutlets > 0 && (
                                                         <div className="flex justify-between">
-                                                            <span>Outlets:</span>
+                                                            <span>{translations.outletsLabel}:</span>
                                                             <span className="font-semibold text-amber-400">
                                                                 {selectedZone.lateralOutlets}
                                                             </span>
                                                         </div>
                                                     )}
                                                 <div className="flex justify-between">
-                                                    <span>Flow per Sprinkler:</span>
+                                                    <span>{translations.flowPerSprinklerLabel}</span>
                                                     <span className="font-semibold text-amber-400">
                                                         {(sprinklerMode === 'preset'
                                                             ? sprinklerSpecs?.flowRatePerMin
@@ -3077,10 +2543,10 @@ function FreeProduct() {
                                                                 {/* Step 1: System Flow Rate */}
                                                                 <div className="mb-3 rounded border border-sky-700/30 bg-sky-800/30 p-2">
                                                                     <div className="mb-1 text-xs font-medium text-sky-300">
-                                                                        Step 1: System Flow Rate
+                                                                        {translations.step1Label}
                                                                     </div>
                                                                     <div className="text-xs text-slate-300">
-                                                                        System Flow Rate:{' '}
+                                                                        {translations.systemFlowRate}{' '}
                                                                         <span className="font-semibold text-sky-400">
                                                                             {
                                                                                 pumpRecommendations
@@ -3095,8 +2561,7 @@ function FreeProduct() {
                                                                 {/* Step 2: TDH Calculation - แยก PE และ PVC */}
                                                                 <div className="mb-3 rounded border border-sky-700/30 bg-sky-800/30 p-2">
                                                                     <div className="mb-3 text-xs font-medium text-sky-300">
-                                                                        Step 2: Total Dynamic Head
-                                                                        (TDH)
+                                                                        {translations.step2Label}
                                                                     </div>
                                                                     <div className="space-y-3">
                                                                         {/* PE Calculation */}
@@ -3121,8 +2586,7 @@ function FreeProduct() {
                                                                                             0 && (
                                                                                             <div className="flex justify-between">
                                                                                                 <span>
-                                                                                                    Static
-                                                                                                    Head:
+                                                                                                    {translations.staticHead}
                                                                                                 </span>
                                                                                                 <span className="font-semibold text-blue-400">
                                                                                                     {
@@ -3137,8 +2601,7 @@ function FreeProduct() {
                                                                                         )}
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Friction
-                                                                                            Losses:
+                                                                                            {translations.frictionLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.frictionLosses.totalFrictionLoss.toFixed(
@@ -3150,9 +2613,8 @@ function FreeProduct() {
                                                                                     <div className="ml-3 space-y-0.5 text-xs text-slate-400">
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Main
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.mainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pe.frictionLosses.mainLoss.toFixed(
@@ -3163,9 +2625,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                SubMain
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.subMainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pe.frictionLosses.subMainLoss.toFixed(
@@ -3176,9 +2637,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Lateral
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.lateralPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pe.frictionLosses.lateralLoss.toFixed(
@@ -3190,8 +2650,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Minor
-                                                                                            Losses:
+                                                                                            {translations.minorLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.minorLosses.toFixed(
@@ -3202,8 +2661,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pressure
-                                                                                            Requirement:
+                                                                                            {translations.pressureRequirement}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.pressureRequirement.toFixed(
@@ -3214,10 +2672,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-blue-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Total
-                                                                                            Dynamic
-                                                                                            Head
-                                                                                            (TDH):
+                                                                                            {translations.step2TotalDynamicHead}:
                                                                                         </span>
                                                                                         <span className="font-bold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.totalDynamicHead.toFixed(
@@ -3252,8 +2707,7 @@ function FreeProduct() {
                                                                                             0 && (
                                                                                             <div className="flex justify-between">
                                                                                                 <span>
-                                                                                                    Static
-                                                                                                    Head:
+                                                                                                    {translations.staticHead}
                                                                                                 </span>
                                                                                                 <span className="font-semibold text-green-400">
                                                                                                     {
@@ -3268,8 +2722,7 @@ function FreeProduct() {
                                                                                         )}
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Friction
-                                                                                            Losses:
+                                                                                            {translations.frictionLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.frictionLosses.totalFrictionLoss.toFixed(
@@ -3281,9 +2734,8 @@ function FreeProduct() {
                                                                                     <div className="ml-3 space-y-0.5 text-xs text-slate-400">
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Main
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.mainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pvc.frictionLosses.mainLoss.toFixed(
@@ -3294,9 +2746,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                SubMain
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.subMainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pvc.frictionLosses.subMainLoss.toFixed(
@@ -3307,9 +2758,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Lateral
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.lateralPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pvc.frictionLosses.lateralLoss.toFixed(
@@ -3321,8 +2771,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Minor
-                                                                                            Losses:
+                                                                                            {translations.minorLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.minorLosses.toFixed(
@@ -3333,8 +2782,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pressure
-                                                                                            Requirement:
+                                                                                            {translations.pressureRequirement}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.pressureRequirement.toFixed(
@@ -3345,10 +2793,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-green-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Total
-                                                                                            Dynamic
-                                                                                            Head
-                                                                                            (TDH):
+                                                                                            {translations.step2TotalDynamicHead}:
                                                                                         </span>
                                                                                         <span className="font-bold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.totalDynamicHead.toFixed(
@@ -3366,7 +2811,7 @@ function FreeProduct() {
                                                                 {/* Step 3: Pump Power - แสดงทั้ง PE และ PVC */}
                                                                 <div className="mb-3 rounded border border-sky-700/30 bg-sky-800/30 p-2">
                                                                     <div className="mb-3 text-xs font-medium text-sky-300">
-                                                                        Step 3: Pump Power
+                                                                        {translations.step3Label}
                                                                     </div>
                                                                     <div className="space-y-3">
                                                                         {/* PE Power */}
@@ -3381,8 +2826,7 @@ function FreeProduct() {
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Hydraulic
-                                                                                            Power:
+                                                                                            {translations.hydraulicPower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.hydraulicPower.toFixed(
@@ -3393,8 +2837,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pump
-                                                                                            Efficiency:
+                                                                                            {translations.pumpEfficiency}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {(
@@ -3411,8 +2854,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Brake
-                                                                                            Power:
+                                                                                            {translations.brakePower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.brakePower.toFixed(
@@ -3423,8 +2865,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-blue-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Required
-                                                                                            Power:
+                                                                                            {translations.requiredPower}
                                                                                         </span>
                                                                                         <span className="font-bold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.powerHP.toFixed(
@@ -3449,8 +2890,7 @@ function FreeProduct() {
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Hydraulic
-                                                                                            Power:
+                                                                                            {translations.hydraulicPower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.hydraulicPower.toFixed(
@@ -3461,8 +2901,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pump
-                                                                                            Efficiency:
+                                                                                            {translations.pumpEfficiency}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {(
@@ -3479,8 +2918,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Brake
-                                                                                            Power:
+                                                                                            {translations.brakePower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.brakePower.toFixed(
@@ -3491,8 +2929,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-green-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Required
-                                                                                            Power:
+                                                                                            {translations.requiredPower}
                                                                                         </span>
                                                                                         <span className="font-bold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.powerHP.toFixed(
@@ -3517,7 +2954,7 @@ function FreeProduct() {
                                                 <div className="mb-2 flex items-center gap-2 text-xs text-orange-400">
                                                     <span className="h-2 w-2 rounded-full bg-orange-400"></span>
                                                     <span>
-                                                        Calculated based on highest flow rate zone:{' '}
+                                                        {translations.calculatedBasedOnHighestFlowRateZone}{' '}
                                                         <strong>{selectedZone.name}</strong>
                                                     </span>
                                                 </div>
@@ -3557,17 +2994,17 @@ function FreeProduct() {
                                                 </div>
                                                 <div className="border-t border-sky-800/50 pt-2">
                                                     <div className="mb-2 text-xs text-sky-300">
-                                                        Highest Flow Zone Details:
+                                                        {translations.highestFlowZoneDetails}:
                                                     </div>
                                                     <div className="space-y-1 text-xs text-slate-300">
                                                         <div className="flex justify-between">
-                                                            <span>Zone Name:</span>
+                                                            <span>{translations.zoneName}</span>
                                                             <span className="font-semibold text-sky-400">
                                                                 {selectedZone.name}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>Zone Flow Rate:</span>
+                                                            <span>{translations.zoneFlowRate}:</span>
                                                             <span className="font-semibold text-sky-400">
                                                                 {Math.round(selectedZone.lpm || 0)}{' '}
                                                                 LPM
@@ -3582,13 +3019,13 @@ function FreeProduct() {
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>Plants in Zone:</span>
+                                                            <span>{translations.plantsInZone}</span>
                                                             <span className="font-semibold text-sky-400">
                                                                 {selectedZone.plants || 0}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>Water Pressure:</span>
+                                                            <span>{translations.waterPressureProduct}:</span>
                                                             <span className="font-semibold text-sky-400">
                                                                 {(sprinklerMode === 'preset'
                                                                     ? sprinklerSpecs?.waterPressure
@@ -3633,10 +3070,10 @@ function FreeProduct() {
                                                                 {/* Step 1: System Flow Rate */}
                                                                 <div className="mb-3 rounded border border-sky-700/30 bg-sky-800/30 p-2">
                                                                     <div className="mb-1 text-xs font-medium text-sky-300">
-                                                                        Step 1: System Flow Rate
+                                                                        {translations.step1Label}
                                                                     </div>
                                                                     <div className="text-xs text-slate-300">
-                                                                        System Flow Rate:{' '}
+                                                                        {translations.systemFlowRate}{' '}
                                                                         <span className="font-semibold text-sky-400">
                                                                             {
                                                                                 pumpRecommendations
@@ -3651,8 +3088,7 @@ function FreeProduct() {
                                                                 {/* Step 2: TDH Calculation - แยก PE และ PVC */}
                                                                 <div className="mb-3 rounded border border-sky-700/30 bg-sky-800/30 p-2">
                                                                     <div className="mb-3 text-xs font-medium text-sky-300">
-                                                                        Step 2: Total Dynamic Head
-                                                                        (TDH)
+                                                                        {translations.step2Label}
                                                                     </div>
                                                                     <div className="space-y-3">
                                                                         {/* PE Calculation */}
@@ -3677,8 +3113,7 @@ function FreeProduct() {
                                                                                             0 && (
                                                                                             <div className="flex justify-between">
                                                                                                 <span>
-                                                                                                    Static
-                                                                                                    Head:
+                                                                                                    {translations.staticHead}
                                                                                                 </span>
                                                                                                 <span className="font-semibold text-blue-400">
                                                                                                     {
@@ -3693,8 +3128,7 @@ function FreeProduct() {
                                                                                         )}
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Friction
-                                                                                            Losses:
+                                                                                            {translations.frictionLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.frictionLosses.totalFrictionLoss.toFixed(
@@ -3706,9 +3140,8 @@ function FreeProduct() {
                                                                                     <div className="ml-3 space-y-0.5 text-xs text-slate-400">
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Main
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.mainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pe.frictionLosses.mainLoss.toFixed(
@@ -3719,9 +3152,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                SubMain
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.subMainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pe.frictionLosses.subMainLoss.toFixed(
@@ -3732,9 +3164,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Lateral
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.lateralPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pe.frictionLosses.lateralLoss.toFixed(
@@ -3746,8 +3177,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Minor
-                                                                                            Losses:
+                                                                                            {translations.minorLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.minorLosses.toFixed(
@@ -3758,8 +3188,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pressure
-                                                                                            Requirement:
+                                                                                            {translations.pressureRequirement}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.pressureRequirement.toFixed(
@@ -3770,10 +3199,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-blue-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Total
-                                                                                            Dynamic
-                                                                                            Head
-                                                                                            (TDH):
+                                                                                            {translations.step2TotalDynamicHead}:
                                                                                         </span>
                                                                                         <span className="font-bold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.totalDynamicHead.toFixed(
@@ -3808,8 +3234,7 @@ function FreeProduct() {
                                                                                             0 && (
                                                                                             <div className="flex justify-between">
                                                                                                 <span>
-                                                                                                    Static
-                                                                                                    Head:
+                                                                                                    {translations.staticHead}
                                                                                                 </span>
                                                                                                 <span className="font-semibold text-green-400">
                                                                                                     {
@@ -3824,8 +3249,7 @@ function FreeProduct() {
                                                                                         )}
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Friction
-                                                                                            Losses:
+                                                                                            {translations.frictionLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.frictionLosses.totalFrictionLoss.toFixed(
@@ -3837,9 +3261,8 @@ function FreeProduct() {
                                                                                     <div className="ml-3 space-y-0.5 text-xs text-slate-400">
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Main
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.mainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pvc.frictionLosses.mainLoss.toFixed(
@@ -3850,9 +3273,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                SubMain
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.subMainPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pvc.frictionLosses.subMainLoss.toFixed(
@@ -3863,9 +3285,8 @@ function FreeProduct() {
                                                                                         </div>
                                                                                         <div className="flex justify-between">
                                                                                             <span>
-                                                                                                •
-                                                                                                Lateral
-                                                                                                Pipe:
+                                                                                                •{' '}
+                                                                                                {translations.lateralPipeLabel3}
                                                                                             </span>
                                                                                             <span>
                                                                                                 {pumpRecommendations.calculationDetails.pvc.frictionLosses.lateralLoss.toFixed(
@@ -3877,8 +3298,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Minor
-                                                                                            Losses:
+                                                                                            {translations.minorLosses}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.minorLosses.toFixed(
@@ -3889,8 +3309,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pressure
-                                                                                            Requirement:
+                                                                                            {translations.pressureRequirement}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.pressureRequirement.toFixed(
@@ -3901,10 +3320,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-green-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Total
-                                                                                            Dynamic
-                                                                                            Head
-                                                                                            (TDH):
+                                                                                            {translations.step2TotalDynamicHead}:
                                                                                         </span>
                                                                                         <span className="font-bold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.totalDynamicHead.toFixed(
@@ -3922,7 +3338,7 @@ function FreeProduct() {
                                                                 {/* Step 3: Pump Power - แสดงทั้ง PE และ PVC */}
                                                                 <div className="mb-3 rounded border border-sky-700/30 bg-sky-800/30 p-2">
                                                                     <div className="mb-3 text-xs font-medium text-sky-300">
-                                                                        Step 3: Pump Power
+                                                                        {translations.step3Label}
                                                                     </div>
                                                                     <div className="space-y-3">
                                                                         {/* PE Power */}
@@ -3937,8 +3353,7 @@ function FreeProduct() {
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Hydraulic
-                                                                                            Power:
+                                                                                            {translations.hydraulicPower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.hydraulicPower.toFixed(
@@ -3949,8 +3364,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pump
-                                                                                            Efficiency:
+                                                                                            {translations.pumpEfficiency}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {(
@@ -3967,8 +3381,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Brake
-                                                                                            Power:
+                                                                                            {translations.brakePower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.brakePower.toFixed(
@@ -3979,8 +3392,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-blue-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Required
-                                                                                            Power:
+                                                                                            {translations.requiredPower}
                                                                                         </span>
                                                                                         <span className="font-bold text-blue-400">
                                                                                             {pumpRecommendations.calculationDetails.pe.powerHP.toFixed(
@@ -4005,8 +3417,7 @@ function FreeProduct() {
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Hydraulic
-                                                                                            Power:
+                                                                                            {translations.hydraulicPower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.hydraulicPower.toFixed(
@@ -4017,8 +3428,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Pump
-                                                                                            Efficiency:
+                                                                                            {translations.pumpEfficiency}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {(
@@ -4035,8 +3445,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between">
                                                                                         <span>
-                                                                                            Brake
-                                                                                            Power:
+                                                                                            {translations.brakePower}
                                                                                         </span>
                                                                                         <span className="font-semibold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.brakePower.toFixed(
@@ -4047,8 +3456,7 @@ function FreeProduct() {
                                                                                     </div>
                                                                                     <div className="flex justify-between border-t border-green-700/50 pt-1">
                                                                                         <span className="font-medium">
-                                                                                            Required
-                                                                                            Power:
+                                                                                            {translations.requiredPower}
                                                                                         </span>
                                                                                         <span className="font-bold text-green-400">
                                                                                             {pumpRecommendations.calculationDetails.pvc.powerHP.toFixed(
@@ -4097,117 +3505,6 @@ function FreeProduct() {
                     </div>
                 </div>
             </div>
-
-            {/* Checkout Modal */}
-            {showCheckoutModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-                    onClick={handleCloseCheckoutModal}
-                >
-                    <div
-                        className="relative mx-4 w-full max-w-md rounded-lg bg-slate-800 p-6 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Close Button */}
-                        <button
-                            onClick={handleCloseCheckoutModal}
-                            className="absolute right-4 top-4 text-slate-400 transition-colors hover:text-white"
-                        >
-                            <svg
-                                className="h-6 w-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                />
-                            </svg>
-                        </button>
-
-                        {/* Modal Content */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600">
-                                    <svg
-                                        className="h-6 w-6 text-white"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        />
-                                    </svg>
-                                </div>
-                                <h3 className="text-xl font-bold text-white">
-                                    {translations.checkoutModalTitle}
-                                </h3>
-                            </div>
-
-                            <div className="leading-relaxed text-slate-300">
-                                <p className="mb-3">{translations.checkoutModalMessage}</p>
-                            </div>
-
-                            {/* LINE QR Code Section */}
-                            <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-4">
-                                <div className="mb-3 text-center">
-                                    <h4 className="mb-1 text-sm font-semibold text-green-400">
-                                        {translations.addFriendOnLine}
-                                    </h4>
-                                    <p className="text-xs text-green-300">
-                                        {translations.scanQRCodeToContact}
-                                    </p>
-                                </div>
-                                <div className="flex justify-center">
-                                    <div className="rounded-lg bg-white p-3 shadow-lg">
-                                        <QRCodeSVG
-                                            value={LINE_FRIEND_URL}
-                                            size={200}
-                                            level="M"
-                                            style={{
-                                                height: 'auto',
-                                                maxWidth: '100%',
-                                                width: '100%',
-                                            }}
-                                            viewBox="0 0 200 200"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="mt-3 text-center text-xs text-green-300">
-                                    {translations.orAddFriendAtLineId}{' '}
-                                    <span className="font-semibold text-green-400">{LINE_ID}</span>
-                                </p>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    onClick={handleCloseCheckoutModal}
-                                    className="flex-1 rounded-lg bg-slate-600 px-4 py-2 font-medium text-white transition-colors hover:bg-slate-500"
-                                >
-                                    {translations.close}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        // TODO: Add functionality to save plan image
-                                        handleCloseCheckoutModal();
-                                    }}
-                                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
-                                >
-                                    {translations.savePlanImage}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

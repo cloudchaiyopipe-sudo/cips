@@ -11,8 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->enum('role', ['user', 'sales', 'super_user'])->default('user')->after('is_super_user');
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->text('description');
+            $table->decimal('price', 10, 2); // ราคาขาย
+            $table->decimal('original_price', 10, 2)->nullable(); // ราคาเดิม (สำหรับโปรโมชั่น)
+            $table->string('image_url')->nullable(); // ลิงก์รูปภาพ
+            $table->enum('category', ['new', 'promotion']); // หมวดหมู่
+            $table->integer('discount')->nullable(); // ส่วนลด %
+            // (isNew, isPromotion สามารถสร้างแบบไดนามิกใน Model หรือ Controller ได้)
+            $table->timestamps();
         });
     }
 

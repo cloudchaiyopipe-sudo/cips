@@ -39,5 +39,8 @@ export interface User {
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;
+    role?: string;
+    is_admin?: boolean;
+    is_super_user?: boolean;
     [key: string]: unknown; // This allows for additional properties...
 }

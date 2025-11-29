@@ -53,6 +53,8 @@ class HandleInertiaRequests extends Middleware
                     'created_at' => $request->user()->created_at,
                     'profile_photo_url' => $request->user()->profile_photo_url,
                     'is_super_user' => $request->user()->is_super_user,
+                    'role' => $request->user()->role,
+                    'is_admin' => $request->user()->isSuperUser(), // Helper เพื่อให้ React ตรวจสอบง่าย
                     'tier' => $request->user()->tier,
                     'tier_expires_at' => $request->user()->tier_expires_at,
                     'monthly_tokens' => $request->user()->monthly_tokens,

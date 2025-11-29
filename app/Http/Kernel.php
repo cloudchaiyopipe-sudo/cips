@@ -70,5 +70,6 @@ class Kernel extends HttpKernel
         'handle.appearance' => \App\Http\Middleware\HandleAppearance::class,
         'sales.role' => \App\Http\Middleware\SalesRoleMiddleware::class,
         'restrict.sales' => \App\Http\Middleware\RestrictSalesAccess::class,
+        'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
     ];
 }

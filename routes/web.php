@@ -5,7 +5,15 @@ use Inertia\Inertia;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SuperUserController;
-use App\Http\Controllers\FarmController; // เพิ่มบรรทัดนี้
+use App\Http\Controllers\FarmController;
+use App\Http\Controllers\Admin\ArticleAdminController;
+use App\Http\Controllers\FreePlan\NewsController;
+use App\Http\Controllers\Admin\ProductAdminController;
+use App\Http\Controllers\FreePlan\ProductController;
+use App\Http\Controllers\PaymentController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Http\Request;
+use Illuminate\Auth\Events\Verified;
 
 /*
 |--------------------------------------------------------------------------
@@ -27,7 +35,7 @@ Route::get('/', function () {
     }
     
     return Inertia::render('new-home');
-})->middleware(['auth', 'verified'])->name('home');
+})->middleware(['auth'])->name('home');
 
 Route::get('/fields', function () {
     $user = auth()->user();
@@ -38,19 +46,19 @@ Route::get('/fields', function () {
     }
     
     return Inertia::render('home');
-})->middleware(['auth', 'verified'])->name('fields');
+})->middleware(['auth'])->name('fields');
 
 // Test route without authentication
 Route::get('/test', function () {
     return response()->json(['message' => 'Test route working']);
 })->name('test');
 
-Route::get('/profile', [ProfileController::class, 'show'])->middleware(['auth', 'verified'])->name('profile');
+Route::get('/profile', [ProfileController::class, 'show'])->middleware(['auth'])->name('profile');
 
 // Equipment CRUD Route - Accessible by sales users
 Route::get('equipment-crud', function () {
     return Inertia::render('equipment-crud');
-})->middleware(['auth', 'verified'])->name('equipment-crud');
+})->middleware(['auth'])->name('equipment-crud');
 
 // Test route to check if web routes are working
 Route::get('/test-web', function () {
@@ -455,7 +463,7 @@ Route::get('/fields-api', function () {
     }
 });
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     // Route::get('dashboard', function () {
     //     return Inertia::render('dashboard');
     // })->name('dashboard');
@@ -724,8 +732,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/plant-points/delete', [FarmController::class, 'deletePlantPoint'])->name('plant-points.delete');
     Route::post('/api/plant-points/move', [FarmController::class, 'movePlantPoint'])->name('plant-points.move');
 
-    // =======================================================
-
     // Field Management Routes - Sales users cannot access
     Route::post('/api/save-field', [FarmController::class, 'saveField'])->name('save-field');
     Route::post('/api/fields', [FarmController::class, 'createField'])->name('create-field');
@@ -771,11 +777,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/folders', [SuperUserController::class, 'createFolderForUser'])->name('create-folder');
         Route::delete('/folders/{folderId}', [SuperUserController::class, 'deleteFolder'])->name('delete-folder');
     });
+});
+
+// Admin Routes - ไม่ต้อง verify email (ย้ายออกมาจาก middleware verified)
+// Admin สามารถเข้าถึงได้แม้ยังไม่ได้ verify email
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    // GET /admin/articles (แสดงรายการ)
+    // GET /admin/articles/create (แสดงฟอร์มสร้าง)
+    // POST /admin/articles (บันทึกของใหม่)
+    // GET /admin/articles/{article}/edit (แสดงฟอร์มแก้ไข)
+    // PUT /admin/articles/{article} (อัปเดตของเดิม)
+    Route::resource('articles', ArticleAdminController::class);
+
+    // เพิ่ม Route สำหรับ Products
+    Route::resource('products', ProductAdminController::class);
+});
+
+// Free Plan Routes - ไม่ต้อง verify email (ย้ายออกมาจาก middleware verified)
+Route::middleware(['auth'])->group(function () {
+    // Free Plan Product Route - Sales users cannot access
+    Route::get('/free-plan/products', [ProductController::class, 'index'])->name('free.products');
 
     // Free Plan Routes - Sales users cannot access
     Route::get('/free-plan', function () {
         return Inertia::render('free-plan/freeHome');
     })->name('free-plan');
+
+    // Free Plan News Route - Sales users cannot access
+    Route::get('/free-plan/news', [NewsController::class, 'index'])->name('free.news');
+    Route::get('/free-plan/articles/{article}', [NewsController::class, 'show'])->name('free.article.show');
 
     Route::get('/free-plan/choose-crop', function () {
         return Inertia::render('free-plan/chooseCrop');
@@ -796,10 +826,57 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/freeProduct');
     })->name('free-plan.product');
 
+    // Free Plan Checkout Route - Sales users cannot access
+    Route::get('/free-plan/checkout', function () {
+        return Inertia::render('free-plan/freeCheckout');
+    })->name('free-plan.checkout');
+
+
     // Free Plan Account/Profile Route - Sales users cannot access
-    Route::get('/free-plan/account', function () {
-        return Inertia::render('free-plan/acCount');
+    Route::get('/free-plan/account', function (Request $request) {
+        return Inertia::render('free-plan/acCount', [
+            'verified' => session('verified'),
+            'status' => session('status'),
+        ]);
     })->name('free-plan.account');
+    
+    // Route สำหรับส่งอีเมลยืนยัน (เมื่อกดปุ่ม)
+    Route::post('/email/verification-notification', function (Request $request) {
+        try {
+            $user = $request->user();
+            
+            // Force mail configuration to be loaded before sending email
+            // This ensures the mail service provider uses the correct SMTP settings
+            config('mail.default');
+            config('mail.mailers.smtp');
+            
+            $user->sendEmailVerificationNotification();
+            
+            return back()->with('status', 'verification-link-sent');
+        } catch (\Exception $e) {
+            \Log::error('Error sending verification email', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return back()->with('error', 'Failed to send verification email. Please try again.');
+        }
+    })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+
+    // Route สำหรับยืนยันอีเมล (เมื่อคลิกลิงก์ในอีเมล)
+    Route::get('/verify-email/{id}/{hash}', function (EmailVerificationRequest $request) {
+        $user = $request->user();
+        
+        if ($user->hasVerifiedEmail()) {
+            return redirect()->route('free-plan.account')->with('verified', true);
+        }
+
+        if ($user->markEmailAsVerified()) {
+            event(new \Illuminate\Auth\Events\Verified($user));
+        }
+
+        return redirect()->route('free-plan.account')->with('verified', true);
+    })->middleware(['auth', 'signed', 'throttle:6,1'])->name('verification.verify');
 
     // Free Plan Upgrade Pro Route - Sales users cannot access
     Route::get('/free-plan/upgradePro', function () {
@@ -816,6 +893,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('free-plan/components/ads');
     })->name('free-plan.ads');
 });
+
+// Serve storage files (fallback if symbolic link doesn't work)
+Route::get('/storage/{path}', function ($path) {
+    $filePath = storage_path('app/public/' . $path);
+    
+    if (!file_exists($filePath)) {
+        abort(404);
+    }
+    
+    return response()->file($filePath);
+})->where('path', '.*')->name('storage.serve');
+
+// Payment routes
+Route::middleware(['auth'])->group(function () {
+    Route::post('/payment/qr', [PaymentController::class, 'generateQr'])->name('payment.qr');
+    Route::get('/payment/status/{chargeId}', [PaymentController::class, 'checkStatus']);
+});
+
+// Auth routes are handled in routes/auth.php
+// Removed Auth::routes() to avoid laravel/ui dependency
 
 // Include other route files
 require __DIR__.'/auth.php';

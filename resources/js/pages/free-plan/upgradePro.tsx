@@ -31,7 +31,19 @@ function UpgradePro() {
         };
     }, []);
 
-    const handleBack = () => window.history.back();
+    const handleBack = () => {
+        // ตรวจสอบ referrer ว่ามาจากหน้าไหน
+        const referrer = document.referrer;
+        
+        // ถ้ามี history ให้กลับไปหน้าก่อนหน้า
+        if (window.history.length > 1 && referrer) {
+            window.history.back();
+        } else {
+            // ถ้าไม่มี history หรือ referrer ให้ไปหน้า free-plan
+            router.visit('/free-plan');
+        }
+    };
+    
     const handleUpgrade = () => {
         router.visit('/free-plan/payment-qr');
     };

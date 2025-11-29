@@ -655,23 +655,51 @@ export const calculatePipeRecommendationsWithTypes = (
     const lateralOutlets = zoneData?.lateralOutlets || 1;
 
     // คำนวณ flow rate สำหรับท่อที่ยาวที่สุดแต่ละประเภท
+    // ⚠️ สำคัญ: การคำนวณ fallback นี้เป็นเพียงการประมาณการ (estimation) ที่อาจจะ overestimate
+    // ควรส่งค่า lateralLongestFlowRate, subMainLongestFlowRate, และ mainLongestFlowRate
+    // ที่เป็นผลรวมที่แท้จริง (Actual Sum) จากส่วนที่เรียกใช้เสมอ
 
     // 1. Lateral ที่ยาวที่สุด: รับ flow rate จาก sprinklers ใน lateral line นั้น
     // Flow rate = flow rate ต่อ sprinkler × จำนวน sprinklers (lateralOutlets)
+    // ⚠️ Fallback: สมมติว่าทุก sprinkler ใน lateral line มี flow rate เท่ากัน
+    // ซึ่งอาจจะ overestimate ถ้า lateral line ที่ยาวที่สุดมี sprinklers น้อยกว่าค่าเฉลี่ย
     const lateralLongestFlowRate =
         zoneData?.lateralLongestFlowRate || lateralFlowRate * lateralOutlets;
+    
+    if (!zoneData?.lateralLongestFlowRate) {
+        console.warn(
+            `⚠️ [Pipe Selection] Using fallback calculation for lateralLongestFlowRate: ${lateralLongestFlowRate.toFixed(2)} LPM (${lateralFlowRate.toFixed(2)} × ${lateralOutlets}). ` +
+            `This may overestimate. Please provide actual lateralLongestFlowRate from zone data.`
+        );
+    }
 
     // 2. SubMain ที่ยาวที่สุด: รับ flow rate รวมจาก lateral ทั้งหมดที่เชื่อมกับมัน
     // Flow rate = flow rate ของ lateral × จำนวน lateral ที่เชื่อม (subMainOutlets)
-    // หรือใช้ค่าที่ส่งมา
+    // ⚠️ Fallback: สมมติว่าทุก lateral ที่เชื่อมกับ subMain มี flow rate เท่ากับ lateral ที่ยาวที่สุด
+    // ซึ่งอาจจะ overestimate ถ้า lateral อื่นๆ มี flow rate น้อยกว่า
     const subMainLongestFlowRate =
         zoneData?.subMainLongestFlowRate || lateralLongestFlowRate * subMainOutlets;
+    
+    if (!zoneData?.subMainLongestFlowRate) {
+        console.warn(
+            `⚠️ [Pipe Selection] Using fallback calculation for subMainLongestFlowRate: ${subMainLongestFlowRate.toFixed(2)} LPM (${lateralLongestFlowRate.toFixed(2)} × ${subMainOutlets}). ` +
+            `This may overestimate. Please provide actual subMainLongestFlowRate from zone data.`
+        );
+    }
 
     // 3. Main ที่ยาวที่สุด: รับ flow rate รวมจาก subMain ทั้งหมดที่เชื่อมกับมัน
     // Flow rate = flow rate ของ subMain × จำนวน subMain ที่เชื่อม (mainOutlets)
-    // หรือใช้ค่าที่ส่งมา
+    // ⚠️ Fallback: สมมติว่าทุก subMain ที่เชื่อมกับ main มี flow rate เท่ากับ subMain ที่ยาวที่สุด
+    // ซึ่งอาจจะ overestimate ถ้า subMain อื่นๆ มี flow rate น้อยกว่า
     const mainLongestFlowRate =
         zoneData?.mainLongestFlowRate || subMainLongestFlowRate * mainOutlets;
+    
+    if (!zoneData?.mainLongestFlowRate) {
+        console.warn(
+            `⚠️ [Pipe Selection] Using fallback calculation for mainLongestFlowRate: ${mainLongestFlowRate.toFixed(2)} LPM (${subMainLongestFlowRate.toFixed(2)} × ${mainOutlets}). ` +
+            `This may overestimate. Please provide actual mainLongestFlowRate from zone data.`
+        );
+    }
 
     // ขั้นตอนที่ 1: คำนวณ Lateral ก่อน (ใช้ได้ max 0.8m)
     // ใช้ flow rate ของ lateral ที่ยาวที่สุด: lateralLongestFlowRate
