@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaTimes, FaChevronRight, FaChevronLeft, FaLightbulb, FaCheckCircle } from 'react-icons/fa';
+import { FaTimes, FaChevronRight, FaChevronLeft, FaLightbulb } from 'react-icons/fa';
 
 interface TourStep {
     id: string;
@@ -85,7 +85,8 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
                 if (!element && step.target.startsWith('#')) {
                     element = document.getElementById(step.target.substring(1));
                 }
-            } catch (e) {
+            } catch (error: unknown) {
+                console.warn('Invalid selector:', step.target, (error as Error).message);
                 // Invalid selector
                 return false;
             }
@@ -119,8 +120,8 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
             if (!element) {
                 try {
                     element = document.querySelector(currentStepData.target) as HTMLElement;
-                } catch (e) {
-                    console.warn('Invalid selector:', currentStepData.target);
+                } catch (error: unknown) {
+                    console.warn('Invalid selector:', currentStepData.target, (error as Error).message);
                 }
             }
 

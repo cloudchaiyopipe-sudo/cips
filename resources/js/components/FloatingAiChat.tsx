@@ -3,24 +3,9 @@ import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../contexts/LanguageContext'; // Import useLanguage hook
 
 // ==================== CHAIYO AI CONFIGURATION ====================
+// ใช้ backend endpoint แทนการเรียก Gemini API โดยตรงเพื่อความปลอดภัย
 const CHAIYO_AI_CONFIG = {
-    API_KEY: 'AIzaSyDVt3FE4zDPWsvJnl-zHe9ypheZPduRrmc', // ใส่ Gemini API key ของคุณที่นี่
-    API_URL:
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
-    COMPANY_KNOWLEDGE: {
-        chaiyo_pipe_fitting: {
-            name: 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
-            founded: '2551 (17 ปี)',
-            capital: '35,000,000 บาท',
-            specializes: 'ผลิตภัณฑ์พลาสติกเพื่อการเกษตร',
-        },
-        kanok_product: {
-            name: 'บริษัท กนกส์โปรดัก จำกัด',
-            founded: '2541 (27 ปี)',
-            specializes: 'ระบบน้ำเพื่อการเกษตรและชลประทาน',
-            products: '6,000+ รายการ',
-        },
-    },
+    API_ENDPOINT: '/api/ai-chat', // ใช้ backend endpoint ที่มี token system
 };
 
 // Define proper types for the component
@@ -357,140 +342,48 @@ const FloatingAiChat = ({
         setIsTyping(true);
 
         try {
-            // สร้าง enhanced system prompt สำหรับ ChaiyoAI
-            const systemPrompt = `คุณคือ ChaiyoAI ผู้ช่วย AI ที่เป็นตัวแทนอย่างเป็นทางการของ บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด และ บริษัท กนกส์โปรดัก จำกัด
+            // ใช้ backend endpoint ที่มี token system และ company knowledge
+            // ส่ง messages array เพื่อให้ backend จัดการ context และ company knowledge
+            const messages = updatedHistory.map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+            }));
 
-🏢 **ข้อมูลสำคัญของบริษัท:**
-**บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด:**
-- ก่อตั้ง: พ.ศ. 2551 (ดำเนินกิจการมา 17 ปี)
-- ทุนจดทะเบียน: 35,000,000 บาท
-- เลขทะเบียน: 0105551062871
-- ที่อยู่: 71/6 หมู่ที่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จังหวัดสมุทรสาคร 74000
-- ประเภทธุรกิจ: การผลิตผลิตภัณฑ์พลาสติกเพื่อการเกษตรทุกชนิด
-
-**บริษัท กนกส์โปรดัก จำกัด (บริษัทแม่):**
-- ก่อตั้ง: พ.ศ. 2541 (ประสบการณ์มากกว่า 27 ปี)
-- กรรมการผู้จัดการ: คุณโผล์กฤษณ์ กนกสินปิณโย
-- ที่อยู่: 15-23 ซอยพระยามนธาตุฯ แยก 10 ถนนบางขุนเทียน เขตบางบอน กรุงเทพฯ
-- ผลิตภัณฑ์: มากกว่า 6,000-9,000 รายการ
-- เป้าหมายรายได้: มากกว่า 600 ล้านบาท ต่อปี
-
-**ผลิตภัณฑ์หลัก:**
-- ท่อและข้อต่อ PVC (ได้รับมาตรฐาน มอก. 1131-2535)
-- ท่อ PE และ HDPE สำหรับระบบน้ำการเกษตร
-- ระบบน้ำหยด (สเปรย์เทป, ดริปเทป)
-- หัวสปริงเกอร์และมินิสปริงเกอร์
-- วาล์วและอุปกรณ์ (ฟุตวาล์ว, เช็ควาล์ว, บอลวาล์ว)
-- อุปกรณ์ประปา (ปั๊มน้ำและอะไหล่)
-
-**แบรนด์สินค้า:**
-- RED HAND (ตรามือแดง): แบรนด์หลักสำหรับท่อและข้อต่อ PVC
-- CHAIYO (ไชโย): ผลิตภัณฑ์เกษตรและระบบน้ำ
-- CHAMP (แชมป์): สายผลิตภัณฑ์เสริม
-- KANOK: ผลิตภัณฑ์จากบริษัทกนกส์โปรดัก
-
-**การรับรองคุณภาพ:**
-- ISO 9001:2015 (รับรองใหม่ปี 2565)
-- มาตรฐานผลิตภัณฑ์อุตสาหกรรม (มอก.)
-- Bureau Veritas Certification
-- เทคโนโลยีป้องกัน UV สำหรับท่อใช้งานภายนอก
-
-**ช่องทางจำหน่าย:**
-- ร้านค้าปลีกสมัยใหม่: ไทวัสดุ (44 สาขา), โฮมโปร (85+ สาขา), เมกาโฮม
-- ออนไลน์: www.chaiyopipe.co.th, Lazada, Shopee
-
-**ข้อมูลติดต่อ:**
-- โทรศัพท์: 02-451-1111, 065-9404230, 065-9404231
-- เว็บไซต์: www.chaiyopipe.co.th, www.kanokgroup.com
-- อีเมล: chaiyopipeonline@gmail.com
-- Line ID: chayut.tee
-
-📋 **หลักการตอบคำถาม:**
-1. สำหรับคำถามเกี่ยวกับบริษัท: ใช้ข้อมูลด้านบนตอบอย่างแม่นยำและครบถ้วน
-2. สำหรับคำถามทั่วไป: ตอบคำถามอย่างเป็นธรรมชาติ โดยเฉพาะเรื่องระบบน้ำและชลประทาน
-3. ตอบเป็นภาษาไทยที่เข้าใจง่าย พูดจาแบบเป็นกันเองและสบายๆ
-4. แสดงความเป็นมืออาชีพในฐานะตัวแทนบริษัท
-5. เน้นย้ำคุณภาพของผลิตภัณฑ์และการบริการ
-6. แนะนำผลิตภัณฑ์ที่เหมาะสมกับความต้องการของลูกค้า
-
-🎯 **เอกลักษณ์ของ ChaiyoAI:**
-- ผู้เชี่ยวชาญด้านระบบน้ำและชลประทาน
-- มีความรู้ลึกเกี่ยวกับผลิตภัณฑ์ทั้ง 2 บริษัท
-- ให้คำปรึกษาที่เป็นประโยชน์และปฏิบัติได้จริง
-- มีบุคลิกเป็นมิตร น่าเชื่อถือ และมืออาชีพ`;
-
-            // สร้าง conversation history สำหรับ context
-            const conversationText = updatedHistory
-                .map((msg) => `${msg.role === 'user' ? 'ผู้ใช้' : 'ChaiyoAI'}: ${msg.content}`)
-                .join('\n\n');
-
-            const fullPrompt = `${systemPrompt}\n\nบทสนทนา:\n${conversationText}`;
-
-            // Check if it's a company-related query for dynamic temperature
-            const isCompanyQuery = isCompanyRelatedQuery(messageToSend);
-
-            const response = await fetch(
-                `${CHAIYO_AI_CONFIG.API_URL}?key=${CHAIYO_AI_CONFIG.API_KEY}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        contents: [
-                            {
-                                parts: [
-                                    {
-                                        text: fullPrompt,
-                                    },
-                                ],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: isCompanyQuery ? 0.3 : 0.7, // Lower temperature for company info
-                            topP: 0.7,
-                            topK: 20,
-                            maxOutputTokens: 500,
-                        },
-                        safetySettings: [
-                            {
-                                category: 'HARM_CATEGORY_HARASSMENT',
-                                threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-                            },
-                            {
-                                category: 'HARM_CATEGORY_HATE_SPEECH',
-                                threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-                            },
-                        ],
-                    }),
-                }
-            );
+            const response = await fetch(CHAIYO_AI_CONFIG.API_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                credentials: 'same-origin', // ส่ง cookies สำหรับ authentication
+                body: JSON.stringify({
+                    messages: messages,
+                }),
+            });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
 
-            // ดึงข้อความตอบกลับจาก Gemini API
-            let aiReply =
-                data.candidates?.[0]?.content?.parts?.[0]?.text ||
-                'ขออภัยครับ ไม่สามารถประมวลผลคำถามได้ในขณะนี้';
-
-            // Add company signature for company-related queries
-            if (isCompanyQuery && !aiReply.includes('ChaiyoAI')) {
-                aiReply +=
-                    '\n\n🌿 **ChaiyoAI** - ตัวแทน AI ของ บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด และ บริษัท กนกส์โปรดัก จำกัด';
-            }
+            // ดึงข้อความตอบกลับจาก backend response
+            const aiReply = data.reply || 'ขออภัยครับ ไม่สามารถประมวลผลคำถามได้ในขณะนี้';
 
             const aiMessage: ChatMessage = { role: 'assistant', content: aiReply };
             setChatHistory((prev) => [...prev, aiMessage]);
-        } catch (error) {
+        } catch (error: any) {
             console.error('ChaiyoAI Error:', error);
 
-            const errorMessage = isCompanyRelatedQuery(messageToSend)
-                ? `ขออภัยครับ ขณะนี้ระบบ ChaiyoAI กำลังประมวลผลข้อมูลบริษัท 🔧\n\nสำหรับข้อมูลเพิ่มเติมเกี่ยวกับ:\n🏢 **บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด**\n🏢 **บริษัท กนกส์โปรดัก จำกัด**\n\n📞 **โทรศัพท์:** 02-451-1111\n🌐 **เว็บไซต์:** www.chaiyopipe.co.th\n📧 **อีเมล:** chaiyopipeonline@gmail.com\n\nลองถามใหม่อีกครั้งได้เลยครับ! 😊`
-                : `ขออภัยครับ ตอนนี้ระบบ ChaiyoAI กำลังประมวลผล 🤖\n\nลองถามใหม่ได้เลยครับ! 😊\n\n🌿 **ChaiyoAI** พร้อมช่วยเหลือเรื่อง:\n💧 ระบบน้ำและชลประทาน\n🔧 ผลิตภัณฑ์ของบริษัท\n💡 คำแนะนำทั่วไป`;
+            // ตรวจสอบว่าเป็น token error หรือไม่
+            const isTokenError = error.message?.includes('token') || error.message?.includes('Token');
+            
+            const errorMessage = isTokenError
+                ? `⚠️ คุณไม่มี Token เพียงพอสำหรับใช้งาน ChaiyoAI\n\nกรุณาซื้อ Token เพิ่มเติมเพื่อใช้งานต่อ 😊\n\n📞 ติดต่อ: 02-451-1111`
+                : isCompanyRelatedQuery(messageToSend)
+                  ? `ขออภัยครับ ขณะนี้ระบบ ChaiyoAI กำลังประมวลผลข้อมูลบริษัท 🔧\n\nสำหรับข้อมูลเพิ่มเติมเกี่ยวกับ:\n🏢 **บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด**\n🏢 **บริษัท กนกส์โปรดัก จำกัด**\n\n📞 **โทรศัพท์:** 02-451-1111\n🌐 **เว็บไซต์:** www.chaiyopipe.co.th\n📧 **อีเมล:** chaiyopipeonline@gmail.com\n\nลองถามใหม่อีกครั้งได้เลยครับ! 😊`
+                  : `ขออภัยครับ ตอนนี้ระบบ ChaiyoAI กำลังประมวลผล 🤖\n\nลองถามใหม่ได้เลยครับ! 😊\n\n🌿 **ChaiyoAI** พร้อมช่วยเหลือเรื่อง:\n💧 ระบบน้ำและชลประทาน\n🔧 ผลิตภัณฑ์ของบริษัท\n💡 คำแนะนำทั่วไป`;
 
             setChatHistory((prev) => [...prev, { role: 'assistant', content: errorMessage }]);
         } finally {

@@ -303,33 +303,33 @@ export interface SprinklerConfig {
     updatedAt: string;
 }
 export const ZONE_COLORS = [
-    '#FF6B6B',
-    '#9B59B6',
-    '#F39C12',
-    '#1ABC9C',
-    '#3498DB',
-    '#DDA0DD',
-    '#98D8C8',
-    '#F7DC6F',
-    '#BB8FCE',
-    '#85C1E9',
-    '#F8C471',
-    '#82E0AA',
-    '#F1948A',
-    '#AED6F1',
-    '#D2B4DE',
-    '#F9E79F',
-    '#A9DFBF',
-    '#FAD7A0',
-    '#D5A6BD',
-    '#B2DFDB',
+    '#3498DB', // 1. Blue
+    '#8B4513', // 2. Saddle Brown (replaces orange-like)
+    '#1ABC9C', // 3. Turquoise
+    '#34495E', // 4. Dark Blue Gray
+    '#D2691E', // 5. Chocolate (replaces orange-like)
+    '#16A085', // 6. Dark Turquoise
+    '#2980B9', // 7. Dark Blue
+    '#1E3A8A', // 8. Navy Blue
+    '#7F8C8D', // 9. Gray
+    '#95A5A6', // 10. Light Gray
+    '#BDC3C7', // 11. Silver
+    '#5DADE2', // 12. Light Blue
+    '#48C9B0', // 13. Medium Turquoise
+    '#85929E', // 14. Medium Gray
+    '#AAB7B8', // 15. Light Gray Blue
+    '#566573', // 16. Dark Gray
+    '#2E86AB', // 17. Ocean Blue
+    '#BC8F8F', // 18. Rosy Brown (replaces light orange)
+    '#85C1E9', // 19. Sky Blue
+    '#45B7D1', // 20. Cyan Blue
 ];
 
 export const EXCLUSION_COLORS = {
     building: '#F59E0B',
     powerplant: '#EF4444',
     river: '#3B82F6',
-    road: '#6B7280',
+    road: '#1F2937', // Dark gray/black
     other: '#8B5CF6',
 };
 

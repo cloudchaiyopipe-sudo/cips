@@ -2601,6 +2601,31 @@ export default function Product() {
                                     })}
                                 </div>
                             )}
+                            <div className="mb-4 rounded-lg bg-gray-800 p-4">
+                                <div>
+                                    <h3 className="mb-3 text-lg font-semibold text-purple-400">
+                                        ⚡ {t('ตัวเลือกปั๊มน้ำ')}
+                                    </h3>
+                                    <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={showPumpOption}
+                                                onChange={(e) => setShowPumpOption(e.target.checked)}
+                                                className="rounded"
+                                            />
+                                            <span className="text-sm font-medium">
+                                                {t('ต้องการใช้ปั๊มน้ำในระบบ')}
+                                            </span>
+                                        </label>
+                                        {!showPumpOption && (
+                                            <p className="text-sm text-gray-400">
+                                                ({t('ใช้แรงดันจากระบบประปาบ้านหรือต้องการซื้อปั๊มน้ำเอง')})
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                             {zones.length > 1 && (
                                 <div className="mb-6 rounded-lg bg-gray-800 p-4">
                                     <div className="rounded bg-blue-900 p-3">
@@ -2777,96 +2802,71 @@ export default function Product() {
                     </div>
 
                     <div className="space-y-6 lg:col-span-8">
-                        <div className="mb-6 flex flex-row flex-wrap justify-between gap-3 rounded-lg bg-gray-800 p-4">
-                            <div>
-                                <h3 className="mb-3 text-lg font-semibold text-purple-400">
-                                    ⚡ {t('ตัวเลือกปั๊มน้ำ')}
-                                </h3>
-                                <div className="flex items-center gap-4">
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={showPumpOption}
-                                            onChange={(e) => setShowPumpOption(e.target.checked)}
-                                            className="rounded"
+                        {/* ปุ่มจัดการโครงการ */}
+                        <div className="mb-6 flex flex-row flex-wrap justify-end gap-3 rounded-lg bg-gray-800 p-4">
+                            <div className="flex flex-row flex-wrap gap-3">
+                                {/* ปุ่มบันทึกโครงการ */}
+                                <button
+                                    onClick={handleSaveProject}
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                >
+                                    <svg
+                                        className="h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
                                         />
-                                        <span className="text-sm font-medium">
-                                            {t('ต้องการใช้ปั๊มน้ำในระบบ')}
-                                        </span>
-                                    </label>
-                                    {!showPumpOption && (
-                                        <p className="text-sm text-gray-400">
-                                            ({t('ใช้แรงดันจากระบบประปาบ้าน')})
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            {/* ปุ่มจัดการโครงการ */}
-                            <div className="mt-4 flex justify-end">
-                                <div className="flex flex-row flex-wrap gap-3">
-                                    {/* ปุ่มบันทึกโครงการ */}
-                                    <button
-                                        onClick={handleSaveProject}
-                                        className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-                                    >
-                                        <svg
-                                            className="h-5 w-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                                            />
-                                        </svg>
-                                        {t('บันทึกโครงการ')}
-                                    </button>
+                                    </svg>
+                                    {t('บันทึกโครงการ')}
+                                </button>
 
-                                    {/* ปุ่มแก้ไขโครงการ */}
-                                    <button
-                                        onClick={handleEditProject}
-                                        className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                {/* ปุ่มแก้ไขโครงการ */}
+                                <button
+                                    onClick={handleEditProject}
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                >
+                                    <svg
+                                        className="h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
                                     >
-                                        <svg
-                                            className="h-5 w-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                            />
-                                        </svg>
-                                        {t('แก้ไขโครงการ')}
-                                    </button>
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                        />
+                                    </svg>
+                                    {t('แก้ไขโครงการ')}
+                                </button>
 
-                                    {/* ปุ่มสร้างโครงการใหม่ */}
-                                    <button
-                                        onClick={handleNewProject}
-                                        className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                {/* ปุ่มสร้างโครงการใหม่ */}
+                                <button
+                                    onClick={handleNewProject}
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                >
+                                    <svg
+                                        className="h-5 w-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
                                     >
-                                        <svg
-                                            className="h-5 w-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                            />
-                                        </svg>
-                                        {t('สร้างโครงการใหม่')}
-                                    </button>
-                                </div>
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                        />
+                                    </svg>
+                                    {t('สร้างโครงการใหม่')}
+                                </button>
                             </div>
                         </div>
 
@@ -3291,7 +3291,7 @@ export default function Product() {
                         </button>
                         <div className="relative flex h-[90vh] w-[90vw] items-center justify-center">
                             <img
-                                src={projectImage}
+                                src={projectImage || undefined}
                                 alt={`${
                                     projectMode === 'garden'
                                         ? t('สวนบ้าน')
@@ -3340,32 +3340,34 @@ export default function Product() {
                 t={t}
             />
 
-            <QuotationDocument
-                show={showQuotation}
-                results={results}
-                quotationData={quotationData}
-                quotationDataCustomer={quotationDataCustomer}
-                selectedSprinkler={currentSprinkler}
-                selectedPump={effectiveEquipment.pump}
-                selectedBranchPipe={effectiveEquipment.branchPipe}
-                selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
-                selectedMainPipe={effectiveEquipment.mainPipe}
-                selectedExtraPipe={selectedExtraPipe}
-                projectImage={projectImage}
-                projectData={projectData}
-                gardenData={gardenData}
-                greenhouseData={greenhouseData}
-                zoneSprinklers={zoneSprinklers}
-                selectedPipes={selectedPipes}
-                sprinklerEquipmentSets={sprinklerEquipmentSets}
-                connectionEquipments={connectionEquipments}
-                zoneInputs={zoneInputs}
-                gardenStats={gardenStats}
-                fieldCropData={fieldCropData}
-                onClose={() => setShowQuotation(false)}
-                projectMode={projectMode}
-                showPump={showPumpOption}
-            />
+            {results && (
+                <QuotationDocument
+                    show={showQuotation}
+                    results={results!}
+                    quotationData={quotationData}
+                    quotationDataCustomer={quotationDataCustomer}
+                    selectedSprinkler={currentSprinkler}
+                    selectedPump={effectiveEquipment.pump}
+                    selectedBranchPipe={effectiveEquipment.branchPipe}
+                    selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
+                    selectedMainPipe={effectiveEquipment.mainPipe}
+                    selectedExtraPipe={selectedExtraPipe}
+                    projectImage={projectImage}
+                    projectData={projectData}
+                    gardenData={gardenData}
+                    greenhouseData={greenhouseData}
+                    zoneSprinklers={zoneSprinklers}
+                    selectedPipes={selectedPipes}
+                    sprinklerEquipmentSets={sprinklerEquipmentSets}
+                    connectionEquipments={connectionEquipments}
+                    zoneInputs={zoneInputs}
+                    gardenStats={gardenStats}
+                    fieldCropData={fieldCropData}
+                    onClose={() => setShowQuotation(false)}
+                    projectMode={projectMode}
+                    showPump={showPumpOption}
+                />
+            )}
             <Footer />
         </div>
     );

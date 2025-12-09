@@ -210,10 +210,11 @@ const GoogleMapsResultsOverlays: React.FC<{
     projectData: EnhancedProjectData;
     pipeSize: number;
     iconSize: number;
+    connectionPointSize: number;
     irrigationZones: IrrigationZoneExtended[];
     lateralPipes: LocalLateralPipe[];
     t: (key: string) => string;
-}> = ({ map, projectData, pipeSize, iconSize, irrigationZones, lateralPipes, t }) => {
+}> = ({ map, projectData, pipeSize, iconSize, connectionPointSize, irrigationZones, lateralPipes, t }) => {
     const overlaysRef = useRef<{
         polygons: Map<string, google.maps.Polygon>;
         polylines: Map<string, google.maps.Polyline>;
@@ -426,7 +427,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 3,
+                            scale: 3 * connectionPointSize,
                             fillColor: '#FF6B6B',
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
@@ -484,7 +485,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                             map: map,
                             icon: {
                                 path: google.maps.SymbolPath.CIRCLE,
-                                scale: 3,
+                                scale: 3 * connectionPointSize,
                                 fillColor: '#FFB347',
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
@@ -800,6 +801,10 @@ const GoogleMapsResultsOverlays: React.FC<{
 
             // สร้าง markers
             filteredConnectionPoints.forEach((mergedPoint, index) => {
+                const baseScale =
+                    mergedPoint.data.length > 1
+                        ? Math.min(5, 3 + mergedPoint.data.length)
+                        : 3;
                 const connectionMarker = new google.maps.Marker({
                     position: new google.maps.LatLng(
                         mergedPoint.position.lat,
@@ -808,10 +813,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale:
-                            mergedPoint.data.length > 1
-                                ? Math.min(5, 3 + mergedPoint.data.length)
-                                : 3,
+                        scale: baseScale * connectionPointSize,
                         fillColor: mergedPoint.color,
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
@@ -880,7 +882,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3,
+                        scale: 3 * connectionPointSize,
                         fillColor: '#F59E0B',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
@@ -930,7 +932,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
+                        scale: 4 * connectionPointSize,
                         fillColor: '#3B82F6',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
@@ -980,7 +982,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3,
+                        scale: 3 * connectionPointSize,
                         fillColor: '#10B981',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
@@ -1013,6 +1015,26 @@ const GoogleMapsResultsOverlays: React.FC<{
             });
         }
 
+        // 🔧 คำนวณขนาดต้นไม้ตาม zoom level และ iconSize
+        // เมื่อซูมออกไกลๆ (zoom ต่ำ) → ต้นไม้เล็กลง
+        // เมื่อซูมเข้าใกล้ๆ (zoom สูง) → ต้นไม้ขนาดปกติ
+        const calculatePlantSize = (zoom: number | undefined, baseIconSize: number): number => {
+            const baseSize = 28 * baseIconSize;
+            if (!zoom) return baseSize; // default
+            
+            // ปรับขนาดตาม zoom โดยยังคงใช้ iconSize เป็น base
+            if (zoom < 14) return baseSize * 0.7; // ซูมออกมาก → เล็กมาก
+            if (zoom < 16) return baseSize * 0.8; // ซูมออกปานกลาง → เล็ก
+            if (zoom < 18) return baseSize * 0.9; // ซูมออกเล็กน้อย → เล็กน้อย
+            if (zoom < 20) return baseSize; // ขนาดปกติ
+            return baseSize * 1.1; // ซูมเข้าใกล้ → ใหญ่ขึ้นเล็กน้อย
+        };
+        
+        const currentZoom = map.getZoom();
+        const basePlantSize = calculatePlantSize(currentZoom, iconSize);
+        const anchorPoint = basePlantSize / 2;
+        const fontSize = Math.max(8, Math.floor(basePlantSize * 0.36)); // ปรับ font size ตามขนาด
+        
         projectData.plants?.forEach((plant) => {
             const plantSymbol = '🌳';
 
@@ -1023,12 +1045,12 @@ const GoogleMapsResultsOverlays: React.FC<{
                     url:
                         'data:image/svg+xml;charset=UTF-8,' +
                         encodeURIComponent(`
-                        <svg width="${28 * iconSize}" height="${28 * iconSize}" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-                            <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${10 * iconSize}" font-weight="bold">${plantSymbol}</text>
+                        <svg width="${basePlantSize}" height="${basePlantSize}" viewBox="0 0 ${basePlantSize} ${basePlantSize}" xmlns="http://www.w3.org/2000/svg">
+                            <text x="${anchorPoint}" y="${anchorPoint}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${fontSize}" font-weight="bold">${plantSymbol}</text>
                         </svg>
                     `),
-                    scaledSize: new google.maps.Size(28 * iconSize, 28 * iconSize),
-                    anchor: new google.maps.Point(14 * iconSize, 14 * iconSize),
+                    scaledSize: new google.maps.Size(basePlantSize, basePlantSize),
+                    anchor: new google.maps.Point(anchorPoint, anchorPoint),
                 },
                 zIndex: 500,
                 title: `${plant.plantData.name} (${plant.id})`,
@@ -1042,7 +1064,7 @@ const GoogleMapsResultsOverlays: React.FC<{
         });
 
         map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
-    }, [map, projectData, pipeSize, iconSize, irrigationZones, lateralPipes, clearOverlays, t]);
+    }, [map, projectData, pipeSize, iconSize, connectionPointSize, irrigationZones, lateralPipes, clearOverlays, t]);
 
     useEffect(() => {
         return () => {
@@ -1140,6 +1162,7 @@ function EnhancedHorticultureResultsPageContent() {
 
     const [pipeSize, setPipeSize] = useState<number>(1);
     const [iconSize, setIconSize] = useState<number>(1);
+    const [connectionPointSize, setConnectionPointSize] = useState<number>(1);
 
     const [isCreatingImage, setIsCreatingImage] = useState(false);
 
@@ -1454,9 +1477,42 @@ function EnhancedHorticultureResultsPageContent() {
         setIconSize(Math.max(0.5, Math.min(3, newSize)));
     };
 
+    const handleConnectionPointSizeChange = (newSize: number) => {
+        setConnectionPointSize(Math.max(0.5, Math.min(3, newSize)));
+    };
+
     const resetSizes = () => {
         setPipeSize(1);
         setIconSize(1);
+        setConnectionPointSize(1);
+    };
+
+    const handleZoomIn = () => {
+        if (mapRef.current && mapLoaded) {
+            try {
+                const currentZoom = mapRef.current.getZoom();
+                if (typeof currentZoom === 'number' && !isNaN(currentZoom)) {
+                    const newZoom = Math.min(21, currentZoom + 1);
+                    mapRef.current.setZoom(newZoom);
+                }
+            } catch (error) {
+                console.error('Error zooming in:', error);
+            }
+        }
+    };
+
+    const handleZoomOut = () => {
+        if (mapRef.current && mapLoaded) {
+            try {
+                const currentZoom = mapRef.current.getZoom();
+                if (typeof currentZoom === 'number' && !isNaN(currentZoom)) {
+                    const newZoom = Math.max(1, currentZoom - 1);
+                    mapRef.current.setZoom(newZoom);
+                }
+            } catch (error) {
+                console.error('Error zooming out:', error);
+            }
+        }
     };
 
     const handleNewProject = () => {
@@ -1491,6 +1547,45 @@ function EnhancedHorticultureResultsPageContent() {
         if (mapLoaded && mapRef.current && window.google?.maps?.ElevationService) {
             elevationServiceRef.current = new google.maps.ElevationService();
         }
+    }, [mapLoaded]);
+
+    // Handle wheel event on map container to zoom map instead of scrolling page
+    useEffect(() => {
+        const mapContainer = mapContainerRef.current;
+        if (!mapContainer || !mapLoaded || !mapRef.current) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            // Check if mouse is over map container
+            const rect = mapContainer.getBoundingClientRect();
+            const isOverMap =
+                e.clientX >= rect.left &&
+                e.clientX <= rect.right &&
+                e.clientY >= rect.top &&
+                e.clientY <= rect.bottom;
+
+            if (isOverMap) {
+                // Prevent page scroll when scrolling on map
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Handle zoom manually
+                const map = mapRef.current;
+                if (map) {
+                    const currentZoom = map.getZoom() || 1;
+                    const delta = e.deltaY > 0 ? -0.5 : 0.5;
+                    const newZoom = Math.max(1, Math.min(21, currentZoom + delta));
+                    
+                    map.setZoom(newZoom);
+                }
+            }
+        };
+
+        // Use passive: false to allow preventDefault
+        mapContainer.addEventListener('wheel', handleWheel, { passive: false });
+
+        return () => {
+            mapContainer.removeEventListener('wheel', handleWheel);
+        };
     }, [mapLoaded]);
 
     // Compute pump elevation and highest plant elevation
@@ -2114,9 +2209,9 @@ function EnhancedHorticultureResultsPageContent() {
                                         📏 {t('ขนาดไอคอน')}
                                     </h4>
                                     <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-3 gap-2">
                                             <div className="flex items-center gap-2">
-                                                <label className="text-xs text-gray-300">
+                                                <label className="text-xs text-gray-300 min-w-[22px]">
                                                     {t('ท่อ')}:
                                                 </label>
                                                 <input
@@ -2130,15 +2225,15 @@ function EnhancedHorticultureResultsPageContent() {
                                                             parseFloat(e.target.value)
                                                         )
                                                     }
-                                                    className="flex-1 accent-green-600"
+                                                    className="w-48 accent-green-600"
                                                 />
-                                                <span className="w-12 text-xs text-green-300">
+                                                <span className="w-10 text-xs text-green-300">
                                                     {pipeSize.toFixed(1)}x
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <label className="text-xs text-gray-300">
-                                                    {t('ไอคอน')}:
+                                                <label className="text-xs text-gray-300 min-w-[28px]">
+                                                    {t('ต้นไม้')}:
                                                 </label>
                                                 <input
                                                     type="range"
@@ -2151,19 +2246,60 @@ function EnhancedHorticultureResultsPageContent() {
                                                             parseFloat(e.target.value)
                                                         )
                                                     }
-                                                    className="flex-1 accent-yellow-600"
+                                                        className="w-52 accent-yellow-600"
                                                 />
-                                                <span className="w-12 text-xs text-yellow-300">
+                                                <span className="w-10 text-xs text-yellow-300">
                                                     {iconSize.toFixed(1)}x
                                                 </span>
                                             </div>
+                                            <div className="flex items-center gap-2">
+                                            <label className="text-xs text-gray-300 min-w-[58px]">
+                                                {t('จุดเชื่อมต่อ')}:
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0.5"
+                                                max="3"
+                                                step="0.1"
+                                                value={connectionPointSize}
+                                                onChange={(e) =>
+                                                    handleConnectionPointSizeChange(
+                                                        parseFloat(e.target.value)
+                                                    )
+                                                }
+                                                className="w-[110px] accent-blue-600"
+                                            />
+                                            <span className="w-10 text-xs text-blue-300">
+                                                {connectionPointSize.toFixed(1)}x
+                                            </span>
                                         </div>
-                                        <button
-                                            onClick={resetSizes}
-                                            className="w-full rounded bg-gray-600 px-3 py-1 text-xs hover:bg-gray-700"
-                                        >
-                                            🔄 {t('รีเซ็ตขนาด')}
-                                        </button>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                onClick={handleZoomOut}
+                                                disabled={!mapLoaded}
+                                                className="flex items-center justify-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={t('ซูมออก') || 'ซูมออก'}
+                                            >
+                                                ➖
+                                            </button>
+                                            <button
+                                                onClick={resetSizes}
+                                                className="flex items-center justify-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs hover:bg-gray-700"
+                                                title={t('รีเซ็ตขนาด') || 'รีเซ็ตขนาด'}
+                                            >
+                                                🔄
+                                            </button>
+                                            <button
+                                                onClick={handleZoomIn}
+                                                disabled={!mapLoaded}
+                                                className="flex items-center justify-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={t('ซูมเข้า') || 'ซูมเข้า'}
+                                            >
+                                                ➕
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2220,6 +2356,7 @@ function EnhancedHorticultureResultsPageContent() {
                                             projectData={projectData}
                                             pipeSize={pipeSize}
                                             iconSize={iconSize}
+                                            connectionPointSize={connectionPointSize}
                                             irrigationZones={irrigationZones}
                                             lateralPipes={lateralPipes}
                                             t={t}
@@ -2412,7 +2549,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                     <div className="mb-2 text-xs font-semibold text-yellow-300">
                                                         📊 {t('สรุปรวมทั้งหมด')}
                                                     </div>
-                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div className="grid grid-cols-3 gap-2 text-xs">
                                                         <div className="flex items-center gap-2">
                                                             <div
                                                                 className="h-3 w-3 rounded-full"
@@ -2589,28 +2726,28 @@ function EnhancedHorticultureResultsPageContent() {
                                 <h3 className="mb-4 text-xl font-semibold text-green-400">
                                     📊 {t('ข้อมูลโดยรวม')}
                                 </h3>
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                                     <div className="rounded bg-gray-700 p-3">
                                         <div className="text-gray-400">
                                             {t('พื้นที่รวมทั้งหมด')}
                                         </div>
-                                        <div className="text-lg font-bold text-green-400">
+                                        <div className="text-lg text-center font-bold text-green-400">
                                             {formatAreaInRai(projectSummary.totalAreaInRai)}
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
                                         <div className="text-gray-400">{t('จำนวนโซน')}</div>
-                                        <div className="text-lg font-bold text-blue-400">
+                                        <div className="text-lg text-center font-bold text-blue-400">
                                             {projectSummary.totalZones} โซน
                                         </div>
                                     </div>
                                     <div className="rounded bg-gray-700 p-3">
                                         <div className="text-gray-400">{t('ต้นไม้ทั้งหมด')}</div>
-                                        <div className="text-lg font-bold text-yellow-400">
+                                        <div className="text-lg text-center font-bold text-yellow-400">
                                             {projectSummary.totalPlants.toLocaleString()} ต้น
                                             {sprinklerConfig &&
                                                 sprinklerConfig.sprinklersPerTree > 1 && (
-                                                    <span className="ml-2 text-sm text-yellow-300">
+                                                    <span className="ml-2 text-xs text-yellow-300">
                                                         (
                                                         {(
                                                             projectSummary.totalPlants *
@@ -2625,7 +2762,7 @@ function EnhancedHorticultureResultsPageContent() {
                                         <div className="text-gray-400">
                                             {t('ปริมาณน้ำต่อครั้ง')}
                                         </div>
-                                        <div className="text-lg font-bold text-cyan-400">
+                                        <div className="text-lg text-center font-bold text-cyan-400">
                                             {formatWaterVolume(
                                                 projectSummary.totalWaterNeedPerSession
                                             )}
@@ -2637,8 +2774,18 @@ function EnhancedHorticultureResultsPageContent() {
                                     ⛰️ {t('ข้อมูลความสูงจากระดับน้ำทะเล')}
                                 </h4>
                                 <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                                    <div
-                                        className="cursor-pointer rounded-md bg-gray-700 p-3 transition-colors hover:bg-gray-600/70"
+                                    <button
+                                        type="button"
+                                        className="cursor-pointer rounded-md bg-blue-800 p-3 transition
+                                            shadow-2xl hover:bg-blue-900/70 active:scale-95
+                                            focus:outline-none focus:ring-2 focus:ring-blue-300
+                                            border-2 border-blue-400/30 hover:border-blue-400
+                                            font-medium flex flex-col items-start"
+                                        style={{
+                                            boxShadow:
+                                                '0 2px 10px 0 rgba(0, 140, 255, 0.15), 0 1.5px 0 0 rgba(0,0,0,.05)',
+                                            transition: 'box-shadow 0.2s, border 0.2s',
+                                        }}
                                         onClick={() => {
                                             if (pumpElevation == null) return;
                                             const input = prompt(
@@ -2671,7 +2818,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 {t(' + ')} {pumpGroundOffset.toFixed(2)} {t('เมตร')}
                                             </div>
                                         )}
-                                    </div>
+                                    </button>
                                     <div className="rounded-md bg-gray-700 p-3">
                                         <div className="text-gray-300">
                                             {t('ความสูงต้นไม้สูงที่สุด')}

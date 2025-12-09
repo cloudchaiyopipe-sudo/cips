@@ -7,11 +7,13 @@ import {
     calculateOverlapArea,
 } from './autoZoneUtils';
 
+// 🔧 FIX: ปรับปรุง updateEditedZone เพื่อ reassign ต้นไม้ให้ถูกต้อง
 export const updateEditedZone = (
     zones: IrrigationZone[],
     editedZone: IrrigationZone,
     allPlants: PlantLocation[]
 ): IrrigationZone[] => {
+    // 🔧 FIX: หาต้นไม้ในโซนที่แก้ไขแล้วจาก coordinates จริง
     const plantsInEditedZone = findPlantsInPolygon(allPlants, editedZone.coordinates);
 
     const updatedEditedZone: IrrigationZone = {
@@ -23,18 +25,20 @@ export const updateEditedZone = (
         ),
     };
 
-    const updatedPlants = allPlants.map((plant) => {
-        const newZoneId = plantsInEditedZone.find((p) => p.id === plant.id)
-            ? editedZone.id
-            : plant.zoneId;
-        return { ...plant, zoneId: newZoneId };
-    });
-
+    // 🔧 FIX: Reassign ต้นไม้ทั้งหมดให้โซนที่ถูกต้อง
+    // เริ่มจากโซนที่แก้ไข แล้วค่อย reassign ให้โซนอื่น
     const updatedZones = zones.map((zone) => {
         if (zone.id === editedZone.id) {
             return updatedEditedZone;
         } else {
-            const plantsInThisZone = updatedPlants.filter((plant) => plant.zoneId === zone.id);
+            // หาต้นไม้ในโซนนี้ (ไม่รวมต้นไม้ที่อยู่ในโซนที่แก้ไขแล้ว)
+            const plantsInThisZone = findPlantsInPolygon(
+                allPlants.filter(
+                    (plant) => !plantsInEditedZone.some((p) => p.id === plant.id)
+                ),
+                zone.coordinates
+            );
+            
             return {
                 ...zone,
                 plants: plantsInThisZone,
@@ -45,6 +49,23 @@ export const updateEditedZone = (
             };
         }
     });
+
+    // 🔧 FIX: ตรวจสอบว่าต้นไม้ทั้งหมดถูก assign แล้วหรือไม่
+    const assignedPlantIds = new Set<string>();
+    updatedZones.forEach((zone) => {
+        zone.plants.forEach((plant) => {
+            assignedPlantIds.add(plant.id);
+        });
+    });
+
+    // ต้นไม้ที่ไม่อยู่ในโซนใดเลย (อาจอยู่ใกล้ขอบเขต)
+    const unassignedPlants = allPlants.filter((plant) => !assignedPlantIds.has(plant.id));
+    
+    if (unassignedPlants.length > 0) {
+        console.warn(
+            `⚠️ มีต้นไม้ ${unassignedPlants.length} ต้นที่ไม่อยู่ในโซนใดเลย หลังจากแก้ไขโซน`
+        );
+    }
 
     return updatedZones;
 };

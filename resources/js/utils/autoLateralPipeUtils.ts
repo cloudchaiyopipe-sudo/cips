@@ -204,10 +204,7 @@ export const generateThroughSubMainPipes = (
     for (const zone of zones) {
         const plantsInZone = zone.plants;
 
-        console.log(`🔍 Processing zone: ${zone.name}, plants: ${plantsInZone.length}`);
-
         if (plantsInZone.length === 0) {
-            console.log(`⚠️ Zone ${zone.name}: No plants, skipping`);
             continue;
         }
 
@@ -218,15 +215,9 @@ export const generateThroughSubMainPipes = (
             // ตรวจสอบ zoneId ก่อน - ถ้ามี zoneId ต้องตรงกับโซนที่กำลังประมวลผลเท่านั้น
             if (subMainPipe.zoneId) {
                 if (subMainPipe.zoneId !== zone.id) {
-                    console.log(
-                        `⚠️ [THROUGH_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ไม่ตรงกับโซน ${zone.id}, ข้ามทันที`
-                    );
                     return false; // ข้ามท่อที่ zoneId ไม่ตรงกันทันที - ห้ามใช้ท่อของโซนอื่น
                 }
                 // ถ้า zoneId ตรงกัน ให้ใช้ท่อนี้
-                console.log(
-                    `✅ [THROUGH_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ตรงกับโซน ${zone.id}, ใช้ท่อนี้`
-                );
                 return true;
             }
 
@@ -253,12 +244,7 @@ export const generateThroughSubMainPipes = (
             return false; // ไม่มี segment ใดผ่านโซน
         });
 
-        console.log(
-            `🔍 Zone ${zone.name}: Found ${relevantSubMainPipes.length} relevant SubMain pipes`
-        );
-
         if (relevantSubMainPipes.length === 0) {
-            console.log(`⚠️ Zone ${zone.name}: No SubMain pipes through zone, skipping`);
             continue;
         }
 
@@ -284,9 +270,6 @@ export const generateThroughSubMainPipes = (
                 if (segmentInZone) {
                     segmentDirectionForGrouping = getSegmentDirection(segmentStart, segmentEnd);
                     foundSegment = true;
-                    console.log(
-                        `🔍 Zone ${zone.name}: ใช้ทิศทางของ segment ${i} ของท่อ ${subMainPipe.id}: ${segmentDirectionForGrouping}`
-                    );
                     break;
                 }
             }
@@ -296,9 +279,6 @@ export const generateThroughSubMainPipes = (
         // ถ้าไม่พบ segment ให้ใช้ทิศทางหลักของท่อเมนรอง
         if (!foundSegment) {
             segmentDirectionForGrouping = getSubMainDirection(relevantSubMainPipes[0]);
-            console.log(
-                `⚠️ Zone ${zone.name}: ไม่พบ segment ในโซน ใช้ทิศทางหลัก: ${segmentDirectionForGrouping}`
-            );
         }
 
         // จัดกลุ่มต้นไม้ให้ตั้งฉากกับทิศทางของ segment ที่ตัดกัน
@@ -309,13 +289,8 @@ export const generateThroughSubMainPipes = (
             segmentDirectionForGrouping
         );
 
-        console.log(
-            `🔍 Zone ${zone.name}: Created ${plantGroups.length} plant groups (ทิศทาง SubMain: ${segmentDirectionForGrouping})`
-        );
-
         for (const row of plantGroups) {
             if (row.length < 1) {
-                console.log(`⚠️ Empty plant group, skipping`);
                 continue;
             }
 
@@ -330,8 +305,7 @@ export const generateThroughSubMainPipes = (
                 pipeStart = pipeData.start;
                 pipeEnd = pipeData.end;
                 pipeLength = pipeData.length;
-            } catch (error) {
-                console.warn(`Error creating perpendicular pipe: ${error}`);
+            } catch {
                 continue;
             }
 
@@ -418,29 +392,14 @@ export const generateThroughSubMainPipes = (
                             // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain
                             // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
                             if (subMainPipe.zoneId) {
-                                const originalCount = validPlants.length;
                                 validPlants = validPlants.filter((plant) => {
                                     // ตรวจสอบว่า plant อยู่ในโซนเดียวกับท่อ SubMain หรือไม่
                                     const plantInZone = isPointInZone(plant.position, zone);
-                                    if (!plantInZone) {
-                                        console.log(
-                                            `⚠️ [THROUGH_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${subMainPipe.zoneId})`
-                                        );
-                                    }
                                     return plantInZone;
                                 });
-
-                                if (validPlants.length < originalCount) {
-                                    console.log(
-                                        `🔍 [THROUGH_SUBMAIN] กรองต้นไม้ออก ${originalCount - validPlants.length} ต้น (เหลือ ${validPlants.length} ต้นในโซน ${zone.id})`
-                                    );
-                                }
                             }
 
                             if (validPlants.length === 0) {
-                                console.log(
-                                    `⚠️ [THROUGH_SUBMAIN] ไม่มีต้นไม้ที่อยู่ในโซน ${zone.id} หลังจากกรองแล้ว, ข้าม`
-                                );
                                 continue;
                             }
 
@@ -449,7 +408,7 @@ export const generateThroughSubMainPipes = (
                             // ใช้ทิศทางของ segment หรือทิศทางหลักของ Sub Main
                             const segmentDirection = getSegmentDirection(segmentStart, segmentEnd);
                             const rotationInfo = hasRotation(validPlants);
-                            let sortedPlants = [...validPlants];
+                            const sortedPlants = [...validPlants];
 
                             if (segmentDirection === 'vertical') {
                                 // ท่อย่อยแนวนอน - เรียงตาม lng
@@ -869,8 +828,8 @@ const generateSimpleLateralPipes = (
                         }
                     }
                 }
-            } catch (error) {
-                console.error(`Error creating lateral pipe: ${error}`);
+            } catch {
+                // Error creating lateral pipe
             }
         }
     }
@@ -888,12 +847,7 @@ export const generateFromSubMainPipes = (
     for (const zone of zones) {
         const plantsInZone = zone.plants;
 
-        console.log(
-            `🔍 [FROM_SUBMAIN] Processing zone: ${zone.name}, plants: ${plantsInZone.length}`
-        );
-
         if (plantsInZone.length === 0) {
-            console.log(`⚠️ [FROM_SUBMAIN] Zone ${zone.name}: No plants, skipping`);
             continue;
         }
 
@@ -904,15 +858,9 @@ export const generateFromSubMainPipes = (
             // ตรวจสอบ zoneId ก่อน - ถ้ามี zoneId ต้องตรงกับโซนที่กำลังประมวลผลเท่านั้น
             if (subMainPipe.zoneId) {
                 if (subMainPipe.zoneId !== zone.id) {
-                    console.log(
-                        `⚠️ [FROM_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ไม่ตรงกับโซน ${zone.id}, ข้ามทันที`
-                    );
                     return false; // ข้ามท่อที่ zoneId ไม่ตรงกันทันที - ห้ามใช้ท่อของโซนอื่น
                 }
                 // ถ้า zoneId ตรงกัน ให้ใช้ท่อนี้
-                console.log(
-                    `✅ [FROM_SUBMAIN] SubMain ${subMainPipe.id}: zoneId (${subMainPipe.zoneId}) ตรงกับโซน ${zone.id}, ใช้ท่อนี้`
-                );
                 return true;
             }
 
@@ -936,31 +884,15 @@ export const generateFromSubMainPipes = (
                 const midInZone = isPointInZone(segmentMidPoint, zone);
 
                 if (startInZone || endInZone || midInZone) {
-                    console.log(
-                        `✅ [FROM_SUBMAIN] SubMain ${subMainPipe.id} segment ${i}: passes through zone (start: ${startInZone}, end: ${endInZone}, mid: ${midInZone})`
-                    );
                     hasSegmentInZone = true;
                     break; // พบ segment ที่ผ่านโซนแล้ว ไม่ต้องตรวจต่อ
                 }
             }
 
-            if (!hasSegmentInZone) {
-                console.log(
-                    `⚠️ [FROM_SUBMAIN] SubMain ${subMainPipe.id}: No segments pass through zone (zoneId: ${subMainPipe.zoneId || 'none'}, zone.id: ${zone.id})`
-                );
-            }
-
             return hasSegmentInZone;
         });
 
-        console.log(
-            `🔍 [FROM_SUBMAIN] Zone ${zone.name}: Found ${relevantSubMainPipes.length} relevant SubMain pipes`
-        );
-
         if (relevantSubMainPipes.length === 0) {
-            console.log(
-                `⚠️ [FROM_SUBMAIN] Zone ${zone.name}: No SubMain pipes through zone, skipping`
-            );
             continue;
         }
 
@@ -986,9 +918,6 @@ export const generateFromSubMainPipes = (
                 if (segmentInZone) {
                     segmentDirectionForGrouping = getSegmentDirection(segmentStart, segmentEnd);
                     foundSegment = true;
-                    console.log(
-                        `🔍 [FROM_SUBMAIN] Zone ${zone.name}: ใช้ทิศทางของ segment ${i} ของท่อ ${subMainPipe.id}: ${segmentDirectionForGrouping}`
-                    );
                     break;
                 }
             }
@@ -998,9 +927,6 @@ export const generateFromSubMainPipes = (
         // ถ้าไม่พบ segment ให้ใช้ทิศทางหลักของท่อเมนรอง
         if (!foundSegment) {
             segmentDirectionForGrouping = getSubMainDirection(relevantSubMainPipes[0]);
-            console.log(
-                `⚠️ [FROM_SUBMAIN] Zone ${zone.name}: ไม่พบ segment ในโซน ใช้ทิศทางหลัก: ${segmentDirectionForGrouping}`
-            );
         }
 
         // จัดกลุ่มต้นไม้ให้ตั้งฉากกับทิศทางของ segment ที่ตัดกัน
@@ -1011,20 +937,11 @@ export const generateFromSubMainPipes = (
             segmentDirectionForGrouping
         );
 
-        console.log(
-            `🔍 [FROM_SUBMAIN] Zone ${zone.name}: Created ${plantGroups.length} plant groups (ทิศทาง SubMain: ${segmentDirectionForGrouping})`
-        );
-
         for (let groupIdx = 0; groupIdx < plantGroups.length; groupIdx++) {
             const row = plantGroups[groupIdx];
             if (!row || row.length < 2) {
-                console.log(
-                    `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: Too few plants (${row?.length || 0}), skipping`
-                );
                 continue;
             }
-
-            console.log(`🔍 [FROM_SUBMAIN] Processing group ${groupIdx} with ${row.length} plants`);
 
             // กรอง plants ที่มีข้อมูลครบถ้วนก่อน
             let validPlants = row.filter(
@@ -1036,39 +953,20 @@ export const generateFromSubMainPipes = (
                     p.plantData
             );
 
-            console.log(
-                `🔍 [FROM_SUBMAIN] Group ${groupIdx}: Valid plants: ${validPlants.length} / ${row.length}`
-            );
-
             // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain
             // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
             // หาท่อ SubMain ที่เกี่ยวข้องกับโซนนี้ (ควรมี zoneId ตรงกัน)
             const relevantSubMainForZone = relevantSubMainPipes.find((sm) => sm.zoneId === zone.id);
 
             if (relevantSubMainForZone && relevantSubMainForZone.zoneId) {
-                const originalCount = validPlants.length;
                 validPlants = validPlants.filter((plant) => {
                     // ตรวจสอบว่า plant อยู่ในโซนเดียวกับท่อ SubMain หรือไม่
                     const plantInZone = isPointInZone(plant.position, zone);
-                    if (!plantInZone) {
-                        console.log(
-                            `⚠️ [FROM_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${relevantSubMainForZone.zoneId})`
-                        );
-                    }
                     return plantInZone;
                 });
-
-                if (validPlants.length < originalCount) {
-                    console.log(
-                        `🔍 [FROM_SUBMAIN] กรองต้นไม้ออก ${originalCount - validPlants.length} ต้น (เหลือ ${validPlants.length} ต้นในโซน ${zone.id})`
-                    );
-                }
             }
 
             if (validPlants.length < 1) {
-                console.log(
-                    `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: No valid plants after filtering, skipping`
-                );
                 continue;
             }
 
@@ -1083,8 +981,7 @@ export const generateFromSubMainPipes = (
                 );
                 pipeStart = pipeData.start;
                 pipeEnd = pipeData.end;
-            } catch (error) {
-                console.warn(`Error creating perpendicular pipe for from_submain: ${error}`);
+            } catch {
                 continue;
             }
 
@@ -1212,22 +1109,6 @@ export const generateFromSubMainPipes = (
             // ใช้ snapThreshold ที่ผ่อนปรนขึ้นเพื่อให้สร้างท่อได้มากขึ้น
             const relaxedThreshold = config.snapThreshold * 1.5;
 
-            console.log(
-                `🔍 [FROM_SUBMAIN] Group ${groupIdx}: Connection check - closestPoint: ${closestPoint ? 'found' : 'null'}, minDistance: ${minDistance.toFixed(2)}m, threshold: ${relaxedThreshold}m`
-            );
-
-            if (!closestPoint) {
-                console.log(`⚠️ [FROM_SUBMAIN] Group ${groupIdx}: No closestPoint found, skipping`);
-            } else if (!bestSubMainPipe) {
-                console.log(
-                    `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: No bestSubMainPipe found, skipping`
-                );
-            } else if (minDistance > relaxedThreshold) {
-                console.log(
-                    `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: Distance too far (${minDistance.toFixed(2)}m > ${relaxedThreshold}m), skipping`
-                );
-            }
-
             if (
                 closestPoint &&
                 bestSubMainPipe &&
@@ -1235,10 +1116,6 @@ export const generateFromSubMainPipes = (
                 isFinite(closestPoint.lat) &&
                 isFinite(closestPoint.lng)
             ) {
-                console.log(
-                    `✅ [FROM_SUBMAIN] Group ${groupIdx}: Creating lateral pipe from connection point`
-                );
-
                 // ใช้ bestSubMainPipe และ bestSegmentIndex แทน subMainPipe และ segmentIndex เดิม
                 const subMainPipe = bestSubMainPipe;
                 const segmentIndex = bestSegmentIndex;
@@ -1247,8 +1124,8 @@ export const generateFromSubMainPipes = (
                 const closestPointOnPipe = findClosestPointOnLine(closestPoint, pipeStart, pipeEnd);
 
                 // คำนวณระยะทางจากจุดเชื่อมต่อไปยังปลายท่อทั้งสองข้าง
-                const distFromConnectionToStart = calculateDistance(closestPoint, pipeStart);
-                const distFromConnectionToEnd = calculateDistance(closestPoint, pipeEnd);
+                // const distFromConnectionToStart = calculateDistance(closestPoint, pipeStart);
+                // const distFromConnectionToEnd = calculateDistance(closestPoint, pipeEnd);
                 const distOnPipeToStart = calculateDistance(closestPointOnPipe, pipeStart);
                 const distOnPipeToEnd = calculateDistance(closestPointOnPipe, pipeEnd);
                 const totalPipeLength = calculateDistance(pipeStart, pipeEnd);
@@ -1268,18 +1145,10 @@ export const generateFromSubMainPipes = (
                     // เพื่อป้องกันการสร้างท่อย่อยที่มีต้นไม้ในโซนอื่น
                     const plantsInSubMainZoneForSingle = validPlants.filter((plant) => {
                         const plantInZone = isPointInZone(plant.position, zone);
-                        if (!plantInZone) {
-                            console.log(
-                                `⚠️ [FROM_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${subMainPipe.zoneId})`
-                            );
-                        }
                         return plantInZone;
                     });
 
                     if (plantsInSubMainZoneForSingle.length === 0) {
-                        console.log(
-                            `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: ไม่มีต้นไม้ที่อยู่ในโซน ${zone.id} หลังจากกรองแล้ว, ข้าม`
-                        );
                         continue;
                     }
 
@@ -1340,20 +1209,10 @@ export const generateFromSubMainPipes = (
                             connectionType: 'from_submain',
                         };
                         if (lateralPipe.plants.length > 0 && isFinite(lateralPipe.length)) {
-                            console.log(
-                                `✅ [FROM_SUBMAIN] Group ${groupIdx}: Created single-side lateral pipe (length: ${lateralPipe.length.toFixed(2)}m, plants: ${lateralPipe.plants.length})`
-                            );
                             results.push(lateralPipe);
-                        } else {
-                            console.log(
-                                `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: Single-side pipe validation failed (plants: ${lateralPipe.plants.length}, length: ${lateralPipe.length})`
-                            );
                         }
                     }
                 } else {
-                    console.log(
-                        `🔍 [FROM_SUBMAIN] Group ${groupIdx}: Plants on both sides (ratio: ${distanceRatio.toFixed(2)})`
-                    );
                     // กรณีต้นไม้อยู่สองฝั่ง: สร้างท่อทั้งสองฝั่งจากจุดเชื่อมต่อ
                     // แยกต้นไม้เป็น 2 กลุ่ม: ฝั่งซ้าย (ใกล้ pipeStart) และฝั่งขวา (ใกล้ pipeEnd)
 
@@ -1363,25 +1222,17 @@ export const generateFromSubMainPipes = (
                     // กรองต้นไม้ให้เหลือเฉพาะต้นไม้ที่อยู่ในโซนเดียวกับท่อ SubMain ก่อน
                     const plantsInSubMainZone = validPlants.filter((plant) => {
                         const plantInZone = isPointInZone(plant.position, zone);
-                        if (!plantInZone) {
-                            console.log(
-                                `⚠️ [FROM_SUBMAIN] กรองต้นไม้ ${plant.id}: ไม่อยู่ในโซน ${zone.id} (ท่อ SubMain zoneId: ${subMainPipe.zoneId})`
-                            );
-                        }
                         return plantInZone;
                     });
 
                     if (plantsInSubMainZone.length === 0) {
-                        console.log(
-                            `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: ไม่มีต้นไม้ที่อยู่ในโซน ${zone.id} หลังจากกรองแล้ว, ข้าม`
-                        );
                         continue;
                     }
 
                     // แยกต้นไม้ตามตำแหน่งเทียบกับจุดเชื่อมต่อบนเส้นท่อ (ใช้เฉพาะต้นไม้ที่อยู่ในโซน)
                     for (const plant of plantsInSubMainZone) {
-                        const distToStart = calculateDistance(closestPointOnPipe, pipeStart);
-                        const distToEnd = calculateDistance(closestPointOnPipe, pipeEnd);
+                        // const distToStart = calculateDistance(closestPointOnPipe, pipeStart);
+                        // const distToEnd = calculateDistance(closestPointOnPipe, pipeEnd);
 
                         // หาจุดที่ใกล้ที่สุดบนเส้นท่อกับตำแหน่งต้นไม้
                         const plantOnPipe = findClosestPointOnLine(
@@ -1458,14 +1309,7 @@ export const generateFromSubMainPipes = (
                                     connectionType: 'from_submain',
                                 };
                                 if (leftPipe.plants.length > 0 && isFinite(leftPipe.length)) {
-                                    console.log(
-                                        `✅ [FROM_SUBMAIN] Group ${groupIdx}: Created left-side lateral pipe (length: ${leftPipe.length.toFixed(2)}m, plants: ${leftPipe.plants.length})`
-                                    );
                                     results.push(leftPipe);
-                                } else {
-                                    console.log(
-                                        `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: Left-side pipe validation failed (plants: ${leftPipe.plants.length}, length: ${leftPipe.length})`
-                                    );
                                 }
                             }
                         }
@@ -1529,14 +1373,7 @@ export const generateFromSubMainPipes = (
                                     connectionType: 'from_submain',
                                 };
                                 if (rightPipe.plants.length > 0 && isFinite(rightPipe.length)) {
-                                    console.log(
-                                        `✅ [FROM_SUBMAIN] Group ${groupIdx}: Created right-side lateral pipe (length: ${rightPipe.length.toFixed(2)}m, plants: ${rightPipe.plants.length})`
-                                    );
                                     results.push(rightPipe);
-                                } else {
-                                    console.log(
-                                        `⚠️ [FROM_SUBMAIN] Group ${groupIdx}: Right-side pipe validation failed (plants: ${rightPipe.plants.length}, length: ${rightPipe.length})`
-                                    );
                                 }
                             }
                         }
@@ -1555,10 +1392,6 @@ export const generateAutoLateralPipes = (
     zones: IrrigationZone[],
     config: Partial<AutoLateralPipeConfig> = {}
 ): AutoLateralPipeResult[] => {
-    console.log(
-        `🚀 [GENERATE] Starting auto lateral pipe generation - mode: ${mode}, zones: ${zones.length}, subMainPipes: ${subMainPipes.length}`
-    );
-
     const defaultConfig: AutoLateralPipeConfig = {
         mode,
         snapThreshold: 20,
@@ -1567,27 +1400,16 @@ export const generateAutoLateralPipes = (
         ...config,
     };
 
-    console.log(`🚀 [GENERATE] Final config:`, {
-        snapThreshold: defaultConfig.snapThreshold,
-        minPipeLength: defaultConfig.minPipeLength,
-        maxPipeLength: defaultConfig.maxPipeLength,
-    });
-
     let results: AutoLateralPipeResult[] = [];
 
     if (mode === 'through_submain') {
-        console.log(`🚀 [GENERATE] Using through_submain mode`);
         results = generateThroughSubMainPipes(subMainPipes, zones, defaultConfig);
     } else if (mode === 'from_submain') {
-        console.log(`🚀 [GENERATE] Using from_submain mode`);
         results = generateFromSubMainPipes(subMainPipes, zones, defaultConfig);
     } else {
-        console.log(`🚀 [GENERATE] Using fallback simple mode`);
         // Fallback to simple mode
         results = generateSimpleLateralPipes(subMainPipes, zones, defaultConfig);
     }
-
-    console.log(`🚀 [GENERATE] Final result: ${results.length} pipes generated`);
 
     return results;
 };
@@ -1626,17 +1448,9 @@ export const validateAutoLateralPipes = (
             // หรือถ้าจุดของท่อ 80% ขึ้นไปอยู่ในโซน ก็ให้ผ่าน
             if (plantsInZonePercentage >= 95 && pointsInZonePercentage >= 70) {
                 // ผ่าน - ต้นไม้ทั้งหมดอยู่ในโซนและท่อส่วนใหญ่อยู่ในโซน
-                if (pointsInZonePercentage < 95) {
-                    console.warn(
-                        `ท่อ ${pipe.id}: ${pointsInZonePercentage.toFixed(1)}% อยู่ในโซน แต่ต้นไม้ทั้งหมดอยู่ในโซน`
-                    );
-                }
             } else if (pointsInZonePercentage < 70) {
                 isValid = false;
                 reason = `ท่อออกนอกขอบเขตโซน (${pointsInZonePercentage.toFixed(1)}% อยู่ในโซน, ${plantsInZonePercentage.toFixed(1)}% ของต้นไม้อยู่ในโซน)`;
-            } else if (pointsInZonePercentage < 95) {
-                // Log warning but don't mark as invalid
-                console.warn(`ท่อ ${pipe.id}: ${pointsInZonePercentage.toFixed(1)}% อยู่ในโซน`);
             }
         }
 
@@ -1743,7 +1557,6 @@ export const createAutoLateralConnectionPoints = (
 
         // ตรวจสอบว่าจุดมีข้อมูลครบถ้วน
         if (!point || !subMainPipeId || !pipe.zoneId) {
-            console.warn('Invalid pipe data for connection point:', pipe);
             continue;
         }
 

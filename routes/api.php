@@ -216,22 +216,23 @@ Route::middleware(['web', 'auth'])->group(function () {
 // ==================================================
 
 // Main ChaiyoAI Chat Endpoint (consumes 2 tokens per chat)
-Route::post('/ai-chat', [ChaiyoAiChatController::class, 'handleChat'])->middleware('consume.tokens:2');
+// Add rate limiting to prevent quota exceeded (10 requests per minute)
+Route::post('/ai-chat', [ChaiyoAiChatController::class, 'handleChat'])
+    ->middleware(['consume.tokens:2', 'throttle:ai-chat']);
 
 // ChaiyoAI Management & Info Routes
 Route::prefix('ai')->group(function () {
     Route::get('/stats', [ChaiyoAiChatController::class, 'getStats']);
     Route::get('/popular-questions', [ChaiyoAiChatController::class, 'getPopularQuestions']);
     Route::get('/health', [ChaiyoAiChatController::class, 'health']);
-    Route::post('/test', [ChaiyoAiChatController::class, 'test']);
+    Route::match(['get', 'post'], '/test', [ChaiyoAiChatController::class, 'test']); // Support both GET and POST
     
     // Company-specific endpoints
     Route::get('/company-info', [ChaiyoAiChatController::class, 'getCompanyInfo']);
     Route::post('/product-recommendations', [ChaiyoAiChatController::class, 'getProductRecommendations']);
 });
 
-// Legacy compatibility routes (for backward compatibility)
-Route::get('/ai-training-stats', [ChaiyoAiChatController::class, 'getStats']);
+// Legacy compatibility routes removed - no training functionality
 
 // ==================================================
 // 🛠️ EQUIPMENT & PRODUCT ROUTES (รวมแล้ว)
@@ -616,6 +617,67 @@ Route::prefix('company')->group(function () {
 // ==================================================
 // 🐛 DEBUG ROUTES (Only in development)
 // ==================================================
+
+// Debug endpoint for API key (available in all environments for troubleshooting)
+Route::get('/debug/api-key', function () {
+    $configKey = config('services.gemini.api_key');
+    $envKey = env('GEMINI_API_KEY');
+    $configCacheExists = file_exists(base_path('bootstrap/cache/config.php'));
+    
+    // Test service initialization
+    $serviceTest = ['success' => false, 'error' => 'Not tested'];
+    try {
+        $service = new \App\Services\ChaiyoAiService();
+        $serviceTest = ['success' => true, 'message' => 'Service initialized successfully'];
+    } catch (\Exception $e) {
+        $serviceTest = ['success' => false, 'error' => $e->getMessage()];
+    }
+    
+    // Test actual API call - DISABLED to prevent rate limit issues
+    // Only test if ?test_api=true is passed in query string
+    $apiCallTest = ['success' => false, 'error' => 'Not tested - Pass ?test_api=true to test API call'];
+    if ($serviceTest['success'] && request()->query('test_api') === 'true') {
+        try {
+            $service = new \App\Services\ChaiyoAiService();
+            $response = $service->generateResponse('ทดสอบ API call');
+            $apiCallTest = [
+                'success' => true,
+                'response_length' => strlen($response),
+                'response_preview' => substr($response, 0, 200),
+                'is_fallback' => strpos($response, 'ขออภัย') !== false || strpos($response, 'กำลังโหลด') !== false
+            ];
+        } catch (\Exception $e) {
+            $apiCallTest = [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => substr($e->getTraceAsString(), 0, 500)
+            ];
+        }
+    }
+    
+    $finalKey = $configKey ?: $envKey;
+    
+    return response()->json([
+        'config_services_gemini_api_key' => $configKey ? [
+            'exists' => true,
+            'length' => strlen($configKey),
+            'preview' => substr($configKey, 0, 10) . '...'
+        ] : ['exists' => false],
+        'env_gemini_api_key' => $envKey ? [
+            'exists' => true,
+            'length' => strlen($envKey),
+            'preview' => substr($envKey, 0, 10) . '...'
+        ] : ['exists' => false],
+        'config_cache_exists' => $configCacheExists,
+        'final_key' => $finalKey ? [
+            'exists' => true,
+            'length' => strlen($finalKey),
+            'preview' => substr($finalKey, 0, 10) . '...'
+        ] : ['exists' => false],
+        'service_initialization_test' => $serviceTest,
+        'api_call_test' => $apiCallTest
+    ]);
+});
 
 if (app()->environment('local')) {
     Route::prefix('debug')->group(function () {

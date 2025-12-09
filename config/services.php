@@ -40,4 +40,8 @@ return [
         'secret_key' => env('OMISE_SECRET_KEY'),
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
 ];

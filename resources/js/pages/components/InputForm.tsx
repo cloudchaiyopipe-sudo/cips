@@ -68,6 +68,7 @@ interface ConnectionPointEquipment {
     zoneId: string;
     zoneName: string;
     connectionType:
+        | 'endToEnd'
         | 'mainToSubMain'
         | 'subMainToMainMid'
         | 'subMainToLateral'
@@ -345,10 +346,11 @@ const InputForm: React.FC<InputFormProps> = ({
 
         filteredStats.forEach((zoneStats) => {
             const connectionTypes = [
-                { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' },
-                { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' },
-                { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' },
-                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' },
+                { key: 'endToEnd', name: 'ปลาย-ปลาย', color: '#DC2626' },
+                { key: 'mainToSubMain', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' },
+                { key: 'subMainToMainMid', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' },
+                { key: 'subMainToLateral', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' },
+                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อเมน (ตัด)', color: '#3B82F6' },
                 {
                     key: 'lateralToSubMainIntersection',
                     name: 'ตัดท่อย่อย-เมนรอง',

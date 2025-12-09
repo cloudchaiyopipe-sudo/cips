@@ -78,6 +78,7 @@ import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import Navbar from '../components/Navbar';
 import SprinklerConfigModal from '../components/horticulture/SprinklerConfigModal';
+import horticultureData from '../components/horticulture/data';
 
 import {
     SprinklerFormData,
@@ -109,7 +110,6 @@ import {
     FaRuler,
     FaMountain,
     FaCube,
-    FaLightbulb,
 } from 'react-icons/fa';
 
 const cleanupLocalStorage = (): boolean => {
@@ -1378,6 +1378,7 @@ interface PlantData {
     plantSpacing: number;
     rowSpacing: number;
     waterNeed: number;
+    flowLitersPerMinute?: number;
 }
 
 /**
@@ -1744,47 +1745,45 @@ type HistoryAction =
     | { type: 'REDO' }
     | { type: 'CLEAR_HISTORY' };
 
-const DEFAULT_PLANT_TYPES = (t: (key: string) => string): PlantData[] => [
-    { id: 1, name: t('ทุเรียน'), plantSpacing: 8, rowSpacing: 8, waterNeed: 200 },
-    { id: 2, name: t('มังคุด'), plantSpacing: 8, rowSpacing: 8, waterNeed: 50 },
-    { id: 3, name: t('มะม่วง'), plantSpacing: 8, rowSpacing: 8, waterNeed: 50 },
-    { id: 4, name: t('ลำไย'), plantSpacing: 10, rowSpacing: 10, waterNeed: 70 },
-    { id: 5, name: t('ลิ้นจี่'), plantSpacing: 8, rowSpacing: 8, waterNeed: 40 },
-    { id: 6, name: t('ลองกอง'), plantSpacing: 8, rowSpacing: 8, waterNeed: 40 },
-    { id: 7, name: t('เงาะ'), plantSpacing: 8, rowSpacing: 8, waterNeed: 40 },
-    { id: 8, name: t('ส้มโอ'), plantSpacing: 7, rowSpacing: 7, waterNeed: 30 },
-    { id: 9, name: t('มะพร้าว'), plantSpacing: 8, rowSpacing: 8, waterNeed: 100 },
-    { id: 10, name: t('ชมพู่'), plantSpacing: 4, rowSpacing: 4, waterNeed: 30 },
-];
+const DEFAULT_PLANT_TYPES = (): PlantData[] => {
+    return horticultureData.map((plant, index) => ({
+        id: index + 1,
+        name: plant.name,
+        plantSpacing: plant.plantSpacing,
+        rowSpacing: plant.rowSpacing,
+        waterNeed: plant.waterNeed,
+        flowLitersPerMinute: plant.flowLitersPerMinute,
+    }));
+};
 
 const ZONE_COLORS = [
-    '#FF6B6B',
-    '#9B59B6',
-    '#F39C12',
-    '#1ABC9C',
-    '#3498DB',
-    '#DDA0DD',
-    '#98D8C8',
-    '#F7DC6F',
-    '#BB8FCE',
-    '#85C1E9',
-    '#F8C471',
-    '#82E0AA',
-    '#F1948A',
-    '#AED6F1',
-    '#D2B4DE',
-    '#F9E79F',
-    '#A9DFBF',
-    '#FAD7A0',
-    '#D5A6BD',
-    '#B2DFDB',
+    '#3498DB', // 1. Blue
+    '#8B4513', // 2. Saddle Brown (replaces orange-like)
+    '#1ABC9C', // 3. Turquoise
+    '#34495E', // 4. Dark Blue Gray
+    '#D2691E', // 5. Chocolate (replaces orange-like)
+    '#16A085', // 6. Dark Turquoise
+    '#2980B9', // 7. Dark Blue
+    '#1E3A8A', // 8. Navy Blue
+    '#7F8C8D', // 9. Gray
+    '#95A5A6', // 10. Light Gray
+    '#BDC3C7', // 11. Silver
+    '#5DADE2', // 12. Light Blue
+    '#48C9B0', // 13. Medium Turquoise
+    '#85929E', // 14. Medium Gray
+    '#AAB7B8', // 15. Light Gray Blue
+    '#566573', // 16. Dark Gray
+    '#2E86AB', // 17. Ocean Blue
+    '#BC8F8F', // 18. Rosy Brown (replaces light orange)
+    '#85C1E9', // 19. Sky Blue
+    '#45B7D1', // 20. Cyan Blue
 ];
 
 const EXCLUSION_COLORS = {
     building: '#F59E0B',
     powerplant: '#EF4444',
     river: '#3B82F6',
-    road: '#6B7280',
+    road: '#1F2937', // Dark gray/black
     other: '#8B5CF6',
 };
 
@@ -2416,12 +2415,29 @@ const ZonePlantSelectionModal = ({
     t: (key: string) => string;
 }) => {
     const [selectedPlant, setSelectedPlant] = useState<PlantData | null>(zone?.plantData || null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredPlants = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return availablePlants;
+        }
+        const searchLower = searchTerm.toLowerCase();
+        return availablePlants.filter((plant) =>
+            plant.name.toLowerCase().includes(searchLower)
+        );
+    }, [availablePlants, searchTerm]);
 
     useEffect(() => {
         if (zone) {
             setSelectedPlant(zone.plantData);
         }
     }, [zone]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSearchTerm('');
+        }
+    }, [isOpen]);
 
     const handleSave = () => {
         if (!selectedPlant || !zone) return;
@@ -2452,8 +2468,22 @@ const ZonePlantSelectionModal = ({
                     </div>
                 </div>
 
+                <div className="mb-4">
+                    <label className="mb-2 block text-sm font-medium text-white">
+                        🔍 {t('ค้นหาพืช')}
+                    </label>
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder={t('พิมพ์ชื่อพืชเพื่อค้นหา...')}
+                        className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                </div>
+
                 <div className="max-h-64 space-y-2 overflow-y-auto">
-                    {availablePlants.map((plant) => (
+                    {filteredPlants.length > 0 ? (
+                        filteredPlants.map((plant) => (
                         <div
                             key={plant.id}
                             className={`relative cursor-pointer rounded p-3 transition-colors ${
@@ -2479,7 +2509,12 @@ const ZonePlantSelectionModal = ({
                                 ✏️
                             </button>
                         </div>
-                    ))}
+                        ))
+                    ) : (
+                        <div className="rounded-lg border border-gray-600 bg-gray-800 p-4 text-center text-gray-400">
+                            {t('ไม่พบพืชที่ค้นหา')}
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-4">
@@ -2537,25 +2572,33 @@ const SimpleMousePlantEditModal = ({
     t: (key: string) => string;
 }) => {
     const [selectedPlantData, setSelectedPlantData] = useState<PlantData | null>(null);
-    const [showPlantSelector, setShowPlantSelector] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // --- track the initial plantId (from first setSelectedPlantData when opened) ---
+    const [initialSelectedPlantId, setInitialSelectedPlantId] = useState<number | null>(null);
 
     useEffect(() => {
-        const handleShowPlantSelector = () => {
-            setShowPlantSelector(true);
-        };
-
-        document.addEventListener('showPlantSelector', handleShowPlantSelector);
-
-        return () => {
-            document.removeEventListener('showPlantSelector', handleShowPlantSelector);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (plant) {
+        if (plant && isOpen) {
             setSelectedPlantData(plant.plantData);
+            setInitialSelectedPlantId(plant.plantData.id);
         }
-    }, [plant]);
+    }, [plant, isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSearchTerm('');
+        }
+    }, [isOpen]);
+
+    const filteredPlants = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return availablePlants;
+        }
+        const searchLower = searchTerm.toLowerCase();
+        return availablePlants.filter((plant) =>
+            plant.name.toLowerCase().includes(searchLower)
+        );
+    }, [availablePlants, searchTerm]);
 
     const handleSave = () => {
         if (!plant || !selectedPlantData) return;
@@ -2571,7 +2614,6 @@ const SimpleMousePlantEditModal = ({
 
     const handlePlantChange = (newPlantData: PlantData) => {
         setSelectedPlantData(newPlantData);
-        setShowPlantSelector(false);
     };
 
     if (!isOpen || !plant) return null;
@@ -2580,14 +2622,6 @@ const SimpleMousePlantEditModal = ({
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
                 <h3 className="mb-4 text-xl font-semibold text-white">🌱 {t('แก้ไขต้นไม้')}</h3>
-                <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-900 p-3 text-sm text-yellow-100">
-                    <div className="font-semibold">⚠️ {t('คำเตือน')}</div>
-                    <div>
-                        {!plant.zoneId
-                            ? `${t('การแก้ไขจะเปลี่ยนต้นไม้ทั้งหมดในพื้นที่หลัก')}`
-                            : `${t('การแก้ไขจะเปลี่ยนต้นไม้ทั้งหมดในพื้นที่ปลูกนี้')}`}
-                    </div>
-                </div>
 
                 <div className="space-y-4">
                     {selectedPlantData && (
@@ -2617,61 +2651,73 @@ const SimpleMousePlantEditModal = ({
                         </div>
                     )}
 
-                    {/* ปุ่มเปลี่ยนต้นไม้ */}
-                    <div className="space-y-2">
-                        <button
-                            onClick={() => setShowPlantSelector(!showPlantSelector)}
-                            className="w-full rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                        >
-                            🔄 {t('เปลี่ยนต้นไม้')}
-                        </button>
+                    {/* แสดงรายการพืช (ไม่มีปุ่มเปลี่ยนต้นไม้แล้ว) */}
+                    <div className="space-y-3">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-white">
+                                🔍 {t('ค้นหาพืช')}
+                            </label>
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder={t('พิมพ์ชื่อพืชเพื่อค้นหา...')}
+                                className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                        </div>
 
-                        {showPlantSelector && (
-                            <div className="max-h-60 space-y-2 overflow-y-auto rounded border border-gray-600 bg-gray-800 p-3">
-                                {availablePlants.map((plantData) => (
-                                    <div key={plantData.id} className="relative">
-                                        <button
-                                            onClick={() => handlePlantChange(plantData)}
-                                            className={`w-full rounded p-2 text-left text-sm transition-colors ${
-                                                selectedPlantData?.id === plantData.id
-                                                    ? 'bg-green-600 text-white'
-                                                    : 'bg-gray-700 text-white hover:bg-gray-600'
-                                            }`}
-                                        >
-                                            <div className="font-semibold">{t(plantData.name)}</div>
-                                            <div className="text-xs text-gray-300">
-                                                {t('ระยะปลูก')}: {plantData.plantSpacing}×
-                                                {plantData.rowSpacing} {t('ม.')} |{t('น้ำ')}:{' '}
-                                                {plantData.waterNeed} {t('ล./ครั้ง')}
-                                            </div>
-                                        </button>
-                                        {/* ปุ่มแก้ไขสำหรับพืชทุกชนิด */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setShowPlantSelector(false);
-                                                onEditPlant(plantData);
-                                            }}
-                                            className="absolute right-1 top-1 rounded bg-yellow-600 p-1 text-xs text-white hover:bg-yellow-700"
-                                            title={t('แก้ไขพืช')}
-                                        >
-                                            ✏️
-                                        </button>
+                        <div className="max-h-48 space-y-2 overflow-y-auto rounded border border-gray-600 bg-gray-800 p-3">
+                            {(() => {
+                                // โชว์อันที่ตรง initialSelectedPlantId ไว้บนสุดเท่านั้น (ตอน open modal)
+                                let plantList = filteredPlants.slice();
+                                if (initialSelectedPlantId) {
+                                    const idx = plantList.findIndex(p => p.id === initialSelectedPlantId);
+                                    if (idx > 0) {
+                                        plantList = [
+                                            plantList[idx],
+                                            ...plantList.slice(0, idx),
+                                            ...plantList.slice(idx + 1),
+                                        ];
+                                    }
+                                }
+                                return plantList.length > 0 ? (
+                                    plantList.map((plantData) => (
+                                        <div key={plantData.id} className="relative">
+                                            <button
+                                                onClick={() => handlePlantChange(plantData)}
+                                                className={`w-full rounded p-2 text-left text-sm transition-colors ${
+                                                    selectedPlantData?.id === plantData.id
+                                                        ? 'bg-green-600 text-white'
+                                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                <div className="font-semibold">{t(plantData.name)}</div>
+                                                <div className="text-xs text-gray-300">
+                                                    {t('ระยะปลูก')}: {plantData.plantSpacing}×
+                                                    {plantData.rowSpacing} {t('ม.')} |{t('น้ำ')}:{' '}
+                                                    {plantData.waterNeed} {t('ล./ครั้ง')}
+                                                </div>
+                                            </button>
+                                            {/* ปุ่มแก้ไขสำหรับพืชทุกชนิด */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onEditPlant(plantData);
+                                                }}
+                                                className="absolute right-1 top-1 rounded bg-yellow-600 p-1 text-xs text-white hover:bg-yellow-700"
+                                                title={t('แก้ไขพืช')}
+                                            >
+                                                ✏️
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="rounded-lg border border-gray-600 bg-gray-700 p-4 text-center text-gray-400">
+                                        {t('ไม่พบพืชที่ค้นหา')}
                                     </div>
-                                ))}
-
-                                {/* ปุ่มเพิ่มพืชใหม่ */}
-                                <button
-                                    onClick={() => {
-                                        setShowPlantSelector(false);
-                                        onCreateCustomPlant();
-                                    }}
-                                    className="w-full rounded border border-purple-300 bg-purple-100 px-4 py-2 text-sm text-purple-700 transition-colors hover:bg-purple-200"
-                                >
-                                    ➕ {t('เพิ่มพืชใหม่')}
-                                </button>
-                            </div>
-                        )}
+                                );
+                            })()}
+                        </div>
                     </div>
 
                     {/* ปุ่มเพิ่มพืชใหม่แยกต่างหาก */}
@@ -3166,6 +3212,24 @@ const PlantAreaSelectionModal = ({
     onCreateCustomPlant: () => void;
     t: (key: string) => string;
 }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredPlants = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return availablePlants;
+        }
+        const searchLower = searchTerm.toLowerCase();
+        return availablePlants.filter((plant) =>
+            plant.name.toLowerCase().includes(searchLower)
+        );
+    }, [availablePlants, searchTerm]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSearchTerm('');
+        }
+    }, [isOpen]);
+
     return (
         <div
             className={`fixed inset-0 z-50 flex items-center justify-center ${
@@ -3186,12 +3250,25 @@ const PlantAreaSelectionModal = ({
                 <div className="space-y-4">
                     <div>
                         <label className="mb-2 block text-sm font-medium text-white">
+                            🔍 {t('ค้นหาพืช')}
+                        </label>
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder={t('พิมพ์ชื่อพืชเพื่อค้นหา...')}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-medium text-white">
                             {t('เลือกพืช')}
                         </label>
                         <select
                             value={selectedPlantType.id}
                             onChange={(e) => {
-                                const plantType = availablePlants.find(
+                                const plantType = filteredPlants.find(
                                     (p) => p.id === Number(e.target.value)
                                 );
                                 if (plantType) {
@@ -3200,11 +3277,15 @@ const PlantAreaSelectionModal = ({
                             }}
                             className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                            {availablePlants.map((plant) => (
-                                <option key={plant.id} value={plant.id}>
-                                    {t(plant.name)}
-                                </option>
-                            ))}
+                            {filteredPlants.length > 0 ? (
+                                filteredPlants.map((plant) => (
+                                    <option key={plant.id} value={plant.id}>
+                                        {t(plant.name)}
+                                    </option>
+                                ))
+                            ) : (
+                                <option value="">{t('ไม่พบพืชที่ค้นหา')}</option>
+                            )}
                         </select>
 
                         <div className="mt-2">
@@ -3302,6 +3383,24 @@ const PlantGenerationModal = ({
     plantAreas: PlantArea[];
     t: (key: string) => string;
 }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredPlants = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return availablePlants;
+        }
+        const searchLower = searchTerm.toLowerCase();
+        return availablePlants.filter((plant) =>
+            plant.name.toLowerCase().includes(searchLower)
+        );
+    }, [availablePlants, searchTerm]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSearchTerm('');
+        }
+    }, [isOpen]);
+
     return (
         <div
             className={`fixed inset-0 z-[9990] flex items-center justify-center ${
@@ -3327,10 +3426,24 @@ const PlantGenerationModal = ({
                                 {t('เลือกพืช')}
                             </label>
 
+                            <div className="mb-3">
+                                <label className="mb-2 block text-sm font-medium text-white">
+                                    🔍 {t('ค้นหาพืช')}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder={t('พิมพ์ชื่อพืชเพื่อค้นหา...')}
+                                    className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+
                             {/* แสดงรายการพืชพร้อมปุ่มแก้ไข */}
                             <div className="max-h-48 space-y-2 overflow-y-auto rounded border border-gray-600 bg-gray-800 p-3">
-                                {availablePlants.map((plantData) => (
-                                    <div key={plantData.id} className="relative">
+                                {filteredPlants.length > 0 ? (
+                                    filteredPlants.map((plantData) => (
+                                        <div key={plantData.id} className="relative">
                                         <button
                                             onClick={() => onPlantTypeChange(plantData)}
                                             className={`w-full rounded p-2 text-left text-sm transition-colors ${
@@ -3358,7 +3471,12 @@ const PlantGenerationModal = ({
                                             ✏️
                                         </button>
                                     </div>
-                                ))}
+                                    ))
+                                ) : (
+                                    <div className="rounded-lg border border-gray-600 bg-gray-700 p-4 text-center text-gray-400">
+                                        {t('ไม่พบพืชที่ค้นหา')}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -3383,28 +3501,36 @@ const PlantGenerationModal = ({
                     )}
 
                     {/* ข้อมูลพืชที่เลือก */}
-                    <div className="rounded-lg bg-gray-800 p-3">
-                        <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-gray-200">{t('ระยะห่างต้น')}:</span>
-                                <span className="font-medium text-white">
-                                    {selectedPlantType.plantSpacing} {t('ม')}
+                    {/* <div className="rounded-lg bg-gray-800 p-3">
+                        <div className="flex items-center justify-between text-sm space-x-3">
+                            <div className="flex items-center space-x-1">
+                                <span className="text-gray-400 font-bold">⇆</span>
+                                <span className="text-gray-200">{t('กว้าง')}</span>
+                                <span className="font-semibold text-white">
+                                    {selectedPlantType.plantSpacing}
                                 </span>
+                                <span className="text-gray-400">{t('ม.')}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-200">{t('ระยะห่างแถว')}:</span>
-                                <span className="font-medium text-white">
-                                    {selectedPlantType.rowSpacing} {t('ม')}
+                            <span className="text-gray-500">|</span>
+                            <div className="flex items-center space-x-1">
+                                <span className="text-gray-400 font-bold">≡</span>
+                                <span className="text-gray-200">{t('ยาว')}</span>
+                                <span className="font-semibold text-white">
+                                    {selectedPlantType.rowSpacing}
                                 </span>
+                                <span className="text-gray-400">{t('ม.')}</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-200">{t('น้ำต่อต้น')}:</span>
-                                <span className="font-medium text-white">
-                                    {selectedPlantType.waterNeed} {t('ล./ครั้ง')}
+                            <span className="text-gray-500">|</span>
+                            <div className="flex items-center space-x-1">
+                                <span className="text-blue-400 font-bold">💧</span>
+                                <span className="text-gray-200">{t('น้ำ')}</span>
+                                <span className="font-semibold text-white">
+                                    {selectedPlantType.waterNeed}
                                 </span>
+                                <span className="text-gray-400">{t('ล./ครั้ง')}</span>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* ปุ่มเพิ่มพืชใหม่ */}
                     <button
@@ -3803,6 +3929,14 @@ const ManualIrrigationZoneModal = ({
     onStartDrawing: () => void;
     t: (key: string) => string;
 }) => {
+    const [inputValue, setInputValue] = useState<string>(numberOfZones.toString());
+
+    useEffect(() => {
+        if (isOpen) {
+            setInputValue(numberOfZones.toString());
+        }
+    }, [isOpen, numberOfZones]);
+
     return (
         <div
             className={`fixed inset-0 z-[9999] flex items-center justify-center ${
@@ -3828,8 +3962,34 @@ const ManualIrrigationZoneModal = ({
                             min="1"
                             max="20"
                             step="1"
-                            value={numberOfZones}
-                            onChange={(e) => onNumberOfZonesChange(parseInt(e.target.value) || 1)}
+                            value={inputValue}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setInputValue(val);
+                                if (val !== '') {
+                                    const num = parseInt(val, 10);
+                                    if (!isNaN(num) && num > 0) {
+                                        // Allow typing freely, but clamp to max
+                                        const clampedValue = Math.min(num, 20);
+                                        onNumberOfZonesChange(clampedValue);
+                                    }
+                                }
+                            }}
+                            onBlur={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || isNaN(parseInt(val, 10))) {
+                                    // If empty or invalid, set to minimum value
+                                    const minValue = 1;
+                                    setInputValue(minValue.toString());
+                                    onNumberOfZonesChange(minValue);
+                                } else {
+                                    const num = parseInt(val, 10);
+                                    // Enforce minimum of 1 and maximum of 20 when user finishes typing
+                                    const clampedValue = Math.max(1, Math.min(num, 20));
+                                    setInputValue(clampedValue.toString());
+                                    onNumberOfZonesChange(clampedValue);
+                                }
+                            }}
                             className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                     </div>
@@ -3871,6 +4031,252 @@ const ManualIrrigationZoneModal = ({
     );
 };
 
+const PumpBasedZoneModal = ({
+    isOpen,
+    onClose,
+    totalWaterFlowRateLPM,
+    onApplyZones,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    totalWaterFlowRateLPM: number;
+    onApplyZones: (numberOfZones: number) => void;
+    t: (key: string) => string;
+}) => {
+    const [selectedOption, setSelectedOption] = useState<'manual' | 'database'>('manual');
+    const [manualFlowRate, setManualFlowRate] = useState<string>('');
+    const [selectedPump, setSelectedPump] = useState<any>(null);
+    const [pumps, setPumps] = useState<any[]>([]);
+    const [loadingPumps, setLoadingPumps] = useState(false);
+    const [calculatedZones, setCalculatedZones] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (isOpen && selectedOption === 'database') {
+            fetchPumps();
+        }
+    }, [isOpen, selectedOption]);
+
+    useEffect(() => {
+        calculateZones();
+    }, [selectedOption, manualFlowRate, selectedPump, totalWaterFlowRateLPM]);
+
+    const fetchPumps = async () => {
+        setLoadingPumps(true);
+        try {
+            const response = await axios.get('/api/equipments/by-category-id/10');
+            setPumps(response.data || []);
+        } catch (error) {
+            console.error('Error fetching pumps:', error);
+            setPumps([]);
+        } finally {
+            setLoadingPumps(false);
+        }
+    };
+
+    const calculateZones = () => {
+        if (selectedOption === 'manual') {
+            const flow = parseFloat(manualFlowRate);
+            if (!isNaN(flow) && flow > 0 && totalWaterFlowRateLPM > 0) {
+                const ratio = totalWaterFlowRateLPM / flow;
+                const zones = ratio <= 1 ? 1 : Math.ceil(ratio);
+                setCalculatedZones(zones);
+            } else {
+                setCalculatedZones(null);
+            }
+        } else if (selectedOption === 'database' && selectedPump) {
+            const pumpFlowRate = selectedPump.max_flow_rate_lpm || 0;
+            if (pumpFlowRate > 0 && totalWaterFlowRateLPM > 0) {
+                const ratio = totalWaterFlowRateLPM / pumpFlowRate;
+                const zones = ratio <= 1 ? 1 : Math.ceil(ratio);
+                setCalculatedZones(zones);
+            } else {
+                setCalculatedZones(null);
+            }
+        } else {
+            setCalculatedZones(null);
+        }
+    };
+
+    const handleApply = () => {
+        if (calculatedZones && calculatedZones >= 1) {
+            onApplyZones(calculatedZones);
+            onClose();
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black bg-opacity-80" onClick={onClose}></div>
+            <div className="relative w-full max-w-lg rounded-lg bg-gray-900 p-6 shadow-xl">
+                <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">
+                        💧 {t('แบ่งโซนจากปั๊มน้ำของคุณ')}
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <FaTimes />
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="rounded-lg bg-blue-900 p-3">
+                        <div className="text-sm text-blue-200">
+                            <p className="font-medium">{t('ปริมาณน้ำรวม')}:</p>
+                            <p className="text-lg font-semibold">
+                                {totalWaterFlowRateLPM.toFixed(2)} {t('ลิตร/นาที')}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div>
+                            <label className="flex items-center space-x-2">
+                                <input
+                                    type="radio"
+                                    name="pumpOption"
+                                    checked={selectedOption === 'manual'}
+                                    onChange={() => {
+                                        setSelectedOption('manual');
+                                        setSelectedPump(null);
+                                    }}
+                                    className="border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-white">
+                                    {t('ตัวเลือกที่ 1')}: {t('กรอกอัตราการไหลของปั๊มน้ำ')}
+                                </span>
+                            </label>
+                        </div>
+
+                        {selectedOption === 'manual' && (
+                            <div className="ml-6">
+                                <label className="mb-2 block text-sm font-medium text-white">
+                                    {t('อัตราการไหล')} (LPM)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="0.01"
+                                    value={manualFlowRate}
+                                    onChange={(e) => setManualFlowRate(e.target.value)}
+                                    className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    placeholder={t('กรอกอัตราการไหล')}
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="flex items-center space-x-2">
+                                <input
+                                    type="radio"
+                                    name="pumpOption"
+                                    checked={selectedOption === 'database'}
+                                    onChange={() => {
+                                        setSelectedOption('database');
+                                        setManualFlowRate('');
+                                    }}
+                                    className="border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-white">
+                                    {t('ตัวเลือกที่ 2')}: {t('เลือกปั๊มน้ำจากฐานข้อมูล')}
+                                </span>
+                            </label>
+                        </div>
+
+                        {selectedOption === 'database' && (
+                            <div className="ml-6">
+                                <label className="mb-2 block text-sm font-medium text-white">
+                                    {t('เลือกปั๊มน้ำ')}
+                                </label>
+                                {loadingPumps ? (
+                                    <div className="text-center text-gray-400">
+                                        {t('กำลังโหลด...')}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={selectedPump?.id || ''}
+                                        onChange={(e) => {
+                                            const pump = pumps.find(
+                                                (p) => p.id === parseInt(e.target.value)
+                                            );
+                                            setSelectedPump(pump || null);
+                                        }}
+                                        className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        <option value="">{t('-- เลือกปั๊มน้ำ --')}</option>
+                                        {pumps.map((pump) => (
+                                            <option key={pump.id} value={pump.id}>
+                                                {pump.name || pump.product_code} -{' '}
+                                                {pump.max_flow_rate_lpm || 0} LPM
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                                {selectedPump && (
+                                    <div className="mt-2 rounded-lg bg-gray-800 p-2 text-sm text-gray-300">
+                                        <p>
+                                            <strong>{t('อัตราการไหลสูงสุด')}:</strong>{' '}
+                                            {selectedPump.max_flow_rate_lpm || 0} LPM
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {calculatedZones !== null && calculatedZones === 1 && (
+                        <div className="rounded-lg bg-blue-900 p-3">
+                            <div className="text-sm text-blue-200">
+                                <p className="font-medium">{t('ผลการคำนวณ')}:</p>
+                                <p className="text-lg font-semibold">
+                                    {t('ไม่ต้องแบ่งโซน ใช้โซนเดียว ก็เพียงพอ!!')}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {calculatedZones !== null && calculatedZones >= 2 && (
+                        <div className="rounded-lg bg-green-900 p-3">
+                            <div className="text-sm text-green-200">
+                                <p className="font-medium">{t('จำนวนโซนที่เหมาะสม')}:</p>
+                                <p className="text-lg font-semibold">{calculatedZones} {t('โซน')}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="rounded-lg bg-yellow-900 p-3">
+                        <div className="text-xs text-yellow-200">
+                            <p className="font-medium">⚠️ {t('คำเตือน')}:</p>
+                            <p className="mt-1">
+                                {t(
+                                    'นี่คือการคำนวณแบบโดยประมาณ สำหรับกรณีที่พื้นที่เป็นที่เรียบและพืชเป็นพืชชนิดเดียวกันที่ต้องการน้ำเท่ากัน หากลูกค้ามีโซนอยู่แล้ว ให้กลับไปกดปุ่มแบ่งโซนเองเพื่อวาดตามจริงได้เลย แต่ถ้าลูกค้ายังไม่มีโซนและโซนไม่ได้เป็นพื้นที่ราบ ลองทดสอบแบ่งโซนเองได้ หรือปรึกษาทีมผู้เชี่ยวชาญของเราได้'
+                                )}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex space-x-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 rounded-lg border border-gray-600 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800"
+                    >
+                        {t('ยกเลิก')}
+                    </button>
+                    <button
+                        onClick={handleApply}
+                        disabled={!calculatedZones || calculatedZones < 1}
+                        className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-600"
+                    >
+                        {calculatedZones === 1 ? t('ใช้โซนเดียว') : t('ใช้จำนวนโซนนี้')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const AutoZoneModal = ({
     isOpen,
     onClose,
@@ -3896,10 +4302,23 @@ const AutoZoneModal = ({
     totalWaterNeed: number;
     t: (key: string) => string;
 }) => {
+    const [showPumpModal, setShowPumpModal] = useState(false);
+
     if (!isOpen) return null;
 
     const averageWaterPerZone =
         config.numberOfZones > 0 ? totalWaterNeed / config.numberOfZones : 0;
+
+    const sprinklerConfig = loadSprinklerConfig();
+    const totalWaterFlowRateLPM =
+        totalPlants * (sprinklerConfig?.flowRatePerMinute || 0) * (sprinklerConfig?.sprinklersPerTree || 1);
+
+    const handleApplyPumpZones = (numberOfZones: number) => {
+        onConfigChange({
+            ...config,
+            numberOfZones: Math.min(numberOfZones, Math.min(totalPlants, 20)),
+        });
+    };
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
@@ -3932,11 +4351,30 @@ const AutoZoneModal = ({
                                     });
                                 } else {
                                     const num = parseInt(val, 10);
+                                    if (!isNaN(num)) {
+                                        // Allow typing freely, but clamp to max
+                                        onConfigChange({
+                                            ...config,
+                                            numberOfZones: Math.min(num, Math.min(totalPlants, 20)),
+                                        });
+                                    }
+                                }
+                            }}
+                            onBlur={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                    onConfigChange({
+                                        ...config,
+                                        numberOfZones: 2,
+                                    });
+                                } else {
+                                    const num = parseInt(val, 10);
+                                    // Enforce minimum of 2 when user finishes typing
                                     onConfigChange({
                                         ...config,
                                         numberOfZones: Math.max(
                                             2,
-                                            Math.min(isNaN(num) ? 2 : num, totalPlants)
+                                            Math.min(isNaN(num) ? 2 : num, Math.min(totalPlants, 20))
                                         ),
                                     });
                                 }
@@ -3946,6 +4384,12 @@ const AutoZoneModal = ({
                         <p className="mt-1 text-xs text-gray-400">
                             {t('สูงสุด')} {Math.min(totalPlants, 20)} {t('โซน')}
                         </p>
+                        <button
+                            onClick={() => setShowPumpModal(true)}
+                            className="mt-2 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                        >
+                            💧 {t('แบ่งโซนจากปั๊มน้ำของคุณ')}
+                        </button>
                     </div>
 
                     {/* <div className="space-y-3">
@@ -4190,6 +4634,14 @@ const AutoZoneModal = ({
                         )}
                     </button>
                 </div>
+
+                <PumpBasedZoneModal
+                    isOpen={showPumpModal}
+                    onClose={() => setShowPumpModal(false)}
+                    totalWaterFlowRateLPM={totalWaterFlowRateLPM}
+                    onApplyZones={handleApplyPumpZones}
+                    t={t}
+                />
             </div>
         </div>
     );
@@ -5312,8 +5764,8 @@ export default function EnhancedHorticulturePlannerPage() {
             exclusionZones: [],
             irrigationZones: [],
             useZones: false,
-            selectedPlantType: DEFAULT_PLANT_TYPES(t)[0],
-            availablePlants: DEFAULT_PLANT_TYPES(t),
+            selectedPlantType: DEFAULT_PLANT_TYPES()[0],
+            availablePlants: DEFAULT_PLANT_TYPES(),
             editMode: null,
             plantGenerationSettings: {
                 layoutPattern: 'grid',
@@ -7113,8 +7565,8 @@ export default function EnhancedHorticulturePlannerPage() {
                     exclusionAreas: projectData.exclusionAreas || [],
                     irrigationZones: projectData.irrigationZones || [],
                     useZones: projectData.useZones || false,
-                    selectedPlantType: projectData.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
-                    availablePlants: projectData.availablePlants || DEFAULT_PLANT_TYPES(t),
+                    selectedPlantType: projectData.selectedPlantType || DEFAULT_PLANT_TYPES()[0],
+                    availablePlants: projectData.availablePlants || DEFAULT_PLANT_TYPES(),
                     branchPipeSettings: projectData.branchPipeSettings || {
                         defaultAngle: 90,
                         maxAngle: 180,
@@ -7183,8 +7635,8 @@ export default function EnhancedHorticulturePlannerPage() {
                     exclusionAreas: projectData.exclusionAreas || [],
                     irrigationZones: projectData.irrigationZones || [],
                     useZones: projectData.useZones || false,
-                    selectedPlantType: projectData.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
-                    availablePlants: projectData.availablePlants || DEFAULT_PLANT_TYPES(t),
+                    selectedPlantType: projectData.selectedPlantType || DEFAULT_PLANT_TYPES()[0],
+                    availablePlants: projectData.availablePlants || DEFAULT_PLANT_TYPES(),
                     branchPipeSettings: projectData.branchPipeSettings || {
                         defaultAngle: 90,
                         maxAngle: 180,
@@ -9009,10 +9461,6 @@ export default function EnhancedHorticulturePlannerPage() {
                     currentAngle: history.present.branchPipeSettings.defaultAngle,
                 };
 
-                console.log(
-                    `✅ สร้างท่อ SubMain ${subMainPipeId}: zoneId = ${targetZone.id} (${targetZone.name})`
-                );
-
                 const exactSpacingStats = calculateExactSpacingStats([
                     ...history.present.subMainPipes,
                     newSubMainPipe,
@@ -10734,7 +11182,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     id: irrigationZone.id,
                     name: irrigationZone.name,
                     coordinates: irrigationZone.coordinates,
-                    plantData: history.present.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
+                    plantData: history.present.selectedPlantType || DEFAULT_PLANT_TYPES()[0],
                     plantCount: irrigationZone.plants.length,
                     totalWaterNeed: irrigationZone.totalWaterNeed,
                     area: 0, // จะคำนวณใหม่ในภายหลัง
@@ -10880,7 +11328,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     id: irrigationZone.id,
                     name: irrigationZone.name,
                     coordinates: irrigationZone.coordinates,
-                    plantData: history.present.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
+                    plantData: history.present.selectedPlantType || DEFAULT_PLANT_TYPES()[0],
                     plantCount: irrigationZone.plants.length,
                     totalWaterNeed: irrigationZone.totalWaterNeed,
                     area: 0, // จะคำนวณใหม่ในภายหลัง
@@ -11002,7 +11450,7 @@ export default function EnhancedHorticulturePlannerPage() {
             exclusionZones: [],
             irrigationZones: [],
             useZones: false,
-            selectedPlantType: DEFAULT_PLANT_TYPES(t)[0],
+            selectedPlantType: DEFAULT_PLANT_TYPES()[0],
             plantSelectionMode: {
                 type: 'single',
                 isCompleted: false,
@@ -11626,9 +12074,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 for (const zone of allZones) {
                     if (zone.coordinates && zone.coordinates.length >= 3) {
                         if (isPointInPolygon(endPoint, zone.coordinates)) {
-                            console.log(
-                                `🔄 อัปเดต zoneId ของท่อ SubMain ${pipe.id}: ${pipe.zoneId || 'none'} → ${zone.id}`
-                            );
                             hasUpdatedZoneId = true;
                             return {
                                 ...pipe,
@@ -11781,11 +12226,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 if (pipe.zoneId && pipe.zoneId === selectedZoneId) {
                     return true; // ใช้ท่อที่มี zoneId ตรงกับโซนที่เลือก
                 }
-
-                // ถ้าไม่มี zoneId หรือ zoneId ไม่ตรงกัน ให้ข้าม
-                console.log(
-                    `⚠️ กรองท่อ SubMain ${pipe.id}: zoneId (${pipe.zoneId || 'none'}) ไม่ตรงกับโซนที่เลือก (${selectedZoneId}), ข้าม`
-                );
                 return false;
             });
 
@@ -11797,9 +12237,6 @@ export default function EnhancedHorticulturePlannerPage() {
             // ใช้ท่อ SubMain ที่กรองแล้ว
             subMainPipes = filteredSubMainPipes;
 
-            console.log(
-                `🔍 กรองท่อ SubMain: เหลือ ${filteredSubMainPipes.length} ท่อสำหรับโซน ${selectedZoneId}`
-            );
         }
 
         if (subMainPipes.length === 0) {
@@ -11872,44 +12309,10 @@ export default function EnhancedHorticulturePlannerPage() {
         }
 
         try {
-            // Debug: แสดงข้อมูลที่ส่งเข้าไป
-            console.log('🔍 Auto Lateral Pipe Generation Debug:', {
-                mode,
-                subMainPipesCount: subMainPipes.length,
-                irrigationZonesCount: irrigationZones.length,
-                zonesInfo: irrigationZones.map((z) => ({
-                    id: z.id,
-                    name: z.name,
-                    plantsCount: z.plants.length,
-                    coordinatesCount: z.coordinates.length,
-                    firstFewPlantPositions: z.plants.slice(0, 3).map((p) => ({
-                        id: p.id,
-                        lat: p.position?.lat,
-                        lng: p.position?.lng,
-                    })),
-                })),
-                subMainPipesInfo: subMainPipes.map((p) => ({
-                    id: p.id,
-                    coordinatesCount: p.coordinates.length,
-                    zoneId: p.zoneId,
-                    firstCoordinate: p.coordinates[0],
-                    lastCoordinate: p.coordinates[p.coordinates.length - 1],
-                })),
-            });
-
             const autoLateralPipes = generateAutoLateralPipes(mode, subMainPipes, irrigationZones, {
                 snapThreshold: 50,
                 minPipeLength: 1,
                 maxPipeLength: 500,
-            });
-
-            console.log('🔍 Generated pipes:', {
-                total: autoLateralPipes.length,
-                pipeIds: autoLateralPipes.map((p) => p.id),
-                pipesByZone: irrigationZones.map((z) => ({
-                    zoneName: z.name,
-                    pipesCount: autoLateralPipes.filter((p) => p.zoneId === z.id).length,
-                })),
             });
 
             // กรองท่อย่อยให้เหลือเฉพาะท่อที่มี zoneId ตรงกับโซนที่ท่อ SubMain เป็นของ
@@ -11928,9 +12331,6 @@ export default function EnhancedHorticulturePlannerPage() {
                 // ตรวจสอบว่า zoneId ของท่อ SubMain ตรงกับ zoneId ของท่อย่อยหรือไม่
                 if (connectedSubMain.zoneId && pipe.zoneId) {
                     if (connectedSubMain.zoneId !== pipe.zoneId) {
-                        console.log(
-                            `⚠️ กรองท่อย่อย ${pipe.id}: zoneId ของท่อ SubMain (${connectedSubMain.zoneId}) ไม่ตรงกับ zoneId ของท่อย่อย (${pipe.zoneId}), ข้าม`
-                        );
                         return false; // ข้ามท่อที่ zoneId ไม่ตรงกัน
                     }
                 }
@@ -11938,26 +12338,10 @@ export default function EnhancedHorticulturePlannerPage() {
                 return true; // ใช้ท่อนี้
             });
 
-            console.log('🔍 Filtered pipes (after zoneId check):', {
-                before: autoLateralPipes.length,
-                after: filteredAutoLateralPipes.length,
-                removed: autoLateralPipes.length - filteredAutoLateralPipes.length,
-                pipesByZone: irrigationZones.map((z) => ({
-                    zoneName: z.name,
-                    pipesCount: filteredAutoLateralPipes.filter((p) => p.zoneId === z.id).length,
-                })),
-            });
-
             const { valid, invalid } = validateAutoLateralPipes(
                 filteredAutoLateralPipes,
                 irrigationZones
             );
-
-            console.log('🔍 Validation result:', {
-                valid: valid.length,
-                invalid: invalid.length,
-                invalidReasons: invalid.map((i) => i.reason),
-            });
 
             if (invalid.length > 0) {
                 // Show user-friendly message about invalid pipes
@@ -12081,7 +12465,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
             if (selectedZoneId) {
                 // ถ้าเลือกโซนเฉพาะ: ลบเฉพาะท่อในโซนนั้นที่สร้างอัตโนมัติ
-                const zoneNames = irrigationZones.map((z) => z.name).join(', ');
+                // const zoneNames = irrigationZones.map((z) => z.name).join(', ');
 
                 existingLateralPipes = existingLateralPipes.filter((pipe) => {
                     const isAutoGenerated =
@@ -12100,7 +12484,6 @@ export default function EnhancedHorticulturePlannerPage() {
 
                     // ลบท่อที่สร้างอัตโนมัติในโซนที่เลือก
                     if (isInSelectedZone) {
-                        console.log(`🗑️ พบท่อเก่าในโซน ${zoneNames}: ${pipe.id}`);
                         return false; // ลบท่อนี้ออก
                     }
 
@@ -12109,11 +12492,11 @@ export default function EnhancedHorticulturePlannerPage() {
 
                 const removedCount = initialPipeCount - existingLateralPipes.length;
                 if (removedCount > 0) {
-                    console.log(
-                        `🗑️ ลบท่อย่อยอัตโนมัติเก่าในโซน ${zoneNames}: ${removedCount} เส้น`
-                    );
+                    // console.log(
+                    //     `🗑️ ลบท่อย่อยอัตโนมัติเก่าในโซน ${zoneNames}: ${removedCount} เส้น`
+                    // );
                 } else {
-                    console.log(`ℹ️ ไม่พบท่อเก่าในโซน ${zoneNames} ให้ลบ`);
+                    //  console.log(`ℹ️ ไม่พบท่อเก่าในโซน ${zoneNames} ให้ลบ`);
                 }
             } else {
                 // ถ้าเลือกทุกโซน: ลบท่อที่สร้างอัตโนมัติทั้งหมดในโซนที่กำลังจะสร้าง
@@ -12134,7 +12517,6 @@ export default function EnhancedHorticulturePlannerPage() {
 
                     // ลบท่อที่สร้างอัตโนมัติในโซนใดๆ ที่จะสร้างใหม่
                     if (isInTargetZones) {
-                        console.log(`🗑️ พบท่อเก่าในโซนที่จะสร้างใหม่: ${pipe.id}`);
                         return false;
                     }
 
@@ -12143,15 +12525,11 @@ export default function EnhancedHorticulturePlannerPage() {
 
                 const removedCount = initialPipeCount - existingLateralPipes.length;
                 if (removedCount > 0) {
-                    console.log(`🗑️ ลบท่อย่อยอัตโนมัติเก่าในทุกโซน: ${removedCount} เส้น`);
+                    // console.log(`🗑️ ลบท่อย่อยอัตโนมัติเก่าในทุกโซน: ${removedCount} เส้น`);
                 } else {
-                    console.log(`ℹ️ ไม่พบท่อเก่าให้ลบ`);
+                    // console.log(`ℹ️ ไม่พบท่อเก่าให้ลบ`);
                 }
             }
-
-            console.log(
-                `📊 ก่อนลบ: ${initialPipeCount} ท่อ, หลังลบ: ${existingLateralPipes.length} ท่อ, จะสร้างใหม่: ${valid.length} ท่อ`
-            );
 
             const newLateralPipes = valid.map((pipe) => {
                 const segmentStats = pipe.intersectionData
@@ -13774,11 +14152,11 @@ export default function EnhancedHorticulturePlannerPage() {
                             <div className="relative">
                                 <button
                                     onClick={handleStartTour}
-                                    className="h-10 w-10 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+                                    className="h-10 w-10 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-300"
                                     title={t('คำแนะนำการใช้งาน')}
                                     data-tour="tour-button"
                                 >
-                                    <FaLightbulb className="h-4 w-4" />
+                                    <div className="flex items-center justify-center text-[20px]">❓</div>
                                 </button>
                             </div>
                         </div>
@@ -16687,6 +17065,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 onClose={handleSprinklerConfigClose}
                 onSave={handleSprinklerConfigSave}
                 plantCount={history.present.plants.length}
+                selectedPlantType={history.present.selectedPlantType}
                 t={t}
             />
 
@@ -17243,6 +17622,23 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         isRulerMode,
     ]);
 
+    // 🔧 เพิ่ม state สำหรับ trigger re-render เมื่อ zoom เปลี่ยน
+    const [zoomTrigger, setZoomTrigger] = useState(0);
+    
+    // 🔧 เพิ่ม listener สำหรับ zoom_changed
+    useEffect(() => {
+        if (!map) return;
+        
+        const zoomListener = map.addListener('zoom_changed', () => {
+            // Trigger re-render เมื่อ zoom เปลี่ยน
+            setZoomTrigger((prev) => prev + 1);
+        });
+        
+        return () => {
+            google.maps.event.removeListener(zoomListener);
+        };
+    }, [map]);
+    
     useEffect(() => {
         if (!map) return;
         clearOverlays();
@@ -18970,6 +19366,21 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         }
 
         if (layerVisibility.plants) {
+            // 🔧 คำนวณขนาดต้นไม้ตาม zoom level
+            // เมื่อซูมออกไกลๆ (zoom ต่ำ) → ต้นไม้เล็กลง
+            // เมื่อซูมเข้าใกล้ๆ (zoom สูง) → ต้นไม้ขนาดปกติ
+            const calculatePlantSize = (zoom: number | undefined): number => {
+                if (!zoom) return 28; // default
+                if (zoom < 14) return 20; // ซูมออกมาก → เล็กมาก
+                if (zoom < 16) return 22; // ซูมออกปานกลาง → เล็ก
+                if (zoom < 18) return 24; // ซูมออกเล็กน้อย → เล็กน้อย
+                if (zoom < 20) return 28; // ขนาดปกติ
+                return 32; // ซูมเข้าใกล้ → ใหญ่ขึ้นเล็กน้อย
+            };
+            
+            const currentZoom = map?.getZoom();
+            const plantSize = calculatePlantSize(currentZoom);
+            
             data.plants.forEach((plant) => {
                 const isConnectionStart = connectionStartPlant?.id === plant.id;
                 const isSelected = data.selectedItems.plants.includes(plant.id);
@@ -19031,6 +19442,11 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     plantZIndex = 1200;
                 }
 
+                // 🔧 ใช้ขนาดที่คำนวณจาก zoom level
+                const finalSize = isHighlightedForLateralPipe ? Math.max(36, plantSize + 8) : plantSize;
+                const finalAnchor = finalSize / 2;
+                const fontSize = Math.max(8, Math.floor(plantSize * 0.36)); // ปรับ font size ตามขนาด
+                
                 const plantMarker = new google.maps.Marker({
                     position: { lat: plant.position.lat, lng: plant.position.lng },
                     map: map,
@@ -19038,26 +19454,20 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                            <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-                                ${isConnectionStart ? '<circle cx="14" cy="14" r="12" fill="none" stroke="#FFD700" stroke-width="3"/>' : ''}
-                                ${isSelected ? '<circle cx="14" cy="14" r="11" fill="none" stroke="#9333EA" stroke-width="2"/>' : ''}
-                                ${isCurrentlyDragging ? '<circle cx="14" cy="14" r="10" fill="none" stroke="#FF6B35" stroke-width="3"/>' : ''}
-                                ${isHighlightedForConnection ? '<circle cx="14" cy="14" r="11" fill="none" stroke="#FFD700" stroke-width="2"/>' : ''}
-                                ${isInPlantMoveMode ? '<circle cx="14" cy="14" r="13" fill="none" stroke="#F97316" stroke-width="2" stroke-dasharray="4,2"/>' : ''}
-                                ${isSelectedForMove ? '<circle cx="14" cy="14" r="13" fill="none" stroke="#10B981" stroke-width="3"/>' : ''}
-                                ${isHighlightedForLateralPipe ? '<circle cx="14" cy="14" r="14" fill="none" stroke="#10B981" stroke-width="3" stroke-dasharray="2,2"/>' : ''}
-                            ${data.plantSelectionMode.type === 'multiple' ? `<circle cx="14" cy="14" r="${Math.max(6, circleRadius - 2)}" fill="${plantColor}" />` : ''}
-                                <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="white" font-size="10" font-weight="bold">${plantSymbol}</text>
+                            <svg width="${finalSize}" height="${finalSize}" viewBox="0 0 ${finalSize} ${finalSize}" xmlns="http://www.w3.org/2000/svg">
+                                ${isConnectionStart ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor * 0.86}" fill="none" stroke="#FFD700" stroke-width="3"/>` : ''}
+                                ${isSelected ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor * 0.79}" fill="none" stroke="#9333EA" stroke-width="2"/>` : ''}
+                                ${isCurrentlyDragging ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor * 0.71}" fill="none" stroke="#FF6B35" stroke-width="3"/>` : ''}
+                                ${isHighlightedForConnection ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor * 0.79}" fill="none" stroke="#FFD700" stroke-width="2"/>` : ''}
+                                ${isInPlantMoveMode ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor * 0.93}" fill="none" stroke="#F97316" stroke-width="2" stroke-dasharray="4,2"/>` : ''}
+                                ${isSelectedForMove ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor * 0.93}" fill="none" stroke="#10B981" stroke-width="3"/>` : ''}
+                                ${isHighlightedForLateralPipe ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${finalAnchor}" fill="none" stroke="#10B981" stroke-width="3" stroke-dasharray="2,2"/>` : ''}
+                            ${data.plantSelectionMode.type === 'multiple' ? `<circle cx="${finalAnchor}" cy="${finalAnchor}" r="${Math.max(finalAnchor * 0.21, circleRadius - 2)}" fill="${plantColor}" />` : ''}
+                                <text x="${finalAnchor}" y="${finalAnchor}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${fontSize}" font-weight="bold">${plantSymbol}</text>
                             </svg>
                         `),
-                        scaledSize: new google.maps.Size(
-                            isHighlightedForLateralPipe ? 36 : 28,
-                            isHighlightedForLateralPipe ? 36 : 28
-                        ),
-                        anchor: new google.maps.Point(
-                            isHighlightedForLateralPipe ? 18 : 14,
-                            isHighlightedForLateralPipe ? 18 : 14
-                        ),
+                        scaledSize: new google.maps.Size(finalSize, finalSize),
+                        anchor: new google.maps.Point(finalAnchor, finalAnchor),
                     },
                     title: `${plant.plantData.name} (${plant.id})`,
                     draggable: plantDraggable,
@@ -19337,6 +19747,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         setDraggedControlPointIndex,
         tempConnectionLine,
         zoneControlPoints,
+        zoomTrigger, // 🔧 เพิ่ม zoomTrigger เพื่อ trigger re-render เมื่อ zoom เปลี่ยน
     ]);
 
     useEffect(() => {

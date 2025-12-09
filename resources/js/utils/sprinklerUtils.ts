@@ -152,7 +152,7 @@ export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: nu
 
 export const DEFAULT_SPRINKLER_CONFIG: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'> = {
     flowRatePerMinute: 2.5,
-    pressureBar: 2.0,
+    pressureBar: 2.5,
     sprinklersPerTree: 1, // จำนวนสปริงเกอร์ต่อต้นไม้ 1 ต้น (ค่าเริ่มต้น)
 };
 

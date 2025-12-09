@@ -7,11 +7,21 @@ import {
     DEFAULT_SPRINKLER_CONFIG,
 } from '../../utils/sprinklerUtils';
 
+interface PlantData {
+    id: number;
+    name: string;
+    plantSpacing: number;
+    rowSpacing: number;
+    waterNeed: number;
+    flowLitersPerMinute?: number;
+}
+
 interface SprinklerConfigModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (config: SprinklerFormData) => void;
     plantCount: number;
+    selectedPlantType?: PlantData | null;
     t: (key: string) => string;
 }
 
@@ -20,6 +30,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
     onClose,
     onSave,
     plantCount,
+    selectedPlantType,
 }) => {
     const [formData, setFormData] = useState<SprinklerFormData>({
         flowRatePerMinute: '',
@@ -33,22 +44,30 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
     useEffect(() => {
         if (isOpen) {
             const existingConfig = loadSprinklerConfig();
+            // ใช้ flowLitersPerMinute จากพืชที่เลือกถ้ามี หรือใช้ค่าจาก config ที่บันทึกไว้ หรือค่า default
+            const flowRateFromPlant = selectedPlantType?.flowLitersPerMinute;
+            const flowRateToUse = flowRateFromPlant 
+                ? flowRateFromPlant.toString()
+                : (existingConfig 
+                    ? existingConfig.flowRatePerMinute.toString()
+                    : DEFAULT_SPRINKLER_CONFIG.flowRatePerMinute.toString());
+            
             if (existingConfig) {
                 setFormData({
-                    flowRatePerMinute: existingConfig.flowRatePerMinute.toString(),
+                    flowRatePerMinute: flowRateToUse,
                     pressureBar: existingConfig.pressureBar.toString(),
                     sprinklersPerTree: (existingConfig.sprinklersPerTree || 1).toString(),
                 });
             } else {
                 setFormData({
-                    flowRatePerMinute: DEFAULT_SPRINKLER_CONFIG.flowRatePerMinute.toString(),
+                    flowRatePerMinute: flowRateToUse,
                     pressureBar: DEFAULT_SPRINKLER_CONFIG.pressureBar.toString(),
                     sprinklersPerTree: DEFAULT_SPRINKLER_CONFIG.sprinklersPerTree.toString(),
                 });
             }
             setErrors({});
         }
-    }, [isOpen]);
+    }, [isOpen, selectedPlantType]);
 
     const handleInputChange = (field: keyof SprinklerFormData, value: string) => {
         setFormData((prev) => ({
@@ -212,7 +231,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                                     className={`w-full rounded-lg border px-4 py-3 pr-12 text-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500 ${
                                         errors.pressureBar ? 'border-red-300' : 'border-white'
                                     }`}
-                                    placeholder="2.0"
+                                    placeholder="2.5"
                                     autoComplete="off"
                                 />
                                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">

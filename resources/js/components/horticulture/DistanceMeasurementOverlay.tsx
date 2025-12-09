@@ -21,7 +21,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
     const [distance, setDistance] = useState<number>(0);
     const [isVisible, setIsVisible] = useState<boolean>(false);
     const startPointRef = useRef<Coordinate | null>(null);
-    const polylineRef = useRef<google.maps.Polyline | null>(null);
     const listenersRef = useRef<google.maps.MapsEventListener[]>([]);
     const cleanupFunctionsRef = useRef<(() => void)[]>([]);
 
@@ -114,10 +113,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
         cleanupFunctionsRef.current = [];
 
         if (!map || !isActive || !editMode) {
-            if (polylineRef.current) {
-                polylineRef.current.setMap(null);
-                polylineRef.current = null;
-            }
             setStartPoint(null);
             setCurrentPoint(null);
             setDistance(0);
@@ -210,12 +205,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         setDistance(0);
                         setIsVisible(true);
                         startPointRef.current = clickedPoint;
-
-                        // Clear previous line
-                        if (polylineRef.current) {
-                            polylineRef.current.setMap(null);
-                            polylineRef.current = null;
-                        }
                     }
                 }
 
@@ -232,10 +221,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     setDistance(0);
                     setIsVisible(false);
                     startPointRef.current = null;
-                    if (polylineRef.current) {
-                        polylineRef.current.setMap(null);
-                        polylineRef.current = null;
-                    }
                 }
             };
 
@@ -261,10 +246,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     setDistance(0);
                     setIsVisible(false);
                     startPointRef.current = null;
-                    if (polylineRef.current) {
-                        polylineRef.current.setMap(null);
-                        polylineRef.current = null;
-                    }
                 }
             );
             listenersRef.current.push(drawingCompleteListener);
@@ -276,10 +257,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                 setDistance(0);
                 setIsVisible(false);
                 startPointRef.current = null;
-                if (polylineRef.current) {
-                    polylineRef.current.setMap(null);
-                    polylineRef.current = null;
-                }
             });
             listenersRef.current.push(doubleClickListener);
 
@@ -290,10 +267,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     setDistance(0);
                     setIsVisible(false);
                     startPointRef.current = null;
-                    if (polylineRef.current) {
-                        polylineRef.current.setMap(null);
-                        polylineRef.current = null;
-                    }
                 }
             };
             document.addEventListener('keydown', keydownListener);
@@ -362,31 +335,9 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
                         const distance = calculateDistance(startPointRef.current, currentPoint);
 
-                        // Update state for popup display
+                        // Update state for popup display (removed line drawing)
                         setCurrentPoint(currentPoint);
                         setDistance(distance);
-
-                        // Draw line without label
-                        const path = [
-                            new google.maps.LatLng(
-                                startPointRef.current.lat,
-                                startPointRef.current.lng
-                            ),
-                            new google.maps.LatLng(currentPoint.lat, currentPoint.lng),
-                        ];
-
-                        if (!polylineRef.current) {
-                            polylineRef.current = new google.maps.Polyline({
-                                path,
-                                strokeColor: '#10B981', // Green color
-                                strokeOpacity: 0.8,
-                                strokeWeight: 3,
-                                map,
-                            });
-                        } else {
-                            polylineRef.current.setPath(path);
-                            polylineRef.current.setMap(map);
-                        }
                     } catch (error) {
                         console.error('Error in mousemove handler:', error);
                     }
@@ -417,11 +368,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
             cleanupFunctionsRef.current.forEach((cleanup) => cleanup());
             cleanupFunctionsRef.current = [];
-
-            if (polylineRef.current) {
-                polylineRef.current.setMap(null);
-                polylineRef.current = null;
-            }
         };
     }, [map, isActive, editMode, startPoint]);
 
@@ -431,10 +377,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
         setDistance(0);
         setIsVisible(false);
         startPointRef.current = null;
-        if (polylineRef.current) {
-            polylineRef.current.setMap(null);
-            polylineRef.current = null;
-        }
     }, [editMode]);
 
     return (
@@ -453,10 +395,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                                 setDistance(0);
                                 setIsVisible(false);
                                 startPointRef.current = null;
-                                if (polylineRef.current) {
-                                    polylineRef.current.setMap(null);
-                                    polylineRef.current = null;
-                                }
                             }}
                             className="text-gray-400 transition-colors hover:text-gray-600"
                         >

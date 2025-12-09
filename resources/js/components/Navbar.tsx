@@ -225,6 +225,16 @@ const Navbar: React.FC = () => {
                             )}
 
                             <div className="flex items-center gap-1 sm:gap-3">
+                                {/* AI Chat Button */}
+                                <button
+                                    onClick={() => setShowFloatingAiChat(true)}
+                                    className="hidden items-center rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:flex sm:px-3 sm:text-sm"
+                                    title={t('เปิด ChaiyoAI Chat')}
+                                >
+                                    <span className="text-sm sm:text-lg">🤖</span>
+                                    <span className="hidden sm:inline">{t('AI Chat')}</span>
+                                </button>
+                                
                                 <FloatingAiChat
                                     isOpen={showFloatingAiChat}
                                     onClose={() => setShowFloatingAiChat(false)}

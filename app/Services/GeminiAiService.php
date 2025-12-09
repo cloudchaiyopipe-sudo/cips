@@ -13,11 +13,25 @@ class GeminiAiService
 
     public function __construct()
     {
-        $this->apiKey = env('GEMINI_API_KEY');
+        // Use config() first (works with config cache), then fallback to env()
+        $this->apiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY');
         $this->baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
         
+        // Trim whitespace in case there are spaces
+        $this->apiKey = $this->apiKey ? trim($this->apiKey) : null;
+        
         if (empty($this->apiKey)) {
-            throw new Exception('GEMINI_API_KEY not found in .env file');
+            $configCachePath = base_path('bootstrap/cache/config.php');
+            $errorMsg = 'GEMINI_API_KEY not found. ';
+            $errorMsg .= 'Please set GEMINI_API_KEY in your .env file. ';
+            
+            if (file_exists($configCachePath)) {
+                $errorMsg .= 'Config cache detected. Please run: php artisan config:clear && php artisan config:cache';
+            } else {
+                $errorMsg .= 'After adding the key, run: php artisan config:clear';
+            }
+            
+            throw new Exception($errorMsg);
         }
     }
 

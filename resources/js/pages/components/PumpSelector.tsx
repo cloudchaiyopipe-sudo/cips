@@ -49,8 +49,17 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [showAccessoriesModal, setShowAccessoriesModal] = useState(false);
+    const [showPumpCalculatorModal, setShowPumpCalculatorModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const [hasAutoSelected, setHasAutoSelected] = useState(false);
+    const [userPumpFlow, setUserPumpFlow] = useState<string>('');
+    const [userPumpHead, setUserPumpHead] = useState<string>('');
+    const [calculationResult, setCalculationResult] = useState<{
+        isFlowAdequate: boolean;
+        isHeadAdequate: boolean;
+        flowRatio: number;
+        headRatio: number;
+    } | null>(null);
     const { t } = useLanguage();
 
     const requiredFlow = results.flows.main;
@@ -544,6 +553,43 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const closeImageModal = () => {
         setShowImageModal(false);
         setModalImage({ src: '', alt: '' });
+    };
+
+    const handleCalculateUserPump = () => {
+        const flow = parseFloat(userPumpFlow);
+        const head = parseFloat(userPumpHead);
+
+        if (isNaN(flow) || isNaN(head) || flow <= 0 || head <= 0) {
+            alert(t('กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง'));
+            return;
+        }
+
+        const requiredFlowLPM =
+            projectMode === 'garden'
+                ? gardenReq.requiredFlowLPM
+                : projectMode === 'greenhouse'
+                  ? horticultureReq.requiredFlowLPM
+                  : projectMode === 'field-crop'
+                    ? fieldCropRequirements.requiredFlowLPM
+                    : horticultureReq.requiredFlowLPM;
+
+        const requiredHeadM = maxPumpHeadWithSafety;
+
+        const isFlowAdequate = flow >= requiredFlowLPM;
+        const isHeadAdequate = head >= requiredHeadM;
+
+        setCalculationResult({
+            isFlowAdequate,
+            isHeadAdequate,
+            flowRatio: requiredFlowLPM > 0 ? flow / requiredFlowLPM : 0,
+            headRatio: requiredHeadM > 0 ? head / requiredHeadM : 0,
+        });
+    };
+
+    const resetCalculator = () => {
+        setUserPumpFlow('');
+        setUserPumpHead('');
+        setCalculationResult(null);
     };
 
     const calculateSimultaneousFlow = () => {
@@ -1081,7 +1127,18 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
+            <div className="flex flex-row items-center justify-between">
             <h3 className="mb-4 text-2xl font-bold text-red-500">{t('ปั๊มน้ำ')}</h3>
+            <button
+                    onClick={() => {
+                        resetCalculator();
+                        setShowPumpCalculatorModal(true);
+                    }}
+                    className="ml-auto mb-4 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+                >
+                    {t('คำนวณปั๊มน้ำของคุณ')}
+                </button>
+            </div>
 
             <div className="mb-4 flex flex-row items-center space-x-6 rounded bg-gray-600 p-3">
                 <h4 className="mr-4 whitespace-nowrap text-lg font-medium text-red-300">
@@ -1121,6 +1178,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         </span>
                     )}
                 </div>
+               
             </div>
 
             <div className="mb-4">
@@ -1579,6 +1637,194 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                                 .toLocaleString()}{' '}
                                             {t('บาท')}
                                         </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showPumpCalculatorModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                    onClick={() => {
+                        setShowPumpCalculatorModal(false);
+                        resetCalculator();
+                    }}
+                >
+                    <div
+                        className="relative mx-4 w-full max-w-2xl rounded-lg bg-gray-800 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between bg-blue-900 px-6 py-4">
+                            <h3 className="text-xl font-bold text-white">
+                                {t('คำนวณปั๊มน้ำของคุณ')}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowPumpCalculatorModal(false);
+                                    resetCalculator();
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
+                                title={t('ปิด')}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {/* แสดงความต้องการปั๊ม */}
+                            <div className="mb-6 rounded bg-gray-700 p-4">
+                                <h4 className="mb-3 text-lg font-medium text-red-300">
+                                    ⚡ {t('ความต้องการปั๊ม:')}
+                                </h4>
+                                <div className="flex flex-col space-y-2 text-sm">
+                                    <span>
+                                        {t('อัตราการไหล:')}{' '}
+                                        <span className="font-bold text-blue-300">
+                                            {Number(
+                                                (projectMode === 'garden'
+                                                    ? gardenReq.requiredFlowLPM
+                                                    : projectMode === 'greenhouse'
+                                                      ? horticultureReq.requiredFlowLPM
+                                                      : projectMode === 'field-crop'
+                                                        ? fieldCropRequirements.requiredFlowLPM
+                                                        : horticultureReq.requiredFlowLPM
+                                                ).toFixed(2)
+                                            ).toLocaleString()}{' '}
+                                            {t('LPM')}
+                                        </span>
+                                    </span>
+                                    <span>
+                                        {t('Pump Head:')}{' '}
+                                        <span className="font-bold text-orange-300">
+                                            {maxPumpHeadWithSafety.toFixed(1)} {t('เมตร')}
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* ช่องกรอกข้อมูล */}
+                            <div className="mb-6 space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-white">
+                                        {t('อัตราการไหลสูงสุดของปั๊ม (Flow)')} ({t('LPM')})
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={userPumpFlow}
+                                        onChange={(e) => setUserPumpFlow(e.target.value)}
+                                        placeholder={t('กรุณากรอกอัตราการไหล')}
+                                        className="w-full rounded border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-white">
+                                        {t('แรงส่งสูงสุด (Pump Head)')} ({t('เมตร')})
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={userPumpHead}
+                                        onChange={(e) => setUserPumpHead(e.target.value)}
+                                        placeholder={t('กรุณากรอกแรงส่งสูงสุด')}
+                                        className="w-full rounded border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        min="0"
+                                        step="0.1"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* ปุ่มคำนวณ */}
+                            <div className="mb-6">
+                                <button
+                                    onClick={handleCalculateUserPump}
+                                    className="w-full rounded bg-green-600 px-6 py-3 text-lg font-medium text-white transition-colors hover:bg-green-500"
+                                >
+                                    {t('คำนวณ')}
+                                </button>
+                            </div>
+
+                            {/* แสดงผลการคำนวณ */}
+                            {calculationResult && (
+                                <div className="space-y-4">
+                                    <div className="rounded bg-gray-700 p-4">
+                                        <h5 className="mb-3 text-lg font-medium text-white">
+                                            {t('ผลการคำนวณ:')}
+                                        </h5>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-300">{t('Flow:')}</span>
+                                                <span
+                                                    className={`font-bold ${
+                                                        calculationResult.isFlowAdequate
+                                                            ? 'text-green-300'
+                                                            : 'text-red-300'
+                                                    }`}
+                                                >
+                                                    {calculationResult.isFlowAdequate
+                                                        ? '✅ ' + t('เพียงพอ')
+                                                        : '❌ ' + t('ไม่เพียงพอ')}
+                                                    <span className="ml-2 text-gray-400">
+                                                        ({calculationResult.flowRatio.toFixed(1)}x)
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-gray-300">{t('Head:')}</span>
+                                                <span
+                                                    className={`font-bold ${
+                                                        calculationResult.isHeadAdequate
+                                                            ? 'text-green-300'
+                                                            : 'text-red-300'
+                                                    }`}
+                                                >
+                                                    {calculationResult.isHeadAdequate
+                                                        ? '✅ ' + t('เพียงพอ')
+                                                        : '❌ ' + t('ไม่เพียงพอ')}
+                                                    <span className="ml-2 text-gray-400">
+                                                        ({calculationResult.headRatio.toFixed(1)}x)
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* คำแนะนำ */}
+                                    {(!calculationResult.isFlowAdequate ||
+                                        !calculationResult.isHeadAdequate) && (
+                                        <div className="rounded bg-yellow-900 p-4">
+                                            <h5 className="mb-2 text-sm font-medium text-yellow-300">
+                                                {t('คำแนะนำ:')}
+                                            </h5>
+                                            <ul className="list-inside list-disc space-y-1 text-xs text-yellow-200">
+                                                {!calculationResult.isFlowAdequate && (
+                                                    <li>
+                                                        {t(
+                                                            'ถ้า Flow ไม่พอ ต้องกลับไปแบ่งโซนใหม่'
+                                                        )}
+                                                    </li>
+                                                )}
+                                                {!calculationResult.isHeadAdequate && (
+                                                    <li>
+                                                        {t(
+                                                            'ถ้า Head ไม่พอ ให้กลับไปวางท่อใหม่ หรือปรับขนาดท่อให้ใหญ่ขึ้น'
+                                                        )}
+                                                    </li>
+                                                )}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* ข้อความแนะนำเพิ่มเติม */}
+                                    <div className="rounded bg-blue-900 p-4">
+                                        <p className="text-sm text-blue-200">
+                                            {t(
+                                                'แต่ถ้าลูกค้ายังไม่มีปั๊มน้ำให้ดูตามที่เราแนะนำให้ได้ หรือเลือกซื้อปั๊มน้ำตาม ⚡ ความต้องการปั๊ม ที่แนะนำได้เลยครับ'
+                                            )}
+                                        </p>
                                     </div>
                                 </div>
                             )}
