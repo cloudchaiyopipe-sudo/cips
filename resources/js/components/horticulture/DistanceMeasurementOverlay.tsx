@@ -17,7 +17,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
     editMode,
 }) => {
     const [startPoint, setStartPoint] = useState<Coordinate | null>(null);
-    const [currentPoint, setCurrentPoint] = useState<Coordinate | null>(null);
     const [distance, setDistance] = useState<number>(0);
     const [isVisible, setIsVisible] = useState<boolean>(false);
     const startPointRef = useRef<Coordinate | null>(null);
@@ -114,7 +113,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
         if (!map || !isActive || !editMode) {
             setStartPoint(null);
-            setCurrentPoint(null);
             setDistance(0);
             setIsVisible(false);
             return;
@@ -201,7 +199,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
                         // Always start new measurement on click
                         setStartPoint(clickedPoint);
-                        setCurrentPoint(clickedPoint);
                         setDistance(0);
                         setIsVisible(true);
                         startPointRef.current = clickedPoint;
@@ -217,7 +214,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     // Right click
                     e.preventDefault();
                     setStartPoint(null);
-                    setCurrentPoint(null);
                     setDistance(0);
                     setIsVisible(false);
                     startPointRef.current = null;
@@ -242,7 +238,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                 'overlaycomplete',
                 () => {
                     setStartPoint(null);
-                    setCurrentPoint(null);
                     setDistance(0);
                     setIsVisible(false);
                     startPointRef.current = null;
@@ -253,7 +248,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             const doubleClickListener = google.maps.event.addListener(map, 'dblclick', () => {
                 // Stop measurement on double click
                 setStartPoint(null);
-                setCurrentPoint(null);
                 setDistance(0);
                 setIsVisible(false);
                 startPointRef.current = null;
@@ -263,7 +257,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             const keydownListener = (e: KeyboardEvent) => {
                 if (e.key === 'Escape' && startPoint) {
                     setStartPoint(null);
-                    setCurrentPoint(null);
                     setDistance(0);
                     setIsVisible(false);
                     startPointRef.current = null;
@@ -336,7 +329,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         const distance = calculateDistance(startPointRef.current, currentPoint);
 
                         // Update state for popup display (removed line drawing)
-                        setCurrentPoint(currentPoint);
                         setDistance(distance);
                     } catch (error) {
                         console.error('Error in mousemove handler:', error);
@@ -373,7 +365,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
     useEffect(() => {
         setStartPoint(null);
-        setCurrentPoint(null);
         setDistance(0);
         setIsVisible(false);
         startPointRef.current = null;
@@ -391,7 +382,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         <button
                             onClick={() => {
                                 setStartPoint(null);
-                                setCurrentPoint(null);
                                 setDistance(0);
                                 setIsVisible(false);
                                 startPointRef.current = null;
@@ -417,28 +407,6 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     <div className="space-y-2">
                         <div className="text-2xl font-bold text-green-600">
                             {formatDistance(distance)}
-                        </div>
-
-                        {startPoint && currentPoint && (
-                            <div className="space-y-1 text-xs text-gray-500">
-                                <div>
-                                    <span className="font-medium">จุดเริ่มต้น:</span>
-                                    <br />
-                                    {startPoint.lat.toFixed(6)}, {startPoint.lng.toFixed(6)}
-                                </div>
-                                <div>
-                                    <span className="font-medium">จุดปัจจุบัน:</span>
-                                    <br />
-                                    {currentPoint.lat.toFixed(6)}, {currentPoint.lng.toFixed(6)}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="space-y-1 text-xs text-gray-400">
-                            <div>• คลิกซ้าย: เริ่มการวัดระยะทางใหม่</div>
-                            <div>• คลิกขวา: หยุดการวัดระยะทาง</div>
-                            <div>• Double click: หยุดการวัดระยะทาง</div>
-                            <div>• ESC: หยุดการวัดระยะทาง</div>
                         </div>
                     </div>
                 </div>

@@ -101,6 +101,11 @@ export const useZoneEditor = ({
                                 new google.maps.LatLng(ne.lat(), ne.lng())
                             );
 
+                            if (!worldCoordinate) {
+                                // Fall through to fallback calculation
+                                throw new Error('Failed to get world coordinate');
+                            }
+
                             // หา map container
                             const container = mapContainerRef?.current || 
                                 document.querySelector('.map-container') ||
@@ -204,7 +209,7 @@ export const useZoneEditor = ({
                 }
             }
         }
-    }, [editState.isEditing, exitEditMode, calculateMapBounds]);
+    }, [editState.isEditing, exitEditMode, calculateMapBounds, map]);
 
     // จัดการการคลิกโซน
     const handleZoneClick = useCallback(
@@ -329,6 +334,7 @@ export const useZoneEditor = ({
             editState.controlPoints,
             mainArea,
             pixelToCoordinate,
+            mapContainerRef,
             onError,
         ]
     );
@@ -370,7 +376,6 @@ export const useZoneEditor = ({
             }
 
             // 🔧 FIX: Validate โซนทับซ้อนกันและ self-intersection
-            const { validateEditedZone, updateEditedZone } = require('../utils/autoZoneUtilsExtensions');
             const validation = validateEditedZone(
                 { ...editState.editingZone, coordinates: validCoordinates },
                 zones,
@@ -415,7 +420,7 @@ export const useZoneEditor = ({
             console.error('❌ Error applying zone changes:', error);
             onError?.('เกิดข้อผิดพลาดในการบันทึกการเปลี่ยนแปลง');
         }
-    }, [editState.editingZone, allPlants, zones, onZonesUpdate, exitEditMode, onSuccess, onError]);
+    }, [editState.editingZone, allPlants, zones, mainArea, onZonesUpdate, exitEditMode, onSuccess, onError]);
 
     // ยกเลิกการเปลี่ยนแปลง
     const cancelZoneChanges = useCallback(() => {
@@ -451,7 +456,7 @@ export const useZoneEditor = ({
             onZonesUpdate(updatedZones);
             exitEditMode();
             onSuccess?.('ลบโซนเรียบร้อย');
-        } catch (e) {
+        } catch {
             onError?.('เกิดข้อผิดพลาดในการลบโซน');
         }
     }, [editState.editingZone, zones, onZonesUpdate, exitEditMode, onError, onSuccess]);
