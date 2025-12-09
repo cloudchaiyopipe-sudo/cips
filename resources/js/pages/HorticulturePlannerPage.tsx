@@ -3455,8 +3455,9 @@ const PlantGenerationModal = ({
                                             <div className="font-semibold">{t(plantData.name)}</div>
                                             <div className="text-xs text-gray-300">
                                                 {t('ระยะปลูก')}: {plantData.plantSpacing}×
-                                                {plantData.rowSpacing} {t('ม.')} |{t('น้ำ')}:{' '}
-                                                {plantData.waterNeed} {t('ล./ครั้ง')}
+                                                {plantData.rowSpacing} {t('ม.')} |{t(' ต้องการน้ำ')}:{' '}
+                                                {plantData.waterNeed} {t('ล./ครั้ง')} {' '}
+                                                {plantData.flowLitersPerMinute ? `(${plantData.flowLitersPerMinute} ${t('ล./นาที')})` : ''}
                                             </div>
                                         </button>
                                         {/* ปุ่มแก้ไขสำหรับพืชทุกชนิด */}
@@ -4064,10 +4065,39 @@ const PumpBasedZoneModal = ({
     const fetchPumps = async () => {
         setLoadingPumps(true);
         try {
-            const response = await axios.get('/api/equipments/by-category-id/10');
-            setPumps(response.data || []);
-        } catch (error) {
+            // Use category name 'pump' instead of hardcoded category_id
+            const response = await axios.get('/api/equipments/by-category/pump');
+            
+            // Handle different response structures
+            let pumpData = response.data;
+            
+            // If response is an error object
+            if (pumpData && typeof pumpData === 'object' && !Array.isArray(pumpData)) {
+                if (pumpData.error) {
+                    console.error('API Error:', pumpData.error);
+                    setPumps([]);
+                    return;
+                }
+                // If response has a data property
+                if (pumpData.data && Array.isArray(pumpData.data)) {
+                    pumpData = pumpData.data;
+                }
+            }
+            
+            // Ensure we have an array
+            const pumpsArray = Array.isArray(pumpData) ? pumpData : [];
+            
+            if (pumpsArray.length === 0) {
+                console.warn('No pumps found for category "pump"');
+            }
+            
+            setPumps(pumpsArray);
+        } catch (error: any) {
             console.error('Error fetching pumps:', error);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response data:', error.response.data);
+            }
             setPumps([]);
         } finally {
             setLoadingPumps(false);
@@ -4122,7 +4152,7 @@ const PumpBasedZoneModal = ({
 
                 <div className="space-y-4">
                     <div className="rounded-lg bg-blue-900 p-3">
-                        <div className="text-sm text-blue-200">
+                        <div className="text-sm text-blue-200 flex items-center gap-3">
                             <p className="font-medium">{t('ปริมาณน้ำรวม')}:</p>
                             <p className="text-lg font-semibold">
                                 {totalWaterFlowRateLPM.toFixed(2)} {t('ลิตร/นาที')}
@@ -4194,31 +4224,76 @@ const PumpBasedZoneModal = ({
                                         {t('กำลังโหลด...')}
                                     </div>
                                 ) : (
-                                    <select
-                                        value={selectedPump?.id || ''}
-                                        onChange={(e) => {
-                                            const pump = pumps.find(
-                                                (p) => p.id === parseInt(e.target.value)
-                                            );
-                                            setSelectedPump(pump || null);
-                                        }}
-                                        className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
-                                    >
-                                        <option value="">{t('-- เลือกปั๊มน้ำ --')}</option>
-                                        {pumps.map((pump) => (
-                                            <option key={pump.id} value={pump.id}>
-                                                {pump.name || pump.product_code} -{' '}
-                                                {pump.max_flow_rate_lpm || 0} LPM
-                                            </option>
-                                        ))}
-                                    </select>
-                                )}
-                                {selectedPump && (
-                                    <div className="mt-2 rounded-lg bg-gray-800 p-2 text-sm text-gray-300">
-                                        <p>
-                                            <strong>{t('อัตราการไหลสูงสุด')}:</strong>{' '}
-                                            {selectedPump.max_flow_rate_lpm || 0} LPM
-                                        </p>
+                                    <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-gray-600 bg-gray-800 p-2">
+                                        {pumps.length === 0 ? (
+                                            <div className="text-center text-gray-400 py-4">
+                                                {t('ไม่พบข้อมูลปั๊มน้ำ')}
+                                            </div>
+                                        ) : (
+                                            pumps.map((pump) => (
+                                                <div
+                                                    key={pump.id}
+                                                    onClick={() => {
+                                                        setSelectedPump(
+                                                            selectedPump?.id === pump.id
+                                                                ? null
+                                                                : pump
+                                                        );
+                                                    }}
+                                                    className={`flex cursor-pointer items-center space-x-3 rounded-lg border p-3 transition-colors ${
+                                                        selectedPump?.id === pump.id
+                                                            ? 'border-blue-500 bg-blue-900/30'
+                                                            : 'border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    <div className="flex-shrink-0">
+                                                        {pump.image ? (
+                                                            <img
+                                                                src={pump.image}
+                                                                alt={pump.name || pump.product_code}
+                                                                className="h-16 w-16 rounded border border-gray-500 object-cover"
+                                                                onError={(e) => {
+                                                                    const target =
+                                                                        e.target as HTMLImageElement;
+                                                                    target.style.display = 'none';
+                                                                    const fallback =
+                                                                        target.nextElementSibling as HTMLElement;
+                                                                    if (fallback)
+                                                                        fallback.style.display =
+                                                                            'flex';
+                                                                }}
+                                                            />
+                                                        ) : null}
+                                                        <div
+                                                            className="flex h-16 w-16 items-center justify-center rounded border border-gray-500 bg-gray-600 text-xs text-gray-300"
+                                                            style={{
+                                                                display: pump.image
+                                                                    ? 'none'
+                                                                    : 'flex',
+                                                            }}
+                                                        >
+                                                            💧
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-white text-sm">
+                                                            {pump.name || pump.product_code}
+                                                        </div>
+                                                        <div className="text-sm text-gray-300">
+                                                            {t('อัตราการไหลสูงสุด')}:{' '}
+                                                            {pump.max_flow_rate_lpm || 0} LPM
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-shrink-0">
+                                                        {selectedPump?.id === pump.id && (
+                                                            <div className="text-blue-400">
+                                                                ✓
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -4227,7 +4302,7 @@ const PumpBasedZoneModal = ({
 
                     {calculatedZones !== null && calculatedZones === 1 && (
                         <div className="rounded-lg bg-blue-900 p-3">
-                            <div className="text-sm text-blue-200">
+                            <div className="text-sm text-blue-200 flex items-center gap-3">
                                 <p className="font-medium">{t('ผลการคำนวณ')}:</p>
                                 <p className="text-lg font-semibold">
                                     {t('ไม่ต้องแบ่งโซน ใช้โซนเดียว ก็เพียงพอ!!')}
@@ -4238,7 +4313,7 @@ const PumpBasedZoneModal = ({
 
                     {calculatedZones !== null && calculatedZones >= 2 && (
                         <div className="rounded-lg bg-green-900 p-3">
-                            <div className="text-sm text-green-200">
+                            <div className="text-sm text-green-200 flex items-center gap-3">
                                 <p className="font-medium">{t('จำนวนโซนที่เหมาะสม')}:</p>
                                 <p className="text-lg font-semibold">{calculatedZones} {t('โซน')}</p>
                             </div>

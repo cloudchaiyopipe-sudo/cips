@@ -197,21 +197,52 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         return a.price - b.price;
                     })[0];
 
-                    const globalDefaultSprinkler = localStorage.getItem(
+                    const globalDefaultSprinklerStr = localStorage.getItem(
                         `${projectMode}_defaultSprinkler`
                     );
 
-                    if (!globalDefaultSprinkler) {
-                        localStorage.setItem(
-                            `${projectMode}_defaultSprinkler`,
-                            JSON.stringify(bestSprinkler)
-                        );
-                    }
-
                     if (!selectedSprinkler) {
-                        const defaultSprinkler = globalDefaultSprinkler
-                            ? JSON.parse(globalDefaultSprinkler)
-                            : bestSprinkler;
+                        let defaultSprinkler = bestSprinkler;
+                        
+                        // Try to find the saved default sprinkler from SprinklerConfigModal
+                        if (globalDefaultSprinklerStr) {
+                            try {
+                                const savedDefaultSprinkler = JSON.parse(globalDefaultSprinklerStr);
+                                
+                                // Find sprinkler by id or productCode in compatibleSprinklers
+                                const foundSprinkler = compatibleSprinklers.find((s: any) => 
+                                    s.id === savedDefaultSprinkler.id || 
+                                    s.productCode === savedDefaultSprinkler.productCode ||
+                                    (savedDefaultSprinkler.productCode && s.productCode === savedDefaultSprinkler.productCode)
+                                );
+                                
+                                if (foundSprinkler) {
+                                    defaultSprinkler = foundSprinkler;
+                                } else {
+                                    // If not found in compatible, try to find in all analyzedSprinklers
+                                    const foundInAll = analyzedSprinklers.find((s: any) => 
+                                        s.id === savedDefaultSprinkler.id || 
+                                        s.productCode === savedDefaultSprinkler.productCode ||
+                                        (savedDefaultSprinkler.productCode && s.productCode === savedDefaultSprinkler.productCode)
+                                    );
+                                    
+                                    if (foundInAll) {
+                                        defaultSprinkler = foundInAll;
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error parsing default sprinkler:', error);
+                            }
+                        }
+                        
+                        // Save the selected default if not already saved
+                        if (!globalDefaultSprinklerStr) {
+                            localStorage.setItem(
+                                `${projectMode}_defaultSprinkler`,
+                                JSON.stringify(defaultSprinkler)
+                            );
+                        }
+                        
                         onSprinklerChange(defaultSprinkler);
                     }
                 }
