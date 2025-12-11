@@ -543,7 +543,7 @@ function FreeHome() {
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-slate-800/80 backdrop-blur-xl shadow-2xl lg:max-w-lg"
+                            className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-slate-800/80 backdrop-blur-xl shadow-2xl md:max-w-xl lg:max-w-2xl"
                         >
                             {/* Header Gradient */}
                             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
@@ -555,12 +555,12 @@ function FreeHome() {
                                 ✕
                             </button>
 
-                            <div className="p-6">
+                            <div className="p-4">
                                 <div
                                     className="group cursor-pointer"
                                     onClick={() => handleAdClick(advertisements[currentAdIndex].link_url)}
                                 >
-                                    <div className="mb-4 text-center">
+                                    <div className="mb-3 text-center">
                                         <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-slate-300 backdrop-blur-sm">
                                             {translations.sponsoredContent}
                                         </span>
@@ -570,7 +570,8 @@ function FreeHome() {
                                         <img
                                             src={advertisements[currentAdIndex].image_url}
                                             alt={advertisements[currentAdIndex].title}
-                                            className="h-[400px] w-full object-cover"
+                                            className="w-full object-contain"
+                                            style={{ aspectRatio: '210/297', maxHeight: '60vh', maxWidth: '100%' }}
                                             onError={(e) => {
                                                 const target = e.target as HTMLImageElement;
                                                 target.src = '/images/no-image.jpg';
@@ -586,7 +587,7 @@ function FreeHome() {
 
                                 {/* Controls */}
                                 {advertisements.length > 1 && (
-                                    <div className="mt-6 flex items-center justify-between">
+                                    <div className="mt-4 flex items-center justify-between">
                                         <button
                                             onClick={handlePrevAd}
                                             className="rounded-lg bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"

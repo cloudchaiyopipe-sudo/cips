@@ -11,13 +11,13 @@ const createManualPages = (translations: LanguageTranslations) => [
     {
         title: translations.welcomeToFreePlan,
         description: translations.manualDescription,
-        image: '/freePlanImg/freeManual/manual_1.jpg',
+        image: '/freePlanImg/freeManual/manual_1.png',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
+                    <div className="mx-auto mb-4 w-full overflow-hidden rounded-lg bg-slate-700" style={{ aspectRatio: '210/297', maxHeight: '50vh' }}>
                         <img
-                            src="/freePlanImg/freeManual/manual_1.jpg"
+                            src="/freePlanImg/freeManual/manual_1.png"
                             alt={translations.gettingStarted}
                             className="h-full w-full object-cover"
                             onError={(e) => {
@@ -37,13 +37,13 @@ const createManualPages = (translations: LanguageTranslations) => [
     {
         title: translations.step1SelectCrop,
         description: translations.selectCropDescription,
-        image: '/freePlanImg/freeManual/manual_2.jpg',
+        image: '/freePlanImg/freeManual/manual_2.png',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
+                    <div className="mx-auto mb-4 w-full overflow-hidden rounded-lg bg-slate-700" style={{ aspectRatio: '210/297', maxHeight: '50vh' }}>
                         <img
-                            src="/freePlanImg/freeManual/manual_2.jpg"
+                            src="/freePlanImg/freeManual/manual_2.png"
                             alt={translations.selectCrop}
                             className="h-full w-full object-cover"
                             onError={(e) => {
@@ -63,13 +63,13 @@ const createManualPages = (translations: LanguageTranslations) => [
     {
         title: translations.step2DrawMap,
         description: translations.drawMapDescription,
-        image: '/freePlanImg/freeManual/manual_3.jpg',
+        image: '/freePlanImg/freeManual/manual_3.png',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
+                    <div className="mx-auto mb-4 w-full overflow-hidden rounded-lg bg-slate-700" style={{ aspectRatio: '210/297', maxHeight: '50vh' }}>
                         <img
-                            src="/freePlanImg/freeManual/manual_3.jpg"
+                            src="/freePlanImg/freeManual/manual_3.png"
                             alt={translations.drawMap}
                             className="h-full w-full object-cover"
                             onError={(e) => {
@@ -87,16 +87,16 @@ const createManualPages = (translations: LanguageTranslations) => [
         ),
     },
     {
-        title: translations.step3PlacePlants,
-        description: translations.placePlantsDescription,
-        image: '/freePlanImg/freeManual/manual_4.jpg',
+        title: translations.step3ViewSummary,
+        description: translations.viewSummaryDescription,
+        image: '/freePlanImg/freeManual/manual_4.png',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
+                    <div className="mx-auto mb-4 w-full overflow-hidden rounded-lg bg-slate-700" style={{ aspectRatio: '210/297', maxHeight: '50vh' }}>
                         <img
-                            src="/freePlanImg/freeManual/manual_4.jpg"
-                            alt={translations.placePlants}
+                            src="/freePlanImg/freeManual/manual_4.png"
+                            alt={translations.viewSummary}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
@@ -107,22 +107,22 @@ const createManualPages = (translations: LanguageTranslations) => [
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">{translations.placePlants}</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.viewSummary}</h3>
                 </div>
             </div>
         ),
     },
     {
-        title: translations.step4PlacePipes,
-        description: translations.placePipesDescription,
-        image: '/freePlanImg/freeManual/manual_5.jpg',
+        title: translations.step4ProductSpecs,
+        description: translations.productSpecsDescription,
+        image: '/freePlanImg/freeManual/manual_5.png',
         content: (
             <div className="space-y-4">
                 <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-80 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-700 md:h-96">
+                    <div className="mx-auto mb-4 w-full overflow-hidden rounded-lg bg-slate-700" style={{ aspectRatio: '210/297', maxHeight: '50vh' }}>
                         <img
-                            src="/freePlanImg/freeManual/manual_5.jpg"
-                            alt={translations.placePipes}
+                            src="/freePlanImg/freeManual/manual_5.png"
+                            alt={translations.productSpecs}
                             className="h-full w-full object-cover"
                             onError={(e) => {
                                 const target = e.target as HTMLImageElement;
@@ -133,7 +133,7 @@ const createManualPages = (translations: LanguageTranslations) => [
                             }}
                         />
                     </div>
-                    <h3 className="text-xl font-bold text-white">{translations.placePipes}</h3>
+                    <h3 className="text-xl font-bold text-white">{translations.productSpecs}</h3>
                 </div>
             </div>
         ),
@@ -196,8 +196,8 @@ function Manual({ onClose }: ManualProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="relative mx-4 w-full max-w-2xl rounded-2xl bg-slate-800 p-6 shadow-2xl md:p-8 lg:max-w-3xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="relative mx-4 w-full max-w-md rounded-2xl bg-slate-800 p-6 shadow-2xl">
                 {/* Close Button */}
                 <button
                     onClick={handleClose}
@@ -207,19 +207,19 @@ function Manual({ onClose }: ManualProps) {
                 </button>
 
                 {/* Header */}
-                <div className="mb-6 text-center">
+                <div className="mb-4 text-center">
                     <h2 className="mb-2 text-2xl font-bold text-white">
                         {manualPages[currentPage].title}
                     </h2>
                 </div>
 
                 {/* Content */}
-                <div className="mb-6 min-h-[350px] md:min-h-[400px]">
+                <div className="mb-6 min-h-[280px]">
                     {manualPages[currentPage].content}
                 </div>
 
                 {/* Progress Indicators */}
-                <div className="mb-6 flex items-center justify-center gap-2">
+                <div className="mb-4 flex items-center justify-center gap-2">
                     {manualPages.map((_, index) => (
                         <button
                             key={index}

@@ -179,7 +179,7 @@ export interface LanguageTranslations {
     // FreeSummary page
     irrigationSummary: string;
     save: string;
-    edit: string;
+    config: string;
     area: string;
     zone: string;
     plants: string;
@@ -428,9 +428,15 @@ export interface LanguageTranslations {
     step3PlacePlants: string;
     placePlants: string;
     placePlantsDescription: string;
+    step3ViewSummary: string;
+    viewSummary: string;
+    viewSummaryDescription: string;
     step4PlacePipes: string;
     placePipes: string;
     placePipesDescription: string;
+    step4ProductSpecs: string;
+    productSpecs: string;
+    productSpecsDescription: string;
     skip: string;
     finish: string;
     dontShowAgainManual: string;
@@ -453,8 +459,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         cipsPro: 'CIPS Pro',
         forProfessionalUsers: 'For professional users.',
         proPlan: '⭐ PRO PLAN',
-        tokensPerMonth: '500 tokens per month',
-        tokensDaily: '100 tokens daily',
+        tokensPerMonth: 'Unlimited irrigation plans',
+        tokensDaily: 'Real-time calculations',
         advancedIrrigationPlanning: 'Advanced irrigation planning',
         prioritySupport: 'Priority support',
         exportCapabilities: 'Export capabilities',
@@ -625,7 +631,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         // FreeSummary page
         irrigationSummary: 'Irrigation Summary',
         save: 'Save',
-        edit: 'Edit',
+        config: 'Config',
         area: 'Area',
         zone: 'Zone',
         plants: 'Plants',
@@ -683,9 +689,9 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         irrigationProducts: 'Irrigation Products',
         selectZone: 'Select Zone',
         sprinklerSelector: 'Sprinkler Selector',
-        mainPipeSelection: 'Main Pipe Selection',
-        subMainPipeSelection: 'Sub Main Pipe Selection',
-        lateralPipeSelection: 'Lateral Pipe Selection',
+        mainPipeSelection: 'Main Pipe',
+        subMainPipeSelection: 'Sub Main Pipe',
+        lateralPipeSelection: 'Lateral Pipe',
         pumpSelection: 'Pump Selection',
         recommendedSize: 'Recommended Size',
         totalPrice: 'Total Price',
@@ -875,9 +881,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         step3PlacePlants: 'Step 3: Place Plants',
         placePlants: 'Place Plants',
         placePlantsDescription: 'Place plants on the map',
+        step3ViewSummary: 'Step 3: View Summary',
+        viewSummary: 'View Summary',
+        viewSummaryDescription: 'Review your irrigation system summary and calculations',
         step4PlacePipes: 'Step 4: Place Pipes',
         placePipes: 'Place Pipes',
         placePipesDescription: 'Place main pipe, sub-main pipe, and lateral pipe',
+        step4ProductSpecs: 'Step 4: Product Specifications',
+        productSpecs: 'Product Specifications',
+        productSpecsDescription: 'View recommended products and equipment specifications',
         skip: 'Skip',
         finish: 'Finish',
         dontShowAgainManual: "Don't show this manual again",
@@ -898,8 +910,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         cipsPro: 'CIPS Pro',
         forProfessionalUsers: 'สำหรับผู้ใช้ระดับมืออาชีพ',
         proPlan: '⭐ แผน PRO',
-        tokensPerMonth: '500 โทเค็นต่อเดือน',
-        tokensDaily: '100 โทเค็นต่อวัน',
+        tokensPerMonth: 'แผนการให้น้ำไม่จำกัด',
+        tokensDaily: 'การคำนวณแบบเรียลไทม์',
         advancedIrrigationPlanning: 'การวางแผนระบบน้ำขั้นสูง',
         prioritySupport: 'การสนับสนุนแบบพิเศษ',
         exportCapabilities: 'ความสามารถในการส่งออก',
@@ -1065,7 +1077,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         // FreeSummary page
         irrigationSummary: 'สรุประบบชลประทาน',
         save: 'บันทึก',
-        edit: 'แก้ไข',
+        config: 'ตั้งค่า',
         area: 'พื้นที่',
         zone: 'โซน',
         plants: 'พืช',
@@ -1123,9 +1135,9 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         irrigationProducts: 'ผลิตภัณฑ์ระบบชลประทาน',
         selectZone: 'เลือกโซน',
         sprinklerSelector: 'ตัวเลือกสปริงเกลอร์',
-        mainPipeSelection: 'การเลือกท่อหลัก',
-        subMainPipeSelection: 'การเลือกท่อรอง',
-        lateralPipeSelection: 'การเลือกท่อแขนง',
+        mainPipeSelection: 'การเลือกท่อเมน',
+        subMainPipeSelection: 'การเลือกท่อเมนย่อย',
+        lateralPipeSelection: 'การเลือกท่อย่อย',
         pumpSelection: 'การเลือกปั๊ม',
         recommendedSize: 'ขนาดที่แนะนำ',
         totalPrice: 'ราคารวม',
@@ -1315,9 +1327,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         step3PlacePlants: 'ขั้นตอนที่ 3: วางตำแหน่งพืช',
         placePlants: 'วางตำแหน่งพืช',
         placePlantsDescription: 'วางตำแหน่งพืชบนแผนที่',
+        step3ViewSummary: 'ขั้นตอนที่ 3: ดูสรุป',
+        viewSummary: 'ดูสรุป',
+        viewSummaryDescription: 'ตรวจสอบสรุประบบชลประทานและการคำนวณของคุณ',
         step4PlacePipes: 'ขั้นตอนที่ 4: วางท่อ',
         placePipes: 'วางท่อ',
         placePipesDescription: 'วางท่อเมน ท่อย่อย และท่อแขนง',
+        step4ProductSpecs: 'ขั้นตอนที่ 4: ข้อมูลผลิตภัณฑ์',
+        productSpecs: 'ข้อมูลผลิตภัณฑ์',
+        productSpecsDescription: 'ดูผลิตภัณฑ์ที่แนะนำและข้อมูลจำเพาะของอุปกรณ์',
         skip: 'ข้าม',
         finish: 'เสร็จสิ้น',
         dontShowAgainManual: 'ไม่แสดงคู่มือนี้อีก',

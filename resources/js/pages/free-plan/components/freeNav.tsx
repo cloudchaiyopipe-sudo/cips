@@ -7,10 +7,30 @@ import { motion } from 'framer-motion';
 function FreeNav() {
     // Get user data from Inertia page props
     const page = usePage<SharedData>();
-    const isAdmin = page.props.auth?.user?.is_admin || false;
+    const user = page.props.auth?.user;
+    const isAdmin = user?.is_admin || false;
     
-    // User Initials (Mock logic based on current hardcoded 'NP', ideally dynamic)
-    const userInitials = "NP"; 
+    // Generate user initials from name
+    const getUserInitials = (name: string | undefined | null): string => {
+        if (!name || name.trim().length === 0) {
+            return 'U';
+        }
+        
+        const nameParts = name.trim().split(/\s+/);
+        
+        if (nameParts.length === 1) {
+            // Single word: use first 2 characters
+            const firstTwo = nameParts[0].substring(0, 2).toUpperCase();
+            return firstTwo.length === 1 ? firstTwo + firstTwo : firstTwo;
+        } else {
+            // Multiple words: use first letter of first and last word
+            const firstInitial = nameParts[0].charAt(0).toUpperCase();
+            const lastInitial = nameParts[nameParts.length - 1].charAt(0).toUpperCase();
+            return firstInitial + lastInitial;
+        }
+    };
+    
+    const userInitials = getUserInitials(user?.name); 
 
     // State for language switching
     const [language, setLanguage] = useState<'EN' | 'TH'>(() => {
