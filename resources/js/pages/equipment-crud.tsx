@@ -5021,9 +5021,9 @@ const EquipmentCRUD: React.FC = () => {
                                                 <th className="px-6 py-3 text-center">
                                                     {t('สถานะ')}
                                                 </th>
-                                                <th className="px-6 py-3 text-center">
+                                                {/* <th className="px-6 py-3 text-center">
                                                     {t('คุณสมบัติ')}
-                                                </th>
+                                                </th> */}
                                                 <th className="px-6 py-3 text-center">
                                                     {t('จัดการ')}
                                                 </th>
@@ -5127,7 +5127,7 @@ const EquipmentCRUD: React.FC = () => {
                                                         {equipment.stock ? (
                                                             <span className="font-semibold text-blue-400">
                                                                 {equipment.stock.toLocaleString()}
-                                                            </span>
+                                                            </span> 
                                                         ) : (
                                                             '-'
                                                         )}
@@ -5153,7 +5153,7 @@ const EquipmentCRUD: React.FC = () => {
                                                             )}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 text-center">
+                                                    {/* <td className="px-3 text-center">
                                                         <div className="flex items-center gap-2">
                                                             {equipment.attributes &&
                                                                 Object.keys(equipment.attributes)
@@ -5183,7 +5183,7 @@ const EquipmentCRUD: React.FC = () => {
                                                                     </span>
                                                                 )}
                                                         </div>
-                                                    </td>
+                                                    </td> */}
                                                     <td
                                                         className="px-6 py-4 text-center"
                                                         onClick={(e) => e.stopPropagation()}

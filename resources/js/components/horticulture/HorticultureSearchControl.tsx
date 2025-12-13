@@ -636,6 +636,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowCategories(false);
                         }}
                         placeholder={placeholder}
+                        data-tour="search-control"
                         className="w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-3 pl-10 pr-24 text-sm text-white placeholder-gray-400 shadow-xl backdrop-blur transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
 

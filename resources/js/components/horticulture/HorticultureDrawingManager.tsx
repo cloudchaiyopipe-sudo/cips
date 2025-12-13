@@ -313,7 +313,7 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
             return {
                 polylineOptions: {
                     strokeColor: '#8B5CF6',
-                    strokeWeight: 3,
+                    strokeWeight: 5,
                     strokeOpacity: 0.9,
                     editable: true,
                     draggable: true,
@@ -669,7 +669,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             geodesic: true,
                             strokeColor: '#8B5CF6',
                             strokeOpacity: 0.9,
-                            strokeWeight: 3,
+                            strokeWeight: 5,
                             map: map,
                             clickable: true,
                             zIndex: 998,
@@ -678,14 +678,14 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         subMainPipePolyline.addListener('mouseover', () => {
                             subMainPipePolyline.setOptions({
                                 strokeColor: '#A78BFA',
-                                strokeWeight: 3,
+                                strokeWeight: 5,
                             });
                         });
 
                         subMainPipePolyline.addListener('mouseout', () => {
                             subMainPipePolyline.setOptions({
                                 strokeColor: '#8B5CF6',
-                                strokeWeight: 3,
+                                strokeWeight: 5,
                             });
                         });
 
@@ -703,7 +703,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                                     setTimeout(() => {
                                         subMainPipePolyline.setOptions({
                                             strokeColor: '#8B5CF6',
-                                            strokeWeight: 3,
+                                            strokeWeight: 5,
                                         });
                                     }, 500);
                                 }

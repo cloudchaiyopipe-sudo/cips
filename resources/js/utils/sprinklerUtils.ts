@@ -1,18 +1,19 @@
 export interface SprinklerConfig {
-    flowRatePerMinute: number;
-    pressureBar: number;
-    radiusMeters: number;
-    createdAt: string;
-    updatedAt: string;
+    flowRatePerMinute: number; 
+    pressureBar: number; 
+    sprinklersPerTree: number; // จำนวนสปริงเกอร์ต่อต้นไม้ 1 ต้น
+    createdAt: string; 
+    updatedAt: string; 
 }
 
 export interface SprinklerFormData {
     flowRatePerMinute: string;
     pressureBar: string;
-    radiusMeters: string;
+    sprinklersPerTree: string;
 }
 
 export const SPRINKLER_STORAGE_KEY = 'sprinklerConfig';
+
 
 export const saveSprinklerConfig = (
     config: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'>
@@ -37,7 +38,12 @@ export const loadSprinklerConfig = (): SprinklerConfig | null => {
     try {
         const storedData = localStorage.getItem(SPRINKLER_STORAGE_KEY);
         if (storedData) {
-            return JSON.parse(storedData);
+            const config = JSON.parse(storedData);
+            // ตรวจสอบว่ามี sprinklersPerTree หรือไม่ (สำหรับ config เก่า)
+            if (config && typeof config.sprinklersPerTree === 'undefined') {
+                config.sprinklersPerTree = 1; // ตั้งค่า default เป็น 1 สำหรับ config เก่า
+            }
+            return config;
         }
         return null;
     } catch (error) {
@@ -54,9 +60,9 @@ export const clearSprinklerConfig = (): void => {
     }
 };
 
-export const calculateTotalFlowRate = (plantCount: number, flowRatePerMinute: number): number => {
+export const calculateTotalFlowRate = (plantCount: number, flowRatePerMinute: number, sprinklersPerTree: number = 1): number => {
     if (plantCount <= 0 || flowRatePerMinute <= 0) return 0;
-    return plantCount * flowRatePerMinute;
+    return plantCount * flowRatePerMinute * sprinklersPerTree;
 };
 
 export const calculateHourlyFlowRate = (flowRatePerMinute: number): number => {
@@ -70,9 +76,6 @@ export const calculateDailyWaterUsage = (
     return flowRatePerMinute * 60 * hoursPerDay;
 };
 
-export const calculateSprinklerCoverage = (radiusMeters: number): number => {
-    return Math.PI * Math.pow(radiusMeters, 2);
-};
 
 export const validateSprinklerConfig = (
     config: SprinklerFormData
@@ -96,11 +99,11 @@ export const validateSprinklerConfig = (
         errors.pressureBar = 'แรงดันสูงเกินไป (ควรน้อยกว่า 50 บาร์)';
     }
 
-    const radius = parseFloat(config.radiusMeters);
-    if (!config.radiusMeters || isNaN(radius) || radius <= 0) {
-        errors.radiusMeters = 'กรุณากรอกรัศมีที่ถูกต้อง (มากกว่า 0)';
-    } else if (radius > 100) {
-        errors.radiusMeters = 'รัศมีสูงเกินไป (ควรน้อยกว่า 100 เมตร)';
+    const sprinklersPerTree = parseFloat(config.sprinklersPerTree || '1');
+    if (config.sprinklersPerTree && (isNaN(sprinklersPerTree) || sprinklersPerTree <= 0)) {
+        errors.sprinklersPerTree = 'กรุณากรอกจำนวนสปริงเกอร์ต่อต้นไม้ที่ถูกต้อง (มากกว่า 0)';
+    } else if (sprinklersPerTree > 100) {
+        errors.sprinklersPerTree = 'จำนวนสปริงเกอร์ต่อต้นไม้สูงเกินไป (ควรน้อยกว่า 100)';
     }
 
     return {
@@ -121,37 +124,30 @@ export const formatPressure = (pressure: number): string => {
     return `${pressure.toFixed(1)} บาร์`;
 };
 
-export const formatRadius = (radius: number): string => {
-    if (radius >= 1000) {
-        return `${(radius / 1000).toFixed(2)} กม.`;
-    }
-    return `${radius.toFixed(1)} ม.`;
-};
-
 export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: number) => {
-    const totalFlowRate = calculateTotalFlowRate(plantCount, config.flowRatePerMinute);
+    const sprinklersPerTree = config.sprinklersPerTree || 1;
+    const totalSprinklers = plantCount * sprinklersPerTree;
+    const totalFlowRate = calculateTotalFlowRate(plantCount, config.flowRatePerMinute, sprinklersPerTree);
     const dailyUsage = calculateDailyWaterUsage(totalFlowRate);
-    const coverage = calculateSprinklerCoverage(config.radiusMeters);
 
     return {
         plantCount,
+        sprinklersPerTree,
+        totalSprinklers,
         flowRatePerPlant: config.flowRatePerMinute,
         totalFlowRate,
         totalFlowRatePerHour: calculateHourlyFlowRate(totalFlowRate),
         dailyWaterUsage: dailyUsage,
         pressure: config.pressureBar,
-        radius: config.radiusMeters,
-        coveragePerSprinkler: coverage,
         formattedFlowRate: formatFlowRate(totalFlowRate),
         formattedPressure: formatPressure(config.pressureBar),
-        formattedRadius: formatRadius(config.radiusMeters),
     };
 };
 
 export const DEFAULT_SPRINKLER_CONFIG: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'> = {
-    flowRatePerMinute: 2.5,
+    flowRatePerMinute: 2.5, 
     pressureBar: 2.0,
-    radiusMeters: 4,
+    sprinklersPerTree: 1, // จำนวนสปริงเกอร์ต่อต้นไม้ 1 ต้น (ค่าเริ่มต้น)
 };
 
 export default {
@@ -161,11 +157,9 @@ export default {
     calculateTotalFlowRate,
     calculateHourlyFlowRate,
     calculateDailyWaterUsage,
-    calculateSprinklerCoverage,
     validateSprinklerConfig,
     formatFlowRate,
     formatPressure,
-    formatRadius,
     generateSprinklerSummary,
     DEFAULT_SPRINKLER_CONFIG,
 };

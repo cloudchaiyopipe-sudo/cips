@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { IrrigationInput, QuotationData, QuotationDataCustomer } from './types/interfaces';
 import { useCalculations, ZoneCalculationData } from './hooks/useCalculations';
 import { calculatePipeRolls, formatNumber } from './utils/calculations';
@@ -1489,7 +1489,7 @@ export default function Product() {
         }
     };
 
-    const handlePipeChange = (pipeType: 'branch' | 'secondary' | 'main' | 'emitter', pipe: any) => {
+    const handlePipeChange = useCallback((pipeType: 'branch' | 'secondary' | 'main' | 'emitter', pipe: any) => {
         if (activeZoneId) {
             setSelectedPipes((prev) => ({
                 ...prev,
@@ -1499,7 +1499,23 @@ export default function Product() {
                 },
             }));
         }
-    };
+    }, [activeZoneId]);
+
+    const handleBranchPipeChange = useCallback((pipe: any) => {
+        handlePipeChange('branch', pipe);
+    }, [handlePipeChange]);
+
+    const handleSecondaryPipeChange = useCallback((pipe: any) => {
+        handlePipeChange('secondary', pipe);
+    }, [handlePipeChange]);
+
+    const handleMainPipeChange = useCallback((pipe: any) => {
+        handlePipeChange('main', pipe);
+    }, [handlePipeChange]);
+
+    const handleEmitterPipeChange = useCallback((pipe: any) => {
+        handlePipeChange('emitter', pipe);
+    }, [handlePipeChange]);
 
     const handlePumpChange = (pump: any) => {
         setSelectedPump(pump);
@@ -1539,10 +1555,93 @@ export default function Product() {
     });
 
     const [currentZonePumpHead, setCurrentZonePumpHead] = useState<number>(0);
+    
+    // เก็บค่า Pump Head ของทุกโซน (zoneId -> pumpHead)
+    const zonePumpHeadsRef = useRef<Map<string, number>>(new Map());
+    
+    // เก็บค่าสูงสุดของ maxPumpHeadForProjectMode (ไม่เปลี่ยนตามโซน)
+    const [maxPumpHeadForAllZones, setMaxPumpHeadForAllZones] = useState<number>(0);
+    
+    // เก็บ activeZoneId ล่าสุดเพื่อใช้ใน handlePumpHeadCalculated
+    const activeZoneIdRef = useRef<string>(activeZoneId);
+    
+    // อัพเดต activeZoneIdRef เมื่อ activeZoneId เปลี่ยน
+    useEffect(() => {
+        activeZoneIdRef.current = activeZoneId;
+    }, [activeZoneId]);
+    
+    // ฟังก์ชันคำนวณค่าสูงสุดจากทุกโซนที่ยังมีอยู่
+    const calculateMaxPumpHeadFromAllZones = useCallback(() => {
+        const zonePumpHeads = zonePumpHeadsRef.current;
+        if (zonePumpHeads.size === 0) {
+            return 0;
+        }
+        const maxHead = Math.max(...Array.from(zonePumpHeads.values()));
+        return maxHead;
+    }, []);
+    
+    // คำนวณค่าที่ส่งไปยัง PumpSelector (ใช้ค่าสูงสุดจากทุกโซน)
+    // ใช้ maxPumpHeadForAllZones เป็นหลัก (ค่าสูงสุดที่เก็บไว้แล้ว - ไม่เปลี่ยนตามโซน)
+    const finalMaxPumpHeadForProjectMode = useMemo(() => {
+        // ใช้ maxPumpHeadForAllZones เป็นหลัก (ค่าสูงสุดที่เก็บไว้แล้ว)
+        // ถ้ายังไม่มีค่าให้ใช้ results?.maxPumpHeadForProjectMode (fallback)
+        const finalValue = maxPumpHeadForAllZones > 0 ? maxPumpHeadForAllZones : (results?.maxPumpHeadForProjectMode ?? 0);
+        return finalValue;
+    }, [
+        maxPumpHeadForAllZones, // ใช้ค่าสูงสุดที่เก็บไว้ (ไม่เปลี่ยนตามโซน)
+        // ใช้ results?.maxPumpHeadForProjectMode เป็น fallback (จะเปลี่ยนเฉพาะเมื่อค่าจริงๆ เปลี่ยน)
+        results?.maxPumpHeadForProjectMode ?? 0
+    ]);
 
     const handlePumpHeadCalculated = (pumpHead: number) => {
         setCurrentZonePumpHead(pumpHead);
+        
+        // ใช้ activeZoneIdRef.current เพื่อให้ได้ค่าล่าสุด
+        const currentZoneId = activeZoneIdRef.current;
+        
+        // เก็บค่า Pump Head ของโซนปัจจุบันไว้ใน Map
+        zonePumpHeadsRef.current.set(currentZoneId, pumpHead);
+        
+        // คำนวณค่าสูงสุดจากทุกโซนที่ยังมีอยู่
+        const maxHead = calculateMaxPumpHeadFromAllZones();
+        
+        // อัพเดตค่าสูงสุด (จะอัพเดตเสมอ ไม่ว่าจะเพิ่มขึ้นหรือลดลง)
+        setMaxPumpHeadForAllZones((prevValue) => {
+            if (maxHead !== prevValue) {
+                return maxHead;
+            }
+            return prevValue;
+        });
     };
+
+    // ลบค่า Pump Head ของโซนที่ถูกลบออกจาก Map
+    useEffect(() => {
+        const zonesData = getZonesData();
+        const currentZoneIds = new Set(zonesData?.map((z: any) => z.id) || []);
+        const storedZoneIds = Array.from(zonePumpHeadsRef.current.keys());
+        
+        // หาโซนที่ถูกลบออก (มีใน Map แต่ไม่มีใน zones ปัจจุบัน)
+        const removedZoneIds = storedZoneIds.filter(zoneId => !currentZoneIds.has(zoneId));
+        
+        if (removedZoneIds.length > 0) {
+            // ลบค่า Pump Head ของโซนที่ถูกลบออก
+            removedZoneIds.forEach(zoneId => {
+                zonePumpHeadsRef.current.delete(zoneId);
+            });
+            
+            // คำนวณค่าสูงสุดใหม่จากโซนที่เหลือ
+            const maxHead = calculateMaxPumpHeadFromAllZones();
+            
+            // อัพเดตค่าสูงสุด
+            setMaxPumpHeadForAllZones((prevValue) => {
+                if (maxHead !== prevValue) {
+                    return maxHead;
+                }
+                return prevValue;
+            });
+        }
+    }, [results?.allZoneResults, calculateMaxPumpHeadFromAllZones]);
+
 
     const handleInputChange = (input: IrrigationInput) => {
         if (activeZoneId) {
@@ -2706,7 +2805,7 @@ export default function Product() {
                                                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
                                             />
                                         </svg>
-                                        💾 {t('บันทึกโครงการ')}
+                                        {t('บันทึกโครงการ')}
                                     </button>
 
                                     {/* ปุ่มแก้ไขโครงการ */}
@@ -2727,7 +2826,7 @@ export default function Product() {
                                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                             />
                                         </svg>
-                                        ✏️ {t('แก้ไขโครงการ')}
+                                        {t('แก้ไขโครงการ')}
                                     </button>
 
                                     {/* ปุ่มสร้างโครงการใหม่ */}
@@ -2748,7 +2847,7 @@ export default function Product() {
                                                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                                             />
                                         </svg>
-                                        ➕ {t('สร้างโครงการใหม่')}
+                                        {t('สร้างโครงการใหม่')}
                                     </button>
                                 </div>
                             </div>
@@ -2822,7 +2921,7 @@ export default function Product() {
                                         results={results}
                                         input={currentInput}
                                         selectedPipe={effectiveEquipment.branchPipe}
-                                        onPipeChange={(pipe) => handlePipeChange('branch', pipe)}
+                                        onPipeChange={handleBranchPipeChange}
                                         horticultureSystemData={horticultureSystemData}
                                         gardenSystemData={gardenSystemData}
                                         greenhouseSystemData={greenhouseData}
@@ -2839,9 +2938,7 @@ export default function Product() {
                                             results={results}
                                             input={currentInput}
                                             selectedPipe={effectiveEquipment.secondaryPipe}
-                                            onPipeChange={(pipe) =>
-                                                handlePipeChange('secondary', pipe)
-                                            }
+                                            onPipeChange={handleSecondaryPipeChange}
                                             horticultureSystemData={horticultureSystemData}
                                             gardenSystemData={gardenSystemData}
                                             greenhouseSystemData={greenhouseData}
@@ -2859,7 +2956,7 @@ export default function Product() {
                                             results={results}
                                             input={currentInput}
                                             selectedPipe={effectiveEquipment.mainPipe}
-                                            onPipeChange={(pipe) => handlePipeChange('main', pipe)}
+                                            onPipeChange={handleMainPipeChange}
                                             horticultureSystemData={horticultureSystemData}
                                             gardenSystemData={gardenSystemData}
                                             greenhouseSystemData={greenhouseData}
@@ -2878,9 +2975,7 @@ export default function Product() {
                                             results={results}
                                             input={currentInput}
                                             selectedPipe={effectiveEquipment.emitterPipe}
-                                            onPipeChange={(pipe) =>
-                                                handlePipeChange('emitter', pipe)
-                                            }
+                                            onPipeChange={handleEmitterPipeChange}
                                             horticultureSystemData={horticultureSystemData}
                                             gardenSystemData={gardenSystemData}
                                             greenhouseSystemData={greenhouseData}
@@ -3037,7 +3132,7 @@ export default function Product() {
                                     fieldCropData={fieldCropData}
                                     greenhouseData={greenhouseData}
                                     gardenStats={gardenStats}
-                                    maxPumpHeadForProjectMode={results?.maxPumpHeadForProjectMode}
+                                    maxPumpHeadForProjectMode={finalMaxPumpHeadForProjectMode}
                                     onPumpHeadCalculated={handlePumpHeadCalculated}
                                 />
 
@@ -3066,9 +3161,7 @@ export default function Product() {
                                         projectSummary={results?.projectSummary}
                                         projectMode={projectMode}
                                         fieldCropData={fieldCropData}
-                                        maxPumpHeadForProjectMode={(() => {
-                                            return currentZonePumpHead;
-                                        })()}
+                                        maxPumpHeadForProjectMode={finalMaxPumpHeadForProjectMode}
                                     />
                                 )}
 
@@ -3112,7 +3205,7 @@ export default function Product() {
                                                     d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
                                                 />
                                             </svg>
-                                            💾 {t('บันทึกโครงการ')}
+                                            {t('บันทึกโครงการ')}
                                         </button>
 
                                         {/* ปุ่มแก้ไขโครงการ */}
@@ -3133,7 +3226,7 @@ export default function Product() {
                                                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                                 />
                                             </svg>
-                                            ✏️ {t('แก้ไขโครงการ')}
+                                            {t('แก้ไขโครงการ')}
                                         </button>
 
                                         {/* ปุ่มสร้างโครงการใหม่ */}
@@ -3154,7 +3247,7 @@ export default function Product() {
                                                     d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                                                 />
                                             </svg>
-                                            ➕ {t('สร้างโครงการใหม่')}
+                                            {t('สร้างโครงการใหม่')}
                                         </button>
                                     </div>
                                 </div>
@@ -3249,6 +3342,9 @@ export default function Product() {
                 selectedPipes={selectedPipes}
                 sprinklerEquipmentSets={sprinklerEquipmentSets}
                 connectionEquipments={connectionEquipments}
+                zoneInputs={zoneInputs}
+                gardenStats={gardenStats}
+                fieldCropData={fieldCropData}
                 onClose={() => setShowQuotation(false)}
                 projectMode={projectMode}
                 showPump={showPumpOption}

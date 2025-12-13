@@ -6,6 +6,7 @@ export interface BestPipeInfo {
     id: string;
     length: number;
     count: number; // จำนวนทางออก
+    sprinklerCount?: number; // จำนวนหัวฉีดทั้งหมด (สำหรับ branch pipe)
     waterFlowRate: number; // ใช้น้ำ L/min
     details?: any;
 }
@@ -87,6 +88,7 @@ export function findPressureLoss(
             },
         };
     } catch (error) {
+        console.error('Error finding pressure loss:', error);
         return null;
     }
 }
@@ -126,32 +128,33 @@ export function findCorrectionFactor(outletCount: number): {
  */
 export function calculateNewHeadLoss(
     bestPipeInfo: BestPipeInfo,
-    pipeType: string,
+    pipeTypeOrSelectedPipeType: string,
     pressureClass: string,
-    pipeSize: string
+    pipeSize: string,
+    actualPipeType?: string // ประเภทท่อจริง (branch, secondary, main, emitter)
 ): PipeCalculationResult | null {
     try {
         let actualPressureClass = pressureClass;
         let pressureNote = '';
 
-        let pipeData = getPipeData(pipeType, pressureClass);
+        let pipeData = getPipeData(pipeTypeOrSelectedPipeType, pressureClass);
         if (!pipeData) {
-            if (pipeType.toUpperCase() === 'PE') {
+            if (pipeTypeOrSelectedPipeType.toUpperCase() === 'PE') {
                 actualPressureClass = 'PN6.3';
-                pipeData = getPipeData(pipeType, actualPressureClass);
+                pipeData = getPipeData(pipeTypeOrSelectedPipeType, actualPressureClass);
                 if (!pipeData) {
                     actualPressureClass = 'PN63';
-                    pipeData = getPipeData(pipeType, actualPressureClass);
+                    pipeData = getPipeData(pipeTypeOrSelectedPipeType, actualPressureClass);
                 }
                 if (actualPressureClass !== pressureClass) {
                     pressureNote = ` (ใช้ ${actualPressureClass} แทน ${pressureClass})`;
                 }
-            } else if (pipeType.toUpperCase() === 'PVC') {
+            } else if (pipeTypeOrSelectedPipeType.toUpperCase() === 'PVC') {
                 actualPressureClass = 'Class8.5';
-                pipeData = getPipeData(pipeType, actualPressureClass);
+                pipeData = getPipeData(pipeTypeOrSelectedPipeType, actualPressureClass);
                 if (!pipeData) {
                     actualPressureClass = 'Class85';
-                    pipeData = getPipeData(pipeType, actualPressureClass);
+                    pipeData = getPipeData(pipeTypeOrSelectedPipeType, actualPressureClass);
                 }
                 if (actualPressureClass !== pressureClass) {
                     pressureNote = ` (ใช้ ${actualPressureClass} แทน ${pressureClass})`;
@@ -160,8 +163,8 @@ export function calculateNewHeadLoss(
         }
 
         const pressureLossResult = findPressureLoss(
-            pipeType,
-            actualPressureClass,
+            pipeTypeOrSelectedPipeType,
+            actualPressureClass, 
             pipeSize,
             bestPipeInfo.waterFlowRate
         );
@@ -170,7 +173,15 @@ export function calculateNewHeadLoss(
             return null;
         }
 
-        const correctionResult = findCorrectionFactor(bestPipeInfo.count);
+        // สำหรับ branch pipe ใช้ sprinklerCount แทน count (ถ้ามี)
+        // ใช้ actualPipeType ถ้ามี ถ้าไม่มีให้ตรวจสอบจาก pipeTypeOrSelectedPipeType
+        const isBranchPipe = actualPipeType === 'branch' || 
+            (actualPipeType === undefined && (pipeTypeOrSelectedPipeType === 'branch' || pipeTypeOrSelectedPipeType.toLowerCase().includes('branch')));
+        const outletCount = (isBranchPipe && bestPipeInfo.sprinklerCount) 
+            ? bestPipeInfo.sprinklerCount 
+            : bestPipeInfo.count;
+
+        const correctionResult = findCorrectionFactor(outletCount);
 
         const headLoss =
             (pressureLossResult.pressureLoss / 10) *
@@ -182,12 +193,13 @@ export function calculateNewHeadLoss(
                 ? ` (ใช้ ${pressureLossResult.actualSize} แทน ${pipeSize})`
                 : '';
 
+        const pipeTypeDisplay = actualPipeType || pipeTypeOrSelectedPipeType;
         const calculationDetails = [
-            `ใช้ ${pipeType} ${actualPressureClass} ขนาด ${pressureLossResult.actualSize}${pressureNote}${sizeNote}`,
+            `ใช้ ${pipeTypeDisplay} ${actualPressureClass} ขนาด ${pressureLossResult.actualSize}${pressureNote}${sizeNote}`,
             `อัตราการไหล: ${bestPipeInfo.waterFlowRate.toFixed(1)} L/min → ใช้ค่า ${pressureLossResult.actualFlow} L/min`,
-            `ค่า X (pressureLoss): ${pressureLossResult.pressureLoss}`,
-            `จำนวนทางออก: ${bestPipeInfo.count} → ใช้ค่า ${correctionResult.actualOutletCount}`,
-            `ค่า Y (correctionFactor): ${correctionResult.correctionFactor}`,
+            `ค่า pressureLoss: ${pressureLossResult.pressureLoss}`,
+            `จำนวนทางออก: ${outletCount} → ใช้ค่า ${correctionResult.actualOutletCount}`,
+            `ค่า correctionFactor: ${correctionResult.correctionFactor}`,
             `ความยาวท่อ: ${bestPipeInfo.length.toFixed(1)} ม.`,
             `สูตร: (${pressureLossResult.pressureLoss}/10) × ${bestPipeInfo.length.toFixed(1)} × ${correctionResult.correctionFactor} = ${headLoss.toFixed(3)} ม.`,
         ].join('\n');
@@ -204,6 +216,7 @@ export function calculateNewHeadLoss(
             sizeInfo: pressureLossResult.sizeInfo,
         };
     } catch (error) {
+        console.error('Error calculating new head loss:', error);
         return null;
     }
 }
@@ -229,8 +242,8 @@ export function calculateSprinklerPressure(sprinkler: any): SprinklerPressureInf
         pressureBar = parseFloat(String(sprinkler.pressureBar));
     }
 
-    const headM = pressureBar * 10;
-    const head20PercentM = headM * 0.2;
+    const headM = pressureBar * 10; 
+    const head20PercentM = headM * 0.2; 
 
     return {
         pressureBar,
@@ -302,7 +315,7 @@ export function validatePipeSelection(
     } catch (error) {
         return {
             isValid: false,
-            reason: 'เกิดข้อผิดพลาดในการตรวจสอบ',
+            reason: 'เกิดข้อผิดพลาดในการตรวจสอบ: ' + error,
         };
     }
 }
@@ -343,7 +356,8 @@ export function selectBestPipe(
                 bestPipeInfo,
                 pipe.pipeType || 'PE',
                 `PN${pipe.pn}`,
-                `${pipe.sizeMM}mm`
+                `${pipe.sizeMM}mm`,
+                pipeType // ส่ง pipeType เพื่อให้ใช้ sprinklerCount สำหรับ branch pipe
             );
 
             return {
@@ -373,6 +387,7 @@ export function selectBestPipe(
 
         return sortedPipes[0];
     } catch (error) {
+        console.error('Error selecting best pipe:', error);
         return null;
     }
 }
@@ -448,10 +463,10 @@ export function validatePipeSizeHierarchy(
         }
 
         case 'branch':
-        case 'emitter': {
+        case 'emitter': {   
             const hasLargerPipes = mainSize > 0 || secondarySize > 0;
-            const isSmallerThanLargerPipes =
-                !hasLargerPipes || currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
+            const isSmallerThanLargerPipes = !hasLargerPipes || 
+                currentSizeMM <= Math.max(mainSize || 0, secondarySize || 0);
             return isSmallerThanLargerPipes;
         }
 
@@ -477,7 +492,7 @@ export function selectBestPipeByHeadLoss(
     bestPipeInfo: BestPipeInfo,
     selectedPipeType: string,
     selectedPipeSizes: SelectedPipeSizes,
-    head20Percent: number
+    head20Percent: number,
 ): any | null {
     if (!availablePipes.length || !bestPipeInfo) {
         return null;
@@ -493,7 +508,7 @@ export function selectBestPipeByHeadLoss(
     }
 
     let targetHeadLossValue: number;
-    let isMaxLimitMode = false;
+    let isMaxLimitMode = false; 
 
     switch (pipeType) {
         case 'main':
@@ -523,7 +538,8 @@ export function selectBestPipeByHeadLoss(
             bestPipeInfo,
             selectedPipeType,
             actualPressureClass,
-            `${pipe.sizeMM}mm`
+            `${pipe.sizeMM}mm`,
+            pipeType // ส่ง pipeType เพื่อให้ใช้ sprinklerCount สำหรับ branch pipe
         );
 
         if (calculation && calculation.headLoss >= 0) {

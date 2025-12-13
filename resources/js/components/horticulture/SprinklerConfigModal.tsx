@@ -24,7 +24,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
     const [formData, setFormData] = useState<SprinklerFormData>({
         flowRatePerMinute: '',
         pressureBar: '',
-        radiusMeters: '',
+        sprinklersPerTree: '1',
     });
 
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -37,13 +37,13 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                 setFormData({
                     flowRatePerMinute: existingConfig.flowRatePerMinute.toString(),
                     pressureBar: existingConfig.pressureBar.toString(),
-                    radiusMeters: existingConfig.radiusMeters.toString(),
+                    sprinklersPerTree: (existingConfig.sprinklersPerTree || 1).toString(),
                 });
             } else {
                 setFormData({
                     flowRatePerMinute: DEFAULT_SPRINKLER_CONFIG.flowRatePerMinute.toString(),
                     pressureBar: DEFAULT_SPRINKLER_CONFIG.pressureBar.toString(),
-                    radiusMeters: DEFAULT_SPRINKLER_CONFIG.radiusMeters.toString(),
+                    sprinklersPerTree: DEFAULT_SPRINKLER_CONFIG.sprinklersPerTree.toString(),
                 });
             }
             setErrors({});
@@ -79,7 +79,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
             const config = {
                 flowRatePerMinute: parseFloat(formData.flowRatePerMinute),
                 pressureBar: parseFloat(formData.pressureBar),
-                radiusMeters: parseFloat(formData.radiusMeters),
+                sprinklersPerTree: parseFloat(formData.sprinklersPerTree || '1'),
             };
 
             const saved = saveSprinklerConfig(config);
@@ -225,35 +225,37 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                             <p className="text-xs text-white">แรงดันน้ำที่ใช้ในการฉีด</p>
                         </div>
 
-                        {/* รัศมีหัวฉีด */}
+                        {/* จำนวนสปริงเกอร์ต่อต้นไม้ */}
                         <div className="space-y-2">
                             <label className="block text-sm font-medium text-white">
-                                📏 รัศมีการฉีด
+                                🚿 จำนวนสปริงเกอร์ต่อต้นไม้
                                 <span className="ml-1 text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <input
                                     type="text"
-                                    inputMode="decimal"
-                                    pattern="[0-9]*\\.?[0-9]*"
-                                    value={formData.radiusMeters ?? ''}
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    value={formData.sprinklersPerTree ?? '1'}
                                     onChange={(e) =>
-                                        handleInputChange('radiusMeters', e.target.value)
+                                        handleInputChange('sprinklersPerTree', e.target.value)
                                     }
                                     className={`w-full rounded-lg border px-4 py-3 pr-12 text-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500 ${
-                                        errors.radiusMeters ? 'border-red-300' : 'border-white'
+                                        errors.sprinklersPerTree ? 'border-red-300' : 'border-white'
                                     }`}
-                                    placeholder="3"
+                                    placeholder="1"
                                     autoComplete="off"
                                 />
                                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                                    <span className="text-sm text-black">เมตร</span>
+                                    <span className="text-sm text-black">หัว/ต้น</span>
                                 </div>
                             </div>
-                            {errors.radiusMeters && (
-                                <p className="text-sm text-red-600">{errors.radiusMeters}</p>
+                            {errors.sprinklersPerTree && (
+                                <p className="text-sm text-red-600">{errors.sprinklersPerTree}</p>
                             )}
-                            <p className="text-xs text-white">ระยะไกลสุดที่น้ำฉีดไปได้</p>
+                            <p className="text-xs text-white">
+                                จำนวนหัวฉีดที่ใช้ต่อต้นไม้ 1 ต้น
+                            </p>
                         </div>
                     </div>
 
@@ -266,7 +268,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                             </span>
                         </h3>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
                             {/* จำนวนต้นไม้ */}
                             <div className="rounded-lg bg-white bg-opacity-10 p-4 text-center backdrop-blur-sm">
                                 <div className="mb-1 text-2xl">🌱</div>
@@ -276,21 +278,34 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                                 <div className="text-xs text-gray-300">ต้นไม้ทั้งหมด</div>
                             </div>
 
+                            {/* จำนวนหัวฉีดทั้งหมด */}
+                            <div className="rounded-lg bg-white bg-opacity-10 p-4 text-center backdrop-blur-sm">
+                                <div className="mb-1 text-2xl">🚿</div>
+                                <div className="text-2xl font-bold text-yellow-400">
+                                    {(
+                                        plantCount * (parseFloat(formData.sprinklersPerTree) || 1)
+                                    ).toLocaleString()}
+                                </div>
+                                <div className="text-xs text-gray-300">หัวฉีดทั้งหมด</div>
+                            </div>
+
                             {/* Q หัวฉีด */}
                             <div className="rounded-lg bg-white bg-opacity-10 p-4 text-center backdrop-blur-sm">
                                 <div className="mb-1 text-2xl">💧</div>
                                 <div className="text-2xl font-bold text-blue-400">
                                     {formData.flowRatePerMinute || '0'}
                                 </div>
-                                <div className="text-xs text-gray-300">ลิตร/นาที/ต้น</div>
+                                <div className="text-xs text-gray-300">ลิตร/นาที/หัว</div>
                             </div>
 
                             {/* ความต้องการน้ำรวม */}
                             <div className="rounded-lg bg-white bg-opacity-10 p-4 text-center backdrop-blur-sm">
-                                <div className="mb-1 text-2xl">🚿</div>
+                                <div className="mb-1 text-2xl">🌊</div>
                                 <div className="text-2xl font-bold text-cyan-400">
                                     {(
-                                        (parseFloat(formData.flowRatePerMinute) || 0) * plantCount
+                                        (parseFloat(formData.flowRatePerMinute) || 0) *
+                                        plantCount *
+                                        (parseFloat(formData.sprinklersPerTree) || 1)
                                     ).toLocaleString()}
                                 </div>
                                 <div className="text-xs text-gray-300">ลิตร/นาที รวม</div>
@@ -303,6 +318,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                                     {(
                                         (parseFloat(formData.flowRatePerMinute) || 0) *
                                         plantCount *
+                                        (parseFloat(formData.sprinklersPerTree) || 1) *
                                         60
                                     ).toLocaleString()}
                                 </div>
