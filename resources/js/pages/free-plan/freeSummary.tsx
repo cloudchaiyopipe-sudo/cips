@@ -1116,7 +1116,7 @@ function FreeSummary() {
                             className="mb-3 text-white"
                         >
                             <h3 className="mb-2 text-base font-semibold">
-                                {translations.plants} Information
+                                {translations.plantsInformation}
                             </h3>
                             <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl">
                                 <div className="mb-3 flex items-center gap-3">
@@ -1649,7 +1649,7 @@ function FreeSummary() {
                                             <span className="text-xs sm:text-sm">🌿</span>
                                         </div>
                                         <span className="text-xs font-medium sm:text-sm">
-                                            จำนวนสปริงเกลอร์ต่อต้น
+                                            {translations.sprinklersPerPlant}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1667,7 +1667,7 @@ function FreeSummary() {
                                             className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 sm:px-3 sm:py-2"
                                         />
                                         <span className="text-xs text-slate-300 sm:text-sm">
-                                            ตัว/ต้น
+                                            {translations.perPlant}
                                         </span>
                                     </div>
                                 </motion.div>
@@ -1682,7 +1682,7 @@ function FreeSummary() {
                                             <span className="text-xs sm:text-sm">💧</span>
                                         </div>
                                         <span className="text-xs font-medium sm:text-sm">
-                                            {translations.flowRatePerMin} (ต่อสปริงเกลอร์)
+                                            {translations.flowRatePerMin} ({translations.perSprinkler})
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1819,7 +1819,7 @@ function FreeSummary() {
                                         {flowRateConfig.flowRatePerMin}
                                     </div>
                                     <div className="text-[10px] text-slate-300 sm:text-xs">
-                                        LPM/สปริงเกลอร์
+                                        {translations.lpmPerSprinkler}
                                     </div>
                                 </div>
 

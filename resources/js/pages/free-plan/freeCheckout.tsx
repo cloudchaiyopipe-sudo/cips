@@ -158,7 +158,7 @@ function FreeCheckout() {
             }, 'image/png');
         } catch (error) {
             console.error('Error saving image:', error);
-            alert('ไม่สามารถบันทึกภาพได้ กรุณาลองอีกครั้ง');
+            alert(translations.errorSavingImage);
         }
     };
 
@@ -174,7 +174,7 @@ function FreeCheckout() {
 
     const handleSaveLineId = () => {
         if (!lineIdInput.trim()) {
-            alert('กรุณากรอก LINE ID');
+            alert(translations.pleaseEnterLineId);
             return;
         }
         // Remove @ if user includes it
@@ -230,7 +230,7 @@ function FreeCheckout() {
                     {/* Left Column: Specifications (2/3 width on large screens) */}
                     <div className="space-y-4 lg:col-span-2">
                         <motion.h2 variants={itemVariants} className="text-xl font-semibold text-white">
-                            รายการอุปกรณ์ที่แนะนำ
+                            {translations.recommendedEquipmentList}
                         </motion.h2>
 
                         {/* Sprinkler Card */}
@@ -277,7 +277,7 @@ function FreeCheckout() {
                                                     if (pe) parts.push(`PE ${pe.sizeMM.toFixed(0)}mm`);
                                                     return parts.length > 0 ? parts.join(' / ') : `${pipeRecommendations.main.sizeMM.toFixed(0)}mm`;
                                                 })()
-                                            ) : 'Loading...'}
+                                            ) : translations.loading}
                                         </div>
                                     </div>
                                 </div>
@@ -310,7 +310,7 @@ function FreeCheckout() {
                                                         if (pe) parts.push(`PE ${pe.sizeMM.toFixed(0)}mm`);
                                                         return parts.length > 0 ? parts.join(' / ') : `${pipeRecommendations.subMain.sizeMM.toFixed(0)}mm`;
                                                     })()
-                                                ) : 'Loading...'}
+                                                ) : translations.loading}
                                             </div>
                                         </div>
                                     </div>
@@ -337,7 +337,7 @@ function FreeCheckout() {
                                                         if (pe) parts.push(`PE ${pe.sizeMM.toFixed(0)}mm`);
                                                         return parts.length > 0 ? parts.join(' / ') : `${pipeRecommendations.lateral.sizeMM.toFixed(0)}mm`;
                                                     })()
-                                                ) : 'Loading...'}
+                                                ) : translations.loading}
                                             </div>
                                         </div>
                                     </div>
@@ -388,7 +388,7 @@ function FreeCheckout() {
                                             whileTap={{ scale: 0.9 }}
                                             onClick={handleOpenLineIdModal}
                                             className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/20 text-green-400 transition-colors hover:bg-green-500/30"
-                                            title="จัดการ LINE ID"
+                                            title={translations.manageLineId}
                                         >
                                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -430,7 +430,7 @@ function FreeCheckout() {
                                             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                                                 <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.51 4.14 7.23-.2.8-.75 2.06-1.54 2.84 0 0-.27.27.15.36.4.08 3.56.32 5.5-1.09 1.25.35 2.58.54 3.93.54 5.52 0 10-4.03 10-9S17.52 2 12 2z" />
                                             </svg>
-                                            แอดไลน์ (เพิ่มเพื่อน)
+                                            {translations.addFriendOnLineButton}
                                         </span>
                                     </motion.a>
                                     {/* ------------------------------------- */}
@@ -443,7 +443,7 @@ function FreeCheckout() {
                                     >
                                         <span className="flex items-center justify-center gap-2">
                                             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                            บันทึก QR Code
+                                            {translations.saveQRCode}
                                         </span>
                                     </motion.button>
                                     
@@ -490,7 +490,7 @@ function FreeCheckout() {
                             </button>
 
                             <h2 className="mb-6 text-xl font-bold text-white">
-                                จัดการ LINE ID
+                                {translations.manageLineId}
                             </h2>
 
                             <div className="space-y-4">
@@ -506,7 +506,7 @@ function FreeCheckout() {
                                         className="w-full rounded-xl border border-slate-600 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
                                     />
                                     <p className="mt-2 text-xs text-slate-400">
-                                        ตัวอย่าง: @fang.nitipoom หรือ fang.nitipoom (ระบบจะเพิ่ม @ ให้อัตโนมัติ)
+                                        {translations.lineIdExampleWithAuto}
                                     </p>
                                 </div>
 
@@ -518,7 +518,7 @@ function FreeCheckout() {
                                         onClick={handleCloseLineIdModal}
                                         className="flex-1 rounded-xl border border-slate-600 bg-transparent px-4 py-3 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
                                     >
-                                        ยกเลิก
+                                        {translations.cancel}
                                     </motion.button>
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}
@@ -527,7 +527,7 @@ function FreeCheckout() {
                                         onClick={handleSaveLineId}
                                         className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-green-900/20 hover:bg-green-500"
                                     >
-                                        บันทึก
+                                        {translations.save}
                                     </motion.button>
                                 </div>
                             </div>

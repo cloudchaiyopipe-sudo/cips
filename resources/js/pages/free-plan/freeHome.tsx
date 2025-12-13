@@ -111,7 +111,7 @@ function FreeHome() {
             }
         } catch (error) {
             console.error('Error loading saved projects:', error);
-            showToast('ไม่สามารถโหลดข้อมูลโปรเจคได้', 'error');
+            showToast(translations.errorLoadingProjects, 'error');
         }
     }, [showToast]);
 
@@ -214,14 +214,14 @@ function FreeHome() {
             }
         } catch (error) {
             console.error('Error loading project:', error);
-            showToast('เกิดข้อผิดพลาดในการโหลดโปรเจค', 'error');
+            showToast(translations.errorLoadingProject, 'error');
         }
     };
 
     const handleDeleteProject = (projectId: number, e: React.MouseEvent) => {
         e.stopPropagation();
         // Custom confirm using browser built-in for now, ideally replace with custom modal too
-        if (confirm('คุณต้องการลบโปรเจคนี้หรือไม่?')) {
+        if (confirm(translations.confirmDeleteProject)) {
             try {
                 const saved = localStorage.getItem('freePlanProjects');
                 if (saved) {
@@ -229,11 +229,11 @@ function FreeHome() {
                     const filtered = projects.filter((p: { id: number }) => p.id !== projectId);
                     localStorage.setItem('freePlanProjects', JSON.stringify(filtered));
                     loadSavedProjects();
-                    showToast('ลบโปรเจคเรียบร้อยแล้ว', 'success');
+                    showToast(translations.projectDeletedSuccessfully, 'success');
                 }
             } catch (error) {
                 console.error('Error deleting project:', error);
-                showToast('เกิดข้อผิดพลาดในการลบโปรเจค', 'error');
+                showToast(translations.errorDeletingProject, 'error');
             }
         }
     };
@@ -246,7 +246,7 @@ function FreeHome() {
 
     const handleSaveProjectName = (projectId: number) => {
         if (!editProjectName.trim()) {
-            showToast('กรุณากรอกชื่อโปรเจค', 'info');
+            showToast(translations.pleaseEnterProjectName, 'info');
             return;
         }
 
@@ -261,12 +261,12 @@ function FreeHome() {
                     loadSavedProjects();
                     setEditingProjectId(null);
                     setEditProjectName('');
-                    showToast('บันทึกชื่อโปรเจคเรียบร้อย', 'success');
+                    showToast(translations.projectNameSavedSuccessfully, 'success');
                 }
             }
         } catch (error) {
             console.error('Error updating project name:', error);
-            showToast('เกิดข้อผิดพลาดในการแก้ไขชื่อโปรเจค', 'error');
+            showToast(translations.errorUpdatingProjectName, 'error');
         }
     };
 
@@ -367,7 +367,7 @@ function FreeHome() {
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                             </svg>
-                            <span>คู่มือการใช้งาน</span>
+                            <span>{translations.userManual}</span>
                         </motion.button>
                     </motion.div>
 
@@ -446,7 +446,7 @@ function FreeHome() {
                                                                 }}
                                                                 className="flex-1 rounded-md bg-green-600 py-1.5 text-xs font-medium text-white shadow hover:bg-green-500 transition-colors"
                                                             >
-                                                                บันทึก
+                                                                {translations.save}
                                                             </button>
                                                             <button
                                                                 onClick={(e) => {
@@ -455,7 +455,7 @@ function FreeHome() {
                                                                 }}
                                                                 className="flex-1 rounded-md bg-slate-600 py-1.5 text-xs font-medium text-white shadow hover:bg-slate-500 transition-colors"
                                                             >
-                                                                ยกเลิก
+                                                                {translations.cancel}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -478,7 +478,7 @@ function FreeHome() {
                                                             <button
                                                                 onClick={(e) => handleEditProjectName(project.id, project.projectName, e)}
                                                                 className="rounded-lg p-2 text-slate-400 hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
-                                                                title="แก้ไขชื่อ"
+                                                                title={translations.editProjectName}
                                                             >
                                                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -487,7 +487,7 @@ function FreeHome() {
                                                             <button
                                                                 onClick={(e) => handleDeleteProject(project.id, e)}
                                                                 className="rounded-lg p-2 text-slate-400 hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                                                                title="ลบโปรเจค"
+                                                                title={translations.deleteProject}
                                                             >
                                                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -504,7 +504,7 @@ function FreeHome() {
                                 <div className="flex h-full flex-col items-center justify-center py-10 opacity-50">
                                     <svg className="h-12 w-12 text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
                                     <p className="text-sm text-slate-400">
-                                        ไม่มีไฟล์ที่บันทึกไว้
+                                        {translations.noSavedFiles}
                                     </p>
                                 </div>
                             )}
@@ -579,7 +579,7 @@ function FreeHome() {
                                         />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                                             <span className="rounded-full bg-white/20 px-4 py-2 text-sm font-semibold text-white backdrop-blur-md">
-                                                คลิกเพื่อดูรายละเอียด ↗
+                                                {translations.clickToViewDetails}
                                             </span>
                                         </div>
                                     </div>

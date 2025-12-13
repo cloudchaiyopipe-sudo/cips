@@ -3,15 +3,31 @@ import { router } from '@inertiajs/react';
 import { usePage } from '@inertiajs/react';
 import { SharedData } from '@/types';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { getTranslations } from '../utils/language';
 
 function FootNav() {
     const { url } = usePage<SharedData>();
+    const [translations, setTranslations] = useState(getTranslations());
+
+    // Listen for language changes
+    useEffect(() => {
+        const handleLanguageChange = () => setTranslations(getTranslations());
+        window.addEventListener('storage', handleLanguageChange);
+        window.addEventListener('languageChanged', handleLanguageChange);
+        window.addEventListener('focus', handleLanguageChange);
+        return () => {
+            window.removeEventListener('storage', handleLanguageChange);
+            window.removeEventListener('languageChanged', handleLanguageChange);
+            window.removeEventListener('focus', handleLanguageChange);
+        };
+    }, []);
 
     // Navigation items
     const navItems = [
         {
             id: 'add-field',
-            label: 'เพิ่มแปลง',
+            label: translations.navAddField,
             // Active Gradient for this specific item (Green)
             activeClass: 'from-green-500/20 to-emerald-500/20 text-green-400', 
             icon: (
@@ -24,7 +40,7 @@ function FootNav() {
         },
         {
             id: 'news',
-            label: 'ข่าวสาร',
+            label: translations.navNews,
             activeClass: 'from-blue-500/20 to-indigo-500/20 text-blue-400',
             icon: (
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,7 +52,7 @@ function FootNav() {
         },
         {
             id: 'products',
-            label: 'สินค้า',
+            label: translations.navProducts,
             activeClass: 'from-purple-500/20 to-pink-500/20 text-purple-400',
             icon: (
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,7 +64,7 @@ function FootNav() {
         },
         {
             id: 'account',
-            label: 'ฉัน',
+            label: translations.navAccount,
             activeClass: 'from-orange-500/20 to-red-500/20 text-orange-400',
             icon: (
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1620,6 +1620,30 @@ function FreeMap() {
 
     // 4. Handlers
 
+    // Function to create pump marker
+    const createPumpMarker = useCallback((position: { lat: number; lng: number }, map: google.maps.Map) => {
+        try {
+            const marker = new window.google.maps.Marker({
+                position: position,
+                map: map,
+                title: translations.waterPump,
+                icon: {
+                    url: '/images/water-pump.png',
+                    scaledSize: new window.google.maps.Size(32, 32),
+                    anchor: new window.google.maps.Point(16, 16),
+                },
+                draggable: false,
+                clickable: true,
+                zIndex: 2000, // Higher than zones and plant points
+            });
+
+            return marker;
+        } catch (error) {
+            console.error('❌ Error creating pump marker:', error);
+            return null;
+        }
+    }, [translations.waterPump]);
+
     // Function to create center marker for a zone
     const createZoneCenterMarker = useCallback(
         (
@@ -1631,7 +1655,7 @@ function FreeMap() {
             const marker = new window.google.maps.Marker({
                 position: center,
                 map: map,
-                title: `Center of ${zoneName}`,
+                title: `${translations.centerOf} ${zoneName}`,
                 icon: {
                     path: window.google.maps.SymbolPath.CIRCLE,
                     scale: 8,
@@ -2122,7 +2146,7 @@ function FreeMap() {
             // Check if Water step (step 1) has water sources before proceeding
             if (stepIndex === 1) {
                 if (waterSources.length === 0) {
-                    showToast('กรุณาวางแหล่งน้ำก่อนไปขั้นตอนถัดไป', 'error');
+                    showToast(translations.pleasePlaceWaterBeforeNext, 'error');
                     return;
                 }
             }
@@ -2130,7 +2154,7 @@ function FreeMap() {
             // Handle Zones step (step 3) - show zone modal
             if (stepIndex === 3) {
                 if (drawnShapes.length === 0) {
-                    showToast('กรุณาวาดพื้นที่ก่อนแบ่งโซน', 'error');
+                    showToast(translations.pleaseDrawAreaBeforeZones, 'error');
                     return;
                 }
 
@@ -2146,7 +2170,7 @@ function FreeMap() {
                     generateMainPipes(map);
                 } else {
                     console.error('❌ Map not available for pipe generation');
-                    showToast('ไม่สามารถสร้างระบบท่อได้ - แผนที่ยังไม่พร้อม', 'error');
+                    showToast(translations.cannotGeneratePipeMapNotReady, 'error');
                 }
                 return;
             }
@@ -2276,6 +2300,7 @@ function FreeMap() {
             setCompletedSteps,
             setCurrentStep,
             removeOverlappedPlantPoints,
+            createPumpMarker,
         ]
     );
 
@@ -2339,7 +2364,7 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: 'คลิกเพื่อวางปั๊มน้ำ',
+                    title: translations.clickToPlacePump,
                     icon: animatedIcon,
                     draggable: false,
                     clickable: true,
@@ -2363,7 +2388,7 @@ function FreeMap() {
 
             return placementPoints;
         },
-        [handlePumpPlacementClick]
+        [handlePumpPlacementClick, translations.clickToPlacePump]
     );
 
     // Function to create water source marker (simple version for useEffect)
@@ -2377,7 +2402,7 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: 'Water Source',
+                    title: translations.waterSource,
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
@@ -2408,7 +2433,7 @@ function FreeMap() {
                 return null;
             }
         },
-        [removeOverlappedPlantPoints]
+        [removeOverlappedPlantPoints, translations.waterSource]
     );
 
     // Function to create water source marker (with drag functionality)
@@ -2419,7 +2444,7 @@ function FreeMap() {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: 'Water Source',
+                    title: translations.waterSource,
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
@@ -2450,7 +2475,7 @@ function FreeMap() {
                 return null;
             }
         },
-        [removeOverlappedPlantPoints]
+        [removeOverlappedPlantPoints, translations.waterSource]
     );
 
     // Recreate markers from saved data when map is initialized
@@ -2480,7 +2505,7 @@ function FreeMap() {
                 }
             });
         }
-    }, [mapInitialized, waterSources, pumps, createWaterSourceMarker, setWaterSources, setPumps]);
+    }, [mapInitialized, waterSources, pumps, createWaterSourceMarker, createPumpMarker, setWaterSources, setPumps]);
 
     // Auto-activate steps based on current step and completion status
     useEffect(() => {
@@ -2586,31 +2611,6 @@ function FreeMap() {
         pumpPlacementPoints,
         createPumpPlacementPoints,
     ]);
-
-    // Function to create pump marker
-    const createPumpMarker = (position: { lat: number; lng: number }, map: google.maps.Map) => {
-
-        try {
-            const marker = new window.google.maps.Marker({
-                position: position,
-                map: map,
-                title: 'Water Pump',
-                icon: {
-                    url: '/images/water-pump.png',
-                    scaledSize: new window.google.maps.Size(32, 32),
-                    anchor: new window.google.maps.Point(16, 16),
-                },
-                draggable: false,
-                clickable: true,
-                zIndex: 2000, // Higher than zones and plant points
-            });
-
-            return marker;
-        } catch (error) {
-            console.error('❌ Error creating pump marker:', error);
-            return null;
-        }
-    };
 
     // Function to generate unique colors for zones
     const generateZoneColors = (count: number): string[] => {
@@ -3526,7 +3526,7 @@ function FreeMap() {
     const handleGenerateZones = () => {
 
         if (drawnShapes.length === 0) {
-            showToast('กรุณาวาดพื้นที่ก่อนแบ่งโซน', 'error');
+            showToast(translations.pleaseDrawAreaBeforeZones, 'error');
             return;
         }
 
@@ -3651,14 +3651,14 @@ function FreeMap() {
                 const subMainPipesData = JSON.parse(existingSubMainPipes);
                 const lateralPipesData = JSON.parse(existingLateralPipes);
 
-                if (
-                    mainPipesData.length > 0 &&
-                    subMainPipesData.length > 0 &&
-                    lateralPipesData.length > 0
-                ) {
-                    showToast('ระบบท่อถูกสร้างแล้ว กรุณากดรีเซ็ตก่อนสร้างใหม่', 'info');
-                    return;
-                }
+                    if (
+                        mainPipesData.length > 0 &&
+                        subMainPipesData.length > 0 &&
+                        lateralPipesData.length > 0
+                    ) {
+                        showToast(translations.pipeSystemAlreadyGenerated, 'info');
+                        return;
+                    }
             } catch (e) {
                 console.error('Error checking existing pipes:', e);
             }
@@ -3666,13 +3666,13 @@ function FreeMap() {
 
         if (pumps.length === 0) {
             console.error('❌ No pumps available for pipe generation');
-            showToast('กรุณาวางปั๊มก่อนสร้างระบบท่อ', 'error');
+            showToast(translations.pleasePlacePumpBeforePipe, 'error');
             return;
         }
 
         if (zones.length === 0) {
             console.error('❌ No zones available for pipe generation');
-            showToast('กรุณาแบ่งโซนก่อนสร้างระบบท่อ', 'error');
+            showToast(translations.pleaseDivideZonesBeforePipe, 'error');
             return;
         }
 
@@ -6084,14 +6084,14 @@ function FreeMap() {
                         >
                         <div className="mb-4 text-center">
                             <h3 className="text-lg font-semibold text-white">
-                                Determine number of zones
+                                {translations.determineNumberOfZones}
                             </h3>
                         </div>
 
                         <div className="mb-6">
                             <div className="mb-4">
                                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                                    Number of zones (1-15):
+                                    {translations.numberOfZones}
                                 </label>
                                 <input
                                     type="number"
@@ -6110,15 +6110,14 @@ function FreeMap() {
 
                             <div className="mb-4">
                                 <p className="text-sm text-slate-400">
-                                    Each zone will have a unique color and will be divided
-                                    horizontally across your area.
+                                    {translations.zoneDescription}
                                 </p>
                             </div>
 
                             {/* Color preview */}
                             <div className="mb-4">
                                 <p className="mb-2 text-sm font-medium text-slate-300">
-                                    Zone colors preview:
+                                    {translations.zoneColorsPreview}
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                     {generateZoneColors(zoneCount).map((color, index) => (
@@ -6145,13 +6144,13 @@ function FreeMap() {
                                 onClick={handleCloseZoneModal}
                                 className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white shadow-md transition-all duration-300 hover:bg-slate-500 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                Cancel
+                                {translations.cancel}
                             </button>
                             <button
                                 onClick={handleGenerateZones}
                                 className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-white shadow-md shadow-green-500/50 transition-all duration-300 hover:bg-green-700 hover:shadow-xl hover:shadow-green-500/50 hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                Generate
+                                {translations.generate}
                             </button>
                         </div>
                     </motion.div>

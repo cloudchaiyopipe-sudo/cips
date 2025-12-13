@@ -158,7 +158,7 @@ function AcCount() {
     };
     const handleSaveLineId = () => {
         if (!lineIdInput.trim()) {
-            alert('กรุณากรอก LINE ID');
+            alert(translations.pleaseEnterLineId);
             return;
         }
         // Remove @ if user includes it
@@ -232,7 +232,7 @@ function AcCount() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200">
-            <Head title="User Profile" />
+            <Head title={translations.userProfileTitle} />
 
             {/* Sticky Navbar */}
             <div className="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-xl border-b border-white/5">
@@ -285,7 +285,7 @@ function AcCount() {
                                                 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' 
                                                 : 'bg-slate-700 text-slate-300 border border-slate-600'
                                         }`}>
-                                            {user?.tier ? user.tier : translations.freePlanName} Plan
+                                            {user?.tier ? user.tier : translations.freePlanName} {translations.plan}
                                         </span>
                                     </div>
                                 </div>
@@ -302,7 +302,7 @@ function AcCount() {
                                             <input
                                                 type="text"
                                                 disabled={!isEditingProfile}
-                                                value={isEditingProfile ? profileData.name : (user?.name || 'User')}
+                                                value={isEditingProfile ? profileData.name : (user?.name || translations.user)}
                                                 onChange={(e) => setProfileData('name', e.target.value)}
                                                 className={`w-full rounded-xl border px-4 py-3 transition-all ${
                                                     isEditingProfile
@@ -320,7 +320,7 @@ function AcCount() {
                                         {profileRecentlySuccessful && isEditingProfile && (
                                             <p className="mt-1 flex items-center gap-1 text-xs text-green-400">
                                                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                                {translations.passwordChangedSuccessfully || 'บันทึกเรียบร้อยแล้ว'}
+                                                {translations.profileSavedSuccessfully}
                                             </p>
                                         )}
                                     </div>
@@ -353,7 +353,7 @@ function AcCount() {
                                                     onClick={handleCancelEdit}
                                                     className="rounded-xl border border-slate-600 bg-transparent px-6 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
                                                 >
-                                                    {translations.cancel || 'ยกเลิก'}
+                                                    {translations.cancel}
                                                 </button>
                                                 <button
                                                     type="submit"
@@ -381,22 +381,30 @@ function AcCount() {
                                     onClick={handleManageAds}
                                     className="group relative overflow-hidden rounded-2xl border border-orange-500/30 bg-gradient-to-br from-orange-900/20 to-slate-900/40 p-5 text-left transition-all hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-900/20"
                                 >
-                                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/20 text-orange-400 group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-500/20 text-orange-400 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-white">{translations.advertisementManagement}</h3>
+                                            <p className="text-xs text-slate-400 mt-1">{translations.uploadManageAds}</p>
+                                        </div>
                                     </div>
-                                    <h3 className="font-semibold text-white">{translations.advertisementManagement}</h3>
-                                    <p className="text-xs text-slate-400 mt-1">{translations.uploadManageAds}</p>
                                 </button>
 
                                 <button
                                     onClick={() => router.visit('/admin/articles')}
                                     className="group relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-slate-900/40 p-5 text-left transition-all hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-900/20"
                                 >
-                                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
-                                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-white">{translations.manageArticles}</h3>
+                                            <p className="text-xs text-slate-400 mt-1">{translations.writeAndEditNews}</p>
+                                        </div>
                                     </div>
-                                    <h3 className="font-semibold text-white">จัดการบทความ</h3>
-                                    <p className="text-xs text-slate-400 mt-1">เขียนและแก้ไขข่าวสาร</p>
                                 </button>
                             </motion.div>
                         )}
@@ -411,7 +419,7 @@ function AcCount() {
                                 <div>
                                     <div className="text-sm text-slate-400">{translations.memberSince}</div>
                                     <div className="font-semibold text-white">
-                                        {user?.created_at ? new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                                        {user?.created_at ? new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : translations.notAvailable}
                                     </div>
                                 </div>
                             </div>
@@ -452,15 +460,15 @@ function AcCount() {
                             {/* Email Verification */}
                             <div className={`mb-6 rounded-xl border p-4 ${user?.email_verified_at ? 'border-green-500/20 bg-green-500/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-slate-300">Email Status</span>
+                                    <span className="text-sm font-medium text-slate-300">{translations.emailStatus}</span>
                                     {user?.email_verified_at ? (
                                         <span className="flex items-center gap-1 text-xs font-bold text-green-400 bg-green-900/30 px-2 py-1 rounded-lg">
                                             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                            VERIFIED
+                                            {translations.verified}
                                         </span>
                                     ) : (
                                         <span className="flex items-center gap-1 text-xs font-bold text-yellow-400 bg-yellow-900/30 px-2 py-1 rounded-lg">
-                                            ⚠ UNVERIFIED
+                                            ⚠ {translations.unverified}
                                         </span>
                                     )}
                                 </div>
@@ -470,7 +478,7 @@ function AcCount() {
                                         {verificationStatus === 'sent' ? (
                                             <div className="flex items-center gap-2 text-sm text-green-400">
                                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                                {translations.verificationEmailSent || 'Email sent!'}
+                                                {translations.verificationEmailSent}
                                             </div>
                                         ) : (
                                             <button
@@ -478,7 +486,7 @@ function AcCount() {
                                                 disabled={sendingVerification}
                                                 className="mt-2 text-sm text-blue-400 hover:text-blue-300 hover:underline disabled:opacity-50"
                                             >
-                                                {sendingVerification ? 'Sending...' : (translations.sendVerificationEmail || 'Resend Verification Email')}
+                                                {sendingVerification ? translations.sending : translations.sendVerificationEmail}
                                             </button>
                                         )}
                                     </div>
@@ -492,7 +500,7 @@ function AcCount() {
                                         onClick={handleOpenLineIdModal}
                                         className="flex w-full items-center justify-between rounded-xl border border-green-900/30 bg-green-900/10 px-4 py-3 text-sm text-green-400 transition-colors hover:bg-green-900/20 hover:text-green-300"
                                     >
-                                        <span>จัดการ LINE ID</span>
+                                        <span>{translations.manageLineId}</span>
                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     </button>
                                 )}
@@ -546,7 +554,7 @@ function AcCount() {
                             
                             <form onSubmit={updatePassword} className="space-y-4">
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-400">{translations.currentPassword || 'Current Password'}</label>
+                                    <label className="mb-1 block text-sm font-medium text-slate-400">{translations.currentPassword}</label>
                                     <input
                                         type="password"
                                         value={data.current_password}
@@ -557,7 +565,7 @@ function AcCount() {
                                 </div>
                                 
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-400">{translations.newPassword || 'New Password'}</label>
+                                    <label className="mb-1 block text-sm font-medium text-slate-400">{translations.newPassword}</label>
                                     <input
                                         type="password"
                                         value={data.password}
@@ -568,7 +576,7 @@ function AcCount() {
                                 </div>
                                 
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-slate-400">{translations.confirmPassword || 'Confirm Password'}</label>
+                                    <label className="mb-1 block text-sm font-medium text-slate-400">{translations.confirmPassword}</label>
                                     <input
                                         type="password"
                                         value={data.password_confirmation}
@@ -580,7 +588,7 @@ function AcCount() {
 
                                 {recentlySuccessful && (
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-lg bg-green-500/10 p-3 text-center text-sm text-green-400">
-                                        {translations.passwordChangedSuccessfully || 'Password changed successfully'}
+                                        {translations.passwordChangedSuccessfully}
                                     </motion.div>
                                 )}
                                 
@@ -590,14 +598,14 @@ function AcCount() {
                                         onClick={() => { setShowChangePasswordModal(false); reset(); }}
                                         className="flex-1 rounded-xl border border-slate-600 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
                                     >
-                                        {translations.cancel || 'Cancel'}
+                                        {translations.cancel}
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={processing}
                                         className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 disabled:opacity-50"
                                     >
-                                        {processing ? 'Saving...' : (translations.save || 'Save')}
+                                        {processing ? translations.saving : translations.save}
                                     </button>
                                 </div>
                             </form>
@@ -634,13 +642,13 @@ function AcCount() {
                             </button>
 
                             <h2 className="mb-6 text-xl font-bold text-white">
-                                จัดการ LINE ID
+                                {translations.manageLineId}
                             </h2>
 
                             <div className="space-y-4">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium text-slate-300">
-                                        LINE ID <span className="text-red-400">*</span>
+                                        {translations.lineId} <span className="text-red-400">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -650,10 +658,10 @@ function AcCount() {
                                         className="w-full rounded-xl border border-slate-600 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
                                     />
                                     <p className="mt-2 text-xs text-slate-400">
-                                        ตัวอย่าง: @fang.nitipoom หรือ fang.nitipoom (ระบบจะเพิ่ม @ ให้อัตโนมัติ)
+                                        {translations.lineIdExample}
                                     </p>
                                     <p className="mt-1 text-xs text-slate-500">
-                                        LINE ID ปัจจุบัน: <span className="text-green-400">{lineId}</span>
+                                        {translations.currentLineId} <span className="text-green-400">{lineId}</span>
                                     </p>
                                 </div>
 
@@ -665,7 +673,7 @@ function AcCount() {
                                         onClick={handleCloseLineIdModal}
                                         className="flex-1 rounded-xl border border-slate-600 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
                                     >
-                                        {translations.cancel || 'ยกเลิก'}
+                                        {translations.cancel}
                                     </motion.button>
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}
@@ -674,7 +682,7 @@ function AcCount() {
                                         onClick={handleSaveLineId}
                                         className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-green-900/20 hover:bg-green-500"
                                     >
-                                        {translations.save || 'บันทึก'}
+                                        {translations.save}
                                     </motion.button>
                                 </div>
                             </div>

@@ -336,7 +336,7 @@ function FreeProduct() {
             localStorage.setItem('calculatedSprinklerSpecs', JSON.stringify(calculatedSprinklerSpecs));
         }
         
-        showToast(translations.checkout || 'Redirecting to checkout...', 'info');
+        showToast(translations.checkout, 'info');
         router.visit('/free-plan/checkout');
     };
 
@@ -1539,7 +1539,7 @@ function FreeProduct() {
                                                     {selectedZone.mainOutlets !== undefined &&
                                                         selectedZone.mainOutlets > 0 && (
                                                             <div className="text-sm font-medium text-red-300 mt-1">
-                                                                {selectedZone.mainOutlets} {translations.outlets?.toLowerCase() || 'outlets'}
+                                                                {selectedZone.mainOutlets} {translations.outlets}
                                                             </div>
                                                         )}
                                                 </div>
@@ -1570,7 +1570,7 @@ function FreeProduct() {
                                                     {selectedZone.subMainOutlets !== undefined &&
                                                         selectedZone.subMainOutlets > 0 && (
                                                             <div className="text-sm font-medium text-purple-300 mt-1">
-                                                                {selectedZone.subMainOutlets} {translations.outlets?.toLowerCase() || 'outlets'}
+                                                                {selectedZone.subMainOutlets} {translations.outlets}
                                                             </div>
                                                         )}
                                                 </div>
@@ -1601,7 +1601,7 @@ function FreeProduct() {
                                                     {selectedZone.lateralOutlets !== undefined &&
                                                         selectedZone.lateralOutlets > 0 && (
                                                             <div className="text-sm font-medium text-yellow-300 mt-1">
-                                                                {selectedZone.lateralOutlets} {translations.outlets?.toLowerCase() || 'outlets'}
+                                                                {selectedZone.lateralOutlets} {translations.outlets}
                                                             </div>
                                                         )}
                                                 </div>
@@ -1767,7 +1767,7 @@ function FreeProduct() {
                                             <div className="border-t border-rose-800/50 pt-2">
                                                 <div className="mb-2 flex items-center justify-between">
                                                     <div className="text-sm font-semibold text-rose-300">
-                                                        {translations.calculationDetails || 'Calculation Details'}:
+                                                        {translations.calculationDetails}:
                                                     </div>
                                                     <button
                                                         onClick={() => setShowMainPipeDetails(!showMainPipeDetails)}
@@ -1775,8 +1775,8 @@ function FreeProduct() {
                                                     >
                                                         <span>
                                                             {showMainPipeDetails
-                                                                ? translations.hideDetails || 'Hide Details'
-                                                                : translations.showDetails || 'Show Details'}
+                                                                ? translations.hideDetails
+                                                                : translations.showDetails}
                                                         </span>
                                                         <span
                                                             className={`transition-transform duration-200 ${showMainPipeDetails ? 'rotate-180' : ''}`}
@@ -1805,7 +1805,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations?.main && (
                                                                     <div>
                                                                         <div className="mb-2 text-xs font-medium text-rose-300">
-                                                                            {translations.pipeTypeRecommendations}:
+                                                                            {translations.pipeTypeRecommendations}
                                                                         </div>
                                                                         <div className="space-y-3">
                                                     {/* PE Recommendation */}
@@ -1936,7 +1936,7 @@ function FreeProduct() {
                                                                 {/* Zone Details */}
                                                                 <div className="border-t border-rose-800/50 pt-2">
                                                                     <div className="mb-2 text-xs text-rose-300">
-                                                                        {translations.zoneDetails}:
+                                                                        {translations.zoneDetails}
                                                                     </div>
                                                                     <div className="space-y-1 text-xs text-slate-300">
                                                                         <div className="flex justify-between">
@@ -2091,7 +2091,7 @@ function FreeProduct() {
                                             <div className="border-t border-violet-800/50 pt-2">
                                                 <div className="mb-2 flex items-center justify-between">
                                                     <div className="text-xs font-medium text-violet-300">
-                                                        {translations.calculationDetails || 'Calculation Details'}:
+                                                        {translations.calculationDetails}:
                                                     </div>
                                                     <button
                                                         onClick={() => setShowSubMainPipeDetails(!showSubMainPipeDetails)}
@@ -2099,8 +2099,8 @@ function FreeProduct() {
                                                     >
                                                         <span>
                                                             {showSubMainPipeDetails
-                                                                ? translations.hideDetails || 'Hide Details'
-                                                                : translations.showDetails || 'Show Details'}
+                                                                ? translations.hideDetails
+                                                                : translations.showDetails}
                                                         </span>
                                                         <span
                                                             className={`transition-transform duration-200 ${showSubMainPipeDetails ? 'rotate-180' : ''}`}
@@ -2129,7 +2129,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations?.subMain && (
                                                                     <div>
                                                                         <div className="mb-2 text-xs font-medium text-violet-300">
-                                                                            Pipe Type Recommendations:
+                                                                            {translations.pipeTypeRecommendations}
                                                                         </div>
                                                                         <div className="space-y-3">
                                                     {/* PE Recommendation */}
@@ -2261,7 +2261,7 @@ function FreeProduct() {
                                                                 {/* Zone Details */}
                                                                 <div className="border-t border-violet-800/50 pt-2">
                                                                     <div className="mb-2 text-xs text-violet-300">
-                                                                        Zone Details:
+                                                                        {translations.zoneDetails}
                                                                     </div>
                                                                     <div className="space-y-1 text-xs text-slate-300">
                                                                         <div className="flex justify-between">
@@ -2416,7 +2416,7 @@ function FreeProduct() {
                                             <div className="border-t border-amber-800/50 pt-2">
                                                 <div className="mb-2 flex items-center justify-between">
                                                     <div className="text-xs font-medium text-amber-300">
-                                                        {translations.calculationDetails || 'Calculation Details'}:
+                                                        {translations.calculationDetails}:
                                                     </div>
                                                     <button
                                                         onClick={() => setShowLateralPipeDetails(!showLateralPipeDetails)}
@@ -2424,8 +2424,8 @@ function FreeProduct() {
                                                     >
                                                         <span>
                                                             {showLateralPipeDetails
-                                                                ? translations.hideDetails || 'Hide Details'
-                                                                : translations.showDetails || 'Show Details'}
+                                                                ? translations.hideDetails
+                                                                : translations.showDetails}
                                                         </span>
                                                         <span
                                                             className={`transition-transform duration-200 ${showLateralPipeDetails ? 'rotate-180' : ''}`}
@@ -2454,7 +2454,7 @@ function FreeProduct() {
                                                                 {pipeTypeRecommendations?.lateral && (
                                                                     <div>
                                                                         <div className="mb-2 text-xs font-medium text-amber-300">
-                                                                            Pipe Type Recommendations:
+                                                                            {translations.pipeTypeRecommendations}
                                                                         </div>
                                                                         <div className="space-y-3">
                                                     {/* PE Recommendation */}
@@ -2586,7 +2586,7 @@ function FreeProduct() {
                                                                 {/* Zone Details */}
                                                                 <div className="border-t border-amber-800/50 pt-2">
                                                                     <div className="mb-2 text-xs text-amber-300">
-                                                                        Zone Details:
+                                                                        {translations.zoneDetails}
                                                                     </div>
                                                                     <div className="space-y-1 text-xs text-slate-300">
                                                                         <div className="flex justify-between">
@@ -2885,8 +2885,7 @@ function FreeProduct() {
                                                                             .pe && (
                                                                             <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-blue-300">
-                                                                                    PE
-                                                                                    (Polyethylene)
+                                                                                    {translations.pePolyethylene}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     {pumpRecommendations
@@ -3006,8 +3005,7 @@ function FreeProduct() {
                                                                             .pvc && (
                                                                             <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-green-300">
-                                                                                    PVC (Polyvinyl
-                                                                                    Chloride)
+                                                                                    {translations.pvcPolyvinylChloride}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     {pumpRecommendations
@@ -3135,8 +3133,7 @@ function FreeProduct() {
                                                                             .pe && (
                                                                             <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-blue-300">
-                                                                                    PE
-                                                                                    (Polyethylene)
+                                                                                    {translations.pePolyethylene}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
@@ -3199,8 +3196,7 @@ function FreeProduct() {
                                                                             .pvc && (
                                                                             <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-green-300">
-                                                                                    PVC (Polyvinyl
-                                                                                    Chloride)
+                                                                                    {translations.pvcPolyvinylChloride}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
@@ -3327,7 +3323,7 @@ function FreeProduct() {
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span>Zone Area:</span>
+                                                            <span>{translations.zoneArea}</span>
                                                             <span className="font-semibold text-sky-400">
                                                                 {selectedZone.area?.toFixed(2) ||
                                                                     '0.00'}{' '}
@@ -3417,8 +3413,7 @@ function FreeProduct() {
                                                                             .pe && (
                                                                             <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-blue-300">
-                                                                                    PE
-                                                                                    (Polyethylene)
+                                                                                    {translations.pePolyethylene}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     {pumpRecommendations
@@ -3538,8 +3533,7 @@ function FreeProduct() {
                                                                             .pvc && (
                                                                             <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-green-300">
-                                                                                    PVC (Polyvinyl
-                                                                                    Chloride)
+                                                                                    {translations.pvcPolyvinylChloride}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     {pumpRecommendations
@@ -3667,8 +3661,7 @@ function FreeProduct() {
                                                                             .pe && (
                                                                             <div className="rounded border border-blue-700/30 bg-blue-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-blue-300">
-                                                                                    PE
-                                                                                    (Polyethylene)
+                                                                                    {translations.pePolyethylene}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">
@@ -3731,8 +3724,7 @@ function FreeProduct() {
                                                                             .pvc && (
                                                                             <div className="rounded border border-green-700/30 bg-green-900/30 p-2">
                                                                                 <div className="mb-2 text-xs font-medium text-green-300">
-                                                                                    PVC (Polyvinyl
-                                                                                    Chloride)
+                                                                                    {translations.pvcPolyvinylChloride}
                                                                                 </div>
                                                                                 <div className="space-y-1 text-xs text-slate-300">
                                                                                     <div className="flex justify-between">

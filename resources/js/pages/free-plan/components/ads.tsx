@@ -105,10 +105,10 @@ function Ads() {
                     return;
                 }
                 
-                setFormData((prev) => ({
-                    ...prev,
-                    image: file,
-                }));
+            setFormData((prev) => ({
+                ...prev,
+                image: file,
+            }));
                 URL.revokeObjectURL(objectUrl);
             };
             
