@@ -1,15 +1,24 @@
 // 1. Import
 import { useState, useEffect, useRef } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import QRCodeSVG from 'react-qr-code';
 import FreeNav from './components/freeNav';
 import { getTranslations } from './utils/language';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SharedData } from '@/types';
 
 // 2. Component
 function FreeCheckout() {
-    // LINE Official Account ID
-    const LINE_ID = '@fang.nitipoom';
-    const LINE_FRIEND_URL = `https://line.me/R/ti/p/${LINE_ID}`;
+    // Get user data from Inertia page props
+    const page = usePage<SharedData>();
+    const user = page.props.auth?.user;
+    const isAdmin = user?.is_admin || false;
+    // LINE Official Account ID - Load from localStorage or use default
+    const [lineId, setLineId] = useState<string>('@fang.nitipoom');
+    const [showLineIdModal, setShowLineIdModal] = useState(false);
+    const [lineIdInput, setLineIdInput] = useState<string>('');
+
+    const LINE_FRIEND_URL = `https://line.me/R/ti/p/${lineId}`;
 
     const [translations, setTranslations] = useState(getTranslations());
     const qrCodeRef = useRef<HTMLDivElement>(null);
@@ -55,14 +64,10 @@ function FreeCheckout() {
 
     // Listen for language changes
     useEffect(() => {
-        const handleLanguageChange = () => {
-            setTranslations(getTranslations());
-        };
-
+        const handleLanguageChange = () => setTranslations(getTranslations());
         window.addEventListener('storage', handleLanguageChange);
         window.addEventListener('languageChanged', handleLanguageChange);
         window.addEventListener('focus', handleLanguageChange);
-
         return () => {
             window.removeEventListener('storage', handleLanguageChange);
             window.removeEventListener('languageChanged', handleLanguageChange);
@@ -70,17 +75,18 @@ function FreeCheckout() {
         };
     }, []);
 
-    // Load data from localStorage
+    // Load data from localStorage (Logic preserved)
     useEffect(() => {
+        // Load LINE ID from localStorage
+        const savedLineId = localStorage.getItem('lineId');
+        if (savedLineId) {
+            setLineId(savedLineId);
+        }
+
         const savedFlowRateConfig = localStorage.getItem('flowRateConfig');
         const savedSprinklerMode = localStorage.getItem('sprinklerMode');
 
-        // Load flow rate config
-        let flowRateConfig = {
-            flowRatePerMin: 2.5,
-            waterPressure: 2.0,
-            radius: 4.0,
-        };
+        let flowRateConfig = { flowRatePerMin: 2.5, waterPressure: 2.0, radius: 4.0 };
         if (savedFlowRateConfig) {
             try {
                 const config = JSON.parse(savedFlowRateConfig);
@@ -89,12 +95,9 @@ function FreeCheckout() {
                     waterPressure: config.waterPressure || 2.0,
                     radius: config.radius || 4.0,
                 };
-            } catch (error) {
-                console.error('Error loading flow rate config:', error);
-            }
+            } catch (error) { console.error('Error loading config:', error); }
         }
 
-        // Set sprinkler specs
         setSprinklerSpecs({
             flowRatePerMin: flowRateConfig.flowRatePerMin,
             waterPressure: flowRateConfig.waterPressure,
@@ -102,53 +105,30 @@ function FreeCheckout() {
             totalLPM: 0,
         });
 
-        // Load sprinkler mode
-        if (savedSprinklerMode) {
-            setSprinklerMode(savedSprinklerMode as 'preset' | 'calculated');
-        }
+        if (savedSprinklerMode) setSprinklerMode(savedSprinklerMode as 'preset' | 'calculated');
 
-        // Load calculated sprinkler specs if available
         const savedCalculatedSpecs = localStorage.getItem('calculatedSprinklerSpecs');
         if (savedCalculatedSpecs) {
-            try {
-                const specs = JSON.parse(savedCalculatedSpecs);
-                setCalculatedSprinklerSpecs(specs);
-            } catch (error) {
-                console.error('Error loading calculated specs:', error);
-            }
+            try { setCalculatedSprinklerSpecs(JSON.parse(savedCalculatedSpecs)); } 
+            catch (error) { console.error('Error loading calculated specs:', error); }
         }
 
-        // Load pipe recommendations
         const savedPipeRecs = localStorage.getItem('pipeRecommendations');
         if (savedPipeRecs) {
-            try {
-                const recs = JSON.parse(savedPipeRecs);
-                setPipeRecommendations(recs);
-            } catch (error) {
-                console.error('Error loading pipe recommendations:', error);
-            }
+            try { setPipeRecommendations(JSON.parse(savedPipeRecs)); }
+            catch (error) { console.error('Error loading pipe recs:', error); }
         }
 
-        // Load pipe type recommendations
         const savedPipeTypeRecs = localStorage.getItem('pipeTypeRecommendations');
         if (savedPipeTypeRecs) {
-            try {
-                const recs = JSON.parse(savedPipeTypeRecs);
-                setPipeTypeRecommendations(recs);
-            } catch (error) {
-                console.error('Error loading pipe type recommendations:', error);
-            }
+            try { setPipeTypeRecommendations(JSON.parse(savedPipeTypeRecs)); }
+            catch (error) { console.error('Error loading pipe type recs:', error); }
         }
 
-        // Load pump recommendations
         const savedPumpRecs = localStorage.getItem('pumpRecommendations');
         if (savedPumpRecs) {
-            try {
-                const recs = JSON.parse(savedPumpRecs);
-                setPumpRecommendations(recs);
-            } catch (error) {
-                console.error('Error loading pump recommendations:', error);
-            }
+            try { setPumpRecommendations(JSON.parse(savedPumpRecs)); }
+            catch (error) { console.error('Error loading pump recs:', error); }
         }
     }, []);
 
@@ -158,26 +138,19 @@ function FreeCheckout() {
 
     const handleSaveImage = async () => {
         if (!qrCodeRef.current) return;
-
         try {
-            // Dynamically import html2canvas
             const { default: html2canvas } = await import('html2canvas');
-            
-            // Capture the QR code container
             const canvas = await html2canvas(qrCodeRef.current, {
                 backgroundColor: '#ffffff',
                 scale: 2,
                 logging: false,
             });
-
-            // Convert canvas to blob and create download link
             canvas.toBlob((blob) => {
                 if (!blob) return;
-                
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `line-qr-code-${LINE_ID.replace('@', '')}.png`;
+                link.download = `chaiyo-line-qr.png`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -185,323 +158,386 @@ function FreeCheckout() {
             }, 'image/png');
         } catch (error) {
             console.error('Error saving image:', error);
-            alert('ไม่สามารถบันทึกภาพได้ กรุณาลองอีกครั้ง');
+            alert(translations.errorSavingImage);
         }
+    };
+
+    const handleOpenLineIdModal = () => {
+        setLineIdInput(lineId);
+        setShowLineIdModal(true);
+    };
+
+    const handleCloseLineIdModal = () => {
+        setShowLineIdModal(false);
+        setLineIdInput('');
+    };
+
+    const handleSaveLineId = () => {
+        if (!lineIdInput.trim()) {
+            alert(translations.pleaseEnterLineId);
+            return;
+        }
+        // Remove @ if user includes it
+        const cleanLineId = lineIdInput.trim().startsWith('@') 
+            ? lineIdInput.trim() 
+            : `@${lineIdInput.trim()}`;
+        
+        setLineId(cleanLineId);
+        localStorage.setItem('lineId', cleanLineId);
+        setShowLineIdModal(false);
     };
 
     const currentSpecs = sprinklerMode === 'preset' ? sprinklerSpecs : calculatedSprinklerSpecs;
 
+    // Animation Variants
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 100 } }
+    };
+
     return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200">
             <Head title={translations.checkout} />
 
             {/* Navbar */}
-            <FreeNav />
+            <div className="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-xl border-b border-white/5">
+                <FreeNav />
+            </div>
 
             {/* Main Content */}
-            <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
+            <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8"
+            >
                 {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-white">
+                <motion.div variants={itemVariants} className="mb-8 text-center">
+                    <h1 className="mb-2 text-3xl font-bold text-white md:text-4xl bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
                         {translations.checkoutModalTitle}
                     </h1>
-                    <p className="mt-2 text-slate-300">
+                    <p className="text-slate-400">
                         {translations.checkoutModalMessage}
                     </p>
-                </div>
+                </motion.div>
 
-                {/* Equipment Specifications Table */}
-                <div className="mb-8 overflow-hidden rounded-lg border border-slate-600 bg-slate-800/50 shadow-lg">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-slate-700/50">
-                                <tr>
-                                    <th className="px-4 py-4 text-center text-sm font-semibold text-white w-24">
-                                        {translations.image}
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">
-                                        {translations.equipment}
-                                    </th>
-                                    <th className="px-6 py-4 text-left text-sm font-semibold text-white">
-                                        {translations.specifications}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-700">
-                                {/* Sprinkler */}
-                                <tr className="bg-emerald-900/20 hover:bg-emerald-900/30">
-                                    <td className="px-4 py-4 text-center">
-                                        <div className="flex items-center justify-center">
-                                            <img
-                                                src="/freePlanImg/sprinkler.png"
-                                                alt={translations.sprinklerAlt}
-                                                className="h-16 w-16 rounded-lg object-contain"
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-emerald-300">
-                                        {translations.sprinklerSelector}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-200">
-                                        {currentSpecs ? (
-                                            <div className="space-y-1">
-                                                <div>
-                                                    <span className="text-slate-400">
-                                                        {translations.flowRateProduct}:{' '}
-                                                    </span>
-                                                    <span className="font-semibold text-emerald-400">
-                                                        {currentSpecs.flowRatePerMin.toFixed(2)} LPM
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-400">
-                                                        {translations.pressureProduct}:{' '}
-                                                    </span>
-                                                    <span className="font-semibold text-emerald-400">
-                                                        {currentSpecs.waterPressure} Bar
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-400">
-                                                        {translations.radiusProduct}:{' '}
-                                                    </span>
-                                                    <span className="font-semibold text-emerald-400">
-                                                        {currentSpecs.radius} m
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
-                                        )}
-                                    </td>
-                                </tr>
+                <div className="grid gap-8 lg:grid-cols-3">
+                    {/* Left Column: Specifications (2/3 width on large screens) */}
+                    <div className="space-y-4 lg:col-span-2">
+                        <motion.h2 variants={itemVariants} className="text-xl font-semibold text-white">
+                            {translations.recommendedEquipmentList}
+                        </motion.h2>
 
-                                {/* Main Pipe */}
-                                <tr className="bg-rose-900/20 hover:bg-rose-900/30">
-                                    <td className="px-4 py-4 text-center">
-                                        <div className="flex items-center justify-center">
-                                            <img
-                                                src="/freePlanImg/pvc-pipes.png"
-                                                alt={translations.mainPipeAlt}
-                                                className="h-16 w-16 rounded-lg object-contain"
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-rose-300">
-                                        {translations.mainPipeSelection}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-200">
-                                        {pipeRecommendations?.main ? (
-                                            <div>
-                                                <span className="text-slate-400">
-                                                    {translations.recommendedSize}:{' '}
-                                                </span>
-                                                <span className="font-semibold text-rose-400">
-                                                    {(() => {
-                                                        const pe = pipeTypeRecommendations?.main?.pe;
-                                                        const pvc = pipeTypeRecommendations?.main?.pvc;
-                                                        const parts: string[] = [];
-                                                        if (pvc) {
-                                                            parts.push(`PVC: ${pvc.sizeInch}`);
-                                                        }
-                                                        if (pe) {
-                                                            parts.push(`PE: ${pe.sizeMM.toFixed(2)}mm`);
-                                                        }
-                                                        return parts.length > 0 ? parts.join(', ') : `${pipeRecommendations.main.sizeMM.toFixed(2)}mm (${pipeRecommendations.main.sizeInch})`;
-                                                    })()}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
-                                        )}
-                                    </td>
-                                </tr>
+                        {/* Sprinkler Card */}
+                        <motion.div variants={itemVariants} className="group overflow-hidden rounded-2xl border border-white/5 bg-slate-800/40 backdrop-blur-sm transition-all hover:border-emerald-500/30 hover:bg-slate-800/60">
+                            <div className="flex flex-col items-center gap-4 p-5 text-center">
+                                <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-emerald-500/10 p-2">
+                                    <img src="/freePlanImg/sprinkler.png" alt="Sprinkler" className="h-full w-full object-contain drop-shadow-md" />
+                                </div>
+                                <h3 className="text-lg font-bold text-emerald-400">{translations.sprinklerSelector}</h3>
+                                <div className="mt-2 grid w-full grid-cols-3 gap-2 text-sm">
+                                    <div className="rounded-lg bg-slate-900/50 p-2 text-center">
+                                        <div className="text-xs text-slate-500">{translations.flowRateProduct}</div>
+                                        <div className="font-semibold text-white">{currentSpecs?.flowRatePerMin.toFixed(2) || '-'} LPM</div>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-900/50 p-2 text-center">
+                                        <div className="text-xs text-slate-500">{translations.pressureProduct}</div>
+                                        <div className="font-semibold text-white">{currentSpecs?.waterPressure || '-'} Bar</div>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-900/50 p-2 text-center">
+                                        <div className="text-xs text-slate-500">{translations.radiusProduct}</div>
+                                        <div className="font-semibold text-white">{currentSpecs?.radius || '-'} m</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
 
-                                {/* SubMain Pipe */}
-                                <tr className="bg-violet-900/20 hover:bg-violet-900/30">
-                                    <td className="px-4 py-4 text-center">
-                                        <div className="flex items-center justify-center">
-                                            <img
-                                                src="/freePlanImg/pvc-pipes.png"
-                                                alt={translations.subMainPipeAlt}
-                                                className="h-16 w-16 rounded-lg object-contain"
-                                            />
+                        {/* Pipe Cards (Hierarchical Layout) */}
+                        <motion.div variants={itemVariants} className="space-y-6">
+                            {/* Main Pipe - Full Width */}
+                            <div className="relative rounded-2xl border border-white/5 bg-slate-800/40 p-5 backdrop-blur-sm transition-all hover:border-rose-500/30 hover:bg-slate-800/60">
+                                <div className="flex flex-col items-center gap-4 text-center">
+                                    <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-rose-500/10 p-2">
+                                        <img src="/freePlanImg/pvc-pipes.png" alt="Main Pipe" className="h-full w-full object-contain drop-shadow-md" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-rose-300">{translations.mainPipeSelection}</h4>
+                                    <div className="w-full rounded-lg bg-slate-900/50 p-3">
+                                        <div className="text-lg font-semibold text-white">
+                                            {pipeRecommendations?.main ? (
+                                                (() => {
+                                                    const pe = pipeTypeRecommendations?.main?.pe;
+                                                    const pvc = pipeTypeRecommendations?.main?.pvc;
+                                                    const parts: string[] = [];
+                                                    if (pvc) parts.push(`PVC ${pvc.sizeInch}`);
+                                                    if (pe) parts.push(`PE ${pe.sizeMM.toFixed(0)}mm`);
+                                                    return parts.length > 0 ? parts.join(' / ') : `${pipeRecommendations.main.sizeMM.toFixed(0)}mm`;
+                                                })()
+                                            ) : translations.loading}
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-violet-300">
-                                        {translations.subMainPipeSelection}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-200">
-                                        {pipeRecommendations?.subMain ? (
-                                            <div>
-                                                <span className="text-slate-400">
-                                                    {translations.recommendedSize}:{' '}
-                                                </span>
-                                                <span className="font-semibold text-violet-400">
-                                                    {(() => {
+                                    </div>
+                                </div>
+                                
+                                {/* Connection Lines from Main to Sub Pipes */}
+                                <div className="absolute bottom-0 left-1/4 h-6 w-0.5 -translate-x-1/2 translate-y-full bg-gradient-to-b from-rose-500/60 via-rose-500/40 to-violet-500/60"></div>
+                                <div className="absolute bottom-0 left-3/4 h-6 w-0.5 -translate-x-1/2 translate-y-full bg-gradient-to-b from-rose-500/60 via-rose-500/40 to-amber-500/60"></div>
+                            </div>
+
+                            {/* Sub Pipes Row - Half Width Each with Connection Lines */}
+                            <div className="relative grid grid-cols-2 gap-4">
+                                {/* SubMain Pipe - Left Half */}
+                                <div className="relative rounded-2xl border border-white/5 bg-slate-800/40 p-5 backdrop-blur-sm transition-all hover:border-violet-500/30 hover:bg-slate-800/60">
+                                    {/* Connection Line from Main */}
+                                    <div className="absolute left-1/2 top-0 h-6 w-0.5 -translate-x-1/2 -translate-y-full bg-gradient-to-b from-violet-500/60 to-violet-500/40"></div>
+                                    
+                                    <div className="flex flex-col items-center gap-4 text-center">
+                                        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-violet-500/10 p-2">
+                                            <img src="/freePlanImg/pvc-pipes.png" alt="SubMain Pipe" className="h-full w-full object-contain drop-shadow-md" />
+                                        </div>
+                                        <h4 className="text-lg font-bold text-violet-300">{translations.subMainPipeSelection}</h4>
+                                        <div className="w-full rounded-lg bg-slate-900/50 p-3">
+                                            <div className="text-lg font-semibold text-white">
+                                                {pipeRecommendations?.subMain ? (
+                                                    (() => {
                                                         const pe = pipeTypeRecommendations?.subMain?.pe;
                                                         const pvc = pipeTypeRecommendations?.subMain?.pvc;
                                                         const parts: string[] = [];
-                                                        if (pvc) {
-                                                            parts.push(`PVC: ${pvc.sizeInch}`);
-                                                        }
-                                                        if (pe) {
-                                                            parts.push(`PE: ${pe.sizeMM.toFixed(2)}mm`);
-                                                        }
-                                                        return parts.length > 0 ? parts.join(', ') : `${pipeRecommendations.subMain.sizeMM.toFixed(2)}mm (${pipeRecommendations.subMain.sizeInch})`;
-                                                    })()}
-                                                </span>
+                                                        if (pvc) parts.push(`PVC ${pvc.sizeInch}`);
+                                                        if (pe) parts.push(`PE ${pe.sizeMM.toFixed(0)}mm`);
+                                                        return parts.length > 0 ? parts.join(' / ') : `${pipeRecommendations.subMain.sizeMM.toFixed(0)}mm`;
+                                                    })()
+                                                ) : translations.loading}
                                             </div>
-                                        ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
-                                        )}
-                                    </td>
-                                </tr>
-
-                                {/* Lateral Pipe */}
-                                <tr className="bg-amber-900/20 hover:bg-amber-900/30">
-                                    <td className="px-4 py-4 text-center">
-                                        <div className="flex items-center justify-center">
-                                            <img
-                                                src="/freePlanImg/pvc-pipes.png"
-                                                alt={translations.lateralPipeAlt}
-                                                className="h-16 w-16 rounded-lg object-contain"
-                                            />
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-amber-300">
-                                        {translations.lateralPipeSelection}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-200">
-                                        {pipeRecommendations?.lateral ? (
-                                            <div>
-                                                <span className="text-slate-400">
-                                                    {translations.recommendedSize}:{' '}
-                                                </span>
-                                                <span className="font-semibold text-amber-400">
-                                                    {(() => {
+                                    </div>
+                                </div>
+
+                                {/* Lateral Pipe - Right Half */}
+                                <div className="relative rounded-2xl border border-white/5 bg-slate-800/40 p-5 backdrop-blur-sm transition-all hover:border-amber-500/30 hover:bg-slate-800/60">
+                                    {/* Connection Line from Main */}
+                                    <div className="absolute left-1/2 top-0 h-6 w-0.5 -translate-x-1/2 -translate-y-full bg-gradient-to-b from-amber-500/60 to-amber-500/40"></div>
+                                    
+                                    <div className="flex flex-col items-center gap-4 text-center">
+                                        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-amber-500/10 p-2">
+                                            <img src="/freePlanImg/pvc-pipes.png" alt="Lateral Pipe" className="h-full w-full object-contain drop-shadow-md" />
+                                        </div>
+                                        <h4 className="text-lg font-bold text-amber-300">{translations.lateralPipeSelection}</h4>
+                                        <div className="w-full rounded-lg bg-slate-900/50 p-3">
+                                            <div className="text-lg font-semibold text-white">
+                                                {pipeRecommendations?.lateral ? (
+                                                    (() => {
                                                         const pe = pipeTypeRecommendations?.lateral?.pe;
                                                         const pvc = pipeTypeRecommendations?.lateral?.pvc;
                                                         const parts: string[] = [];
-                                                        if (pvc) {
-                                                            parts.push(`PVC: ${pvc.sizeInch}`);
-                                                        }
-                                                        if (pe) {
-                                                            parts.push(`PE: ${pe.sizeMM.toFixed(2)}mm`);
-                                                        }
-                                                        return parts.length > 0 ? parts.join(', ') : `${pipeRecommendations.lateral.sizeMM.toFixed(2)}mm (${pipeRecommendations.lateral.sizeInch})`;
-                                                    })()}
-                                                </span>
+                                                        if (pvc) parts.push(`PVC ${pvc.sizeInch}`);
+                                                        if (pe) parts.push(`PE ${pe.sizeMM.toFixed(0)}mm`);
+                                                        return parts.length > 0 ? parts.join(' / ') : `${pipeRecommendations.lateral.sizeMM.toFixed(0)}mm`;
+                                                    })()
+                                                ) : translations.loading}
                                             </div>
-                                        ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
-                                        )}
-                                    </td>
-                                </tr>
-
-                                {/* Pump */}
-                                <tr className="bg-sky-900/20 hover:bg-sky-900/30">
-                                    <td className="px-4 py-4 text-center">
-                                        <div className="flex items-center justify-center">
-                                            <img
-                                                src="/images/water-pump.png"
-                                                alt={translations.pumpAlt}
-                                                className="h-16 w-16 rounded-lg object-contain"
-                                            />
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-medium text-sky-300">
-                                        {translations.pumpSelection}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-200">
-                                        {pumpRecommendations ? (
-                                            <div className="space-y-1">
-                                                <div>
-                                                    <span className="text-slate-400">
-                                                        {translations.flowRateProduct}:{' '}
-                                                    </span>
-                                                    <span className="font-semibold text-sky-400">
-                                                        {pumpRecommendations.flowRate} LPM
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-400">
-                                                        {translations.headProduct}:{' '}
-                                                    </span>
-                                                    <span className="font-semibold text-sky-400">
-                                                        {pumpRecommendations.head} m
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-400">
-                                                        {translations.powerProduct}:{' '}
-                                                    </span>
-                                                    <span className="font-semibold text-sky-400">
-                                                        {pumpRecommendations.power} HP
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <span className="text-slate-400">{translations.loading}</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
 
-                {/* LINE QR Code Section */}
-                <div className="rounded-lg border border-green-600/50 bg-green-900/20 p-6">
-                    <div className="mb-4 text-center">
-                        <h3 className="mb-2 text-xl font-semibold text-green-400">
-                            {translations.addFriendOnLine}
-                        </h3>
-                        <p className="text-sm text-green-300">
-                            {translations.scanQRCodeToContact}
-                        </p>
+                        {/* Pump Card */}
+                        <motion.div variants={itemVariants} className="overflow-hidden rounded-2xl border border-white/5 bg-slate-800/40 backdrop-blur-sm transition-all hover:border-sky-500/30 hover:bg-slate-800/60">
+                            <div className="flex flex-col items-center gap-4 p-5 text-center">
+                                <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-sky-500/10 p-2">
+                                    <img src="/images/water-pump.png" alt="Pump" className="h-full w-full object-contain drop-shadow-md" />
+                                </div>
+                                <h3 className="text-lg font-bold text-sky-400">{translations.pumpSelection}</h3>
+                                <div className="mt-2 grid w-full grid-cols-3 gap-2 text-sm">
+                                    <div className="rounded-lg bg-slate-900/50 p-2 text-center">
+                                        <div className="text-xs text-slate-500">{translations.flowRateProduct}</div>
+                                        <div className="font-semibold text-white">{pumpRecommendations?.flowRate || '-'} LPM</div>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-900/50 p-2 text-center">
+                                        <div className="text-xs text-slate-500">{translations.headProduct}</div>
+                                        <div className="font-semibold text-white">{pumpRecommendations?.head || '-'} m</div>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-900/50 p-2 text-center">
+                                        <div className="text-xs text-slate-500">{translations.powerProduct}</div>
+                                        <div className="font-semibold text-white">{pumpRecommendations?.power || '-'} HP</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
                     </div>
-                    <div className="flex justify-center">
-                        <div ref={qrCodeRef} className="rounded-lg bg-white p-4 shadow-lg">
-                            <QRCodeSVG
-                                value={LINE_FRIEND_URL}
-                                size={250}
-                                level="M"
-                                style={{
-                                    height: 'auto',
-                                    maxWidth: '100%',
-                                    width: '100%',
-                                }}
-                                viewBox="0 0 250 250"
-                            />
+
+{/* Right Column: QR Code & Actions */}
+<motion.div variants={itemVariants} className="space-y-6 lg:col-span-1">
+                        <div className="relative overflow-hidden rounded-3xl border border-green-500/30 bg-gradient-to-br from-green-900/40 to-slate-900/40 p-6 shadow-xl backdrop-blur-xl">
+                            {/* Decorative Elements */}
+                            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-green-500/20 blur-3xl" />
+                            <div className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-blue-500/20 blur-3xl" />
+
+                            <div className="relative z-10 text-center">
+                                <div className="mb-2 flex items-center justify-between">
+                                    <h3 className="text-xl font-bold text-green-400">
+                                        {translations.addFriendOnLine}
+                                    </h3>
+                                    {isAdmin && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.1 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={handleOpenLineIdModal}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/20 text-green-400 transition-colors hover:bg-green-500/30"
+                                            title={translations.manageLineId}
+                                        >
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </motion.button>
+                                    )}
+                                </div>
+                                <p className="mb-6 text-sm text-slate-300">
+                                    {translations.scanQRCodeToContact}
+                                </p>
+
+                                {/* QR Code Container (White background for scanning) */}
+                                <div className="mx-auto w-fit overflow-hidden rounded-xl bg-white p-4 shadow-2xl">
+                                    <div ref={qrCodeRef} className="bg-white p-2">
+                                        <QRCodeSVG
+                                            value={LINE_FRIEND_URL}
+                                            size={200}
+                                            level="H"
+                                        />
+                                        <div className="mt-2 text-center text-xs font-bold text-slate-900">
+                                            {lineId}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex flex-col gap-3">
+                                    {/* --- ส่วนที่เพิ่มใหม่: ปุ่มกดแอดไลน์ --- */}
+                                    <motion.a
+                                        href={LINE_FRIEND_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="w-full cursor-pointer rounded-xl bg-[#06C755] py-3 font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:bg-[#05b34c]"
+                                    >
+                                        <span className="flex items-center justify-center gap-2">
+                                            {/* Icon LINE (แบบเรียบง่าย) หรือ Icon เพิ่มเพื่อน */}
+                                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.51 4.14 7.23-.2.8-.75 2.06-1.54 2.84 0 0-.27.27.15.36.4.08 3.56.32 5.5-1.09 1.25.35 2.58.54 3.93.54 5.52 0 10-4.03 10-9S17.52 2 12 2z" />
+                                            </svg>
+                                            {translations.addFriendOnLineButton}
+                                        </span>
+                                    </motion.a>
+                                    {/* ------------------------------------- */}
+
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handleSaveImage}
+                                        className="w-full rounded-xl bg-slate-700 py-3 font-semibold text-white shadow-lg transition-all hover:bg-slate-600"
+                                    >
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                            {translations.saveQRCode}
+                                        </span>
+                                    </motion.button>
+                                    
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handleBack}
+                                        className="w-full rounded-xl border border-slate-600 bg-slate-800/50 py-3 font-semibold text-slate-300 transition-all hover:bg-slate-700 hover:text-white"
+                                    >
+                                        {translations.back}
+                                    </motion.button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <p className="mt-4 text-center text-sm text-green-300">
-                        {translations.orAddFriendAtLineId}{' '}
-                        <span className="font-semibold text-green-400">{LINE_ID}</span>
-                    </p>
+                    </motion.div>
                 </div>
+            </motion.div>
 
-                {/* Action Buttons */}
-                <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                    <button
-                        onClick={handleBack}
-                        className="w-full rounded-lg bg-slate-600 px-8 py-3 font-medium text-white transition-colors hover:bg-slate-500 sm:w-auto"
+            {/* LINE ID Management Modal */}
+            <AnimatePresence>
+                {showLineIdModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={handleCloseLineIdModal}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
                     >
-                        {translations.back}
-                    </button>
-                    <button
-                        onClick={handleSaveImage}
-                        className="w-full rounded-lg bg-green-600 px-8 py-3 font-medium text-white transition-colors hover:bg-green-700 sm:w-auto"
-                    >
-                        บันทึกภาพ QR Code
-                    </button>
-                </div>
-            </div>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            transition={{ duration: 0.3 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl"
+                        >
+                            <button
+                                onClick={handleCloseLineIdModal}
+                                className="absolute right-4 top-4 text-slate-400 hover:text-white"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+
+                            <h2 className="mb-6 text-xl font-bold text-white">
+                                {translations.manageLineId}
+                            </h2>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                                        LINE ID <span className="text-red-400">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={lineIdInput}
+                                        onChange={(e) => setLineIdInput(e.target.value)}
+                                        placeholder="@fang.nitipoom"
+                                        className="w-full rounded-xl border border-slate-600 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                                    />
+                                    <p className="mt-2 text-xs text-slate-400">
+                                        {translations.lineIdExampleWithAuto}
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        type="button"
+                                        onClick={handleCloseLineIdModal}
+                                        className="flex-1 rounded-xl border border-slate-600 bg-transparent px-4 py-3 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
+                                    >
+                                        {translations.cancel}
+                                    </motion.button>
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        type="button"
+                                        onClick={handleSaveLineId}
+                                        className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-green-900/20 hover:bg-green-500"
+                                    >
+                                        {translations.save}
+                                    </motion.button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
 
 // 3. Export
 export default FreeCheckout;
-

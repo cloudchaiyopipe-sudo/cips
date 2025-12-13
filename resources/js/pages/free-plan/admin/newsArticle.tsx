@@ -241,7 +241,7 @@ export default function CreateArticle() {
                             <div className="mt-3 relative">
                                 <img
                                     src={imagePreview}
-                                    alt="Preview"
+                                    alt={translations.preview}
                                     className="max-w-full h-auto rounded border"
                                     style={{ maxHeight: '300px' }}
                                 />

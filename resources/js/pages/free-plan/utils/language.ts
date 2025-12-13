@@ -9,6 +9,25 @@ export interface LanguageTranslations {
     sponsoredContent: string;
     clickAdToVisit: string;
     next: string;
+    userManual: string;
+    confirmDeleteProject: string;
+    projectDeletedSuccessfully: string;
+    errorDeletingProject: string;
+    pleaseEnterProjectName: string;
+    projectNameSavedSuccessfully: string;
+    errorUpdatingProjectName: string;
+    errorLoadingProjects: string;
+    errorLoadingProject: string;
+    noSavedFiles: string;
+    clickToViewDetails: string;
+    editProjectName: string;
+    deleteProject: string;
+
+    // FootNav page
+    navAddField: string;
+    navNews: string;
+    navProducts: string;
+    navAccount: string;
 
     // UpgradePro page
     cipsPro: string;
@@ -31,6 +50,7 @@ export interface LanguageTranslations {
     dataSecure: string;
 
     // AcCount page
+    userProfileTitle: string;
     userProfile: string;
     manageAccountInfo: string;
     fullName: string;
@@ -40,6 +60,7 @@ export interface LanguageTranslations {
     freePlanName: string;
     proPlanName: string;
     advancedPlanName: string;
+    plan: string;
     basicFeatures: string;
     advancedFeatures: string;
     premiumFeatures: string;
@@ -47,6 +68,8 @@ export interface LanguageTranslations {
     advertisementManagement: string;
     uploadManageAds: string;
     manageAdvertisements: string;
+    manageArticles: string;
+    writeAndEditNews: string;
     accountStatistics: string;
     memberSince: string;
     emailStatus: string;
@@ -66,7 +89,15 @@ export interface LanguageTranslations {
     newPassword: string;
     confirmPassword: string;
     passwordChangedSuccessfully: string;
+    profileSavedSuccessfully: string;
     saving: string;
+    user: string;
+    notAvailable: string;
+    manageLineId: string;
+    lineId: string;
+    lineIdExample: string;
+    currentLineId: string;
+    pleaseEnterLineId: string;
 
     // ChooseCrop page
     selectCropTypes: string;
@@ -175,11 +206,24 @@ export interface LanguageTranslations {
     searchLocation: string;
     enterNumberOfZones: string;
     noPlantSelected: string;
+    pleasePlaceWaterBeforeNext: string;
+    pleaseDrawAreaBeforeZones: string;
+    cannotGeneratePipeMapNotReady: string;
+    clickToPlacePump: string;
+    pipeSystemAlreadyGenerated: string;
+    pleasePlacePumpBeforePipe: string;
+    pleaseDivideZonesBeforePipe: string;
+    determineNumberOfZones: string;
+    numberOfZones: string;
+    zoneColorsPreview: string;
+    generate: string;
+    centerOf: string;
+    zoneDescription: string;
 
     // FreeSummary page
     irrigationSummary: string;
     save: string;
-    edit: string;
+    config: string;
     area: string;
     zone: string;
     plants: string;
@@ -224,6 +268,11 @@ export interface LanguageTranslations {
     plantsLabel: string;
     lPerSession: string;
     lPerDayPerPlant: string;
+    plantsInformation: string;
+    sprinklersPerPlant: string;
+    perPlant: string;
+    perSprinkler: string;
+    lpmPerSprinkler: string;
     projectSavedSuccessfully: string;
     cannotAddNewProject: string;
     projectLimitReached: string;
@@ -285,6 +334,7 @@ export interface LanguageTranslations {
     pipeLength: string;
     longestPipe: string;
     pipeTypeRecommendations: string;
+    zoneArea: string;
     irrigationTime: string;
     waterNeedPerSessionLabel: string;
     totalWaterVolume: string;
@@ -384,6 +434,7 @@ export interface LanguageTranslations {
     youDoNotHavePermission: string;
     articleCreatedSuccessfully: string;
     errorOccurred: string;
+    preview: string;
 
     // ProductList page
     productListTitle: string;
@@ -428,13 +479,62 @@ export interface LanguageTranslations {
     step3PlacePlants: string;
     placePlants: string;
     placePlantsDescription: string;
+    step3ViewSummary: string;
+    viewSummary: string;
+    viewSummaryDescription: string;
     step4PlacePipes: string;
     placePipes: string;
     placePipesDescription: string;
+    step4ProductSpecs: string;
+    productSpecs: string;
+    productSpecsDescription: string;
     skip: string;
     finish: string;
     dontShowAgainManual: string;
     noImage: string;
+
+    // FreeCheckout page
+    recommendedEquipmentList: string;
+    addFriendOnLineButton: string;
+    saveQRCode: string;
+    errorSavingImage: string;
+    lineIdExampleWithAuto: string;
+
+    // PaymentQR page
+    paymentQRCode: string;
+    scanQRCodeWithPromptPay: string;
+    useMobileBankingApp: string;
+    generatingQRCode: string;
+    retry: string;
+    paymentSuccessful: string;
+    paymentFailed: string;
+    waitingForPayment: string;
+    noQRCodeAvailable: string;
+    paymentInformation: string;
+    planLabel: string;
+    amountLabel: string;
+    paymentMethod: string;
+    statusLabel: string;
+    paid: string;
+    failed: string;
+    waiting: string;
+    pending: string;
+    paymentInstructions: string;
+    openMobileBankingApp: string;
+    selectScanQRCodeOption: string;
+    scanQRCodeDisplayed: string;
+    verifyPaymentAmount: string;
+    confirmPaymentInBankingApp: string;
+    paymentStatusWillUpdate: string;
+    willRedirectAfterConfirmation: string;
+    goToAccount: string;
+    waitingForPaymentConfirmation: string;
+    backToUpgradePage: string;
+    transactionID: string;
+    paymentSuccessfulMessage: string;
+    failedToGenerateQRCode: string;
+    promptPayQR: string;
+    paymentProcessedSecurely: string;
 }
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
@@ -448,13 +548,32 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         sponsoredContent: 'Sponsored Content',
         clickAdToVisit: 'Click the ad to visit the link',
         next: 'Next',
+        userManual: 'User Manual',
+        confirmDeleteProject: 'Do you want to delete this project?',
+        projectDeletedSuccessfully: 'Project deleted successfully',
+        errorDeletingProject: 'Error deleting project',
+        pleaseEnterProjectName: 'Please enter project name',
+        projectNameSavedSuccessfully: 'Project name saved successfully',
+        errorUpdatingProjectName: 'Error updating project name',
+        errorLoadingProjects: 'Cannot load projects',
+        errorLoadingProject: 'Error loading project',
+        noSavedFiles: 'No saved files',
+        clickToViewDetails: 'Click to view details ↗',
+        editProjectName: 'Edit Name',
+        deleteProject: 'Delete Project',
+
+        // FootNav page
+        navAddField: 'Add Field',
+        navNews: 'News',
+        navProducts: 'Products',
+        navAccount: 'Me',
 
         // UpgradePro page
         cipsPro: 'CIPS Pro',
         forProfessionalUsers: 'For professional users.',
         proPlan: '⭐ PRO PLAN',
-        tokensPerMonth: '500 tokens per month',
-        tokensDaily: '100 tokens daily',
+        tokensPerMonth: 'Unlimited irrigation plans',
+        tokensDaily: 'Real-time calculations',
         advancedIrrigationPlanning: 'Advanced irrigation planning',
         prioritySupport: 'Priority support',
         exportCapabilities: 'Export capabilities',
@@ -470,6 +589,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         dataSecure: 'Your data is 100% secure',
 
         // AcCount page
+        userProfileTitle: 'User Profile - Free Plan',
         userProfile: 'User Profile',
         manageAccountInfo: 'Manage your account information.',
         fullName: 'Full Name',
@@ -479,6 +599,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         freePlanName: 'Free',
         proPlanName: 'Pro',
         advancedPlanName: 'Advanced',
+        plan: 'Plan',
         basicFeatures: 'Basic features with limited tokens.',
         advancedFeatures: 'Advanced features with more tokens.',
         premiumFeatures: 'Premium features with maximum tokens.',
@@ -487,6 +608,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         uploadManageAds:
             'Upload and manage your advertisements that will be displayed on the free plan homepage.',
         manageAdvertisements: 'Manage Advertisements',
+        manageArticles: 'Manage Articles',
+        writeAndEditNews: 'Write and edit news articles',
         accountStatistics: 'Account Statistics',
         memberSince: 'Member since:',
         emailStatus: 'Email status:',
@@ -506,7 +629,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         newPassword: 'New Password',
         confirmPassword: 'Confirm New Password',
         passwordChangedSuccessfully: 'Password changed successfully',
+        profileSavedSuccessfully: 'Profile saved successfully',
         saving: 'Saving...',
+        user: 'User',
+        notAvailable: 'Not available',
+        manageLineId: 'Manage LINE ID',
+        lineId: 'LINE ID',
+        lineIdExample: 'Example: @username',
+        currentLineId: 'Current LINE ID:',
+        pleaseEnterLineId: 'Please enter LINE ID',
 
         // ChooseCrop page
         selectCropTypes: 'Select Crop Types',
@@ -621,11 +752,24 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         searchLocation: 'Search location...',
         enterNumberOfZones: 'Enter number of zones',
         noPlantSelected: 'No plant selected',
+        pleasePlaceWaterBeforeNext: 'Please place water source before proceeding to next step',
+        pleaseDrawAreaBeforeZones: 'Please draw area before dividing zones',
+        cannotGeneratePipeMapNotReady: 'Cannot generate pipe system - map is not ready',
+        clickToPlacePump: 'Click to place water pump',
+        pipeSystemAlreadyGenerated: 'Pipe system already generated. Please reset before generating again',
+        pleasePlacePumpBeforePipe: 'Please place pump before generating pipe system',
+        pleaseDivideZonesBeforePipe: 'Please divide zones before generating pipe system',
+        determineNumberOfZones: 'Determine number of zones',
+        numberOfZones: 'Number of zones (1-15):',
+        zoneColorsPreview: 'Zone colors preview:',
+        generate: 'Generate',
+        centerOf: 'Center of',
+        zoneDescription: 'Each zone will have a unique color and will be divided horizontally across your area.',
 
         // FreeSummary page
         irrigationSummary: 'Irrigation Summary',
         save: 'Save',
-        edit: 'Edit',
+        config: 'Config',
         area: 'Area',
         zone: 'Zone',
         plants: 'Plants',
@@ -670,6 +814,11 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         plantsLabel: 'plants',
         lPerSession: 'L/session',
         lPerDayPerPlant: 'L/day/plant',
+        plantsInformation: 'Plants Information',
+        sprinklersPerPlant: 'Sprinklers per plant',
+        perPlant: 'per plant',
+        perSprinkler: 'per sprinkler',
+        lpmPerSprinkler: 'LPM/sprinkler',
         projectSavedSuccessfully: 'Project saved successfully!',
         cannotAddNewProject: 'Cannot add new project',
         projectLimitReached: 'You have reached the limit of 2 saved projects',
@@ -683,9 +832,9 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         irrigationProducts: 'Irrigation Products',
         selectZone: 'Select Zone',
         sprinklerSelector: 'Sprinkler Selector',
-        mainPipeSelection: 'Main Pipe Selection',
-        subMainPipeSelection: 'Sub Main Pipe Selection',
-        lateralPipeSelection: 'Lateral Pipe Selection',
+        mainPipeSelection: 'Main Pipe',
+        subMainPipeSelection: 'Sub Main Pipe',
+        lateralPipeSelection: 'Lateral Pipe',
         pumpSelection: 'Pump Selection',
         recommendedSize: 'Recommended Size',
         totalPrice: 'Total Price',
@@ -731,6 +880,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         pipeLength: 'Pipe Length:',
         longestPipe: 'Longest Pipe:',
         pipeTypeRecommendations: 'Pipe Type Recommendations:',
+        zoneArea: 'Zone Area:',
         irrigationTime: 'Irrigation Time',
         waterNeedPerSessionLabel: 'Water Need per Session',
         totalWaterVolume: 'Total Water Volume',
@@ -831,6 +981,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         youDoNotHavePermission: 'You do not have permission to access this page',
         articleCreatedSuccessfully: 'Article created successfully',
         errorOccurred: 'An error occurred',
+        preview: 'Preview',
 
         // ProductList page
         productListTitle: 'Product List - Free Plan',
@@ -875,13 +1026,62 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         step3PlacePlants: 'Step 3: Place Plants',
         placePlants: 'Place Plants',
         placePlantsDescription: 'Place plants on the map',
+        step3ViewSummary: 'Step 3: View Summary',
+        viewSummary: 'View Summary',
+        viewSummaryDescription: 'Review your irrigation system summary and calculations',
         step4PlacePipes: 'Step 4: Place Pipes',
         placePipes: 'Place Pipes',
         placePipesDescription: 'Place main pipe, sub-main pipe, and lateral pipe',
+        step4ProductSpecs: 'Step 4: Product Specifications',
+        productSpecs: 'Product Specifications',
+        productSpecsDescription: 'View recommended products and equipment specifications',
         skip: 'Skip',
         finish: 'Finish',
         dontShowAgainManual: "Don't show this manual again",
         noImage: 'No image',
+
+        // FreeCheckout page
+        recommendedEquipmentList: 'Recommended Equipment List',
+        addFriendOnLineButton: 'Add Friend on LINE',
+        saveQRCode: 'Save QR Code',
+        errorSavingImage: 'Cannot save image. Please try again',
+        lineIdExampleWithAuto: 'Example: @fang.nitipoom or fang.nitipoom (system will add @ automatically)',
+
+        // PaymentQR page
+        paymentQRCode: 'Payment QR Code',
+        scanQRCodeWithPromptPay: 'Scan QR Code with PromptPay',
+        useMobileBankingApp: 'Use your mobile banking app with PromptPay to scan the QR code below to complete the payment securely',
+        generatingQRCode: 'Generating QR Code...',
+        retry: 'Retry',
+        paymentSuccessful: '✓ Payment Successful!',
+        paymentFailed: '✗ Payment Failed',
+        waitingForPayment: '⏳ Waiting for payment...',
+        noQRCodeAvailable: 'No QR Code available',
+        paymentInformation: 'Payment Information',
+        planLabel: 'Plan:',
+        amountLabel: 'Amount:',
+        paymentMethod: 'Payment Method:',
+        statusLabel: 'Status:',
+        paid: 'Paid',
+        failed: 'Failed',
+        waiting: 'Waiting...',
+        pending: 'Pending',
+        paymentInstructions: 'Payment Instructions',
+        openMobileBankingApp: 'Open your mobile banking app (any bank that supports PromptPay)',
+        selectScanQRCodeOption: 'Select "Scan QR Code" or "PromptPay" option',
+        scanQRCodeDisplayed: 'Scan the QR code displayed above',
+        verifyPaymentAmount: 'Verify the payment amount',
+        confirmPaymentInBankingApp: 'Confirm the payment in your banking app',
+        paymentStatusWillUpdate: 'Payment status will be updated automatically',
+        willRedirectAfterConfirmation: 'You will be redirected once payment is confirmed',
+        goToAccount: 'Go to Account',
+        waitingForPaymentConfirmation: '⏳ Waiting for payment confirmation. Please complete the payment using the QR code above.',
+        backToUpgradePage: 'Back to Upgrade Page',
+        transactionID: 'Transaction ID:',
+        paymentSuccessfulMessage: 'Payment successful! Your Pro Plan subscription will be activated soon.',
+        failedToGenerateQRCode: 'Failed to generate QR code. Please try again.',
+        promptPayQR: 'PromptPay QR',
+        paymentProcessedSecurely: 'Payment is processed securely through Omise. Your Pro Plan subscription will be activated automatically once payment is confirmed. If you have any questions, please contact our support team.',
     },
     TH: {
         // FreeHome page
@@ -893,13 +1093,32 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         sponsoredContent: 'เนื้อหาโฆษณา',
         clickAdToVisit: 'คลิกโฆษณาเพื่อไปที่ลิงก์',
         next: 'ถัดไป',
+        userManual: 'คู่มือการใช้งาน',
+        confirmDeleteProject: 'คุณต้องการลบโปรเจคนี้หรือไม่?',
+        projectDeletedSuccessfully: 'ลบโปรเจคเรียบร้อยแล้ว',
+        errorDeletingProject: 'เกิดข้อผิดพลาดในการลบโปรเจค',
+        pleaseEnterProjectName: 'กรุณากรอกชื่อโปรเจค',
+        projectNameSavedSuccessfully: 'บันทึกชื่อโปรเจคเรียบร้อย',
+        errorUpdatingProjectName: 'เกิดข้อผิดพลาดในการแก้ไขชื่อโปรเจค',
+        errorLoadingProjects: 'ไม่สามารถโหลดข้อมูลโปรเจคได้',
+        errorLoadingProject: 'เกิดข้อผิดพลาดในการโหลดโปรเจค',
+        noSavedFiles: 'ไม่มีไฟล์ที่บันทึกไว้',
+        clickToViewDetails: 'คลิกเพื่อดูรายละเอียด ↗',
+        editProjectName: 'แก้ไขชื่อ',
+        deleteProject: 'ลบโปรเจค',
+
+        // FootNav page
+        navAddField: 'เพิ่มแปลง',
+        navNews: 'ข่าวสาร',
+        navProducts: 'สินค้า',
+        navAccount: 'ฉัน',
 
         // UpgradePro page
         cipsPro: 'CIPS Pro',
         forProfessionalUsers: 'สำหรับผู้ใช้ระดับมืออาชีพ',
         proPlan: '⭐ แผน PRO',
-        tokensPerMonth: '500 โทเค็นต่อเดือน',
-        tokensDaily: '100 โทเค็นต่อวัน',
+        tokensPerMonth: 'แผนการให้น้ำไม่จำกัด',
+        tokensDaily: 'การคำนวณแบบเรียลไทม์',
         advancedIrrigationPlanning: 'การวางแผนระบบน้ำขั้นสูง',
         prioritySupport: 'การสนับสนุนแบบพิเศษ',
         exportCapabilities: 'ความสามารถในการส่งออก',
@@ -915,6 +1134,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         dataSecure: 'ข้อมูลของคุณปลอดภัย 100%',
 
         // AcCount page
+        userProfileTitle: 'โปรไฟล์ผู้ใช้ - Free Plan',
         userProfile: 'โปรไฟล์ผู้ใช้',
         manageAccountInfo: 'จัดการข้อมูลบัญชีของคุณ',
         fullName: 'ชื่อเต็ม',
@@ -924,6 +1144,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         freePlanName: 'ฟรี',
         proPlanName: 'Pro',
         advancedPlanName: 'ขั้นสูง',
+        plan: 'แผน',
         basicFeatures: 'ฟีเจอร์พื้นฐานพร้อมโทเค็นจำกัด',
         advancedFeatures: 'ฟีเจอร์ขั้นสูงพร้อมโทเค็นเพิ่มเติม',
         premiumFeatures: 'ฟีเจอร์พรีเมียมพร้อมโทเค็นสูงสุด',
@@ -931,6 +1152,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         advertisementManagement: 'การจัดการโฆษณา',
         uploadManageAds: 'อัปโหลดและจัดการโฆษณาของคุณที่จะแสดงในหน้าแรกของแผนฟรี',
         manageAdvertisements: 'จัดการโฆษณา',
+        manageArticles: 'การจัดการบทความ',
+        writeAndEditNews: 'เขียนและแก้ไขบทความข่าวสาร',
         accountStatistics: 'สถิติบัญชี',
         memberSince: 'สมาชิกตั้งแต่:',
         emailStatus: 'สถานะอีเมล:',
@@ -950,7 +1173,15 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         newPassword: 'รหัสผ่านใหม่',
         confirmPassword: 'ยืนยันรหัสผ่านใหม่',
         passwordChangedSuccessfully: 'รหัสผ่านถูกเปลี่ยนเรียบร้อยแล้ว',
+        profileSavedSuccessfully: 'บันทึกโปรไฟล์สำเร็จ',
         saving: 'กำลังบันทึก...',
+        user: 'ผู้ใช้',
+        notAvailable: 'ไม่มีข้อมูล',
+        manageLineId: 'จัดการ LINE ID',
+        lineId: 'LINE ID',
+        lineIdExample: 'ตัวอย่าง: @username',
+        currentLineId: 'LINE ID ปัจจุบัน:',
+        pleaseEnterLineId: 'กรุณากรอก LINE ID',
 
         // ChooseCrop page
         selectCropTypes: 'เลือกประเภทพืช',
@@ -1061,11 +1292,24 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         searchLocation: 'ค้นหาสถานที่...',
         enterNumberOfZones: 'ใส่จำนวนโซน',
         noPlantSelected: 'ยังไม่ได้เลือกพืช',
+        pleasePlaceWaterBeforeNext: 'กรุณาวางแหล่งน้ำก่อนไปขั้นตอนถัดไป',
+        pleaseDrawAreaBeforeZones: 'กรุณาวาดพื้นที่ก่อนแบ่งโซน',
+        cannotGeneratePipeMapNotReady: 'ไม่สามารถสร้างระบบท่อได้ - แผนที่ยังไม่พร้อม',
+        clickToPlacePump: 'คลิกเพื่อวางปั๊มน้ำ',
+        pipeSystemAlreadyGenerated: 'ระบบท่อถูกสร้างแล้ว กรุณากดรีเซ็ตก่อนสร้างใหม่',
+        pleasePlacePumpBeforePipe: 'กรุณาวางปั๊มก่อนสร้างระบบท่อ',
+        pleaseDivideZonesBeforePipe: 'กรุณาแบ่งโซนก่อนสร้างระบบท่อ',
+        determineNumberOfZones: 'กำหนดจำนวนโซน',
+        numberOfZones: 'จำนวนโซน (1-15):',
+        zoneColorsPreview: 'ตัวอย่างสีโซน:',
+        generate: 'สร้าง',
+        centerOf: 'จุดศูนย์กลางของ',
+        zoneDescription: 'แต่ละโซนจะมีสีเฉพาะตัวและจะถูกแบ่งตามแนวนอนในพื้นที่ของคุณ',
 
         // FreeSummary page
         irrigationSummary: 'สรุประบบชลประทาน',
         save: 'บันทึก',
-        edit: 'แก้ไข',
+        config: 'ตั้งค่า',
         area: 'พื้นที่',
         zone: 'โซน',
         plants: 'พืช',
@@ -1110,6 +1354,11 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         plantsLabel: 'พืช',
         lPerSession: 'ลิตร/รอบ',
         lPerDayPerPlant: 'ลิตร/วัน/พืช',
+        plantsInformation: 'ข้อมูลพืช',
+        sprinklersPerPlant: 'จำนวนสปริงเกลอร์ต่อต้น',
+        perPlant: 'ตัว/ต้น',
+        perSprinkler: 'ต่อสปริงเกลอร์',
+        lpmPerSprinkler: 'LPM/สปริงเกลอร์',
         projectSavedSuccessfully: 'บันทึกโปรเจคสำเร็จ!',
         cannotAddNewProject: 'ไม่สามารถเพิ่มโปรเจคใหม่ได้',
         projectLimitReached: 'คุณมีโปรเจคที่บันทึกไว้ครบ 2 โปรเจคแล้ว',
@@ -1123,9 +1372,9 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         irrigationProducts: 'ผลิตภัณฑ์ระบบชลประทาน',
         selectZone: 'เลือกโซน',
         sprinklerSelector: 'ตัวเลือกสปริงเกลอร์',
-        mainPipeSelection: 'การเลือกท่อหลัก',
-        subMainPipeSelection: 'การเลือกท่อรอง',
-        lateralPipeSelection: 'การเลือกท่อแขนง',
+        mainPipeSelection: 'การเลือกท่อเมน',
+        subMainPipeSelection: 'การเลือกท่อเมนย่อย',
+        lateralPipeSelection: 'การเลือกท่อย่อย',
         pumpSelection: 'การเลือกปั๊ม',
         recommendedSize: 'ขนาดที่แนะนำ',
         totalPrice: 'ราคารวม',
@@ -1171,6 +1420,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         pipeLength: 'ความยาวท่อ:',
         longestPipe: 'ท่อยาวที่สุด:',
         pipeTypeRecommendations: 'คำแนะนำประเภทท่อ:',
+        zoneArea: 'พื้นที่โซน:',
         irrigationTime: 'เวลาน้ำ',
         waterNeedPerSessionLabel: 'ความต้องการน้ำต่อรอบ',
         totalWaterVolume: 'ปริมาณน้ำทั้งหมด',
@@ -1271,6 +1521,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         youDoNotHavePermission: 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้',
         articleCreatedSuccessfully: 'บทความถูกสร้างเรียบร้อยแล้ว',
         errorOccurred: 'เกิดข้อผิดพลาด',
+        preview: 'ตัวอย่าง',
 
         // ProductList page
         productListTitle: 'รายการสินค้า - Free Plan',
@@ -1315,13 +1566,62 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         step3PlacePlants: 'ขั้นตอนที่ 3: วางตำแหน่งพืช',
         placePlants: 'วางตำแหน่งพืช',
         placePlantsDescription: 'วางตำแหน่งพืชบนแผนที่',
+        step3ViewSummary: 'ขั้นตอนที่ 3: ดูสรุป',
+        viewSummary: 'ดูสรุป',
+        viewSummaryDescription: 'ตรวจสอบสรุประบบชลประทานและการคำนวณของคุณ',
         step4PlacePipes: 'ขั้นตอนที่ 4: วางท่อ',
         placePipes: 'วางท่อ',
         placePipesDescription: 'วางท่อเมน ท่อย่อย และท่อแขนง',
+        step4ProductSpecs: 'ขั้นตอนที่ 4: ข้อมูลผลิตภัณฑ์',
+        productSpecs: 'ข้อมูลผลิตภัณฑ์',
+        productSpecsDescription: 'ดูผลิตภัณฑ์ที่แนะนำและข้อมูลจำเพาะของอุปกรณ์',
         skip: 'ข้าม',
         finish: 'เสร็จสิ้น',
         dontShowAgainManual: 'ไม่แสดงคู่มือนี้อีก',
         noImage: 'ไม่มีรูปภาพ',
+
+        // FreeCheckout page
+        recommendedEquipmentList: 'รายการอุปกรณ์ที่แนะนำ',
+        addFriendOnLineButton: 'แอดไลน์ (เพิ่มเพื่อน)',
+        saveQRCode: 'บันทึก QR Code',
+        errorSavingImage: 'ไม่สามารถบันทึกภาพได้ กรุณาลองอีกครั้ง',
+        lineIdExampleWithAuto: 'ตัวอย่าง: @fang.nitipoom หรือ fang.nitipoom (ระบบจะเพิ่ม @ ให้อัตโนมัติ)',
+
+        // PaymentQR page
+        paymentQRCode: 'QR Code สำหรับชำระเงิน',
+        scanQRCodeWithPromptPay: 'สแกน QR Code ด้วย PromptPay',
+        useMobileBankingApp: 'ใช้แอปธนาคารมือถือของคุณที่รองรับ PromptPay เพื่อสแกน QR Code ด้านล่างเพื่อชำระเงินอย่างปลอดภัย',
+        generatingQRCode: 'กำลังสร้าง QR Code...',
+        retry: 'ลองอีกครั้ง',
+        paymentSuccessful: '✓ ชำระเงินสำเร็จ!',
+        paymentFailed: '✗ ชำระเงินไม่สำเร็จ',
+        waitingForPayment: '⏳ กำลังรอการชำระเงิน...',
+        noQRCodeAvailable: 'ไม่มี QR Code',
+        paymentInformation: 'ข้อมูลการชำระเงิน',
+        planLabel: 'แผน:',
+        amountLabel: 'จำนวนเงิน:',
+        paymentMethod: 'วิธีการชำระเงิน:',
+        statusLabel: 'สถานะ:',
+        paid: 'ชำระแล้ว',
+        failed: 'ล้มเหลว',
+        waiting: 'กำลังรอ...',
+        pending: 'รอดำเนินการ',
+        paymentInstructions: 'คำแนะนำการชำระเงิน',
+        openMobileBankingApp: 'เปิดแอปธนาคารมือถือของคุณ (ธนาคารใดก็ได้ที่รองรับ PromptPay)',
+        selectScanQRCodeOption: 'เลือก "สแกน QR Code" หรือ "PromptPay"',
+        scanQRCodeDisplayed: 'สแกน QR Code ที่แสดงด้านบน',
+        verifyPaymentAmount: 'ตรวจสอบจำนวนเงินที่ต้องชำระ',
+        confirmPaymentInBankingApp: 'ยืนยันการชำระเงินในแอปธนาคารของคุณ',
+        paymentStatusWillUpdate: 'สถานะการชำระเงินจะอัปเดตอัตโนมัติ',
+        willRedirectAfterConfirmation: 'คุณจะถูกเปลี่ยนเส้นทางเมื่อการชำระเงินได้รับการยืนยัน',
+        goToAccount: 'ไปที่บัญชี',
+        waitingForPaymentConfirmation: '⏳ กำลังรอการยืนยันการชำระเงิน กรุณาทำการชำระเงินโดยใช้ QR Code ด้านบน',
+        backToUpgradePage: 'กลับไปหน้าอัปเกรด',
+        transactionID: 'รหัสธุรกรรม:',
+        paymentSuccessfulMessage: 'ชำระเงินสำเร็จ! การสมัครสมาชิก Pro Plan ของคุณจะถูกเปิดใช้งานเร็วๆ นี้',
+        failedToGenerateQRCode: 'ไม่สามารถสร้าง QR Code ได้ กรุณาลองอีกครั้ง',
+        promptPayQR: 'PromptPay QR',
+        paymentProcessedSecurely: 'การชำระเงินจะถูกประมวลผลอย่างปลอดภัยผ่าน Omise การสมัครสมาชิก Pro Plan ของคุณจะถูกเปิดใช้งานอัตโนมัติเมื่อการชำระเงินได้รับการยืนยัน หากคุณมีคำถามใดๆ กรุณาติดต่อทีมสนับสนุนของเรา',
     },
 };
 

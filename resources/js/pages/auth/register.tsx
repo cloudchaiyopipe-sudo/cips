@@ -172,7 +172,7 @@ export default function Register() {
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     disabled={processing}
                                     placeholder="กรอกชื่อ-นามสกุลของคุณ"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
                             <InputError message={errors.name} />
@@ -199,7 +199,7 @@ export default function Register() {
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     disabled={processing}
                                     placeholder="example@company.com"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
                             <InputError message={errors.email} />
@@ -226,7 +226,7 @@ export default function Register() {
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     disabled={processing}
                                     placeholder="08x-xxx-xxxx"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
                             <InputError message={errors.phone} />
@@ -251,7 +251,7 @@ export default function Register() {
                                     disabled={processing}
                                     placeholder="กรอกรายละเอียดเพิ่มเติมเกี่ยวกับคุณ..."
                                     rows={3}
-                                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                             </div>
                             <InputError message={errors.additional_details} />
@@ -278,7 +278,7 @@ export default function Register() {
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     disabled={processing}
                                     placeholder="สร้างรหัสผ่านที่แข็งแรง"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                                 <button
                                     type="button"
@@ -319,7 +319,7 @@ export default function Register() {
                                     onKeyDown={(e) => e.key === 'Enter' && submit(e)}
                                     disabled={processing}
                                     placeholder="กรอกรหัสผ่านอีกครั้งเพื่อยืนยัน"
-                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-12 text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
                                 />
                                 <button
                                     type="button"

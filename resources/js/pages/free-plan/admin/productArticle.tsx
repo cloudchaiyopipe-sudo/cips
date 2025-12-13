@@ -102,7 +102,7 @@ export default function CreateProduct() {
                 router.visit('/free-plan/products');
             },
             onError: (errors) => {
-                console.error('เกิดข้อผิดพลาด:', errors);
+                console.error(translations.errorOccurred, errors);
             }
         });
     }
@@ -285,7 +285,7 @@ export default function CreateProduct() {
                                 <div className="relative mt-3">
                                     <img
                                         src={imagePreview || data.image_url}
-                                        alt="Preview"
+                                        alt={translations.preview}
                                         className="max-h-[300px] w-auto rounded border"
                                     />
                                     <button
