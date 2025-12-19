@@ -80,6 +80,7 @@ export interface AnalyzedSprinkler {
     pricePerFlow: number;
     brand?: string;
     image?: string;
+    video_link?: string;
     description?: string;
 }
 
@@ -117,9 +118,19 @@ export interface AnalyzedPump {
 
 export interface PumpAccessory {
     id: number;
-    productCode: string;
+    productCode?: string;
     name: string;
-    brand: string;
+    brand?: string;
+    price?: number;
+    quantity?: number;
+    size?: string;
+    is_included?: boolean;
+    sort_order?: number;
+    image?: string;
+    image_url?: string;
+    accessory_type?: string;
+    specifications?: any;
+    description?: string;
 }
 
 export interface HeadLossValidation {

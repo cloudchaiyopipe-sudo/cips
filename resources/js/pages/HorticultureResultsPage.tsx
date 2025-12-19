@@ -427,11 +427,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 3 * connectionPointSize,
+                            scale: 2 * connectionPointSize,
                             fillColor: '#FF6B6B',
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
-                            strokeWeight: 2,
+                            strokeWeight: 1.5,
                         },
                         zIndex: 2000,
                         title: `จุดเชื่อมต่อท่อย่อย: ${lateralPipe.id}`,
@@ -485,7 +485,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                             map: map,
                             icon: {
                                 path: google.maps.SymbolPath.CIRCLE,
-                                scale: 3 * connectionPointSize,
+                                scale: 2 * connectionPointSize,
                                 fillColor: '#FFB347',
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
@@ -803,8 +803,8 @@ const GoogleMapsResultsOverlays: React.FC<{
             filteredConnectionPoints.forEach((mergedPoint, index) => {
                 const baseScale =
                     mergedPoint.data.length > 1
-                        ? Math.min(5, 3 + mergedPoint.data.length)
-                        : 3;
+                        ? Math.min(3, 2 + mergedPoint.data.length * 0.3)
+                        : 2;
                 const connectionMarker = new google.maps.Marker({
                     position: new google.maps.LatLng(
                         mergedPoint.position.lat,
@@ -817,7 +817,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                         fillColor: mergedPoint.color,
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+                        strokeWeight: 1.5,
                     },
                     zIndex: mergedPoint.zIndex,
                     title: mergedPoint.title,
@@ -882,7 +882,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3 * connectionPointSize,
+                        scale: 2 * connectionPointSize,
                         fillColor: '#F59E0B',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
@@ -932,11 +932,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4 * connectionPointSize,
+                        scale: 2.5 * connectionPointSize,
                         fillColor: '#3B82F6',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+                        strokeWeight: 1.5,
                     },
                     zIndex: 2003,
                     title: `จุดตัดท่อเมนรอง ↔ ท่อเมน`,
@@ -982,7 +982,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3 * connectionPointSize,
+                        scale: 2 * connectionPointSize,
                         fillColor: '#10B981',
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
@@ -2130,7 +2130,7 @@ function EnhancedHorticultureResultsPageContent() {
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <Navbar />
-            <div className="p-4">
+            <div className="p-4 pt-20">
                 <div className="mx-auto w-full">
                     {/* Header */}
                     <div className="mx-4 mb-4 flex justify-between text-left">

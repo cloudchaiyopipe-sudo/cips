@@ -2553,7 +2553,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                 {/* Navbar */}
                 <Navbar />
 
-                <div className="h-[calc(100vh-4rem)] overflow-hidden">
+                <div className="h-[calc(100vh-4rem)] overflow-hidden pt-20">
                     <div className="flex h-full">
                         {/* Left Side - Control Panel */}
                         <div

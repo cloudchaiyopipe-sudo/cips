@@ -94,7 +94,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
             <Navbar />
 
             {/* Main Content with adjusted height to account for navbar */}
-            <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
+            <div className="flex pt-20" style={{ height: 'calc(100vh - 64px)' }}>
                 {/* Sidebar - Fixed Summary Panel */}
                 <div className="flex w-80 flex-col overflow-hidden border-r border-gray-700 bg-gray-800">
                     {/* Header */}

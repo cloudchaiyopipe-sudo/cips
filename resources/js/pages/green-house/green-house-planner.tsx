@@ -1877,7 +1877,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             </div>
 
             {/* Main Content with top padding to account for fixed navbar */}
-            <div className="flex h-full flex-col pt-16">
+            <div className="flex h-full flex-col pt-20">
                 {/* Header */}
                 {!isHeaderCollapsed ? (
                     <div className="relative flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">

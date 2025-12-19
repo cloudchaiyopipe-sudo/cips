@@ -211,7 +211,7 @@ export default function NewHome() {
                 <Navbar />
 
                 {/* Pro/Advanced User Hero Section */}
-                <section className="relative bg-gradient-to-br from-gray-800 to-gray-900 py-20">
+                <section className="relative bg-gradient-to-br from-gray-800 to-gray-900 py-20 pt-20">
                     <div className="mx-auto max-w-7xl px-6">
                         <div className="text-center">
                             <div className="mb-6">
@@ -346,7 +346,7 @@ export default function NewHome() {
             <Navbar />
 
             {/* Hero Section with App Screenshot */}
-            <section className="relative bg-gradient-to-br from-gray-800 to-gray-900 py-20">
+            <section className="relative bg-gradient-to-br from-gray-800 to-gray-900 py-20 pt-20">
                 <div className="mx-auto max-w-7xl px-6">
                     <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:gap-16">
                         {/* Left Content */}

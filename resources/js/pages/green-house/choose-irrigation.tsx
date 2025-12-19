@@ -131,7 +131,7 @@ export default function ChooseIrrigationMethod() {
             </div>
 
             {/* Main Content with top padding to account for fixed navbar */}
-            <div className="h-full overflow-y-auto pt-16">
+            <div className="h-full overflow-y-auto pt-20">
                 <div className="flex min-h-full flex-col items-center justify-center p-4">
                     <div className="w-full max-w-4xl">
                         {/* Header */}

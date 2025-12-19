@@ -1928,7 +1928,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             >
                 <Navbar />
 
-                <div className="h-[calc(100vh-4rem)] overflow-hidden">
+                <div className="h-[calc(100vh-4rem)] overflow-hidden pt-20">
                     <div className="flex h-full">
                         {/* Left Side - Control Panel */}
                         <div

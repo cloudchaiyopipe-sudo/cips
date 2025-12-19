@@ -60,7 +60,7 @@ class SummaryErrorBoundary extends React.Component<
             return (
                 <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6">
                     <Navbar />
-                    <div className="rounded-lg bg-red-900 p-6 text-center text-white">
+                    <div className="rounded-lg bg-red-900 p-6 text-center text-white pt-20">
                         <h2 className="mb-4 text-xl font-bold">
                             {t('เกิดข้อผิดพลาดในการแสดงสรุปผล')}
                         </h2>
@@ -1265,7 +1265,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         return (
             <div className="flex min-h-screen w-full items-center justify-center bg-gray-900 p-6">
                 <Navbar />
-                <div className="text-center">
+                <div className="text-center pt-20">
                     <h1 className="mb-4 text-2xl font-bold text-white">
                         {error || t('ไม่พบข้อมูลการออกแบบ')}
                     </h1>
@@ -1283,7 +1283,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     return (
         <SummaryErrorBoundary t={t}>
             <Navbar />
-            <div className="min-h-screen w-full bg-gray-900 p-6">
+            <div className="min-h-screen w-full bg-gray-900 p-6 pt-20">
                 {error && (
                     <div className="fixed left-4 top-4 z-50 rounded-lg bg-red-600 p-4 text-white shadow-lg">
                         <div className="flex items-center justify-between">

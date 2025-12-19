@@ -2261,6 +2261,8 @@ export const countConnectionPointsByZoneFromFiltered = (
     });
 
     // 6. submain-to-lateral connections
+    // สำหรับ submain-to-lateral ต้องนับทุก connection แยกกัน ไม่ merge
+    // เพราะท่อย่อยหลายเส้นอาจเริ่มจากจุดเดียวกันบนท่อเมนรอง
     if (projectData.lateralPipes) {
         const subMainToLateralConnections = findSubMainToLateralStartConnections(
             projectData.subMainPipes,
@@ -2291,18 +2293,53 @@ export const countConnectionPointsByZoneFromFiltered = (
                 );
 
                 if (subMainZoneId && lateralZoneId && subMainZoneId === lateralZoneId) {
-                    addConnectionPoint(
-                        connection.connectionPoint,
-                        'submain-to-lateral',
-                        {
+                    // สำหรับ submain-to-lateral ใช้ position key ที่รวม lateralPipeId ด้วย
+                    // เพื่อไม่ให้ merge connections ที่เป็นท่อย่อยต่างเส้นแม้จะเริ่มจากจุดเดียวกัน
+                    const positionKey = `${connection.connectionPoint.lat.toFixed(6)}_${connection.connectionPoint.lng.toFixed(6)}_${connection.lateralPipeId}`;
+                    
+                    // หา zoneId จาก connection point position
+                    let zoneId: string | null = null;
+
+                    // ตรวจสอบจาก irrigationZones ก่อน
+                    if (irrigationZones && irrigationZones.length > 0) {
+                        for (const zone of irrigationZones) {
+                            if (
+                                zone.coordinates &&
+                                zone.coordinates.length >= 3 &&
+                                isPointInPolygon(connection.connectionPoint, zone.coordinates)
+                            ) {
+                                zoneId = zone.id;
+                                break;
+                            }
+                        }
+                    }
+
+                    // ถ้ายังไม่มี ให้ตรวจสอบจาก zones
+                    if (!zoneId && projectData.zones && projectData.zones.length > 0) {
+                        for (const zone of projectData.zones) {
+                            if (
+                                zone.coordinates &&
+                                zone.coordinates.length >= 3 &&
+                                isPointInPolygon(connection.connectionPoint, zone.coordinates)
+                            ) {
+                                zoneId = zone.id;
+                                break;
+                            }
+                        }
+                    }
+
+                    // เพิ่ม connection point โดยไม่ merge กับจุดอื่น (ใช้ unique key)
+                    mergedConnectionPointsMap.set(positionKey, {
+                        position: connection.connectionPoint,
+                        types: ['submain-to-lateral'],
+                        data: [{
                             id: `submain-lateral-${connection.subMainPipeId}-${connection.lateralPipeId}`,
                             subMainPipeId: connection.subMainPipeId,
                             lateralPipeId: connection.lateralPipeId,
                             type: 'submain-to-lateral',
-                        },
-                        undefined,
-                        subMainPipe
-                    );
+                        }],
+                        zoneId: zoneId || undefined,
+                    });
                 }
             }
         });

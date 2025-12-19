@@ -3921,6 +3921,7 @@ const ManualIrrigationZoneModal = ({
     numberOfZones,
     onNumberOfZonesChange,
     onStartDrawing,
+    totalPlants,
     t,
 }: {
     isOpen: boolean;
@@ -3928,15 +3929,25 @@ const ManualIrrigationZoneModal = ({
     numberOfZones: number;
     onNumberOfZonesChange: (number: number) => void;
     onStartDrawing: () => void;
+    totalPlants: number;
     t: (key: string) => string;
 }) => {
     const [inputValue, setInputValue] = useState<string>(numberOfZones.toString());
+    const [showPumpModal, setShowPumpModal] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setInputValue(numberOfZones.toString());
         }
     }, [isOpen, numberOfZones]);
+
+    const sprinklerConfig = loadSprinklerConfig();
+    const totalWaterFlowRateLPM =
+        totalPlants * (sprinklerConfig?.flowRatePerMinute || 0) * (sprinklerConfig?.sprinklersPerTree || 1);
+
+    const handleApplyPumpZones = (numberOfZones: number) => {
+        onNumberOfZonesChange(Math.min(numberOfZones, 20));
+    };
 
     return (
         <div
@@ -3993,6 +4004,12 @@ const ManualIrrigationZoneModal = ({
                             }}
                             className="w-full rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
+                        <button
+                            onClick={() => setShowPumpModal(true)}
+                            className="mt-2 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                        >
+                            💧 {t('แบ่งโซนจากปั๊มน้ำของคุณ')}
+                        </button>
                     </div>
 
                     <div className="rounded-lg bg-blue-900 p-3">
@@ -4027,6 +4044,14 @@ const ManualIrrigationZoneModal = ({
                         ✏️ {t('เริ่มวาดโซน')}
                     </button>
                 </div>
+
+                <PumpBasedZoneModal
+                    isOpen={showPumpModal}
+                    onClose={() => setShowPumpModal(false)}
+                    totalWaterFlowRateLPM={totalWaterFlowRateLPM}
+                    onApplyZones={handleApplyPumpZones}
+                    t={t}
+                />
             </div>
         </div>
     );
@@ -11715,7 +11740,7 @@ export default function EnhancedHorticulturePlannerPage() {
         return (
             <div className="min-h-screen bg-gray-900 text-white">
                 <Navbar />
-                <div className="flex h-screen items-center justify-center">
+                <div className="flex h-screen items-center justify-center pt-20">
                     <div className="mx-auto max-w-md rounded-lg bg-gray-800 p-8 text-center">
                         <div className="mb-4 text-6xl">⚠️</div>
                         <h2 className="mb-4 text-xl font-semibold text-red-400">
@@ -13750,7 +13775,7 @@ export default function EnhancedHorticulturePlannerPage() {
 
             <header className="sticky top-0 z-50 border-b border-gray-200 bg-gray-800 shadow-sm">
                 <Navbar />
-                <div className="px-4 py-3">
+                <div className="px-4 py-3 pt-20">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-6">
                             <div className="flex items-center space-x-2">
@@ -14651,7 +14676,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                     className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 hover:text-white"
                                                                     data-tour="start-plant-selection"
                                                                 >
-                                                                    🌱 {t('เริ่มสร้างต้นไม้')}
+                                                                    {t('สร้างต้นไม้อัตโนมัติ')}
                                                                 </button>
                                                             )}
 
@@ -15483,7 +15508,16 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                     }}
                                                                     className="w-full rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100"
                                                                 >
-                                                                    💧 {t('แบ่งโซนด้วยตัวเองใหม่')}
+                                                                    💧 {t('แบ่งโซนด้วยตัวเอง')}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        setShowAutoZoneModal(true)
+                                                                    }
+                                                                    className="w-full rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100"
+                                                                    data-tour="auto-zone"
+                                                                >
+                                                                    🔄 {t('แบ่งโซนอัตโนมัติ')}
                                                                 </button>
                                                                 <button
                                                                     onClick={
@@ -15534,15 +15568,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                         ? t('ออกจากการแก้ไข')
                                                                         : t('แก้ไขโซน')}
                                                                 </button>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        setShowAutoZoneModal(true)
-                                                                    }
-                                                                    className="w-full rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100"
-                                                                    data-tour="auto-zone"
-                                                                >
-                                                                    🔄 {t('เปลี่ยนแบบโซนอัตโนมัติ')}
-                                                                </button>
+                                                                
                                                                 <button
                                                                     onClick={() => {
                                                                         if (
@@ -17157,6 +17183,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 numberOfZones={numberOfManualZones}
                 onNumberOfZonesChange={setNumberOfManualZones}
                 onStartDrawing={handleStartManualIrrigationZones}
+                totalPlants={history.present.plants.length}
                 t={t}
             />
 

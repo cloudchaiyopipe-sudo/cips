@@ -128,7 +128,7 @@ export default function Profile() {
             <div className="min-h-screen bg-gray-900">
                 <Head title="Profile" />
                 <Navbar />
-                <div className="flex min-h-[50vh] items-center justify-center">
+                <div className="flex min-h-[50vh] items-center justify-center pt-20">
                     <div className="text-center">
                         <h1 className="mb-4 text-2xl font-bold text-white">Loading Profile...</h1>
                         <p className="text-gray-400">
@@ -146,7 +146,7 @@ export default function Profile() {
             <Head title="Profile" />
             <Navbar />
 
-            <div className="p-6">
+            <div className="p-6 pt-20">
                 <div className="mx-auto max-w-4xl">
                     {/* Header */}
                     <div className="mb-8">

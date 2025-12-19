@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CalculationResults, PipeType, IrrigationInput, AnalyzedPipe } from '../types/interfaces';
 import { calculatePipeRolls } from '../utils/calculations';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -514,6 +514,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         },
         [t]
     );
+
 
     useEffect(() => {
         const loadPipes = async () => {
@@ -1780,6 +1781,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         ))}
                     </div>
                 )}
+
 
                 {/* แสดงข้อมูลท่อที่เลือก */}
                 {selectedPipe && (

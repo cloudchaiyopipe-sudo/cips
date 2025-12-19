@@ -2649,7 +2649,7 @@ export default function GreenhouseSummary() {
                 </div>
 
                 {/* Add padding top to account for fixed navbar */}
-                <div className="pt-16"></div>
+                <div className="pt-20"></div>
 
                 <div className="border-b border-gray-700 bg-gray-800">
                     <div className="mx-auto px-4 py-6">
@@ -2765,7 +2765,7 @@ export default function GreenhouseSummary() {
             </div>
 
             {/* Add padding top to account for fixed navbar */}
-            <div className="pt-16 print:pt-0"></div>
+            <div className="pt-20 print:pt-0"></div>
 
             {/* Enhanced Header Section with Action Buttons */}
             <div className="border-b border-gray-700 bg-gray-800 print:hidden print:border-gray-300 print:bg-white">

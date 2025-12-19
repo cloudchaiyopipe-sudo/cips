@@ -1691,7 +1691,7 @@ export default function Home() {
     return (
         <div className="flex min-h-screen flex-col bg-gray-900">
             <Navbar />
-            <div className="flex-1">
+            <div className="flex-1 pt-20">
                 <div className="p-6">
                     <div className="mx-auto max-w-7xl">
                         {/* Main Content Header */}

@@ -7,6 +7,7 @@ import {
     QuotationData,
     QuotationDataCustomer,
     IrrigationInput,
+    PumpAccessory,
 } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
@@ -1066,25 +1067,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 originalData: selectedPump,
             });
 
-            const accessories = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
+            const accessories: PumpAccessory[] = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
 
             if (accessories && accessories.length > 0) {
                 accessories
                     .sort(
-                        (a: { sort_order: any }, b: { sort_order: any }) =>
+                        (a: PumpAccessory, b: PumpAccessory) =>
                             (a.sort_order || 0) - (b.sort_order || 0)
                     )
                     .forEach(
-                        (accessory: {
-                            id: any;
-                            name: any;
-                            size: any;
-                            is_included: any;
-                            price: any;
-                            image_url: any;
-                            image: any;
-                            accessory_type: any;
-                        }) => {
+                        (accessory: PumpAccessory) => {
                             if (
                                 !accessory.is_included ||
                                 (accessory.price && accessory.price > 0)
@@ -1098,7 +1090,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 };
 
                                 const typeName =
-                                    accessoryTypeMap[accessory.accessory_type] ||
+                                    (accessory.accessory_type && accessoryTypeMap[accessory.accessory_type]) ||
                                     accessory.accessory_type ||
                                     '';
 
@@ -1108,7 +1100,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     image: accessory.image_url || accessory.image || '',
                                     date: '',
                                     description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''}`,
-                                    quantity: 1,
+                                    quantity: accessory.quantity || 1,
                                     unitPrice: accessory.is_included ? 0 : accessory.price || 0,
                                     discount: accessory.is_included ? 0 : 0.0,
                                     taxes: 'Output\nVAT\n7%',

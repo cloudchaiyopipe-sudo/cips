@@ -60,7 +60,7 @@ export default function AreaInputMethod({ crops }: AreaInputMethodProps) {
             </div>
 
             {/* Main Content with top padding to account for fixed navbar */}
-            <div className="h-full overflow-y-auto pt-16">
+            <div className="h-full overflow-y-auto pt-20">
                 <div className="mx-auto max-w-6xl p-6">
                     {/* Header */}
                     <div className="mb-8">
