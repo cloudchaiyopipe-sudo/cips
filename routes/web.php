@@ -27,16 +27,13 @@ use Illuminate\Auth\Events\Verified;
 */
 
 Route::get('/', function () {
-    $user = auth()->user();
-    
-    // If user is sales, redirect to equipment-crud
-    if ($user && $user->role === 'sales') {
-        return redirect()->route('equipment-crud');
-    }
-    
+    // Always render new-home for all authenticated users
+    // (Previously redirected sales users to equipment-crud)
     return Inertia::render('new-home');
 })->middleware(['auth'])->name('home');
 
+// Route for home.tsx (field management page)
+// Accessible via "Try Advanced For Free" button in new-home
 Route::get('/fields', function () {
     $user = auth()->user();
     

@@ -89,10 +89,36 @@ function Ads() {
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate A4 aspect ratio (210:297 = 0.707:1)
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            
+            img.onload = () => {
+                const aspectRatio = img.width / img.height;
+                const a4Ratio = 210 / 297; // A4 aspect ratio
+                const tolerance = 0.05; // 5% tolerance
+                
+                if (Math.abs(aspectRatio - a4Ratio) > tolerance) {
+                    alert(`ภาพควรมีอัตราส่วน A4 (210:297 หรือ 0.707:1)\nอัตราส่วนปัจจุบัน: ${aspectRatio.toFixed(3)}\nอัตราส่วน A4: ${a4Ratio.toFixed(3)}\n\nกรุณาเลือกภาพที่มีอัตราส่วนใกล้เคียง A4`);
+                    e.target.value = ''; // Clear the input
+                    URL.revokeObjectURL(objectUrl);
+                    return;
+                }
+                
             setFormData((prev) => ({
                 ...prev,
                 image: file,
             }));
+                URL.revokeObjectURL(objectUrl);
+            };
+            
+            img.onerror = () => {
+                alert('ไม่สามารถโหลดภาพได้ กรุณาลองอีกครั้ง');
+                e.target.value = '';
+                URL.revokeObjectURL(objectUrl);
+            };
+            
+            img.src = objectUrl;
         }
     };
 
@@ -289,7 +315,10 @@ function Ads() {
                                     className="w-full rounded bg-slate-800/60 px-3 py-2 text-sm"
                                 />
                                 <p className="mt-1 text-xs text-slate-400">
-                                    Supported formats: JPG, PNG, GIF. Max size: 5MB
+                                    รูปแบบที่รองรับ: JPG, PNG, GIF. ขนาดสูงสุด: 5MB
+                                </p>
+                                <p className="mt-1 text-xs text-amber-400">
+                                    ⚠️ ภาพต้องมีอัตราส่วน A4 (210:297 หรือ 0.707:1) เช่น 595x842px, 1240x1754px, 2480x3508px
                                 </p>
                             </div>
 
@@ -331,12 +360,13 @@ function Ads() {
                             {advertisements.map((ad) => (
                                 <div key={ad.id} className="rounded-lg bg-slate-700/50 p-4">
                                     <div className="flex flex-col items-stretch gap-4 md:flex-row md:items-start">
-                                        {/* Image */}
+                                        {/* Image - A4 Aspect Ratio Preview */}
                                         <div className="flex-shrink-0">
                                             <img
                                                 src={ad.image_url}
                                                 alt={ad.title}
-                                                className="h-16 w-16 rounded object-cover md:h-20 md:w-20"
+                                                className="h-24 rounded object-contain md:h-40 lg:h-48"
+                                                style={{ aspectRatio: '210/297', width: 'auto' }}
                                                 onError={(e) => {
                                                     const target = e.target as HTMLImageElement;
                                                     target.src = '/images/no-image.jpg';

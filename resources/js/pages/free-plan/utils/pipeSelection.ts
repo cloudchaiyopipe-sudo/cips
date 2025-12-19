@@ -5,7 +5,7 @@ export interface PipeRecommendation {
     sizeMM: number;
     sizeInch: string;
     reason: string;
-    pressureLoss?: number; // Pressure loss in meters
+    pressureLoss?: number; // Pressure loss in meters (เฉพาะท่อนั้นๆ)
     hf?: number; // Head loss per 100m
     adjustmentFactor?: number; // F value
     calculationDetails?: {
@@ -84,6 +84,7 @@ function getAdjustmentFactor(outlets: number): number {
 }
 
 // ฟังก์ชันคำนวณ Pressure Loss และเลือกขนาดท่อที่เหมาะสม (สำหรับ pipe type เดียว)
+// Returns Self Loss for that specific pipe segment
 function calculateOptimalPipeSize(
     flowRate: number,
     length: number,
@@ -260,13 +261,13 @@ function calculateOptimalPipeSize(
     const sizeInch = bestSize.sizeInch;
 
     // สร้าง reason พร้อมแสดง maxPressureLoss
-    const reason = `Pressure Loss: ${bestSize.pressureLoss.toFixed(2)}m / Max: ${maxPressureLoss.toFixed(2)}m (Formula: (HF/10) × Length × F = (${bestSize.hf.toFixed(3)}/10) × ${length.toFixed(1)} × ${adjustmentFactor.toFixed(3)})`;
+    const reason = `Pressure Loss: ${bestSize.pressureLoss.toFixed(2)}m / Max Allowed for this segment: ${maxPressureLoss.toFixed(2)}m`;
 
     return {
         sizeMM: bestSize.sizeMM,
         sizeInch: `${sizeInch}"`,
         reason: reason,
-        pressureLoss: bestSize.pressureLoss,
+        pressureLoss: bestSize.pressureLoss, // Return Self Loss
         hf: bestSize.hf,
         adjustmentFactor: adjustmentFactor,
         calculationDetails: {
@@ -427,14 +428,6 @@ function enforcePipeSizeHierarchy(result: PipeTypeRecommendations): PipeTypeReco
 }
 
 // ฟังก์ชันคำนวณ maxPressureLoss ตามสัดส่วนที่กำหนด
-// คำนวณแบบ cascade: lateral → subMain → main
-// สรุป: Loss รวมทั้งหมด (lateral + subMain + main) ต้องไม่เกิน 20% ของ head loss
-// เช่น แรงดัน 2 bar = 20m head, loss รวมต้องไม่เกิน 4m
-// การคำนวณ:
-// 1. Lateral: คำนวณก่อน - ใช้ได้ 40% ของ totalLossMax (อัตราส่วน 40:60 กับ subMain)
-// 2. SubMain: รวม loss ของ lateral ที่เชื่อมกับมัน - ใช้ได้ 60% ของ totalLossMax
-// 3. Main: รวม loss ของ lateral + subMain - ใช้ได้ 20% ของ head - (lateralLoss + subMainLoss)
-// เงื่อนไข: loss ของ lateral ต้องไม่มากกว่า loss ของ subMain (ไม่รวม lateral)
 function calculateMaxPressureLoss(
     waterPressure: number,
     pipeType: string,
@@ -451,22 +444,20 @@ function calculateMaxPressureLoss(
 
     if (pipeType === 'lateral') {
         // Lateral: คำนวณก่อน - ใช้ได้ 40% ของ totalLossMax (อัตราส่วน 40:60 กับ subMain)
-        return totalLossMax * 0.4; // 4m * 0.4 = 1.6m
+        return totalLossMax * 0.4;
     } else if (pipeType === 'subMain') {
         // SubMain: รวม loss ของ lateral ที่เชื่อมกับมัน
-        // ใช้ได้ 60% ของ totalLossMax
         const lateralLoss = previousLosses?.lateralLoss || 0;
-        const subMainMaxAllocation = totalLossMax * 0.6; // 4m * 0.6 = 2.4m
+        const subMainMaxAllocation = totalLossMax * 0.6;
         // ใช้ค่าที่น้อยกว่าระหว่าง subMainMaxAllocation กับ remainingLoss
-        const remainingLoss = totalLossMax - lateralLoss; // 4m - lateralLoss
+        const remainingLoss = totalLossMax - lateralLoss;
         return Math.max(0, Math.min(subMainMaxAllocation, remainingLoss));
     } else {
         // Main: รวม loss ของ lateral + subMain
-        // ใช้ได้ 20% ของ head - (lateralLoss + subMainLoss)
         const lateralLoss = previousLosses?.lateralLoss || 0;
         const subMainLoss = previousLosses?.subMainLoss || 0;
         const usedLoss = lateralLoss + subMainLoss;
-        const remainingLoss = totalLossMax - usedLoss; // 4m - (lateral + subMain)
+        const remainingLoss = totalLossMax - usedLoss;
         // ต้องไม่เป็นลบ
         return Math.max(0, remainingLoss);
     }
@@ -475,10 +466,10 @@ function calculateMaxPressureLoss(
 // ฟังก์ชันคำนวณทั้ง PE และ PVC สำหรับ pipe type หนึ่ง
 function calculatePipeSizeForType(
     flowRate: number,
-    longestLength: number, // ใช้ความยาวท่อที่ยาวที่สุดของแต่ละชนิด
-    pipeType: string, // 'main', 'subMain', 'lateral'
+    longestLength: number,
+    pipeType: string,
     outlets: number = 1,
-    waterPressure: number = 2.0, // แรงดันน้ำในหน่วย Bar
+    waterPressure: number = 2.0,
     previousLosses?: {
         lateralLoss?: number;
         subMainLoss?: number;
@@ -486,7 +477,7 @@ function calculatePipeSizeForType(
 ): PipeTypeRecommendation {
     const result: PipeTypeRecommendation = {};
 
-    // คำนวณ maxPressureLoss ตามสัดส่วนแบบ cascade
+    // คำนวณ maxPressureLoss (งบประมาณ Loss ที่เหลืออยู่สำหรับท่อส่วนนี้)
     const maxPressureLoss = calculateMaxPressureLoss(waterPressure, pipeType, previousLosses);
 
     // กำหนดตารางที่ใช้สำหรับแต่ละ pipe type
@@ -542,13 +533,13 @@ function calculatePipeSizeForType(
     return result;
 }
 
-// ฟังก์ชันหลักสำหรับคำนวณขนาดท่อ (ใช้ข้อมูลจาก zone และตารางเท่านั้น) - เก็บไว้สำหรับ backward compatibility
+// ฟังก์ชันหลักสำหรับคำนวณขนาดท่อ (Backward compatibility)
 export const calculatePipeSize = (
     flowRate: number,
     length: number,
     pipeType: string,
     outlets: number = 1,
-    waterPressure: number = 2.0 // Default 2 Bar
+    waterPressure: number = 2.0
 ): PipeRecommendation => {
     const typeResult = calculatePipeSizeForType(flowRate, length, pipeType, outlets, waterPressure);
     // Return PE ถ้ามี ไม่เช่นนั้น return PVC
@@ -563,30 +554,27 @@ export const calculatePipeSize = (
     );
 };
 
-// ฟังก์ชันสำหรับคำนวณข้อเสนอแนะทั้งหมด (ใช้ flow rate ของ zone ที่เลือก)
-// คำนวณแบบ cascade: lateral → subMain → main
+// ฟังก์ชันสำหรับคำนวณข้อเสนอแนะทั้งหมด (Backward compatibility)
 export const calculatePipeRecommendations = (
-    zoneFlowRate: number, // Flow rate ของ zone ที่เลือก
-    lateralFlowRate: number, // Flow rate ต่อ sprinkler
-    waterPressure: number, // แรงดันน้ำในหน่วย Bar
+    zoneFlowRate: number,
+    lateralFlowRate: number,
+    waterPressure: number,
     zoneData?: {
-        mainLongestLength?: number; // ความยาวท่อเมนที่ยาวที่สุด
-        subMainLongestLength?: number; // ความยาวท่อเมนย่อยที่ยาวที่สุด
-        lateralLongestLength?: number; // ความยาวท่อย่อยที่ยาวที่สุด
-        mainLength?: number; // สำหรับ backward compatibility
-        subMainLength?: number; // สำหรับ backward compatibility
-        lateralLength?: number; // สำหรับ backward compatibility
+        mainLongestLength?: number;
+        subMainLongestLength?: number;
+        lateralLongestLength?: number;
+        mainLength?: number;
+        subMainLength?: number;
+        lateralLength?: number;
         mainOutlets?: number;
         subMainOutlets?: number;
         lateralOutlets?: number;
     }
 ): PipeRecommendations => {
-    // ใช้ longestLength ถ้ามี ไม่เช่นนั้นใช้ length (backward compatibility)
     const mainLongestLength = zoneData?.mainLongestLength || zoneData?.mainLength || 50;
     const subMainLongestLength = zoneData?.subMainLongestLength || zoneData?.subMainLength || 30;
     const lateralLongestLength = zoneData?.lateralLongestLength || zoneData?.lateralLength || 20;
 
-    // ใช้ calculatePipeRecommendationsWithTypes เพื่อคำนวณแบบ cascade
     const pipeTypeRecs = calculatePipeRecommendationsWithTypes(
         zoneFlowRate,
         lateralFlowRate,
@@ -601,7 +589,6 @@ export const calculatePipeRecommendations = (
         }
     );
 
-    // ใช้ PE เป็นค่าเริ่มต้น (backward compatibility)
     return {
         main: pipeTypeRecs.main.pe ||
             pipeTypeRecs.main.pvc || {
@@ -630,79 +617,38 @@ export const calculatePipeRecommendations = (
 // ฟังก์ชันใหม่สำหรับคำนวณข้อเสนอแนะทั้งหมดพร้อมทั้ง PE และ PVC
 // คำนวณแบบ cascade: lateral → subMain → main
 export const calculatePipeRecommendationsWithTypes = (
-    zoneFlowRate: number, // Flow rate ของ zone ที่เลือก
-    lateralFlowRate: number, // Flow rate ต่อ sprinkler
-    waterPressure: number, // แรงดันน้ำในหน่วย Bar
+    zoneFlowRate: number,
+    lateralFlowRate: number,
+    waterPressure: number,
     zoneData?: {
-        mainLongestLength?: number; // ความยาวท่อเมนที่ยาวที่สุด
-        subMainLongestLength?: number; // ความยาวท่อเมนย่อยที่ยาวที่สุด
-        lateralLongestLength?: number; // ความยาวท่อย่อยที่ยาวที่สุด
-        mainOutlets?: number; // จำนวนทางออกของท่อเมน (จำนวน subMain ที่เชื่อมกับ main)
-        subMainOutlets?: number; // จำนวนทางออกของท่อเมนย่อย (จำนวน lateral ที่เชื่อมกับ subMain)
-        lateralOutlets?: number; // จำนวนทางออกของท่อย่อย (จำนวน sprinklers ใน lateral line)
-        // Flow rates สำหรับท่อที่ยาวที่สุด
-        lateralLongestFlowRate?: number; // Flow rate ที่ท่อ lateral ที่ยาวที่สุดรับ
-        subMainLongestFlowRate?: number; // Flow rate รวมที่ท่อ subMain ที่ยาวที่สุดรับ (จาก lateral ทั้งหมดที่เชื่อมกับมัน)
-        mainLongestFlowRate?: number; // Flow rate รวมที่ท่อ main ที่ยาวที่สุดรับ (จาก subMain ทั้งหมดที่เชื่อมกับมัน)
+        mainLongestLength?: number;
+        subMainLongestLength?: number;
+        lateralLongestLength?: number;
+        mainOutlets?: number;
+        subMainOutlets?: number;
+        lateralOutlets?: number;
+        lateralLongestFlowRate?: number;
+        subMainLongestFlowRate?: number;
+        mainLongestFlowRate?: number;
     }
 ): PipeTypeRecommendations => {
-    // ใช้ความยาวท่อที่ยาวที่สุดของแต่ละชนิด (ต้องส่งมาจาก longestPipes)
-    const mainLongestLength = zoneData?.mainLongestLength || 50; // Default 50m
-    const subMainLongestLength = zoneData?.subMainLongestLength || 30; // Default 30m
-    const lateralLongestLength = zoneData?.lateralLongestLength || 20; // Default 20m
+    // ใช้ความยาวท่อที่ยาวที่สุดของแต่ละชนิด
+    const mainLongestLength = zoneData?.mainLongestLength || 50;
+    const subMainLongestLength = zoneData?.subMainLongestLength || 30;
+    const lateralLongestLength = zoneData?.lateralLongestLength || 20;
     const mainOutlets = zoneData?.mainOutlets || 1;
     const subMainOutlets = zoneData?.subMainOutlets || 1;
     const lateralOutlets = zoneData?.lateralOutlets || 1;
 
     // คำนวณ flow rate สำหรับท่อที่ยาวที่สุดแต่ละประเภท
-    // ⚠️ สำคัญ: การคำนวณ fallback นี้เป็นเพียงการประมาณการ (estimation) ที่อาจจะ overestimate
-    // ควรส่งค่า lateralLongestFlowRate, subMainLongestFlowRate, และ mainLongestFlowRate
-    // ที่เป็นผลรวมที่แท้จริง (Actual Sum) จากส่วนที่เรียกใช้เสมอ
-
-    // 1. Lateral ที่ยาวที่สุด: รับ flow rate จาก sprinklers ใน lateral line นั้น
-    // Flow rate = flow rate ต่อ sprinkler × จำนวน sprinklers (lateralOutlets)
-    // ⚠️ Fallback: สมมติว่าทุก sprinkler ใน lateral line มี flow rate เท่ากัน
-    // ซึ่งอาจจะ overestimate ถ้า lateral line ที่ยาวที่สุดมี sprinklers น้อยกว่าค่าเฉลี่ย
     const lateralLongestFlowRate =
         zoneData?.lateralLongestFlowRate || lateralFlowRate * lateralOutlets;
-
-    if (!zoneData?.lateralLongestFlowRate) {
-        console.warn(
-            `⚠️ [Pipe Selection] Using fallback calculation for lateralLongestFlowRate: ${lateralLongestFlowRate.toFixed(2)} LPM (${lateralFlowRate.toFixed(2)} × ${lateralOutlets}). ` +
-                `This may overestimate. Please provide actual lateralLongestFlowRate from zone data.`
-        );
-    }
-
-    // 2. SubMain ที่ยาวที่สุด: รับ flow rate รวมจาก lateral ทั้งหมดที่เชื่อมกับมัน
-    // Flow rate = flow rate ของ lateral × จำนวน lateral ที่เชื่อม (subMainOutlets)
-    // ⚠️ Fallback: สมมติว่าทุก lateral ที่เชื่อมกับ subMain มี flow rate เท่ากับ lateral ที่ยาวที่สุด
-    // ซึ่งอาจจะ overestimate ถ้า lateral อื่นๆ มี flow rate น้อยกว่า
     const subMainLongestFlowRate =
         zoneData?.subMainLongestFlowRate || lateralLongestFlowRate * subMainOutlets;
-
-    if (!zoneData?.subMainLongestFlowRate) {
-        console.warn(
-            `⚠️ [Pipe Selection] Using fallback calculation for subMainLongestFlowRate: ${subMainLongestFlowRate.toFixed(2)} LPM (${lateralLongestFlowRate.toFixed(2)} × ${subMainOutlets}). ` +
-                `This may overestimate. Please provide actual subMainLongestFlowRate from zone data.`
-        );
-    }
-
-    // 3. Main ที่ยาวที่สุด: รับ flow rate รวมจาก subMain ทั้งหมดที่เชื่อมกับมัน
-    // Flow rate = flow rate ของ subMain × จำนวน subMain ที่เชื่อม (mainOutlets)
-    // ⚠️ Fallback: สมมติว่าทุก subMain ที่เชื่อมกับ main มี flow rate เท่ากับ subMain ที่ยาวที่สุด
-    // ซึ่งอาจจะ overestimate ถ้า subMain อื่นๆ มี flow rate น้อยกว่า
     const mainLongestFlowRate =
         zoneData?.mainLongestFlowRate || subMainLongestFlowRate * mainOutlets;
 
-    if (!zoneData?.mainLongestFlowRate) {
-        console.warn(
-            `⚠️ [Pipe Selection] Using fallback calculation for mainLongestFlowRate: ${mainLongestFlowRate.toFixed(2)} LPM (${subMainLongestFlowRate.toFixed(2)} × ${mainOutlets}). ` +
-                `This may overestimate. Please provide actual mainLongestFlowRate from zone data.`
-        );
-    }
-
-    // ขั้นตอนที่ 1: คำนวณ Lateral ก่อน (ใช้ได้ max 0.8m)
-    // ใช้ flow rate ของ lateral ที่ยาวที่สุด: lateralLongestFlowRate
+    // --- ขั้นตอนที่ 1: คำนวณ Lateral ---
     // สูตร: (HF/10) × longestLength × F
     const lateralResult = calculatePipeSizeForType(
         lateralLongestFlowRate,
@@ -712,17 +658,16 @@ export const calculatePipeRecommendationsWithTypes = (
         waterPressure
     );
 
-    // เก็บ pressure loss จาก lateral แยกตาม PE และ PVC
+    // เก็บ pressure loss จาก lateral (Self Loss)
     const lateralLossPE = lateralResult.pe?.pressureLoss || 0;
     const lateralLossPVC = lateralResult.pvc?.pressureLoss || 0;
 
-    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ maxPressureLoss สำหรับ subMain
-    // เพื่อให้ subMain และ main pipe มีโอกาสหาขนาดที่เหมาะสมได้
+    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ budget สำหรับ subMain
     let lateralLossForCalculation = Math.min(lateralLossPE, lateralLossPVC);
 
-    // ขั้นตอนที่ 2: คำนวณ SubMain โดยรวม loss ของ lateral ที่เชื่อมกับมัน
-    // ท่อเมนย่อยจะรับภาระจากท่อย่อย
-    // ใช้ flow rate ของ subMain ที่ยาวที่สุด: subMainLongestFlowRate (รวมจาก lateral ทั้งหมดที่เชื่อมกับมัน)
+    // --- ขั้นตอนที่ 2: คำนวณ SubMain ---
+    // รวม loss ของ lateral เพื่อตรวจสอบว่า "Total Loss" เกินโควต้าหรือไม่
+    // แต่ค่าที่ return ใน subMainResult จะต้องเป็น Self Loss
     const subMainResult = calculatePipeSizeForType(
         subMainLongestFlowRate,
         subMainLongestLength,
@@ -732,15 +677,14 @@ export const calculatePipeRecommendationsWithTypes = (
         { lateralLoss: lateralLossForCalculation }
     );
 
-    // เก็บ loss ของ subMain เองก่อน (ไม่รวม lateral) แยกตาม PE และ PVC
+    // เก็บ loss ของ subMain เอง (Self Loss)
     const subMainLossSelfPE = subMainResult.pe?.pressureLoss || 0;
     const subMainLossSelfPVC = subMainResult.pvc?.pressureLoss || 0;
 
-    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ maxPressureLoss สำหรับ main
+    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ budget สำหรับ main
     const subMainLossSelfForCalculation = Math.min(subMainLossSelfPE, subMainLossSelfPVC);
 
-    // ตรวจสอบเงื่อนไข: loss ของ lateral ต้องไม่มากกว่า loss ของ subMain (ไม่รวม lateral)
-    // ถ้า lateralLossForCalculation > subMainLossSelfForCalculation ให้ปรับ lateralLossForCalculation
+    // ตรวจสอบเงื่อนไข: lateralLoss > subMainLossSelf (ไม่จำเป็นต้องเปลี่ยน logic หลัก แต่คงไว้ตามเดิม)
     if (
         lateralLossForCalculation > subMainLossSelfForCalculation &&
         subMainLossSelfForCalculation > 0
@@ -748,91 +692,44 @@ export const calculatePipeRecommendationsWithTypes = (
         lateralLossForCalculation = subMainLossSelfForCalculation;
     }
 
-    // subMain loss รวม = loss ของ subMain เอง + loss ของ lateral (แยกตาม PE และ PVC)
-    const subMainLossPE = subMainLossSelfPE + lateralLossPE;
-    const subMainLossPVC = subMainLossSelfPVC + lateralLossPVC;
+    // คำนวณ Cumulative Loss เพื่อใช้ส่งต่อไปยัง Main Calculation เท่านั้น
+    // (ห้ามนำค่านี้ไปใส่ใน subMainResult.pe.pressureLoss เพื่อป้องกันการนับซ้ำในขั้นตอน Pump Calc)
+    const subMainCumulativeLossPE = subMainLossSelfPE + lateralLossPE;
+    const subMainCumulativeLossPVC = subMainLossSelfPVC + lateralLossPVC;
 
-    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ maxPressureLoss สำหรับ main
-    const subMainLossForCalculation = Math.min(subMainLossPE, subMainLossPVC);
+    const subMainCumulativeLossForCalculation = Math.min(subMainCumulativeLossPE, subMainCumulativeLossPVC);
 
-    // อัปเดต pressureLoss ในผลลัพธ์ให้รวม loss จาก lateral
-    if (subMainResult.pe) {
-        subMainResult.pe.pressureLoss = subMainLossPE;
-    }
-    if (subMainResult.pvc) {
-        subMainResult.pvc.pressureLoss = subMainLossPVC;
-    }
-
-    // ขั้นตอนที่ 3: คำนวณ Main โดยรวม loss ของ lateral + subMain
-    // ท่อเมนจะรับภาระจากท่อเมนย่อยด้วย
-    // ใช้ flow rate ของ main ที่ยาวที่สุด: mainLongestFlowRate (รวมจาก subMain ทั้งหมดที่เชื่อมกับมัน)
-    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ maxPressureLoss สำหรับ main
+    // --- ขั้นตอนที่ 3: คำนวณ Main ---
     const mainResult = calculatePipeSizeForType(
         mainLongestFlowRate,
         mainLongestLength,
         'main',
         mainOutlets,
         waterPressure,
-        { lateralLoss: lateralLossForCalculation, subMainLoss: subMainLossForCalculation }
+        { lateralLoss: lateralLossForCalculation, subMainLoss: subMainCumulativeLossForCalculation }
     );
 
-    // เก็บ loss ของ main เองก่อน (ไม่รวม lateral + subMain) แยกตาม PE และ PVC
+    // เก็บ loss ของ main เอง (Self Loss)
     const mainLossSelfPE = mainResult.pe?.pressureLoss || 0;
     const mainLossSelfPVC = mainResult.pvc?.pressureLoss || 0;
 
-    // main loss รวม = loss ของ main เอง + loss ของ subMain (subMainLoss รวม lateral แล้ว)
-    // ไม่ต้องบวก lateralLoss อีกเพราะ subMainLoss รวม lateral อยู่แล้ว
-    const mainLossPE = mainLossSelfPE + subMainLossPE;
-    const mainLossPVC = mainLossSelfPVC + subMainLossPVC;
+    // คำนวณ Cumulative Loss เพื่อใช้ตรวจสอบ Total System Loss เท่านั้น
+    const mainCumulativeLossPE = mainLossSelfPE + subMainCumulativeLossPE;
+    const mainCumulativeLossPVC = mainLossSelfPVC + subMainCumulativeLossPVC;
 
-    // ใช้ค่า loss ที่สูงที่สุด (worst-case) สำหรับการคำนวณ TDH เพื่อให้แน่ใจว่าปั๊มจะแรงพอ
-    const mainLoss = Math.max(mainLossPE, mainLossPVC);
+    // ตรวจสอบว่า loss รวมทั้งหมดไม่เกิน 20% ของ head loss (Warning Only)
+    const totalHead = waterPressure * 10;
+    const totalLossMax = totalHead * 0.2;
+    const totalSystemLoss = Math.max(mainCumulativeLossPE, mainCumulativeLossPVC);
 
-    // อัปเดต pressureLoss ในผลลัพธ์ให้รวม loss จาก lateral + subMain
-    if (mainResult.pe) {
-        mainResult.pe.pressureLoss = mainLossPE;
-    }
-    if (mainResult.pvc) {
-        mainResult.pvc.pressureLoss = mainLossPVC;
-    }
-
-    // ตรวจสอบว่า loss รวมทั้งหมดไม่เกิน 20% ของ head loss
-    // ใช้ค่า worst-case (Math.max) สำหรับการตรวจสอบ
-    const totalHead = waterPressure * 10; // แปลง bar เป็น meter head
-    const totalLossMax = totalHead * 0.2; // 20% ของ head loss
-    const totalLoss = mainLoss; // mainLoss รวม lateral + subMain แล้ว (worst-case)
-
-    // คำนวณ worst-case loss สำหรับการแสดงผล
-    const lateralLossWorstCase = Math.max(lateralLossPE, lateralLossPVC);
-    const subMainLossWorstCase = Math.max(subMainLossPE, subMainLossPVC);
-
-    // ถ้า loss รวมเกินค่าสูงสุด ให้แจ้งเตือน (แต่ยังคงใช้ผลลัพธ์ที่คำนวณได้)
-    // ระบบจะเลือกขนาดท่อที่เล็กที่สุดที่เหมาะสมแล้ว ดังนั้นถ้า loss ยังเกิน
-    // อาจต้องเพิ่มแรงดันน้ำหรือปรับปรุงการออกแบบระบบ
-    if (totalLoss > totalLossMax) {
+    if (totalSystemLoss > totalLossMax) {
         console.warn(
-            `⚠️ Total pressure loss (worst-case: ${totalLoss.toFixed(2)}m) exceeds maximum allowed (${totalLossMax.toFixed(2)}m = 20% of ${totalHead.toFixed(2)}m head)`
+            `⚠️ Total pressure loss (approx: ${totalSystemLoss.toFixed(2)}m) exceeds maximum recommended (${totalLossMax.toFixed(2)}m). Consider increasing pipe sizes.`
         );
-        console.warn(`   - Lateral loss (worst-case): ${lateralLossWorstCase.toFixed(2)}m`);
-        console.warn(
-            `   - SubMain loss (worst-case, รวม lateral): ${subMainLossWorstCase.toFixed(2)}m`
-        );
-        console.warn(`   - Main loss (worst-case, รวม lateral + subMain): ${mainLoss.toFixed(2)}m`);
-        console.warn(
-            `   💡 Suggestion: Consider increasing water pressure or using larger pipe sizes.`
-        );
-    } else {
-        console.log(
-            `✅ Total pressure loss (worst-case) is within limit: ${totalLoss.toFixed(2)}m / ${totalLossMax.toFixed(2)}m (20% of ${totalHead.toFixed(2)}m head)`
-        );
-        console.log(`   - Lateral loss (worst-case): ${lateralLossWorstCase.toFixed(2)}m`);
-        console.log(
-            `   - SubMain loss (worst-case, รวม lateral): ${subMainLossWorstCase.toFixed(2)}m`
-        );
-        console.log(`   - Main loss (worst-case, รวม lateral + subMain): ${mainLoss.toFixed(2)}m`);
     }
 
-    // สร้างผลลัพธ์เริ่มต้น
+    // สร้างผลลัพธ์
+    // IMPORTANT: pressureLoss ใน object นี้คือ Self Loss ของแต่ละท่อ
     const initialResult: PipeTypeRecommendations = {
         main: mainResult,
         subMain: subMainResult,

@@ -6,7 +6,15 @@ import { GardenPlant, getTranslatedPlantName, getPlantImagePath } from './utils/
 // import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
 import { getTranslations } from './utils/language';
+import { motion, AnimatePresence } from 'framer-motion';
 // use dynamic import of html2canvas in handler for better compatibility
+
+// Toast Type
+interface Toast {
+    id: number;
+    message: string;
+    type: 'success' | 'error' | 'info';
+}
 
 // Google Maps TypeScript declarations
 interface MapOptions {
@@ -137,6 +145,17 @@ function FreeMap() {
             marker: unknown;
         }>
     >([]);
+    // State for Toasts (แทน Alert)
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    // Toast Handler
+    const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        const id = Date.now();
+        setToasts((prev) => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 3000);
+    }, []);
     const mapRef = useRef<HTMLDivElement>(null);
     const drawingManagerRef = useRef<unknown>(null);
     const mapInstanceRef = useRef<unknown>(null);
@@ -451,10 +470,19 @@ function FreeMap() {
                 return;
             }
 
-            // Convert spacing from cm to degrees (rough approximation)
+            // Convert spacing to meters (handle both cm and meters)
+            // If value is > 10, assume it's in cm, otherwise assume it's in meters
+            const plantSpacingMeters = plantData.plantSpacing > 10 
+                ? plantData.plantSpacing / 100  // Convert cm to meters
+                : plantData.plantSpacing;        // Already in meters
+            const rowSpacingMeters = plantData.rowSpacing > 10
+                ? plantData.rowSpacing / 100    // Convert cm to meters
+                : plantData.rowSpacing;         // Already in meters
+
+            // Convert spacing from meters to degrees (rough approximation)
             // 1 degree ≈ 111,000 meters
-            const plantSpacingDegrees = plantData.plantSpacing / 100 / 111000; // cm to degrees
-            const rowSpacingDegrees = plantData.rowSpacing / 100 / 111000; // cm to degrees
+            const plantSpacingDegrees = plantSpacingMeters / 111000; // meters to degrees
+            const rowSpacingDegrees = rowSpacingMeters / 111000;    // meters to degrees
 
             let bounds: { north: number; south: number; east: number; west: number };
 
@@ -554,19 +582,38 @@ function FreeMap() {
 
                     if (isWithinShape) {
                         // Create plant point marker
-                        const plantImagePath = getPlantImagePath(plantData.name);
+                        // Check if this is a custom plant
+                        const isCustomPlant = localStorage.getItem('isCustomPlant') === 'true';
+                        let markerIcon;
+                        
+                        if (isCustomPlant) {
+                            // Use green circle for custom plants
+                            markerIcon = {
+                                path: window.google.maps.SymbolPath.CIRCLE,
+                                scale: 8,
+                                fillColor: '#22c55e', // green-500
+                                fillOpacity: 1,
+                                strokeColor: '#ffffff',
+                                strokeWeight: 2,
+                            };
+                        } else {
+                            // Use plant image for regular plants
+                            const plantImagePath = getPlantImagePath(plantData.name);
+                            markerIcon = {
+                                url: plantImagePath,
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 12),
+                            };
+                        }
+                        
                         const marker = new window.google.maps.Marker({
                             position: position,
                             map: map,
                             title: `${getTranslatedPlantName(plantData.name, translations)} Plant`,
-                            icon: {
-                                url: plantImagePath,
-                                scaledSize: new window.google.maps.Size(24, 24),
-                                anchor: new window.google.maps.Point(12, 12),
-                            },
+                            icon: markerIcon,
                             draggable: false,
                             clickable: false,
-                            zIndex: 2000, // Above pipes, highest priority
+                            zIndex: 1500, // Below pipes
                         });
 
                         plantPoints.push({
@@ -954,23 +1001,40 @@ function FreeMap() {
 
                 plantPoints.forEach((point) => {
                     if (point.position && !point.marker) {
-                        const plantImagePath = plantData
-                            ? getPlantImagePath(plantData.name)
-                            : '/freePlanImg/fruits/coconut.png';
+                        // Check if this is a custom plant
+                        const isCustomPlant = localStorage.getItem('isCustomPlant') === 'true';
+                        let markerIcon;
+                        
+                        if (isCustomPlant) {
+                            // Use green circle for custom plants
+                            markerIcon = {
+                                path: window.google.maps.SymbolPath.CIRCLE,
+                                scale: 8,
+                                fillColor: '#22c55e', // green-500
+                                fillOpacity: 1,
+                                strokeColor: '#ffffff',
+                                strokeWeight: 2,
+                            };
+                        } else {
+                            // Use plant image for regular plants
+                            const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
+                            markerIcon = {
+                                url: plantImagePath,
+                                scaledSize: new window.google.maps.Size(24, 24),
+                                anchor: new window.google.maps.Point(12, 12),
+                            };
+                        }
+                        
                         const marker = new window.google.maps.Marker({
                             position: point.position,
                             map: map,
                             title: plantData
                                 ? `${getTranslatedPlantName(plantData.name, translations)} Plant`
                                 : 'Plant',
-                            icon: {
-                                url: plantImagePath,
-                                scaledSize: new window.google.maps.Size(24, 24),
-                                anchor: new window.google.maps.Point(12, 12),
-                            },
+                            icon: markerIcon,
                             draggable: false,
                             clickable: false,
-                            zIndex: 2000, // Above pipes, highest priority
+                            zIndex: 1500, // Below pipes
                         });
                         setPlantPoints((prev) =>
                             prev.map((p) => (p.id === point.id ? { ...p, marker } : p))
@@ -989,7 +1053,7 @@ function FreeMap() {
                             strokeColor: '#DC2626', // Red color for main pipes
                             strokeOpacity: 0.8,
                             strokeWeight: 4, // Thicker line for main pipes
-                            zIndex: 1500, // Above zones but below plant points
+                            zIndex: 2500, // Above plant points (tree icons)
                         });
 
                         polyline.setMap(map);
@@ -1011,7 +1075,7 @@ function FreeMap() {
                             strokeColor: '#8B5CF6', // Purple color for sub-main pipes
                             strokeOpacity: 0.7,
                             strokeWeight: 3, // Slightly thinner than main pipes
-                            zIndex: 1500, // Above zones but below plant points
+                            zIndex: 2500, // Above plant points (tree icons)
                         });
 
                         polyline.setMap(map);
@@ -1033,7 +1097,7 @@ function FreeMap() {
                             strokeColor: '#FCD34D', // Yellow color for lateral pipes
                             strokeOpacity: 0.8,
                             strokeWeight: 2, // Thinner than sub-main pipes
-                            zIndex: 1500, // Above zones but below plant points
+                            zIndex: 2500, // Above plant points (tree icons)
                         });
 
                         polyline.setMap(map);
@@ -1170,6 +1234,7 @@ function FreeMap() {
                                                 JSON.stringify(waterSourcesForStorage)
                                             );
 
+
                                             // Auto-advance to Place Pump step after placing water source
                                             setCompletedSteps((prev) => {
                                                 const newCompletedSteps = [...prev, 1]; // Mark step 1 (Water) as completed
@@ -1183,6 +1248,7 @@ function FreeMap() {
                                                     'mapStepProgress',
                                                     JSON.stringify(progressData)
                                                 );
+
 
                                                 return newCompletedSteps;
                                             });
@@ -1416,6 +1482,7 @@ function FreeMap() {
                                         JSON.stringify(waterSourcesForStorage)
                                     );
 
+
                                     // Auto-advance to Place Pump step after placing water source
                                     setCompletedSteps((prev) => {
                                         const newCompletedSteps = [...prev, 1]; // Mark step 1 (Water) as completed
@@ -1429,6 +1496,7 @@ function FreeMap() {
                                             'mapStepProgress',
                                             JSON.stringify(progressData)
                                         );
+
 
                                         return newCompletedSteps;
                                     });
@@ -1552,6 +1620,30 @@ function FreeMap() {
 
     // 4. Handlers
 
+    // Function to create pump marker
+    const createPumpMarker = useCallback((position: { lat: number; lng: number }, map: google.maps.Map) => {
+        try {
+            const marker = new window.google.maps.Marker({
+                position: position,
+                map: map,
+                title: translations.waterPump,
+                icon: {
+                    url: '/images/water-pump.png',
+                    scaledSize: new window.google.maps.Size(32, 32),
+                    anchor: new window.google.maps.Point(16, 16),
+                },
+                draggable: false,
+                clickable: true,
+                zIndex: 2000, // Higher than zones and plant points
+            });
+
+            return marker;
+        } catch (error) {
+            console.error('❌ Error creating pump marker:', error);
+            return null;
+        }
+    }, [translations.waterPump]);
+
     // Function to create center marker for a zone
     const createZoneCenterMarker = useCallback(
         (
@@ -1563,7 +1655,7 @@ function FreeMap() {
             const marker = new window.google.maps.Marker({
                 position: center,
                 map: map,
-                title: `Center of ${zoneName}`,
+                title: `${translations.centerOf} ${zoneName}`,
                 icon: {
                     path: window.google.maps.SymbolPath.CIRCLE,
                     scale: 8,
@@ -1667,23 +1759,40 @@ function FreeMap() {
 
             plantPoints.forEach((point) => {
                 if (!point.marker) {
-                    const plantImagePath = plantData
-                        ? getPlantImagePath(plantData.name)
-                        : '/freePlanImg/fruits/coconut.png';
+                    // Check if this is a custom plant
+                    const isCustomPlant = localStorage.getItem('isCustomPlant') === 'true';
+                    let markerIcon;
+                    
+                    if (isCustomPlant) {
+                        // Use green circle for custom plants
+                        markerIcon = {
+                            path: window.google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: '#22c55e', // green-500
+                            fillOpacity: 1,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2,
+                        };
+                    } else {
+                        // Use plant image for regular plants
+                        const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
+                        markerIcon = {
+                            url: plantImagePath,
+                            scaledSize: new window.google.maps.Size(24, 24),
+                            anchor: new window.google.maps.Point(12, 12),
+                        };
+                    }
+                    
                     const marker = new window.google.maps.Marker({
                         position: point.position,
                         map: map,
                         title: plantData
                             ? `${getTranslatedPlantName(plantData.name, translations)} Plant`
                             : 'Plant',
-                        icon: {
-                            url: plantImagePath,
-                            scaledSize: new window.google.maps.Size(24, 24),
-                            anchor: new window.google.maps.Point(12, 12),
-                        },
+                        icon: markerIcon,
                         draggable: false,
                         clickable: false,
-                        zIndex: 2000, // Above pipes, highest priority
+                        zIndex: 1500, // Below pipes
                     });
                     setPlantPoints((prev) =>
                         prev.map((p) => (p.id === point.id ? { ...p, marker } : p))
@@ -1702,7 +1811,7 @@ function FreeMap() {
                         strokeColor: '#DC2626',
                         strokeOpacity: 0.8,
                         strokeWeight: 4,
-                        zIndex: 1500, // Above zones but below plant points
+                        zIndex: 2500, // Above plant points (tree icons)
                     });
                     polyline.setMap(map);
                     allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -1722,7 +1831,7 @@ function FreeMap() {
                         strokeColor: '#8B5CF6',
                         strokeOpacity: 0.7,
                         strokeWeight: 3,
-                        zIndex: 1500, // Above zones but below plant points
+                        zIndex: 2500, // Above plant points (tree icons)
                     });
                     polyline.setMap(map);
                     allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -1742,7 +1851,7 @@ function FreeMap() {
                         strokeColor: '#FCD34D',
                         strokeOpacity: 0.8,
                         strokeWeight: 2,
-                        zIndex: 1500, // Above zones but below plant points
+                        zIndex: 2500, // Above plant points (tree icons)
                     });
                     polyline.setMap(map);
                     allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -2037,7 +2146,7 @@ function FreeMap() {
             // Check if Water step (step 1) has water sources before proceeding
             if (stepIndex === 1) {
                 if (waterSources.length === 0) {
-                    alert('กรุณาวางแหล่งน้ำก่อนไปขั้นตอนถัดไป');
+                    showToast(translations.pleasePlaceWaterBeforeNext, 'error');
                     return;
                 }
             }
@@ -2045,7 +2154,7 @@ function FreeMap() {
             // Handle Zones step (step 3) - show zone modal
             if (stepIndex === 3) {
                 if (drawnShapes.length === 0) {
-                    alert('กรุณาวาดพื้นที่ก่อนแบ่งโซน');
+                    showToast(translations.pleaseDrawAreaBeforeZones, 'error');
                     return;
                 }
 
@@ -2061,7 +2170,7 @@ function FreeMap() {
                     generateMainPipes(map);
                 } else {
                     console.error('❌ Map not available for pipe generation');
-                    alert('ไม่สามารถสร้างระบบท่อได้ - แผนที่ยังไม่พร้อม');
+                    showToast(translations.cannotGeneratePipeMapNotReady, 'error');
                 }
                 return;
             }
@@ -2077,6 +2186,7 @@ function FreeMap() {
                     completedSteps: newCompletedSteps,
                 };
                 localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
+
 
                 return newCompletedSteps;
             });
@@ -2122,6 +2232,7 @@ function FreeMap() {
             setIsDrawingMode(true);
         }
     };
+
 
     // Function to handle pump placement click
     const handlePumpPlacementClick = useCallback(
@@ -2172,6 +2283,7 @@ function FreeMap() {
                     };
                     localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
 
+
                     return newCompletedSteps;
                 });
 
@@ -2188,14 +2300,15 @@ function FreeMap() {
             setCompletedSteps,
             setCurrentStep,
             removeOverlappedPlantPoints,
+            createPumpMarker,
         ]
     );
 
     // Function to create pump placement points around water source
     const createPumpPlacementPoints = useCallback(
         (waterSourcePosition: { lat: number; lng: number }, map: google.maps.Map) => {
-            // Define offset distances (in degrees, roughly 10 meters - further from water source icon)
-            const offset = 0.00004; // Approximately 10 meters - further away from the water source icon
+            // ระยะห่าง (ประมาณ 5 เมตร)
+            const offset = 0.00005; 
 
             const placementPoints: Array<{
                 id: number;
@@ -2204,89 +2317,70 @@ function FreeMap() {
                 type: 'corner' | 'midpoint';
             }> = [];
 
-            // 4 corner points
-            const cornerPoints = [
-                { lat: waterSourcePosition.lat + offset, lng: waterSourcePosition.lng + offset }, // Top-right
-                { lat: waterSourcePosition.lat + offset, lng: waterSourcePosition.lng - offset }, // Top-left
-                { lat: waterSourcePosition.lat - offset, lng: waterSourcePosition.lng - offset }, // Bottom-left
-                { lat: waterSourcePosition.lat - offset, lng: waterSourcePosition.lng + offset }, // Bottom-right
+            // กำหนดตำแหน่งจุด 8 ทิศ
+            const points = [
+                // Corners
+                { lat: waterSourcePosition.lat + offset, lng: waterSourcePosition.lng + offset, type: 'corner' },
+                { lat: waterSourcePosition.lat + offset, lng: waterSourcePosition.lng - offset, type: 'corner' },
+                { lat: waterSourcePosition.lat - offset, lng: waterSourcePosition.lng - offset, type: 'corner' },
+                { lat: waterSourcePosition.lat - offset, lng: waterSourcePosition.lng + offset, type: 'corner' },
+                // Midpoints
+                { lat: waterSourcePosition.lat + offset, lng: waterSourcePosition.lng, type: 'midpoint' },
+                { lat: waterSourcePosition.lat, lng: waterSourcePosition.lng - offset, type: 'midpoint' },
+                { lat: waterSourcePosition.lat - offset, lng: waterSourcePosition.lng, type: 'midpoint' },
+                { lat: waterSourcePosition.lat, lng: waterSourcePosition.lng + offset, type: 'midpoint' },
             ];
 
-            // 4 midpoint points
-            const midpointPoints = [
-                { lat: waterSourcePosition.lat + offset, lng: waterSourcePosition.lng }, // Top
-                { lat: waterSourcePosition.lat, lng: waterSourcePosition.lng - offset }, // Left
-                { lat: waterSourcePosition.lat - offset, lng: waterSourcePosition.lng }, // Bottom
-                { lat: waterSourcePosition.lat, lng: waterSourcePosition.lng + offset }, // Right
-            ];
+            points.forEach((pt, index) => {
+                const position = { lat: pt.lat, lng: pt.lng };
+                
+                // SVG ที่มี Animation ในตัว (SMIL)
+                const animatedIcon = {
+                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <filter id="shadow${index}" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.5)"/>
+                                </filter>
+                            </defs>
+                            
+                            <circle cx="20" cy="20" r="10" fill="#F59E0B" opacity="0.5">
+                                <animate attributeName="r" from="10" to="20" dur="1.5s" repeatCount="indefinite" />
+                                <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
+                            </circle>
+                            
+                            <circle cx="20" cy="20" r="12" fill="#FFFFFF" filter="url(#shadow${index})" />
+                            <circle cx="20" cy="20" r="10" fill="#F59E0B" />
+                            
+                            <!-- เครื่องหมาย + -->
+                            <line x1="20" y1="12" x2="20" y2="28" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="12" y1="20" x2="28" y2="20" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    `),
+                    scaledSize: new window.google.maps.Size(40, 40),
+                    anchor: new window.google.maps.Point(20, 20),
+                };
 
-            // Create corner point markers
-            cornerPoints.forEach((position, index) => {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: 'คลิกเพื่อวางปั๊มน้ำ (มุม)',
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="10" cy="10" r="8" fill="#3B82F6" fill-opacity="0.2" stroke="#3B82F6" stroke-width="2"/>
-                            <circle cx="10" cy="10" r="4" fill="#3B82F6"/>
-                        </svg>
-                    `),
-                        scaledSize: new window.google.maps.Size(20, 20),
-                        anchor: new window.google.maps.Point(10, 10),
-                    },
+                    title: translations.clickToPlacePump,
+                    icon: animatedIcon,
                     draggable: false,
                     clickable: true,
-                    zIndex: 1500, // Between water source and zones
+                    // Z-Index สูงสุดเพื่อให้ลอยเหนือทุกอย่าง
+                    zIndex: 2200, 
+                    // เพิ่ม Animation แบบเด้ง (Bounce) ของ Google Maps เองด้วยก็ได้ (ถ้าชอบ)
+                    // animation: window.google.maps.Animation.DROP 
                 });
 
                 placementPoints.push({
                     id: Date.now() + index,
                     position: position,
                     marker: marker,
-                    type: 'corner',
+                    type: pt.type as 'corner' | 'midpoint',
                 });
 
-                // Add click listener to corner point
-                window.google.maps.event.addListener(marker, 'click', () => {
-                    handlePumpPlacementClick(position, map);
-                });
-            });
-
-            // Create midpoint markers
-            midpointPoints.forEach((position, index) => {
-                const marker = new window.google.maps.Marker({
-                    position: position,
-                    map: map,
-                    title: 'คลิกเพื่อวางปั๊มน้ำ (กลาง)',
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-                        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="9" cy="9" r="7" fill="#60A5FA" fill-opacity="0.2" stroke="#60A5FA" stroke-width="2"/>
-                            <circle cx="9" cy="9" r="3.5" fill="#60A5FA"/>
-                        </svg>
-                    `),
-                        scaledSize: new window.google.maps.Size(18, 18),
-                        anchor: new window.google.maps.Point(9, 9),
-                    },
-                    draggable: false,
-                    clickable: true,
-                    zIndex: 1500, // Between water source and zones
-                });
-
-                placementPoints.push({
-                    id: Date.now() + index + 4,
-                    position: position,
-                    marker: marker,
-                    type: 'midpoint',
-                });
-
-                // Add click listener to midpoint
                 window.google.maps.event.addListener(marker, 'click', () => {
                     handlePumpPlacementClick(position, map);
                 });
@@ -2294,17 +2388,21 @@ function FreeMap() {
 
             return placementPoints;
         },
-        [handlePumpPlacementClick]
+        [handlePumpPlacementClick, translations.clickToPlacePump]
     );
 
     // Function to create water source marker (simple version for useEffect)
     const createWaterSourceMarkerSimple = useCallback(
-        (position: { lat: number; lng: number }, map: google.maps.Map) => {
+        (
+            position: { lat: number; lng: number },
+            map: google.maps.Map
+        ) => {
+
             try {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: 'Water Source',
+                    title: translations.waterSource,
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
@@ -2318,7 +2416,7 @@ function FreeMap() {
                             <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                         </svg>
                     `),
-                        scaledSize: new window.google.maps.Size(48, 48),
+                        size: new window.google.maps.Size(48, 48),
                         anchor: new window.google.maps.Point(24, 24),
                     },
                     draggable: false,
@@ -2335,17 +2433,18 @@ function FreeMap() {
                 return null;
             }
         },
-        [removeOverlappedPlantPoints]
+        [removeOverlappedPlantPoints, translations.waterSource]
     );
 
     // Function to create water source marker (with drag functionality)
     const createWaterSourceMarker = useCallback(
         (position: { lat: number; lng: number }, map: google.maps.Map) => {
+
             try {
                 const marker = new window.google.maps.Marker({
                     position: position,
                     map: map,
-                    title: 'Water Source',
+                    title: translations.waterSource,
                     icon: {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
@@ -2359,7 +2458,7 @@ function FreeMap() {
                             <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                         </svg>
                     `),
-                        scaledSize: new window.google.maps.Size(48, 48),
+                        size: new window.google.maps.Size(48, 48),
                         anchor: new window.google.maps.Point(24, 24),
                     },
                     draggable: false,
@@ -2376,7 +2475,7 @@ function FreeMap() {
                 return null;
             }
         },
-        [removeOverlappedPlantPoints]
+        [removeOverlappedPlantPoints, translations.waterSource]
     );
 
     // Recreate markers from saved data when map is initialized
@@ -2406,11 +2505,12 @@ function FreeMap() {
                 }
             });
         }
-    }, [mapInitialized, waterSources, pumps, createWaterSourceMarker, setWaterSources, setPumps]);
+    }, [mapInitialized, waterSources, pumps, createWaterSourceMarker, createPumpMarker, setWaterSources, setPumps]);
 
     // Auto-activate steps based on current step and completion status
     useEffect(() => {
         if (!mapInitialized || !drawingManagerRef.current) return;
+
 
         // Step 0: Draw Area - Auto-activate drawing when page loads or when step 0 is current
         if (currentStep === 0 && !completedSteps.includes(0)) {
@@ -2500,6 +2600,7 @@ function FreeMap() {
             }
             setIsDrawingMode(false);
         }
+
     }, [
         currentStep,
         completedSteps,
@@ -2510,30 +2611,6 @@ function FreeMap() {
         pumpPlacementPoints,
         createPumpPlacementPoints,
     ]);
-
-    // Function to create pump marker
-    const createPumpMarker = (position: { lat: number; lng: number }, map: google.maps.Map) => {
-        try {
-            const marker = new window.google.maps.Marker({
-                position: position,
-                map: map,
-                title: 'Water Pump',
-                icon: {
-                    url: '/images/water-pump.png',
-                    scaledSize: new window.google.maps.Size(32, 32),
-                    anchor: new window.google.maps.Point(16, 16),
-                },
-                draggable: false,
-                clickable: true,
-                zIndex: 2000, // Higher than zones and plant points
-            });
-
-            return marker;
-        } catch (error) {
-            console.error('❌ Error creating pump marker:', error);
-            return null;
-        }
-    };
 
     // Function to generate unique colors for zones
     const generateZoneColors = (count: number): string[] => {
@@ -2920,6 +2997,7 @@ function FreeMap() {
 
         // Note: Area bounds not needed for Voronoi tessellation as it's based on plant positions
 
+
         // Use K-means clustering to find optimal zone centers based on plant positions
         const plantPositions = plantPoints.map((p) => ({
             lat: p.position.lat,
@@ -2930,6 +3008,7 @@ function FreeMap() {
             console.error('❌ No plant positions available for Voronoi generation');
             return;
         }
+
 
         // Perform K-means clustering to find zone centers
         const plantLocations = plantPoints.map((p) => ({
@@ -2943,7 +3022,9 @@ function FreeMap() {
                 waterNeed: 1,
             },
         }));
-        const zoneCenters = performKMeansClustering(plantLocations, numberOfZones);
+        // Use RCB (Recursive Coordinate Bisection) for balanced zone division
+        const zoneCenters = performRecursiveCoordinateBisection(plantLocations, numberOfZones);
+
 
         // Generate zone colors
         const zoneColors = generateZoneColors(numberOfZones);
@@ -2960,28 +3041,28 @@ function FreeMap() {
             centerMarker: google.maps.Marker;
         }> = [];
 
-        // Create Voronoi cells for each zone center
-        for (let zoneIdx = 0; zoneIdx < numberOfZones; zoneIdx++) {
-            const zoneCenter = zoneCenters[zoneIdx][0]; // Get first plant in cluster as center
+        // Create zones from RCB clusters
+        // RCB already provides balanced clusters, so we use them directly
+        for (let zoneIdx = 0; zoneIdx < zoneCenters.length; zoneIdx++) {
+            const cluster = zoneCenters[zoneIdx];
+            if (cluster.length === 0) continue;
 
-            // Find all plants closest to this zone center
-            const plantsInZone = plantPoints.filter((plant) => {
-                const distances = zoneCenters.map((cluster) => {
-                    const clusterCenter = cluster[0];
-                    return Math.sqrt(
-                        Math.pow(plant.position.lat - clusterCenter.position.lat, 2) +
-                            Math.pow(plant.position.lng - clusterCenter.position.lng, 2)
-                    );
-                });
-                const minDistance = Math.min(...distances);
-                const distanceToThisCenter = Math.sqrt(
-                    Math.pow(plant.position.lat - zoneCenter.position.lat, 2) +
-                        Math.pow(plant.position.lng - zoneCenter.position.lng, 2)
-                );
-                return Math.abs(distanceToThisCenter - minDistance) < 0.000001;
-            });
+            // Get plants in this cluster (RCB already grouped them)
+            const plantsInZone = plantPoints.filter((plant) =>
+                cluster.some((clusterPlant) => clusterPlant.id === plant.id.toString())
+            );
 
             if (plantsInZone.length === 0) continue;
+
+            // Calculate center of this cluster (average position)
+            const zoneCenter = {
+                position: {
+                    lat:
+                        cluster.reduce((sum, p) => sum + p.position.lat, 0) / cluster.length,
+                    lng:
+                        cluster.reduce((sum, p) => sum + p.position.lng, 0) / cluster.length,
+                },
+            };
 
             // Create Voronoi cell boundary using convex hull of plants in this zone
             // Pass shape data to clip hull to drawn area boundaries
@@ -3025,6 +3106,7 @@ function FreeMap() {
             const zoneName = `Zone ${zoneIdx + 1}`;
             const centerMarker = createZoneCenterMarker(map, center, zoneName, zoneColors[zoneIdx]);
 
+
             newZones.push({
                 id: Date.now() + zoneIdx,
                 name: zoneName,
@@ -3054,8 +3136,103 @@ function FreeMap() {
         return newZones;
     };
 
-    // Balanced K-means clustering function for plant points (not used with vertical zones)
-    // This ensures each zone has approximately equal number of plants
+    // Recursive Coordinate Bisection (RCB) algorithm for balanced zone division
+    // This ensures each zone has approximately equal number of plants (difference <= 1)
+    const performRecursiveCoordinateBisection = (
+        plants: PlantLocation[],
+        numberOfZones: number
+    ): PlantLocation[][] => {
+        if (plants.length === 0 || numberOfZones <= 0) return [];
+        if (numberOfZones === 1) return [plants];
+        if (plants.length <= numberOfZones) {
+            return plants.map((plant) => [plant]);
+        }
+
+        // Base case: if we need 2 zones, split in half
+        if (numberOfZones === 2) {
+            return splitPlantsInHalf(plants);
+        }
+
+        // Calculate bounds of all plants
+        const bounds = calculatePlantBounds(plants);
+
+        // Determine which axis is longer (wider)
+        const latRange = bounds.north - bounds.south;
+        const lngRange = bounds.east - bounds.west;
+        const splitByLat = latRange > lngRange; // Split by latitude if area is taller
+
+        // Sort plants by the axis we're splitting on
+        const sortedPlants = [...plants].sort((a, b) => {
+            if (splitByLat) {
+                return a.position.lat - b.position.lat;
+            } else {
+                return a.position.lng - b.position.lng;
+            }
+        });
+
+        // Calculate how many zones each half should get
+        const zonesForFirstHalf = Math.ceil(numberOfZones / 2);
+        const zonesForSecondHalf = numberOfZones - zonesForFirstHalf;
+
+        // Split plants in half
+        const midPoint = Math.floor(sortedPlants.length / 2);
+        const firstHalf = sortedPlants.slice(0, midPoint);
+        const secondHalf = sortedPlants.slice(midPoint);
+
+        // Recursively divide each half
+        const firstHalfZones = performRecursiveCoordinateBisection(firstHalf, zonesForFirstHalf);
+        const secondHalfZones = performRecursiveCoordinateBisection(secondHalf, zonesForSecondHalf);
+
+        // Combine results
+        return [...firstHalfZones, ...secondHalfZones];
+    };
+
+    // Helper function to split plants in half (for base case)
+    const splitPlantsInHalf = (plants: PlantLocation[]): PlantLocation[][] => {
+        if (plants.length === 0) return [[], []];
+        if (plants.length === 1) return [[plants[0]], []];
+
+        // Calculate bounds
+        const bounds = calculatePlantBounds(plants);
+        const latRange = bounds.north - bounds.south;
+        const lngRange = bounds.east - bounds.west;
+
+        // Sort by the longer axis
+        const sortedPlants = [...plants].sort((a, b) => {
+            if (latRange > lngRange) {
+                return a.position.lat - b.position.lat;
+            } else {
+                return a.position.lng - b.position.lng;
+            }
+        });
+
+        const midPoint = Math.floor(sortedPlants.length / 2);
+        return [sortedPlants.slice(0, midPoint), sortedPlants.slice(midPoint)];
+    };
+
+    // Helper function to calculate bounds of plant points
+    const calculatePlantBounds = (plants: PlantLocation[]): {
+        north: number;
+        south: number;
+        east: number;
+        west: number;
+    } => {
+        if (plants.length === 0) {
+            return { north: 0, south: 0, east: 0, west: 0 };
+        }
+
+        const lats = plants.map((p) => p.position.lat);
+        const lngs = plants.map((p) => p.position.lng);
+
+        return {
+            north: Math.max(...lats),
+            south: Math.min(...lats),
+            east: Math.max(...lngs),
+            west: Math.min(...lngs),
+        };
+    };
+
+    // Legacy K-means clustering function (kept for reference, not used)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const performKMeansClustering = (plants: PlantLocation[], k: number): PlantLocation[][] => {
         if (plants.length === 0 || k <= 0) return [];
@@ -3063,9 +3240,11 @@ function FreeMap() {
             return plants.map((plant) => [plant]);
         }
 
+
         // Calculate target size for each cluster (balanced distribution)
         const targetSize = Math.floor(plants.length / k);
         const remainder = plants.length % k;
+
 
         // Initialize centroids using k-means++ for better initial distribution
         const centroids: Array<{ lat: number; lng: number }> = [];
@@ -3345,8 +3524,9 @@ function FreeMap() {
 
     // Function to handle zone generation from modal
     const handleGenerateZones = () => {
+
         if (drawnShapes.length === 0) {
-            alert('กรุณาวาดพื้นที่ก่อนแบ่งโซน');
+            showToast(translations.pleaseDrawAreaBeforeZones, 'error');
             return;
         }
 
@@ -3354,6 +3534,7 @@ function FreeMap() {
         const newZones = createVoronoiZones(mapInstanceRef.current as google.maps.Map, zoneCount);
 
         if (newZones && newZones.length > 0) {
+
             // Close modal
             setShowZoneModal(false);
 
@@ -3368,6 +3549,7 @@ function FreeMap() {
                     completedSteps: newCompletedSteps,
                 };
                 localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
+
 
                 return newCompletedSteps;
             });
@@ -3457,6 +3639,7 @@ function FreeMap() {
 
     // Function to generate main pipes from pumps to zone centers
     const generateMainPipes = (map: google.maps.Map) => {
+
         // Check if pipe system already generated
         const existingMainPipes = localStorage.getItem('mainPipes');
         const existingSubMainPipes = localStorage.getItem('subMainPipes');
@@ -3468,14 +3651,14 @@ function FreeMap() {
                 const subMainPipesData = JSON.parse(existingSubMainPipes);
                 const lateralPipesData = JSON.parse(existingLateralPipes);
 
-                if (
-                    mainPipesData.length > 0 &&
-                    subMainPipesData.length > 0 &&
-                    lateralPipesData.length > 0
-                ) {
-                    alert('ระบบท่อถูกสร้างแล้ว กรุณากดรีเซ็ตก่อนสร้างใหม่');
-                    return;
-                }
+                    if (
+                        mainPipesData.length > 0 &&
+                        subMainPipesData.length > 0 &&
+                        lateralPipesData.length > 0
+                    ) {
+                        showToast(translations.pipeSystemAlreadyGenerated, 'info');
+                        return;
+                    }
             } catch (e) {
                 console.error('Error checking existing pipes:', e);
             }
@@ -3483,13 +3666,13 @@ function FreeMap() {
 
         if (pumps.length === 0) {
             console.error('❌ No pumps available for pipe generation');
-            alert('กรุณาวางปั๊มก่อนสร้างระบบท่อ');
+            showToast(translations.pleasePlacePumpBeforePipe, 'error');
             return;
         }
 
         if (zones.length === 0) {
             console.error('❌ No zones available for pipe generation');
-            alert('กรุณาแบ่งโซนก่อนสร้างระบบท่อ');
+            showToast(translations.pleaseDivideZonesBeforePipe, 'error');
             return;
         }
 
@@ -3546,7 +3729,7 @@ function FreeMap() {
                 strokeColor: '#DC2626',
                 strokeOpacity: 0.8,
                 strokeWeight: 4,
-                zIndex: 1500, // Above zones but below plant points
+                zIndex: 2500, // Above plant points (tree icons)
             });
 
             polyline.setMap(map);
@@ -3572,6 +3755,7 @@ function FreeMap() {
             zoneId: pipe.zoneId,
         }));
         localStorage.setItem('mainPipes', JSON.stringify(pipesForStorage));
+
 
         // Generate sub-main pipes after main pipes
         const generatedSubMainPipes = generateSubMainPipes(map);
@@ -3860,6 +4044,7 @@ function FreeMap() {
 
     // Function to generate sub-main pipes connecting through main pipes
     const generateSubMainPipes = (map: google.maps.Map) => {
+
         if (zones.length === 0) {
             console.error('❌ No zones available for sub-main pipe generation');
             return;
@@ -3887,6 +4072,7 @@ function FreeMap() {
 
         // Create sub-main pipes for each zone
         zones.forEach((zone) => {
+
             // Find plant points in this zone to determine the actual tree boundaries
             const zonePlantPoints = plantPoints.filter(
                 (point) =>
@@ -3903,16 +4089,16 @@ function FreeMap() {
             // Calculate actual pipe boundaries based on actual tree positions
             // Find the westernmost and easternmost trees in this zone
             const treeLngs = zonePlantPoints.map((point) => point.position.lng);
-
+            
             // Find westernmost and easternmost tree positions
             const westmostTreeLng = Math.min(...treeLngs);
             const eastmostTreeLng = Math.max(...treeLngs);
-
+            
             // Use tree positions as primary boundaries for the pipe
             // Pipe should not extend beyond the actual tree range
             let westLng = westmostTreeLng;
             let eastLng = eastmostTreeLng;
-
+            
             // If zone has coordinates (polygon), ensure pipe doesn't exceed polygon boundaries
             if (zone.coordinates && zone.coordinates.length > 0) {
                 const pipeLat = zone.center.lat;
@@ -3968,7 +4154,7 @@ function FreeMap() {
                     const polygonLngs = uniqueIntersections.map((i) => i.lng);
                     const polygonWestLng = Math.min(...polygonLngs);
                     const polygonEastLng = Math.max(...polygonLngs);
-
+                    
                     // Pipe should be within tree range, but also not exceed polygon boundaries
                     // Take the intersection of tree range and polygon range
                     westLng = Math.max(westmostTreeLng, polygonWestLng);
@@ -3981,10 +4167,11 @@ function FreeMap() {
             // But pipe should primarily be limited by tree positions (not extending beyond trees)
             westLng = Math.max(westLng, zone.bounds.west);
             eastLng = Math.min(eastLng, zone.bounds.east);
-
+            
             // Most importantly: ensure pipe doesn't extend beyond the actual tree range
             westLng = Math.max(westLng, westmostTreeLng);
             eastLng = Math.min(eastLng, eastmostTreeLng);
+
 
             // Create horizontal sub-main pipe within zone boundaries
             // This ensures the pipe never exceeds zone boundaries
@@ -3993,6 +4180,7 @@ function FreeMap() {
                 { lat: zone.center.lat, lng: eastLng }, // Eastern boundary (within zone)
             ];
 
+
             // Create polyline for sub-main pipe
             const polyline = new window.google.maps.Polyline({
                 path: pipePath,
@@ -4000,7 +4188,7 @@ function FreeMap() {
                 strokeColor: '#8B5CF6', // Purple color for sub-main pipes
                 strokeOpacity: 0.8,
                 strokeWeight: 3, // Slightly thinner than main pipes
-                zIndex: 1500, // Above zones but below plant points
+                zIndex: 2500, // Above plant points (tree icons)
             });
 
             // Add to map
@@ -4085,7 +4273,7 @@ function FreeMap() {
 
                 // Check if there's only one tree (westmostTreeLng === eastmostTreeLng)
                 const isSingleTree = Math.abs(westmostTreeLng - eastmostTreeLng) < 0.000001;
-
+                
                 if (isSingleTree) {
                     // If only one tree, pipe should only go from zone center to that tree position
                     // Don't extend beyond the single tree
@@ -4097,10 +4285,7 @@ function FreeMap() {
                     // Multiple trees - extend pipe to cover tree range
                     // Determine the order of points in the final path
                     // Use tree boundaries instead of westLng/eastLng to ensure pipe doesn't extend beyond actual trees
-                    if (
-                        closestPointOnSubMain.lng === westLng ||
-                        Math.abs(closestPointOnSubMain.lng - westmostTreeLng) < 0.000001
-                    ) {
+                    if (closestPointOnSubMain.lng === westLng || Math.abs(closestPointOnSubMain.lng - westmostTreeLng) < 0.000001) {
                         // Connection point is at west end - path: zone center -> west -> east (but only to eastmost tree)
                         finalPath = [
                             zoneCenter,
@@ -4125,6 +4310,7 @@ function FreeMap() {
                 if (pipeIndex >= 0) {
                     newSubMainPipes[pipeIndex].path = finalPath;
                 }
+
             } else {
                 // Zone center is already connected
             }
@@ -4140,6 +4326,7 @@ function FreeMap() {
             zoneId: pipe.zoneId,
         }));
         localStorage.setItem('subMainPipes', JSON.stringify(pipesForStorage));
+
 
         return newSubMainPipes;
     };
@@ -4167,6 +4354,7 @@ function FreeMap() {
             return [];
         }
 
+
         // First, sort all trees by longitude to make grouping easier
         const sortedTrees = [...treesInZone].sort((a, b) => a.position.lng - b.position.lng);
 
@@ -4177,6 +4365,7 @@ function FreeMap() {
         // 1 degree ≈ 111,000 meters, so 0.75m ≈ 0.00000675 degrees
         // Using 0.00001 degrees (approximately 1.1 meters) for better tolerance
         const tolerance = 0.00001; // Fixed tolerance: ~1.1 meters
+
 
         sortedTrees.forEach((tree) => {
             const lng = tree.position.lng;
@@ -4278,11 +4467,10 @@ function FreeMap() {
                 distance = geometry.spherical.computeDistanceBetween(pointLatLng, projectedLatLng);
             } else {
                 // Fallback: simple distance calculation
-                distance =
-                    Math.sqrt(
-                        Math.pow(point.lat - projectedPoint.lat, 2) +
-                            Math.pow(point.lng - projectedPoint.lng, 2)
-                    ) * 111000; // Convert to meters (rough approximation)
+                distance = Math.sqrt(
+                    Math.pow(point.lat - projectedPoint.lat, 2) +
+                        Math.pow(point.lng - projectedPoint.lng, 2)
+                ) * 111000; // Convert to meters (rough approximation)
             }
 
             if (distance < minDistance) {
@@ -4323,13 +4511,13 @@ function FreeMap() {
             for (let i = 0; i < zone.coordinates.length; i++) {
                 const p1 = zone.coordinates[i];
                 const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
-
+                
                 // Check if point is on this edge
                 const edgeLength = Math.sqrt(
                     Math.pow(p2.lat - p1.lat, 2) + Math.pow(p2.lng - p1.lng, 2)
                 );
                 if (edgeLength < tolerance) continue; // Skip zero-length edges
-
+                
                 // Distance from point to line segment
                 const A = point.lat - p1.lat;
                 const B = point.lng - p1.lng;
@@ -4338,23 +4526,23 @@ function FreeMap() {
                 const dot = A * C + B * D;
                 const lenSq = C * C + D * D;
                 const t = Math.max(0, Math.min(1, dot / lenSq));
-
+                
                 const closestPoint = {
                     lat: p1.lat + t * C,
                     lng: p1.lng + t * D,
                 };
-
+                
                 const dist = Math.sqrt(
                     Math.pow(point.lat - closestPoint.lat, 2) +
-                        Math.pow(point.lng - closestPoint.lng, 2)
+                    Math.pow(point.lng - closestPoint.lng, 2)
                 );
-
+                
                 // If point is very close to edge, consider it on boundary
                 if (dist < tolerance) {
                     return true;
                 }
             }
-
+            
             // Check if point is inside polygon
             return isPointInPolygon(point, zone.coordinates);
         }
@@ -4440,18 +4628,10 @@ function FreeMap() {
                     const p2 = zone.coordinates[(i + 1) % zone.coordinates.length];
 
                     // Line segment intersection
-                    const denom =
-                        (p2.lat - p1.lat) * (end.lng - start.lng) -
-                        (p2.lng - p1.lng) * (end.lat - start.lat);
+                    const denom = (p2.lat - p1.lat) * (end.lng - start.lng) - (p2.lng - p1.lng) * (end.lat - start.lat);
                     if (Math.abs(denom) > 0.000001) {
-                        const t1 =
-                            ((p1.lng - start.lng) * (end.lat - start.lat) -
-                                (p1.lat - start.lat) * (end.lng - start.lng)) /
-                            denom;
-                        const t2 =
-                            ((p1.lng - start.lng) * (p2.lat - p1.lat) -
-                                (p1.lat - start.lat) * (p2.lng - p1.lng)) /
-                            denom;
+                        const t1 = ((p1.lng - start.lng) * (end.lat - start.lat) - (p1.lat - start.lat) * (end.lng - start.lng)) / denom;
+                        const t2 = ((p1.lng - start.lng) * (p2.lat - p1.lat) - (p1.lat - start.lat) * (p2.lng - p1.lng)) / denom;
 
                         if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
                             const lat = p1.lat + t1 * (p2.lat - p1.lat);
@@ -4564,11 +4744,7 @@ function FreeMap() {
                 } else {
                     // First point is outside, find entry point
                     if (i + 1 < pipePath.length) {
-                        const intersection = findZoneBoundaryIntersection(
-                            point,
-                            pipePath[i + 1],
-                            zone
-                        );
+                        const intersection = findZoneBoundaryIntersection(point, pipePath[i + 1], zone);
                         if (intersection) {
                             clippedPath.push(intersection);
                             lastPointInside = true;
@@ -4614,6 +4790,7 @@ function FreeMap() {
             zoneId: number;
         }>
     ) => {
+
         if (zones.length === 0) {
             console.error('❌ No zones available for lateral pipe generation');
             return;
@@ -4647,8 +4824,10 @@ function FreeMap() {
                   ? subMainPipes
                   : [];
 
+
         // Create lateral pipes for each zone
         zones.forEach((zone) => {
+
             // Find sub-main pipe for this zone
             const zoneSubMainPipe = currentSubMainPipes.find((pipe) => pipe.zoneId === zone.id);
 
@@ -4812,7 +4991,8 @@ function FreeMap() {
                     // Determine if connection point is within the lateral pipe range
                     const connectionLat = connectionPoint.lat;
                     const isConnectionWithinRange =
-                        connectionLat >= bottomLat - 0.00001 && connectionLat <= topLat + 0.00001;
+                        connectionLat >= bottomLat - 0.00001 &&
+                        connectionLat <= topLat + 0.00001;
 
                     if (isConnectionWithinRange) {
                         // Connection point is within lateral pipe range - create vertical connection
@@ -4856,16 +5036,14 @@ function FreeMap() {
                             );
                         } else {
                             // Fallback
-                            distToTop =
-                                Math.sqrt(
-                                    Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
-                                        Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
-                                ) * 111000;
-                            distToBottom =
-                                Math.sqrt(
-                                    Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
-                                        Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
-                                ) * 111000;
+                            distToTop = Math.sqrt(
+                                Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                            distToBottom = Math.sqrt(
+                                Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
                         }
 
                         if (distToTop < distToBottom) {
@@ -4878,7 +5056,10 @@ function FreeMap() {
                     }
 
                     // Verify that connection point is valid (not NaN or Infinity)
-                    if (!isFinite(connectionPoint.lat) || !isFinite(connectionPoint.lng)) {
+                    if (
+                        !isFinite(connectionPoint.lat) ||
+                        !isFinite(connectionPoint.lng)
+                    ) {
                         return; // Skip this column
                     }
 
@@ -4895,7 +5076,9 @@ function FreeMap() {
                         const lat = point.position.lat;
                         const lng = point.position.lng;
                         return (
-                            Math.abs(lng - columnLng) < 0.00001 && lat >= bottomLat && lat <= topLat
+                            Math.abs(lng - columnLng) < 0.00001 &&
+                            lat >= bottomLat &&
+                            lat <= topLat
                         );
                     });
 
@@ -4921,7 +5104,7 @@ function FreeMap() {
                         strokeColor: '#FCD34D', // Yellow color for lateral pipes
                         strokeOpacity: 0.8,
                         strokeWeight: 2, // Thinner than sub-main pipes
-                        zIndex: 1500, // Above zones but below plant points
+                        zIndex: 2500, // Above plant points (tree icons)
                     });
 
                     // Add to map
@@ -4937,6 +5120,7 @@ function FreeMap() {
                 });
 
                 // Verify all columns have lateral pipes
+
 
                 // Find trees that are not connected to any lateral pipe
                 const zoneLateralPipes = newLateralPipes.filter((pipe) => pipe.zoneId === zone.id);
@@ -5025,6 +5209,7 @@ function FreeMap() {
                     return !isConnected;
                 });
 
+
                 // Group unconnected trees by longitude (columns)
                 const unconnectedTreeColumns: Array<
                     Array<{ id: number; position: { lat: number; lng: number } }>
@@ -5056,6 +5241,7 @@ function FreeMap() {
                 unconnectedTreeColumns.forEach((column) => {
                     column.sort((a, b) => b.position.lat - a.position.lat); // Sort descending (north to south)
                 });
+
 
                 // Create lateral pipes for unconnected tree columns using projection
                 unconnectedTreeColumns.forEach((column, columnIndex) => {
@@ -5203,7 +5389,8 @@ function FreeMap() {
                     // Determine if connection point is within the lateral pipe range
                     const connectionLat = connectionPoint.lat;
                     const isConnectionWithinRange =
-                        connectionLat >= bottomLat - 0.00001 && connectionLat <= topLat + 0.00001;
+                        connectionLat >= bottomLat - 0.00001 &&
+                        connectionLat <= topLat + 0.00001;
 
                     if (isConnectionWithinRange) {
                         // Connection point is within lateral pipe range
@@ -5243,16 +5430,14 @@ function FreeMap() {
                             );
                         } else {
                             // Fallback
-                            distToTop =
-                                Math.sqrt(
-                                    Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
-                                        Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
-                                ) * 111000;
-                            distToBottom =
-                                Math.sqrt(
-                                    Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
-                                        Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
-                                ) * 111000;
+                            distToTop = Math.sqrt(
+                                Math.pow(lateralTopPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralTopPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
+                            distToBottom = Math.sqrt(
+                                Math.pow(lateralBottomPoint.lat - connectionPoint.lat, 2) +
+                                    Math.pow(lateralBottomPoint.lng - connectionPoint.lng, 2)
+                            ) * 111000;
                         }
 
                         if (distToTop < distToBottom) {
@@ -5287,7 +5472,7 @@ function FreeMap() {
                         strokeColor: '#FCD34D', // Yellow color for lateral pipes
                         strokeOpacity: 0.8,
                         strokeWeight: 2,
-                        zIndex: 1500, // Above zones but below plant points
+                        zIndex: 2500, // Above plant points (tree icons)
                     });
 
                     // Add to map
@@ -5301,6 +5486,7 @@ function FreeMap() {
                         zoneId: zone.id,
                     });
                 });
+
             } else {
                 // Zone center is already connected
             }
@@ -5317,10 +5503,12 @@ function FreeMap() {
         }));
         localStorage.setItem('lateralPipes', JSON.stringify(pipesForStorage));
 
+
         return newLateralPipes;
     };
 
     const getButtonState = (stepIndex: number) => {
+
         // Generate Pipe System (step 4) - check if already generated
         if (stepIndex === 4) {
             // Check if pipe system already generated in localStorage
@@ -5364,30 +5552,71 @@ function FreeMap() {
 
     // 4. Render
     return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
+        <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600">
             <Head title={translations.irrigationSystemDesign} />
+
+            {/* Toast Notifications */}
+            <div className="fixed top-24 right-4 z-[2000] flex flex-col gap-2 pointer-events-none">
+                <AnimatePresence>
+                    {toasts.map((toast) => (
+                        <motion.div
+                            key={toast.id}
+                            initial={{ opacity: 0, x: 50, scale: 0.9 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 20, scale: 0.9 }}
+                            transition={{ duration: 0.3 }}
+                            className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-md ${
+                                toast.type === 'success' ? 'border-green-500/20 bg-green-900/80 text-green-100' :
+                                toast.type === 'error' ? 'border-red-500/20 bg-red-900/80 text-red-100' :
+                                'border-blue-500/20 bg-blue-900/80 text-blue-100'
+                            }`}
+                        >
+                            <span className="text-sm font-medium">{toast.message}</span>
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
 
             {/* Navbar */}
             <FreeNav />
 
             {/* Loading indicator */}
             {apiLoading && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-800/80 backdrop-blur-sm">
-                    <div className="flex flex-col items-center space-y-4">
-                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                        <p className="text-lg text-white">{translations.loadingGoogleMaps}</p>
-                    </div>
-                </div>
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-lg"
+                >
+                    <motion.div 
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="flex flex-col items-center space-y-4"
+                    >
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent shadow-lg shadow-blue-500/50"></div>
+                        <p className="text-lg font-medium text-white">{translations.loadingGoogleMaps}</p>
+                    </motion.div>
+                </motion.div>
             )}
 
             {/* Main Content */}
-            <div className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6">
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6"
+            >
                 {/* Header Bar (title and quick chips) */}
-                <div className="mb-4 flex items-center justify-between">
+                <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.1 }}
+                    className="mb-4 flex items-center justify-between"
+                >
                     <h2 className="text-lg font-bold text-white md:text-xl">
                         {translations.irrigationSystemDesign}
                     </h2>
-                </div>
+                </motion.div>
 
                 {/* Plant and Project Name Inputs */}
                 <div className="mb-4 flex gap-3">
@@ -5421,14 +5650,19 @@ function FreeMap() {
                                 value={projectName}
                                 onChange={handleProjectNameChange}
                                 placeholder={translations.labelNameOfProject}
-                                className="w-full rounded-lg border border-slate-500 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                className="w-full rounded-lg border border-slate-500 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 shadow-md transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:shadow-lg"
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Google Maps Container */}
-                <div className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-600 bg-slate-700/40 md:h-[420px]">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg shadow-md md:h-[420px]"
+                >
                     {/* Search Component */}
                     <div className="absolute left-32 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
                         <div className="relative">
@@ -5439,7 +5673,7 @@ function FreeMap() {
                                 onFocus={handleSearchInputFocus}
                                 onBlur={handleSearchInputBlur}
                                 placeholder={translations.searchLocation}
-                                className="w-full rounded-lg border border-slate-500 bg-white px-3 py-2 pr-8 text-sm text-gray-900 placeholder-gray-500 shadow-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 md:px-4 md:py-2 md:pr-10 md:text-base"
+                                className="w-full rounded-lg border border-slate-500 bg-white px-3 py-2 pr-8 text-sm text-gray-900 placeholder-gray-500 shadow-md transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:shadow-lg md:px-4 md:py-2 md:pr-10 md:text-base"
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 md:right-3">
                                 <svg
@@ -5459,12 +5693,17 @@ function FreeMap() {
 
                             {/* Search Results Dropdown */}
                             {showSearchResults && searchResults.length > 0 && (
-                                <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-lg md:max-h-60">
+                                <motion.div 
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-lg backdrop-blur-sm md:max-h-60"
+                                >
                                     {searchResults.map((result) => (
-                                        <div
+                                        <motion.div
                                             key={result.place_id}
+                                            whileHover={{ scale: 1.01, x: 4 }}
                                             onClick={() => handleSearchResultClick(result.place_id)}
-                                            className="cursor-pointer px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 md:px-4 md:py-2 md:text-sm"
+                                            className="cursor-pointer px-3 py-2 text-xs text-gray-700 transition-colors duration-200 hover:bg-blue-50 md:px-4 md:py-2 md:text-sm"
                                         >
                                             <div className="font-medium">
                                                 {result.structured_formatting?.main_text}
@@ -5472,19 +5711,23 @@ function FreeMap() {
                                             <div className="text-xs text-gray-500">
                                                 {result.structured_formatting?.secondary_text}
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     ))}
-                                </div>
+                                </motion.div>
                             )}
                         </div>
                     </div>
 
-                    <div ref={mapRef} className="h-full min-h-[350px] w-full md:min-h-[420px]" />
+                    <div ref={mapRef} className="h-full w-full min-h-[350px] md:min-h-[420px]" />
                     {!mapLoaded && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-slate-700/40 backdrop-blur-sm">
-                            <div className="text-center text-sky-300">
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-800/60 backdrop-blur-md">
+                            <motion.div 
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="text-center text-sky-300"
+                            >
                                 <p className="mb-3 text-xs italic">// Loading Google Maps API...</p>
-                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md border-2 border-slate-400">
+                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md border-2 border-slate-400/50 bg-slate-800/40 backdrop-blur-sm">
                                     <svg
                                         className="h-8 w-8 animate-spin text-slate-300"
                                         fill="none"
@@ -5499,34 +5742,24 @@ function FreeMap() {
                                         />
                                     </svg>
                                 </div>
-                            </div>
+                            </motion.div>
                         </div>
                     )}
-                </div>
+                </motion.div>
 
                 {/* Tools + Info Panel */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                     {/* Left tools */}
-                    <div className="relative h-14 overflow-visible rounded-lg md:col-span-2 md:h-auto md:flex-col md:space-y-3 md:overflow-visible">
+                    <div className="relative h-14 overflow-visible rounded-lg md:h-auto md:flex-col md:space-y-3 md:overflow-visible md:col-span-2">
                         {/* Step 1: Draw Area */}
                         <button
                             onClick={() => !isStepCompleted(0) && handleStepClick(0)}
                             disabled={getButtonState(0) === 'disabled' || isStepCompleted(0)}
                             style={{
-                                zIndex:
-                                    currentStep === 0
-                                        ? 50
-                                        : currentStep > 0
-                                          ? 40 - currentStep * 10
-                                          : 0,
-                                transform:
-                                    currentStep === 0
-                                        ? 'translateX(0)'
-                                        : currentStep > 0
-                                          ? `translateX(${currentStep * 8}px)`
-                                          : 'translateX(0)',
+                                zIndex: currentStep === 0 ? 50 : currentStep > 0 ? 40 - currentStep * 10 : 0,
+                                transform: currentStep === 0 ? 'translateX(0)' : currentStep > 0 ? `translateX(${currentStep * 8}px)` : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:!z-auto md:h-auto md:w-full md:!transform-none md:px-4 ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 0
                                     ? 'w-full opacity-100'
                                     : currentStep > 0
@@ -5534,11 +5767,11 @@ function FreeMap() {
                                       : 'w-12 opacity-40'
                             } ${
                                 getButtonState(0) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600'
+                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
                                     : getButtonState(0) === 'active'
                                       ? isDrawingMode
-                                          ? 'bg-blue-600 hover:bg-blue-700'
-                                          : 'bg-slate-600 hover:bg-slate-500'
+                                          ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
+                                          : 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                         >
@@ -5556,24 +5789,10 @@ function FreeMap() {
                             onClick={() => !isStepCompleted(1) && handleStepClick(1)}
                             disabled={getButtonState(1) === 'disabled' || isStepCompleted(1)}
                             style={{
-                                zIndex:
-                                    currentStep === 1
-                                        ? 50
-                                        : currentStep > 1
-                                          ? 40 - (currentStep - 1) * 10
-                                          : currentStep < 1
-                                            ? 10
-                                            : 0,
-                                transform:
-                                    currentStep === 1
-                                        ? 'translateX(0)'
-                                        : currentStep > 1
-                                          ? `translateX(${(currentStep - 1) * 8}px)`
-                                          : currentStep < 1
-                                            ? 'translateX(8px)'
-                                            : 'translateX(0)',
+                                zIndex: currentStep === 1 ? 50 : currentStep > 1 ? 40 - (currentStep - 1) * 10 : currentStep < 1 ? 10 : 0,
+                                transform: currentStep === 1 ? 'translateX(0)' : currentStep > 1 ? `translateX(${(currentStep - 1) * 8}px)` : currentStep < 1 ? 'translateX(8px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:!z-auto md:h-auto md:w-full md:!transform-none md:px-4 ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 1
                                     ? 'w-full opacity-100'
                                     : currentStep !== 1
@@ -5581,11 +5800,11 @@ function FreeMap() {
                                       : 'w-12 opacity-40'
                             } ${
                                 getButtonState(1) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600'
+                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
                                     : getButtonState(1) === 'active'
                                       ? waterSources.length > 0
-                                          ? 'bg-green-600 hover:bg-green-700'
-                                          : 'bg-blue-600 hover:bg-blue-700'
+                                          ? 'bg-green-600 hover:bg-green-700 shadow-green-500/50 hover:shadow-xl hover:shadow-green-500/50'
+                                          : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                             title={
@@ -5608,24 +5827,10 @@ function FreeMap() {
                             onClick={() => !isStepCompleted(2) && handleStepClick(2)}
                             disabled={getButtonState(2) === 'disabled' || isStepCompleted(2)}
                             style={{
-                                zIndex:
-                                    currentStep === 2
-                                        ? 50
-                                        : currentStep > 2
-                                          ? 40 - (currentStep - 2) * 10
-                                          : currentStep < 2
-                                            ? 20
-                                            : 0,
-                                transform:
-                                    currentStep === 2
-                                        ? 'translateX(0)'
-                                        : currentStep > 2
-                                          ? `translateX(${(currentStep - 2) * 8}px)`
-                                          : currentStep < 2
-                                            ? 'translateX(16px)'
-                                            : 'translateX(0)',
+                                zIndex: currentStep === 2 ? 50 : currentStep > 2 ? 40 - (currentStep - 2) * 10 : currentStep < 2 ? 20 : 0,
+                                transform: currentStep === 2 ? 'translateX(0)' : currentStep > 2 ? `translateX(${(currentStep - 2) * 8}px)` : currentStep < 2 ? 'translateX(16px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:!z-auto md:h-auto md:w-full md:!transform-none md:px-4 ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 2
                                     ? 'w-full opacity-100'
                                     : currentStep !== 2
@@ -5633,11 +5838,11 @@ function FreeMap() {
                                       : 'w-12 opacity-40'
                             } ${
                                 getButtonState(2) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600'
+                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
                                     : getButtonState(2) === 'active'
                                       ? pumps.length > 0
-                                          ? 'bg-green-600 hover:bg-green-700'
-                                          : 'bg-blue-600 hover:bg-blue-700'
+                                          ? 'bg-green-600 hover:bg-green-700 shadow-green-500/50 hover:shadow-xl hover:shadow-green-500/50'
+                                          : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                             title={
@@ -5660,24 +5865,10 @@ function FreeMap() {
                             onClick={() => !isStepCompleted(3) && handleStepClick(3)}
                             disabled={getButtonState(3) === 'disabled' || isStepCompleted(3)}
                             style={{
-                                zIndex:
-                                    currentStep === 3
-                                        ? 50
-                                        : currentStep > 3
-                                          ? 40 - (currentStep - 3) * 10
-                                          : currentStep < 3
-                                            ? 30
-                                            : 0,
-                                transform:
-                                    currentStep === 3
-                                        ? 'translateX(0)'
-                                        : currentStep > 3
-                                          ? `translateX(${(currentStep - 3) * 8}px)`
-                                          : currentStep < 3
-                                            ? 'translateX(24px)'
-                                            : 'translateX(0)',
+                                zIndex: currentStep === 3 ? 50 : currentStep > 3 ? 40 - (currentStep - 3) * 10 : currentStep < 3 ? 30 : 0,
+                                transform: currentStep === 3 ? 'translateX(0)' : currentStep > 3 ? `translateX(${(currentStep - 3) * 8}px)` : currentStep < 3 ? 'translateX(24px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:!z-auto md:h-auto md:w-full md:!transform-none md:px-4 ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 3
                                     ? 'w-full opacity-100'
                                     : currentStep !== 3
@@ -5685,11 +5876,11 @@ function FreeMap() {
                                       : 'w-12 opacity-40'
                             } ${
                                 getButtonState(3) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600'
+                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
                                     : getButtonState(3) === 'active'
                                       ? zones.length > 0
-                                          ? 'bg-green-600 hover:bg-green-700'
-                                          : 'bg-blue-600 hover:bg-blue-700'
+                                          ? 'bg-green-600 hover:bg-green-700 shadow-green-500/50 hover:shadow-xl hover:shadow-green-500/50'
+                                          : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                             title={
@@ -5713,14 +5904,9 @@ function FreeMap() {
                             disabled={getButtonState(4) === 'disabled'}
                             style={{
                                 zIndex: currentStep === 4 ? 50 : currentStep < 4 ? 40 : 0,
-                                transform:
-                                    currentStep === 4
-                                        ? 'translateX(0)'
-                                        : currentStep < 4
-                                          ? 'translateX(32px)'
-                                          : 'translateX(0)',
+                                transform: currentStep === 4 ? 'translateX(0)' : currentStep < 4 ? 'translateX(32px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 font-medium text-white transition-all duration-300 md:relative md:left-auto md:top-auto md:!z-auto md:h-auto md:w-full md:!transform-none md:px-4 ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 font-medium text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 4
                                     ? 'w-full opacity-100'
                                     : currentStep < 4
@@ -5728,9 +5914,9 @@ function FreeMap() {
                                       : 'w-12 opacity-40'
                             } ${
                                 getButtonState(4) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600'
+                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
                                     : getButtonState(4) === 'active'
-                                      ? 'bg-blue-600 hover:bg-blue-700'
+                                      ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                         >
@@ -5741,8 +5927,13 @@ function FreeMap() {
                     </div>
 
                     {/* Right info */}
-                    <div className="flex flex-col md:col-span-3">
-                        <div className="flex-1 rounded-lg border border-slate-600 bg-slate-700/40 p-3 text-white">
+                    <motion.div 
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, delay: 0.3 }}
+                        className="flex flex-col md:col-span-3"
+                    >
+                        <div className="flex-1 rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg p-3 text-white shadow-md hover:shadow-lg transition-all duration-300">
                             {currentStep === 0 && isDrawingMode ? (
                                 <div className="text-center">
                                     <p className="mb-2 text-sm font-medium text-blue-300">
@@ -5842,62 +6033,65 @@ function FreeMap() {
                                 </div>
                             )}
                         </div>
-                        <div className="mt-3 hidden md:block">
-                            {/* Step 5: Generate Pipe System */}
-                            <button
-                                onClick={() => handleStepClick(4)}
-                                disabled={getButtonState(4) === 'disabled'}
-                                className={`w-full rounded-lg px-4 py-3 font-medium text-white transition-colors ${
-                                    getButtonState(4) === 'completed'
-                                        ? 'cursor-not-allowed bg-green-600'
-                                        : getButtonState(4) === 'active'
-                                          ? 'bg-blue-600 hover:bg-blue-700'
-                                          : 'cursor-not-allowed bg-slate-400'
-                                }`}
-                            >
-                                {translations.generatePipeSystem}
-                            </button>
-                        </div>
-                    </div>
+                    </motion.div>
                 </div>
 
                 {/* Bottom Nav */}
-                <div className="mt-6 flex gap-3">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                    className="mt-6 flex gap-3"
+                >
                     <button
                         onClick={handleBack}
-                        className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white hover:bg-slate-500"
+                        className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white shadow-md transition-all duration-300 hover:bg-slate-500 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {translations.back}
                     </button>
                     <button
                         onClick={handleReset}
-                        className="flex-1 rounded-lg bg-amber-600 px-4 py-3 text-white hover:bg-amber-700"
+                        className="flex-1 rounded-lg bg-amber-600 px-4 py-3 text-white shadow-md shadow-amber-500/50 transition-all duration-300 hover:bg-amber-700 hover:shadow-lg hover:shadow-amber-500/50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {translations.reset}
                     </button>
                     <button
                         onClick={handleNext}
-                        className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700"
+                        className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {translations.next}
                     </button>
-                </div>
-            </div>
+                </motion.div>
+            </motion.div>
 
             {/* Zone Configuration Modal */}
-            {showZoneModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="mx-4 w-full max-w-md rounded-lg bg-slate-800 p-6 shadow-xl">
+            <AnimatePresence>
+                {showZoneModal && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={handleCloseZoneModal}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            transition={{ duration: 0.3 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mx-4 w-full max-w-md rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg p-6 shadow-xl"
+                        >
                         <div className="mb-4 text-center">
                             <h3 className="text-lg font-semibold text-white">
-                                Determine number of zones
+                                {translations.determineNumberOfZones}
                             </h3>
                         </div>
 
                         <div className="mb-6">
                             <div className="mb-4">
                                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                                    Number of zones (1-15):
+                                    {translations.numberOfZones}
                                 </label>
                                 <input
                                     type="number"
@@ -5909,34 +6103,37 @@ function FreeMap() {
                                             Math.max(1, Math.min(15, parseInt(e.target.value) || 1))
                                         )
                                     }
-                                    className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-3 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    className="w-full rounded-lg border border-slate-400/20 bg-slate-700/60 backdrop-blur-sm px-4 py-3 text-white placeholder-slate-400 shadow-md transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:shadow-lg"
                                     placeholder={translations.enterNumberOfZones}
                                 />
                             </div>
 
                             <div className="mb-4">
                                 <p className="text-sm text-slate-400">
-                                    Each zone will have a unique color and will be divided
-                                    horizontally across your area.
+                                    {translations.zoneDescription}
                                 </p>
                             </div>
 
                             {/* Color preview */}
                             <div className="mb-4">
                                 <p className="mb-2 text-sm font-medium text-slate-300">
-                                    Zone colors preview:
+                                    {translations.zoneColorsPreview}
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                     {generateZoneColors(zoneCount).map((color, index) => (
-                                        <div
+                                        <motion.div
                                             key={index}
-                                            className="flex h-8 w-8 items-center justify-center rounded border border-slate-600"
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            whileHover={{ scale: 1.1 }}
+                                            className="flex h-8 w-8 items-center justify-center rounded border border-slate-400/30 shadow-md"
                                             style={{ backgroundColor: color }}
                                         >
                                             <span className="text-xs font-bold text-white">
                                                 {index + 1}
                                             </span>
-                                        </div>
+                                        </motion.div>
                                     ))}
                                 </div>
                             </div>
@@ -5945,20 +6142,21 @@ function FreeMap() {
                         <div className="flex gap-3">
                             <button
                                 onClick={handleCloseZoneModal}
-                                className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white transition-colors hover:bg-slate-500"
+                                className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white shadow-md transition-all duration-300 hover:bg-slate-500 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                Cancel
+                                {translations.cancel}
                             </button>
                             <button
                                 onClick={handleGenerateZones}
-                                className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-white transition-colors hover:bg-green-700"
+                                className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-white shadow-md shadow-green-500/50 transition-all duration-300 hover:bg-green-700 hover:shadow-xl hover:shadow-green-500/50 hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                Generate
+                                {translations.generate}
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </motion.div>
+                </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

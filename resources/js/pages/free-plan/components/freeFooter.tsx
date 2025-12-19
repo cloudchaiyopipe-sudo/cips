@@ -170,7 +170,7 @@ function FreeFooter() {
 
                 <motion.div
                     variants={itemVariants}
-                    className="mt-12 text-center text-xs text-slate-500"
+                    className="mt-8 pb-12 text-center text-xs text-slate-500 md:mt-12 md:pb-0"
                 >
                     &copy; {new Date().getFullYear()} Chaiyo Irrigation Planning System. All rights
                     reserved.

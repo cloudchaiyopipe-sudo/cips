@@ -57,7 +57,7 @@ export default function CreateProduct() {
 
         try {
             setUploadingImage(true);
-
+            
             // สร้าง FormData สำหรับอัปโหลด
             const formData = new FormData();
             formData.append('image', file);
@@ -67,9 +67,7 @@ export default function CreateProduct() {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-CSRF-TOKEN':
-                        document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-                            ?.content || '',
+                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '',
                 },
             });
 
@@ -77,7 +75,7 @@ export default function CreateProduct() {
 
             if (result.success && result.url) {
                 setData('image_url', result.url);
-
+                
                 // แสดง preview
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -85,11 +83,7 @@ export default function CreateProduct() {
                 };
                 reader.readAsDataURL(file);
             } else {
-                alert(
-                    translations.cannotUploadImage +
-                        ' ' +
-                        (result.message || translations.errorOccurred)
-                );
+                alert(translations.cannotUploadImage + ' ' + (result.message || translations.errorOccurred));
             }
         } catch (error) {
             console.error('Error uploading image:', error);
@@ -108,8 +102,8 @@ export default function CreateProduct() {
                 router.visit('/free-plan/products');
             },
             onError: (errors) => {
-                console.error('เกิดข้อผิดพลาด:', errors);
-            },
+                console.error(translations.errorOccurred, errors);
+            }
         });
     }
 
@@ -143,14 +137,9 @@ export default function CreateProduct() {
                         <span className="font-medium">{translations.backToProductList}</span>
                     </button>
 
-                    <h1 className="mb-6 text-3xl font-bold text-white">
-                        {translations.createNewProduct}
-                    </h1>
+                    <h1 className="mb-6 text-3xl font-bold text-white">{translations.createNewProduct}</h1>
 
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white"
-                    >
+                    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
                         {/* Name Field */}
                         <div>
                             <label htmlFor="name" className="mb-1 block font-medium text-white">
@@ -165,17 +154,12 @@ export default function CreateProduct() {
                                 placeholder={translations.pleaseEnterProductName}
                                 disabled={processing}
                             />
-                            {errors.name && (
-                                <div className="mt-1 text-sm text-red-400">{errors.name}</div>
-                            )}
+                            {errors.name && <div className="mt-1 text-sm text-red-400">{errors.name}</div>}
                         </div>
 
                         {/* Description Field */}
                         <div>
-                            <label
-                                htmlFor="description"
-                                className="mb-1 block font-medium text-white"
-                            >
+                            <label htmlFor="description" className="mb-1 block font-medium text-white">
                                 {translations.productDescription}
                             </label>
                             <textarea
@@ -188,9 +172,7 @@ export default function CreateProduct() {
                                 disabled={processing}
                             />
                             {errors.description && (
-                                <div className="mt-1 text-sm text-red-400">
-                                    {errors.description}
-                                </div>
+                                <div className="mt-1 text-sm text-red-400">{errors.description}</div>
                             )}
                         </div>
 
@@ -210,18 +192,13 @@ export default function CreateProduct() {
                                 placeholder="0.00"
                                 disabled={processing}
                             />
-                            {errors.price && (
-                                <div className="mt-1 text-sm text-red-400">{errors.price}</div>
-                            )}
+                            {errors.price && <div className="mt-1 text-sm text-red-400">{errors.price}</div>}
                         </div>
 
                         {/* Original Price Field - แสดงเฉพาะสินค้าโปรโมชั่น */}
                         {data.category === 'promotion' && (
                             <div>
-                                <label
-                                    htmlFor="originalPrice"
-                                    className="mb-1 block font-medium text-white"
-                                >
+                                <label htmlFor="originalPrice" className="mb-1 block font-medium text-white">
                                     {translations.originalPrice}
                                 </label>
                                 <input
@@ -230,17 +207,13 @@ export default function CreateProduct() {
                                     step="0.01"
                                     min="0"
                                     value={data.originalPrice}
-                                    onChange={(e) =>
-                                        setData('originalPrice', parseFloat(e.target.value) || 0)
-                                    }
+                                    onChange={(e) => setData('originalPrice', parseFloat(e.target.value) || 0)}
                                     className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
                                     placeholder={`0.00 (${translations.optional})`}
                                     disabled={processing}
                                 />
                                 {errors.originalPrice && (
-                                    <div className="mt-1 text-sm text-red-400">
-                                        {errors.originalPrice}
-                                    </div>
+                                    <div className="mt-1 text-sm text-red-400">{errors.originalPrice}</div>
                                 )}
                             </div>
                         )}
@@ -253,9 +226,7 @@ export default function CreateProduct() {
                             <select
                                 id="category"
                                 value={data.category}
-                                onChange={(e) =>
-                                    setData('category', e.target.value as 'new' | 'promotion')
-                                }
+                                onChange={(e) => setData('category', e.target.value as 'new' | 'promotion')}
                                 className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
                                 disabled={processing}
                             >
@@ -270,10 +241,7 @@ export default function CreateProduct() {
                         {/* Discount Field (only show if category is promotion) */}
                         {data.category === 'promotion' && (
                             <div>
-                                <label
-                                    htmlFor="discount"
-                                    className="mb-1 block font-medium text-white"
-                                >
+                                <label htmlFor="discount" className="mb-1 block font-medium text-white">
                                     {translations.discount}
                                 </label>
                                 <input
@@ -282,17 +250,13 @@ export default function CreateProduct() {
                                     min="0"
                                     max="100"
                                     value={data.discount}
-                                    onChange={(e) =>
-                                        setData('discount', parseInt(e.target.value) || 0)
-                                    }
+                                    onChange={(e) => setData('discount', parseInt(e.target.value) || 0)}
                                     className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
                                     placeholder="0"
                                     disabled={processing}
                                 />
                                 {errors.discount && (
-                                    <div className="mt-1 text-sm text-red-400">
-                                        {errors.discount}
-                                    </div>
+                                    <div className="mt-1 text-sm text-red-400">{errors.discount}</div>
                                 )}
                             </div>
                         )}
@@ -312,20 +276,16 @@ export default function CreateProduct() {
                                 disabled={processing || uploadingImage}
                             />
                             {uploadingImage && (
-                                <div className="mt-2 text-sm text-blue-400">
-                                    {translations.uploading}
-                                </div>
+                                <div className="mt-2 text-sm text-blue-400">{translations.uploading}</div>
                             )}
-                            {errors.image_url && (
-                                <div className="mt-1 text-sm text-red-400">{errors.image_url}</div>
-                            )}
+                            {errors.image_url && <div className="mt-1 text-sm text-red-400">{errors.image_url}</div>}
 
                             {/* Image Preview */}
                             {(imagePreview || data.image_url) && (
                                 <div className="relative mt-3">
                                     <img
                                         src={imagePreview || data.image_url}
-                                        alt="Preview"
+                                        alt={translations.preview}
                                         className="max-h-[300px] w-auto rounded border"
                                     />
                                     <button

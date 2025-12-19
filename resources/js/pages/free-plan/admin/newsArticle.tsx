@@ -1,7 +1,7 @@
 import { Head, useForm, usePage, router } from '@inertiajs/react';
 import { useState, useRef, useEffect } from 'react';
 import FreeNav from '../components/freeNav';
-import { getTranslations } from '../utils/language';
+import { getTranslations } from '../utils/language'; 
 
 interface User {
     id: number;
@@ -78,7 +78,7 @@ export default function CreateArticle() {
 
         try {
             setUploadingImage(true);
-
+            
             // สร้าง FormData สำหรับอัปโหลด
             const formData = new FormData();
             formData.append('image', file);
@@ -88,9 +88,7 @@ export default function CreateArticle() {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-CSRF-TOKEN':
-                        document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-                            ?.content || '',
+                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '',
                 },
             });
 
@@ -98,7 +96,7 @@ export default function CreateArticle() {
 
             if (result.success && result.url) {
                 setData('image_url', result.url);
-
+                
                 // แสดง preview
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -106,11 +104,7 @@ export default function CreateArticle() {
                 };
                 reader.readAsDataURL(file);
             } else {
-                alert(
-                    translations.cannotUploadImage +
-                        ' ' +
-                        (result.message || translations.errorOccurred)
-                );
+                alert(translations.cannotUploadImage + ' ' + (result.message || translations.errorOccurred));
             }
         } catch (error) {
             console.error('Error uploading image:', error);
@@ -141,8 +135,8 @@ export default function CreateArticle() {
             },
             onError: (errors) => {
                 console.error(translations.errorOccurred, errors);
-            },
-        });
+            }
+        }); 
     }
 
     // If not admin, show access denied message
@@ -177,15 +171,15 @@ export default function CreateArticle() {
             <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
                 {/* Custom Navbar */}
                 <FreeNav />
-
+                
                 <div className="mx-auto max-w-4xl px-4 py-4 md:px-6 md:py-6">
                     {/* Header */}
                     <div className="mb-6 flex items-center gap-2 text-white">
-                        <button
+                        <button 
                             onClick={() => {
                                 // กลับไปหน้าก่อนหน้า
                                 window.history.back();
-                            }}
+                            }} 
                             className="flex items-center gap-2 text-slate-300 transition-colors hover:text-white"
                         >
                             <svg
@@ -205,103 +199,86 @@ export default function CreateArticle() {
                         </button>
                     </div>
 
-                    <h1 className="mb-6 text-3xl font-bold text-white">
-                        {translations.createNewArticle}
-                    </h1>
+                    <h1 className="text-3xl font-bold text-white mb-6">{translations.createNewArticle}</h1>
 
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white"
-                    >
-                        <div>
-                            <label htmlFor="title" className="mb-1 block font-medium text-white">
-                                {translations.articleTitle}
-                            </label>
-                            <input
-                                id="title"
-                                type="text"
-                                value={data.title}
-                                onChange={(e) => setData('title', e.target.value)}
-                                className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                placeholder={translations.pleaseEnterArticleTitle}
-                                disabled={processing}
-                            />
-                            {/* 4. แสดง Error ถ้ามี (Inertia ส่งมาให้) */}
-                            {errors.title && (
-                                <div className="mt-1 text-sm text-red-400">{errors.title}</div>
-                            )}
-                        </div>
-
-                        {/* อัปโหลดรูปภาพ */}
-                        <div>
-                            <label htmlFor="image" className="mb-1 block font-medium text-white">
-                                {translations.articleImage}
-                            </label>
-                            <input
-                                ref={fileInputRef}
-                                id="image"
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                disabled={uploadingImage}
-                                className="w-full rounded-md border border-slate-500 bg-slate-700/50 p-2 text-white file:mr-4 file:rounded-md file:border-0 file:bg-blue-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-600 disabled:opacity-50"
-                            />
-                            {uploadingImage && (
-                                <div className="mt-1 text-sm text-blue-400">
-                                    {translations.uploading}
-                                </div>
-                            )}
-                            {errors.image_url && (
-                                <div className="mt-1 text-sm text-red-400">{errors.image_url}</div>
-                            )}
-
-                            {/* แสดง preview รูปภาพ */}
-                            {imagePreview && (
-                                <div className="relative mt-3">
-                                    <img
-                                        src={imagePreview}
-                                        alt="Preview"
-                                        className="h-auto max-w-full rounded border"
-                                        style={{ maxHeight: '300px' }}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleRemoveImage}
-                                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
-                                        title={translations.removeImage}
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div>
-                            <label htmlFor="content" className="mb-1 block font-medium text-white">
-                                {translations.articleContent}
-                            </label>
-                            <textarea
-                                id="content"
-                                value={data.content}
-                                onChange={(e) => setData('content', e.target.value)}
-                                rows={10}
-                                className="w-full resize-y rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                placeholder={translations.pleaseEnterArticleContent}
-                                disabled={processing}
-                            />
-                            {errors.content && (
-                                <div className="mt-1 text-sm text-red-400">{errors.content}</div>
-                            )}
-                        </div>
-
-                        <button
-                            type="submit"
+                <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
+                    <div>
+                        <label htmlFor="title" className="block mb-1 text-white font-medium">{translations.articleTitle}</label>
+                        <input
+                            id="title"
+                            type="text"
+                            value={data.title}
+                            onChange={(e) => setData('title', e.target.value)}
+                            className="w-full border border-slate-500 rounded-md p-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder={translations.pleaseEnterArticleTitle}
                             disabled={processing}
-                            className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-                        >
-                            {processing ? translations.savingArticle : translations.saveArticle}
-                        </button>
-                    </form>
+                        />
+                        {/* 4. แสดง Error ถ้ามี (Inertia ส่งมาให้) */}
+                        {errors.title && <div className="text-red-400 text-sm mt-1">{errors.title}</div>}
+                    </div>
+
+                    {/* อัปโหลดรูปภาพ */}
+                    <div>
+                        <label htmlFor="image" className="block mb-1 text-white font-medium">{translations.articleImage}</label>
+                        <input
+                            ref={fileInputRef}
+                            id="image"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            disabled={uploadingImage}
+                            className="w-full border border-slate-500 rounded-md p-2 text-white bg-slate-700/50 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-white hover:file:bg-blue-600 disabled:opacity-50"
+                        />
+                        {uploadingImage && (
+                            <div className="text-blue-400 text-sm mt-1">{translations.uploading}</div>
+                        )}
+                        {errors.image_url && (
+                            <div className="text-red-400 text-sm mt-1">{errors.image_url}</div>
+                        )}
+                        
+                        {/* แสดง preview รูปภาพ */}
+                        {imagePreview && (
+                            <div className="mt-3 relative">
+                                <img
+                                    src={imagePreview}
+                                    alt={translations.preview}
+                                    className="max-w-full h-auto rounded border"
+                                    style={{ maxHeight: '300px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveImage}
+                                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
+                                    title={translations.removeImage}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label htmlFor="content" className="block mb-1 text-white font-medium">{translations.articleContent}</label>
+                        <textarea
+                            id="content"
+                            value={data.content}
+                            onChange={(e) => setData('content', e.target.value)}
+                            rows={10}
+                            className="w-full border border-slate-500 rounded-md p-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder={translations.pleaseEnterArticleContent}
+                            disabled={processing}
+                        />
+                        {errors.content && <div className="text-red-400 text-sm mt-1">{errors.content}</div>}
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={processing}
+                        className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                        {processing ? translations.savingArticle : translations.saveArticle}
+                    </button>
+                </form>
                 </div>
             </div>
         </>
