@@ -14,6 +14,7 @@ class Product extends Model
         'category',
         'discount',
         'image_url',
+        'video_url',
     ];
 
     protected $casts = [

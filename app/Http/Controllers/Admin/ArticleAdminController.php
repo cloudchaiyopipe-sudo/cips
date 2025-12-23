@@ -52,6 +52,38 @@ class ArticleAdminController extends Controller
                          ->with('success', 'บทความถูกสร้างเรียบร้อยแล้ว');
     }
 
+    // แสดงหน้าฟอร์มแก้ไขบทความ
+    public function edit(Article $article)
+    {
+        return Inertia::render('free-plan/admin/newsArticle', [
+            'article' => [
+                'id' => $article->id,
+                'title' => $article->title,
+                'content' => $article->content,
+                'image_url' => $article->image_url ?? '',
+            ]
+        ]);
+    }
+
+    // อัปเดตบทความ
+    public function update(Request $request, Article $article)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
+            'image_url' => 'nullable|string|max:500',
+        ]);
+
+        $article->update([
+            'title' => $request->title,
+            'content' => $request->content,
+            'image_url' => $request->image_url,
+        ]);
+
+        return redirect()->route('free.news')
+                         ->with('success', 'บทความถูกแก้ไขเรียบร้อยแล้ว');
+    }
+
     // ลบบทความ
     public function destroy(Article $article)
     {

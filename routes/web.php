@@ -794,6 +794,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 Route::middleware(['auth'])->group(function () {
     // Free Plan Product Route - Sales users cannot access
     Route::get('/free-plan/products', [ProductController::class, 'index'])->name('free.products');
+    Route::get('/free-plan/products/{product}', [ProductController::class, 'show'])->name('free.product.show');
 
     // Free Plan Routes - Sales users cannot access
     Route::get('/free-plan', function () {

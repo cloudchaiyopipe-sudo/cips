@@ -442,12 +442,14 @@ export interface LanguageTranslations {
     addProduct: string;
     newProducts: string;
     promotionProducts: string;
+    recommendedProducts: string;
     noProductsInCategory: string;
     deleteProduct: string;
     confirmDeleteProduct: string;
     errorDeletingProduct: string;
     newBadge: string;
     promotionBadge: string;
+    recommendedBadge: string;
     viewDetails: string;
 
     // ProductArticle page
@@ -463,6 +465,11 @@ export interface LanguageTranslations {
     category: string;
     discount: string;
     productImage: string;
+    productVideo: string;
+    productVideoUrl: string;
+    pleaseEnterVideoUrl: string;
+    videoUrlPlaceholder: string;
+    removeVideo: string;
     savingProduct: string;
     saveProduct: string;
 
@@ -989,12 +996,14 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         addProduct: 'Add Product',
         newProducts: 'New Products',
         promotionProducts: 'Promotion Products',
+        recommendedProducts: 'Recommended Products',
         noProductsInCategory: 'No products in this category',
         deleteProduct: 'Delete Product',
         confirmDeleteProduct: 'Are you sure you want to delete this product?',
         errorDeletingProduct: 'Error deleting product',
         newBadge: 'New',
         promotionBadge: 'Promotion',
+        recommendedBadge: 'Recommended',
         viewDetails: 'View Details',
 
         // ProductArticle page
@@ -1010,6 +1019,11 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         category: 'Category:',
         discount: 'Discount (%):',
         productImage: 'Product Image:',
+        productVideo: 'Product Video:',
+        productVideoUrl: 'Video URL:',
+        pleaseEnterVideoUrl: 'Please enter video URL',
+        videoUrlPlaceholder: 'https://youtube.com/watch?v=... or https://vimeo.com/...',
+        removeVideo: 'Remove Video',
         savingProduct: 'Saving...',
         saveProduct: 'Save Product',
 
@@ -1529,12 +1543,14 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         addProduct: 'เพิ่มสินค้า',
         newProducts: 'สินค้าใหม่',
         promotionProducts: 'สินค้าโปรโมชั่น',
+        recommendedProducts: 'สินค้าแนะนำ',
         noProductsInCategory: 'ไม่มีสินค้าในหมวดหมู่นี้',
         deleteProduct: 'ลบสินค้า',
         confirmDeleteProduct: 'คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?',
         errorDeletingProduct: 'เกิดข้อผิดพลาดในการลบสินค้า',
         newBadge: 'ใหม่',
         promotionBadge: 'โปรโมชั่น',
+        recommendedBadge: 'แนะนำ',
         viewDetails: 'ดูรายละเอียด',
 
         // ProductArticle page
@@ -1550,6 +1566,11 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         category: 'หมวดหมู่:',
         discount: 'ส่วนลด (%):',
         productImage: 'รูปภาพสินค้า:',
+        productVideo: 'วิดีโอสินค้า:',
+        productVideoUrl: 'ลิงก์วิดีโอ:',
+        pleaseEnterVideoUrl: 'กรุณากรอกลิงก์วิดีโอ',
+        videoUrlPlaceholder: 'https://youtube.com/watch?v=... หรือ https://vimeo.com/...',
+        removeVideo: 'ลบวิดีโอ',
         savingProduct: 'กำลังบันทึก...',
         saveProduct: 'บันทึกสินค้า',
 

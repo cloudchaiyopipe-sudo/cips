@@ -1,11 +1,32 @@
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { useState, useRef, useEffect } from 'react';
 import FreeNav from '../components/freeNav';
 import FootNav from '../components/footNav';
 import { getTranslations } from '../utils/language';
 
+interface Product {
+    id: number;
+    name: string;
+    description: string;
+    price: number;
+    originalPrice?: number;
+    category: 'new' | 'promotion' | 'recommended';
+    discount?: number;
+    image_url: string;
+    video_url: string;
+}
+
+interface PageProps {
+    product?: Product;
+    [key: string]: unknown;
+}
+
 export default function CreateProduct() {
-    const [imagePreview, setImagePreview] = useState<string>('');
+    const page = usePage<PageProps>();
+    const product = page.props.product;
+    const isEditMode = !!product;
+    
+    const [imagePreview, setImagePreview] = useState<string>(product?.image_url || '');
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [translations, setTranslations] = useState(getTranslations());
@@ -27,15 +48,23 @@ export default function CreateProduct() {
         };
     }, []);
 
+    // Set image preview when product is loaded
+    useEffect(() => {
+        if (product?.image_url) {
+            setImagePreview(product.image_url);
+        }
+    }, [product]);
+
     // 1. เพิ่ม field ทั้งหมด รวมถึง 'image_url' แทน 'image'
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        description: '',
-        price: 0,
-        originalPrice: 0,
-        category: 'new' as 'new' | 'promotion',
-        discount: 0,
-        image_url: '',
+    const { data, setData, post, put, processing, errors } = useForm({
+        name: product?.name || '',
+        description: product?.description || '',
+        price: product?.price || 0,
+        originalPrice: product?.originalPrice || 0,
+        category: product?.category || ('new' as 'new' | 'promotion' | 'recommended'),
+        discount: product?.discount || 0,
+        image_url: product?.image_url || '',
+        video_url: product?.video_url || '',
     });
 
     // Handle image upload (เหมือนกับข่าวสาร)
@@ -93,23 +122,66 @@ export default function CreateProduct() {
         }
     };
 
+    // Helper function to extract YouTube video ID
+    const getYouTubeVideoId = (url: string): string | null => {
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/,
+            /youtube\.com\/.*[?&]v=([^&\n?#]+)/,
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        return null;
+    };
+
+    // Helper function to extract Vimeo video ID
+    const getVimeoVideoId = (url: string): string | null => {
+        const patterns = [
+            /vimeo\.com\/(\d+)/,
+            /vimeo\.com\/.*\/(\d+)/,
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        return null;
+    };
+
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        // 2. Inertia ฉลาดพอที่จะ POST เป็น multipart/form-data ให้เอง!
-        post('/admin/products', {
-            onSuccess: () => {
-                // Redirect to product list after success
-                router.visit('/free-plan/products');
-            },
-            onError: (errors) => {
-                console.error(translations.errorOccurred, errors);
-            }
-        });
+        if (isEditMode && product) {
+            // Update existing product
+            put(`/admin/products/${product.id}`, {
+                onSuccess: () => {
+                    router.visit('/free-plan/products');
+                },
+                onError: (errors) => {
+                    console.error(translations.errorOccurred, errors);
+                }
+            });
+        } else {
+            // Create new product
+            post('/admin/products', {
+                onSuccess: () => {
+                    router.visit('/free-plan/products');
+                },
+                onError: (errors) => {
+                    console.error(translations.errorOccurred, errors);
+                }
+            });
+        }
     }
 
     return (
         <>
-            <Head title={translations.createNewProduct} />
+            <Head title={isEditMode ? (translations.editProduct || 'แก้ไขสินค้า') : translations.createNewProduct} />
             <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
                 {/* Custom Navbar */}
                 <FreeNav />
@@ -137,7 +209,9 @@ export default function CreateProduct() {
                         <span className="font-medium">{translations.backToProductList}</span>
                     </button>
 
-                    <h1 className="mb-6 text-3xl font-bold text-white">{translations.createNewProduct}</h1>
+                    <h1 className="mb-6 text-3xl font-bold text-white">
+                        {isEditMode ? (translations.editProduct || 'แก้ไขสินค้า') : translations.createNewProduct}
+                    </h1>
 
                     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
                         {/* Name Field */}
@@ -226,12 +300,13 @@ export default function CreateProduct() {
                             <select
                                 id="category"
                                 value={data.category}
-                                onChange={(e) => setData('category', e.target.value as 'new' | 'promotion')}
+                                onChange={(e) => setData('category', e.target.value as 'new' | 'promotion' | 'recommended')}
                                 className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
                                 disabled={processing}
                             >
                                 <option value="new">{translations.newProducts}</option>
                                 <option value="promotion">{translations.promotionProducts}</option>
+                                <option value="recommended">{translations.recommendedProducts}</option>
                             </select>
                             {errors.category && (
                                 <div className="mt-1 text-sm text-red-400">{errors.category}</div>
@@ -305,6 +380,92 @@ export default function CreateProduct() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Video Field - Only for Recommended Products */}
+                        {data.category === 'recommended' && (
+                            <div>
+                                <label htmlFor="video_url" className="mb-1 block font-medium text-white">
+                                    {translations.productVideo}
+                                </label>
+                                <input
+                                    id="video_url"
+                                    type="url"
+                                    value={data.video_url}
+                                    onChange={(e) => setData('video_url', e.target.value)}
+                                    className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                                    placeholder={translations.videoUrlPlaceholder}
+                                    disabled={processing}
+                                />
+                                <p className="mt-1 text-xs text-slate-400">
+                                    {translations.videoUrlPlaceholder}
+                                </p>
+                                {errors.video_url && (
+                                    <div className="mt-1 text-sm text-red-400">{errors.video_url}</div>
+                                )}
+
+                                {/* Video Preview */}
+                                {data.video_url && (() => {
+                                    const youtubeId = getYouTubeVideoId(data.video_url);
+                                    const vimeoId = getVimeoVideoId(data.video_url);
+                                    
+                                    return (
+                                        <div className="relative mt-3">
+                                            <div className="rounded-lg border border-slate-500 bg-slate-800/50 p-4">
+                                                {/* YouTube Embed */}
+                                                {youtubeId ? (
+                                                    <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+                                                        <iframe
+                                                            src={`https://www.youtube.com/embed/${youtubeId}`}
+                                                            className="h-full w-full"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowFullScreen
+                                                            title="Video preview"
+                                                        />
+                                                    </div>
+                                                ) : vimeoId ? (
+                                                    <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+                                                        <iframe
+                                                            src={`https://player.vimeo.com/video/${vimeoId}`}
+                                                            className="h-full w-full"
+                                                            allow="autoplay; fullscreen; picture-in-picture"
+                                                            allowFullScreen
+                                                            title="Video preview"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center justify-center rounded-lg bg-slate-700/50 p-8">
+                                                        <div className="text-center">
+                                                            <svg className="mx-auto h-12 w-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                            </svg>
+                                                            <p className="mt-2 text-sm text-slate-400">
+                                                                {translations.preview}
+                                                            </p>
+                                                            <a
+                                                                href={data.video_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="mt-2 block break-all text-sm text-blue-400 hover:text-blue-300"
+                                                            >
+                                                                {data.video_url}
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setData('video_url', '')}
+                                                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+                                                title={translations.removeVideo}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
 
                         {/* Submit Button */}
                         <button

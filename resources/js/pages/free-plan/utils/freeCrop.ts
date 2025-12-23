@@ -249,9 +249,31 @@ export const getTranslatedPlantName = (
     return plantName; // Fallback to original name
 };
 
-export const searchGardenPlants = (query: string): GardenPlant[] => {
-    const lowercaseQuery = query.toLowerCase();
-    return gardenPlants.filter((plant) => plant.name.toLowerCase().includes(lowercaseQuery));
+export const searchGardenPlants = (
+    query: string,
+    translations?: LanguageTranslations
+): GardenPlant[] => {
+    const lowercaseQuery = query.toLowerCase().trim();
+    if (!lowercaseQuery) return gardenPlants;
+
+    return gardenPlants.filter((plant) => {
+        // Search in English name
+        const englishMatch = plant.name.toLowerCase().includes(lowercaseQuery);
+        
+        // Search in translated name if translations provided
+        if (translations) {
+            const translationKey = plantNameMap[plant.name];
+            if (translationKey) {
+                const translatedName = translations[translationKey as keyof LanguageTranslations];
+                if (translatedName && typeof translatedName === 'string') {
+                    const thaiMatch = translatedName.toLowerCase().includes(lowercaseQuery);
+                    return englishMatch || thaiMatch;
+                }
+            }
+        }
+        
+        return englishMatch;
+    });
 };
 
 export const getGardenPlantsByCategory = (

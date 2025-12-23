@@ -808,7 +808,7 @@ function FreeMap() {
             // Determine map type control position based on screen size
             const isMobile = window.innerWidth < 768; // Mobile breakpoint
             const mapTypeControlPosition = isMobile
-                ? window.google.maps.ControlPosition.MIDDLE_LEFT
+                ? window.google.maps.ControlPosition.TOP_LEFT
                 : window.google.maps.ControlPosition.TOP_RIGHT;
 
             const mapOptions: MapOptions = {
@@ -1052,9 +1052,71 @@ function FreeMap() {
                             geodesic: true,
                             strokeColor: '#DC2626', // Red color for main pipes
                             strokeOpacity: 0.8,
-                            strokeWeight: 4, // Thicker line for main pipes
-                            zIndex: 2500, // Above plant points (tree icons)
+                            strokeWeight: 6, // Thicker for easier hover
+                            zIndex: 5000, // Above zones (zones are 1000)
                         });
+
+                        // Add InfoWindow for hover tooltip
+                        const infoWindow = new window.google.maps.InfoWindow({
+                            content: `<div class="text-center font-semibold text-gray-800">${translations.mainPipe}</div>`,
+                        });
+
+                        // Calculate midpoint for tooltip position
+                        const midpoint = {
+                            lat: (pipe.fromPump.lat + pipe.toZoneCenter.lat) / 2,
+                            lng: (pipe.fromPump.lng + pipe.toZoneCenter.lng) / 2,
+                        };
+                        const midpointMarker = new window.google.maps.Marker({
+                            position: midpoint,
+                            map: null, // Hidden marker just for tooltip positioning
+                            visible: false,
+                        });
+
+                        // Helper function to check distance from point to polyline
+                        const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                            const geometry = window.google?.maps?.geometry;
+                            if (!geometry?.spherical) return Infinity;
+                            
+                            const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                            let minDistance = Infinity;
+                            
+                            const path = [pipe.fromPump, pipe.toZoneCenter];
+                            // Check distance to all points on the path
+                            for (const pathPoint of path) {
+                                const pathLatLng = new window.google.maps.LatLng(pathPoint.lat, pathPoint.lng);
+                                const distance = geometry.spherical.computeDistanceBetween(pointLatLng, pathLatLng);
+                                minDistance = Math.min(minDistance, distance);
+                            }
+                            
+                            return minDistance;
+                        };
+
+                        let isHovering = false;
+                        let hoverTimeout: NodeJS.Timeout | null = null;
+
+                        // Use mousemove on map to detect hover
+                        const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                            if (!event.latLng) return;
+                            
+                            const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                            const distance = getDistanceToPolyline(mousePoint);
+                            const hoverThreshold = 20; // 20 meters - increased for easier hover detection
+
+                            if (distance <= hoverThreshold && !isHovering) {
+                                isHovering = true;
+                                if (hoverTimeout) clearTimeout(hoverTimeout);
+                                infoWindow.open(map, midpointMarker);
+                            } else if (distance > hoverThreshold && isHovering) {
+                                isHovering = false;
+                                if (hoverTimeout) clearTimeout(hoverTimeout);
+                                hoverTimeout = setTimeout(() => {
+                                    infoWindow.close();
+                                }, 200);
+                            }
+                        });
+
+                        // Store listener for cleanup
+                        (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
                         polyline.setMap(map);
                         allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -1074,9 +1136,70 @@ function FreeMap() {
                             geodesic: true,
                             strokeColor: '#8B5CF6', // Purple color for sub-main pipes
                             strokeOpacity: 0.7,
-                            strokeWeight: 3, // Slightly thinner than main pipes
-                            zIndex: 2500, // Above plant points (tree icons)
+                            strokeWeight: 5, // Thicker for easier hover
+                            zIndex: 5000, // Above zones (zones are 1000)
                         });
+
+                        // Add InfoWindow for hover tooltip
+                        const infoWindow = new window.google.maps.InfoWindow({
+                            content: `<div class="text-center font-semibold text-gray-800">${translations.subMainPipe}</div>`,
+                        });
+
+                        // Calculate midpoint for tooltip position
+                        const midpoint = {
+                            lat: pipe.path[0].lat,
+                            lng: (pipe.path[0].lng + pipe.path[pipe.path.length - 1].lng) / 2,
+                        };
+                        const midpointMarker = new window.google.maps.Marker({
+                            position: midpoint,
+                            map: null, // Hidden marker just for tooltip positioning
+                            visible: false,
+                        });
+
+                        // Helper function to check distance from point to polyline
+                        const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                            const geometry = window.google?.maps?.geometry;
+                            if (!geometry?.spherical) return Infinity;
+                            
+                            const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                            let minDistance = Infinity;
+                            
+                            // Check distance to all points on the path
+                            for (const pathPoint of pipe.path) {
+                                const pathLatLng = new window.google.maps.LatLng(pathPoint.lat, pathPoint.lng);
+                                const distance = geometry.spherical.computeDistanceBetween(pointLatLng, pathLatLng);
+                                minDistance = Math.min(minDistance, distance);
+                            }
+                            
+                            return minDistance;
+                        };
+
+                        let isHovering = false;
+                        let hoverTimeout: NodeJS.Timeout | null = null;
+
+                        // Use mousemove on map to detect hover
+                        const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                            if (!event.latLng) return;
+                            
+                            const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                            const distance = getDistanceToPolyline(mousePoint);
+                            const hoverThreshold = 20; // 20 meters - increased for easier hover detection
+
+                            if (distance <= hoverThreshold && !isHovering) {
+                                isHovering = true;
+                                if (hoverTimeout) clearTimeout(hoverTimeout);
+                                infoWindow.open(map, midpointMarker);
+                            } else if (distance > hoverThreshold && isHovering) {
+                                isHovering = false;
+                                if (hoverTimeout) clearTimeout(hoverTimeout);
+                                hoverTimeout = setTimeout(() => {
+                                    infoWindow.close();
+                                }, 200);
+                            }
+                        });
+
+                        // Store listener for cleanup
+                        (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
                         polyline.setMap(map);
                         allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -1096,9 +1219,70 @@ function FreeMap() {
                             geodesic: true,
                             strokeColor: '#FCD34D', // Yellow color for lateral pipes
                             strokeOpacity: 0.8,
-                            strokeWeight: 2, // Thinner than sub-main pipes
-                            zIndex: 2500, // Above plant points (tree icons)
+                            strokeWeight: 4, // Thicker for easier hover
+                            zIndex: 5000, // Above zones (zones are 1000)
                         });
+
+                        // Add InfoWindow for hover tooltip
+                        const infoWindow = new window.google.maps.InfoWindow({
+                            content: `<div class="text-center font-semibold text-gray-800">${translations.lateralPipe}</div>`,
+                        });
+
+                        // Calculate midpoint for tooltip position
+                        const midpoint = {
+                            lat: (pipe.path[0].lat + pipe.path[pipe.path.length - 1].lat) / 2,
+                            lng: pipe.path[0].lng,
+                        };
+                        const midpointMarker = new window.google.maps.Marker({
+                            position: midpoint,
+                            map: null, // Hidden marker just for tooltip positioning
+                            visible: false,
+                        });
+
+                        // Helper function to check distance from point to polyline
+                        const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                            const geometry = window.google?.maps?.geometry;
+                            if (!geometry?.spherical) return Infinity;
+                            
+                            const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                            let minDistance = Infinity;
+                            
+                            // Check distance to all points on the path
+                            for (const pathPoint of pipe.path) {
+                                const pathLatLng = new window.google.maps.LatLng(pathPoint.lat, pathPoint.lng);
+                                const distance = geometry.spherical.computeDistanceBetween(pointLatLng, pathLatLng);
+                                minDistance = Math.min(minDistance, distance);
+                            }
+                            
+                            return minDistance;
+                        };
+
+                        let isHovering = false;
+                        let hoverTimeout: NodeJS.Timeout | null = null;
+
+                        // Use mousemove on map to detect hover
+                        const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                            if (!event.latLng) return;
+                            
+                            const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                            const distance = getDistanceToPolyline(mousePoint);
+                            const hoverThreshold = 20; // 20 meters - increased for easier hover detection
+
+                            if (distance <= hoverThreshold && !isHovering) {
+                                isHovering = true;
+                                if (hoverTimeout) clearTimeout(hoverTimeout);
+                                infoWindow.open(map, midpointMarker);
+                            } else if (distance > hoverThreshold && isHovering) {
+                                isHovering = false;
+                                if (hoverTimeout) clearTimeout(hoverTimeout);
+                                hoverTimeout = setTimeout(() => {
+                                    infoWindow.close();
+                                }, 200);
+                            }
+                        });
+
+                        // Store listener for cleanup
+                        (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
                         polyline.setMap(map);
                         allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -1637,6 +1821,21 @@ function FreeMap() {
                 zIndex: 2000, // Higher than zones and plant points
             });
 
+            // Add InfoWindow for hover tooltip
+            const infoWindow = new window.google.maps.InfoWindow({
+                content: `<div class="text-center font-semibold text-gray-800">${translations.waterPump}</div>`,
+            });
+
+            // Show tooltip on mouseover
+            marker.addListener('mouseover', () => {
+                infoWindow.open(map, marker);
+            });
+
+            // Hide tooltip on mouseout
+            marker.addListener('mouseout', () => {
+                infoWindow.close();
+            });
+
             return marker;
         } catch (error) {
             console.error('❌ Error creating pump marker:', error);
@@ -1810,9 +2009,71 @@ function FreeMap() {
                         geodesic: true,
                         strokeColor: '#DC2626',
                         strokeOpacity: 0.8,
-                        strokeWeight: 4,
-                        zIndex: 2500, // Above plant points (tree icons)
+                        strokeWeight: 6, // Thicker for easier hover
+                        zIndex: 5000, // Above zones (zones are 1000)
                     });
+
+                    // Add InfoWindow for hover tooltip
+                    const infoWindow = new window.google.maps.InfoWindow({
+                        content: `<div class="text-center font-semibold text-gray-800">${translations.mainPipe}</div>`,
+                    });
+
+                    // Calculate midpoint for tooltip position
+                    const midpoint = {
+                        lat: (pipe.fromPump.lat + pipe.toZoneCenter.lat) / 2,
+                        lng: (pipe.fromPump.lng + pipe.toZoneCenter.lng) / 2,
+                    };
+                    const midpointMarker = new window.google.maps.Marker({
+                        position: midpoint,
+                        map: null, // Hidden marker just for tooltip positioning
+                        visible: false,
+                    });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        const path = [pipe.fromPump, pipe.toZoneCenter];
+                        for (let i = 0; i < path.length - 1; i++) {
+                            const segStart = new window.google.maps.LatLng(path[i].lat, path[i].lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, segStart);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+                    let isHovering = false;
+                    let hoverTimeout: NodeJS.Timeout | null = null;
+
+                    // Use mousemove on map to detect hover
+                    const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                        if (!event.latLng) return;
+                        
+                        const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        const distance = getDistanceToPolyline(mousePoint);
+                        const hoverThreshold = 10; // 10 meters
+
+                        if (distance <= hoverThreshold && !isHovering) {
+                            isHovering = true;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            infoWindow.open(map, midpointMarker);
+                        } else if (distance > hoverThreshold && isHovering) {
+                            isHovering = false;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            hoverTimeout = setTimeout(() => {
+                                infoWindow.close();
+                            }, 200);
+                        }
+                    });
+
+                    // Store listener for cleanup
+                    (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
+
                     polyline.setMap(map);
                     allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setMainPipes((prev) =>
@@ -1830,9 +2091,70 @@ function FreeMap() {
                         geodesic: true,
                         strokeColor: '#8B5CF6',
                         strokeOpacity: 0.7,
-                        strokeWeight: 3,
-                        zIndex: 2500, // Above plant points (tree icons)
+                        strokeWeight: 5, // Thicker for easier hover
+                        zIndex: 5000, // Above zones (zones are 1000)
                     });
+
+                    // Add InfoWindow for hover tooltip
+                    const infoWindow = new window.google.maps.InfoWindow({
+                        content: `<div class="text-center font-semibold text-gray-800">${translations.subMainPipe}</div>`,
+                    });
+
+                    // Calculate midpoint for tooltip position
+                    const midpoint = {
+                        lat: pipe.path[0].lat,
+                        lng: (pipe.path[0].lng + pipe.path[pipe.path.length - 1].lng) / 2,
+                    };
+                    const midpointMarker = new window.google.maps.Marker({
+                        position: midpoint,
+                        map: null, // Hidden marker just for tooltip positioning
+                        visible: false,
+                    });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            const segStart = new window.google.maps.LatLng(pipe.path[i].lat, pipe.path[i].lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, segStart);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+                    let isHovering = false;
+                    let hoverTimeout: NodeJS.Timeout | null = null;
+
+                    // Use mousemove on map to detect hover
+                    const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                        if (!event.latLng) return;
+                        
+                        const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        const distance = getDistanceToPolyline(mousePoint);
+                        const hoverThreshold = 10; // 10 meters
+
+                        if (distance <= hoverThreshold && !isHovering) {
+                            isHovering = true;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            infoWindow.open(map, midpointMarker);
+                        } else if (distance > hoverThreshold && isHovering) {
+                            isHovering = false;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            hoverTimeout = setTimeout(() => {
+                                infoWindow.close();
+                            }, 200);
+                        }
+                    });
+
+                    // Store listener for cleanup
+                    (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
+
                     polyline.setMap(map);
                     allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setSubMainPipes((prev) =>
@@ -1850,9 +2172,70 @@ function FreeMap() {
                         geodesic: true,
                         strokeColor: '#FCD34D',
                         strokeOpacity: 0.8,
-                        strokeWeight: 2,
-                        zIndex: 2500, // Above plant points (tree icons)
+                        strokeWeight: 4, // Thicker for easier hover
+                        zIndex: 5000, // Above zones (zones are 1000)
                     });
+
+                    // Add InfoWindow for hover tooltip
+                    const infoWindow = new window.google.maps.InfoWindow({
+                        content: `<div class="text-center font-semibold text-gray-800">${translations.lateralPipe}</div>`,
+                    });
+
+                    // Calculate midpoint for tooltip position
+                    const midpoint = {
+                        lat: (pipe.path[0].lat + pipe.path[pipe.path.length - 1].lat) / 2,
+                        lng: pipe.path[0].lng,
+                    };
+                    const midpointMarker = new window.google.maps.Marker({
+                        position: midpoint,
+                        map: null, // Hidden marker just for tooltip positioning
+                        visible: false,
+                    });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        for (let i = 0; i < pipe.path.length - 1; i++) {
+                            const segStart = new window.google.maps.LatLng(pipe.path[i].lat, pipe.path[i].lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, segStart);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+                    let isHovering = false;
+                    let hoverTimeout: NodeJS.Timeout | null = null;
+
+                    // Use mousemove on map to detect hover
+                    const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                        if (!event.latLng) return;
+                        
+                        const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        const distance = getDistanceToPolyline(mousePoint);
+                        const hoverThreshold = 10; // 10 meters
+
+                        if (distance <= hoverThreshold && !isHovering) {
+                            isHovering = true;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            infoWindow.open(map, midpointMarker);
+                        } else if (distance > hoverThreshold && isHovering) {
+                            isHovering = false;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            hoverTimeout = setTimeout(() => {
+                                infoWindow.close();
+                            }, 200);
+                        }
+                    });
+
+                    // Store listener for cleanup
+                    (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
+
                     polyline.setMap(map);
                     allPipeOverlaysRef.current.push(polyline); // Track for reset
                     setLateralPipes((prev) =>
@@ -2424,6 +2807,21 @@ function FreeMap() {
                     zIndex: 2000, // Higher than zones and plant points
                 });
 
+                // Add InfoWindow for hover tooltip
+                const infoWindow = new window.google.maps.InfoWindow({
+                    content: `<div class="text-center font-semibold text-gray-800">${translations.waterSource}</div>`,
+                });
+
+                // Show tooltip on mouseover
+                marker.addListener('mouseover', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                // Hide tooltip on mouseout
+                marker.addListener('mouseout', () => {
+                    infoWindow.close();
+                });
+
                 // Remove overlapped plant points at water source position (4 meters radius)
                 removeOverlappedPlantPoints(position, 4);
 
@@ -2464,6 +2862,21 @@ function FreeMap() {
                     draggable: false,
                     clickable: true,
                     zIndex: 2000, // Higher than zones and plant points
+                });
+
+                // Add InfoWindow for hover tooltip
+                const infoWindow = new window.google.maps.InfoWindow({
+                    content: `<div class="text-center font-semibold text-gray-800">${translations.waterSource}</div>`,
+                });
+
+                // Show tooltip on mouseover
+                marker.addListener('mouseover', () => {
+                    infoWindow.open(map, marker);
+                });
+
+                // Hide tooltip on mouseout
+                marker.addListener('mouseout', () => {
+                    infoWindow.close();
                 });
 
                 // Remove overlapped plant points at water source position (4 meters radius)
@@ -3651,14 +4064,14 @@ function FreeMap() {
                 const subMainPipesData = JSON.parse(existingSubMainPipes);
                 const lateralPipesData = JSON.parse(existingLateralPipes);
 
-                    if (
-                        mainPipesData.length > 0 &&
-                        subMainPipesData.length > 0 &&
-                        lateralPipesData.length > 0
-                    ) {
+                if (
+                    mainPipesData.length > 0 &&
+                    subMainPipesData.length > 0 &&
+                    lateralPipesData.length > 0
+                ) {
                         showToast(translations.pipeSystemAlreadyGenerated, 'info');
-                        return;
-                    }
+                    return;
+                }
             } catch (e) {
                 console.error('Error checking existing pipes:', e);
             }
@@ -3728,9 +4141,71 @@ function FreeMap() {
                 geodesic: true,
                 strokeColor: '#DC2626',
                 strokeOpacity: 0.8,
-                strokeWeight: 4,
-                zIndex: 2500, // Above plant points (tree icons)
+                strokeWeight: 6, // Thicker for easier hover
+                zIndex: 5000, // Above zones (zones are 1000)
             });
+
+            // Add InfoWindow for hover tooltip
+            const infoWindow = new window.google.maps.InfoWindow({
+                content: `<div class="text-center font-semibold text-gray-800">${translations.mainPipe}</div>`,
+            });
+
+            // Calculate midpoint for tooltip position
+            const midpoint = {
+                lat: (nearestPump.position.lat + zone.center.lat) / 2,
+                lng: (nearestPump.position.lng + zone.center.lng) / 2,
+            };
+            const midpointMarker = new window.google.maps.Marker({
+                position: midpoint,
+                map: null, // Hidden marker just for tooltip positioning
+                visible: false,
+            });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        const path = [nearestPump.position, zone.center];
+                        // Check distance to all points on the path
+                        for (const pathPoint of path) {
+                            const pathLatLng = new window.google.maps.LatLng(pathPoint.lat, pathPoint.lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, pathLatLng);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+            let isHovering = false;
+            let hoverTimeout: NodeJS.Timeout | null = null;
+
+            // Use mousemove on map to detect hover
+            const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                if (!event.latLng) return;
+                
+                const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                const distance = getDistanceToPolyline(mousePoint);
+                const hoverThreshold = 10; // 10 meters
+
+                if (distance <= hoverThreshold && !isHovering) {
+                    isHovering = true;
+                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    infoWindow.open(map, midpointMarker);
+                } else if (distance > hoverThreshold && isHovering) {
+                    isHovering = false;
+                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    hoverTimeout = setTimeout(() => {
+                        infoWindow.close();
+                    }, 200);
+                }
+            });
+
+            // Store listener for cleanup
+            (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
             polyline.setMap(map);
             allPipeOverlaysRef.current.push(polyline); // Track for reset
@@ -4187,9 +4662,70 @@ function FreeMap() {
                 geodesic: true,
                 strokeColor: '#8B5CF6', // Purple color for sub-main pipes
                 strokeOpacity: 0.8,
-                strokeWeight: 3, // Slightly thinner than main pipes
-                zIndex: 2500, // Above plant points (tree icons)
+                strokeWeight: 5, // Thicker for easier hover
+                zIndex: 5000, // Above zones (zones are 1000)
             });
+
+            // Add InfoWindow for hover tooltip
+            const infoWindow = new window.google.maps.InfoWindow({
+                content: `<div class="text-center font-semibold text-gray-800">${translations.subMainPipe}</div>`,
+            });
+
+            // Calculate midpoint for tooltip position
+            const midpoint = {
+                lat: pipePath[0].lat,
+                lng: (pipePath[0].lng + pipePath[pipePath.length - 1].lng) / 2,
+            };
+            const midpointMarker = new window.google.maps.Marker({
+                position: midpoint,
+                map: null, // Hidden marker just for tooltip positioning
+                visible: false,
+            });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        // Check distance to all points on the path
+                        for (const pathPoint of pipePath) {
+                            const pathLatLng = new window.google.maps.LatLng(pathPoint.lat, pathPoint.lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, pathLatLng);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+            let isHovering = false;
+            let hoverTimeout: NodeJS.Timeout | null = null;
+
+            // Use mousemove on map to detect hover
+            const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                if (!event.latLng) return;
+                
+                const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                const distance = getDistanceToPolyline(mousePoint);
+                const hoverThreshold = 10; // 10 meters
+
+                if (distance <= hoverThreshold && !isHovering) {
+                    isHovering = true;
+                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    infoWindow.open(map, midpointMarker);
+                } else if (distance > hoverThreshold && isHovering) {
+                    isHovering = false;
+                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    hoverTimeout = setTimeout(() => {
+                        infoWindow.close();
+                    }, 200);
+                }
+            });
+
+            // Store listener for cleanup
+            (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
             // Add to map
             polyline.setMap(map);
@@ -5103,9 +5639,69 @@ function FreeMap() {
                         geodesic: true,
                         strokeColor: '#FCD34D', // Yellow color for lateral pipes
                         strokeOpacity: 0.8,
-                        strokeWeight: 2, // Thinner than sub-main pipes
-                        zIndex: 2500, // Above plant points (tree icons)
+                        strokeWeight: 4, // Thicker for easier hover
+                        zIndex: 5000, // Above zones (zones are 1000)
                     });
+
+                    // Add InfoWindow for hover tooltip
+                    const infoWindow = new window.google.maps.InfoWindow({
+                        content: `<div class="text-center font-semibold text-gray-800">${translations.lateralPipe}</div>`,
+                    });
+
+                    // Calculate midpoint for tooltip position
+                    const midpoint = {
+                        lat: (clippedPath[0].lat + clippedPath[clippedPath.length - 1].lat) / 2,
+                        lng: clippedPath[0].lng,
+                    };
+                    const midpointMarker = new window.google.maps.Marker({
+                        position: midpoint,
+                        map: null, // Hidden marker just for tooltip positioning
+                        visible: false,
+                    });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        for (let i = 0; i < clippedPath.length - 1; i++) {
+                            const segStart = new window.google.maps.LatLng(clippedPath[i].lat, clippedPath[i].lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, segStart);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+                    let isHovering = false;
+                    let hoverTimeout: NodeJS.Timeout | null = null;
+
+                    // Use mousemove on map to detect hover
+                    const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                        if (!event.latLng) return;
+                        
+                        const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        const distance = getDistanceToPolyline(mousePoint);
+                        const hoverThreshold = 10; // 10 meters
+
+                        if (distance <= hoverThreshold && !isHovering) {
+                            isHovering = true;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            infoWindow.open(map, midpointMarker);
+                        } else if (distance > hoverThreshold && isHovering) {
+                            isHovering = false;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            hoverTimeout = setTimeout(() => {
+                                infoWindow.close();
+                            }, 200);
+                        }
+                    });
+
+                    // Store listener for cleanup
+                    (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
                     // Add to map
                     polyline.setMap(map);
@@ -5474,6 +6070,66 @@ function FreeMap() {
                         strokeWeight: 2,
                         zIndex: 2500, // Above plant points (tree icons)
                     });
+
+                    // Add InfoWindow for hover tooltip
+                    const infoWindow = new window.google.maps.InfoWindow({
+                        content: `<div class="text-center font-semibold text-gray-800">${translations.lateralPipe}</div>`,
+                    });
+
+                    // Calculate midpoint for tooltip position
+                    const midpoint = {
+                        lat: (clippedPath[0].lat + clippedPath[clippedPath.length - 1].lat) / 2,
+                        lng: clippedPath[0].lng,
+                    };
+                    const midpointMarker = new window.google.maps.Marker({
+                        position: midpoint,
+                        map: null, // Hidden marker just for tooltip positioning
+                        visible: false,
+                    });
+
+                    // Helper function to check distance from point to polyline
+                    const getDistanceToPolyline = (point: { lat: number; lng: number }): number => {
+                        const geometry = window.google?.maps?.geometry;
+                        if (!geometry?.spherical) return Infinity;
+                        
+                        const pointLatLng = new window.google.maps.LatLng(point.lat, point.lng);
+                        let minDistance = Infinity;
+                        
+                        for (let i = 0; i < clippedPath.length - 1; i++) {
+                            const segStart = new window.google.maps.LatLng(clippedPath[i].lat, clippedPath[i].lng);
+                            const distance = geometry.spherical.computeDistanceBetween(pointLatLng, segStart);
+                            minDistance = Math.min(minDistance, distance);
+                        }
+                        
+                        return minDistance;
+                    };
+
+                    let isHovering = false;
+                    let hoverTimeout: NodeJS.Timeout | null = null;
+
+                    // Use mousemove on map to detect hover
+                    const mousemoveListener = map.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+                        if (!event.latLng) return;
+                        
+                        const mousePoint = { lat: event.latLng.lat(), lng: event.latLng.lng() };
+                        const distance = getDistanceToPolyline(mousePoint);
+                        const hoverThreshold = 10; // 10 meters
+
+                        if (distance <= hoverThreshold && !isHovering) {
+                            isHovering = true;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            infoWindow.open(map, midpointMarker);
+                        } else if (distance > hoverThreshold && isHovering) {
+                            isHovering = false;
+                            if (hoverTimeout) clearTimeout(hoverTimeout);
+                            hoverTimeout = setTimeout(() => {
+                                infoWindow.close();
+                            }, 200);
+                        }
+                    });
+
+                    // Store listener for cleanup
+                    (polyline as unknown as { _hoverListener?: google.maps.MapsEventListener })._hoverListener = mousemoveListener;
 
                     // Add to map
                     polyline.setMap(map);

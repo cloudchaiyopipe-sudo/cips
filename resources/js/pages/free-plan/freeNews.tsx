@@ -197,9 +197,19 @@ function FreeNews() {
                                     onClick={() => handleArticleClick(article.id)}
                                     className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-slate-800/40 backdrop-blur-sm transition-all duration-300 hover:border-white/10 hover:bg-slate-800/60 hover:shadow-xl hover:shadow-black/20"
                                 >
-                                    {/* Delete Button (Admin) */}
+                                    {/* Admin Edit & Delete Buttons */}
                                     {isAdmin && (
-                                        <div className="absolute right-3 top-3 z-20">
+                                        <div className="absolute right-3 top-3 z-20 flex gap-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    router.visit(`/admin/articles/${article.id}/edit`);
+                                                }}
+                                                className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/80 text-white backdrop-blur-md transition-all hover:bg-blue-600 hover:scale-110"
+                                                title="แก้ไข"
+                                            >
+                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                            </button>
                                             <button
                                                 onClick={(e) => handleDelete(e, article.id)}
                                                 disabled={deletingId === article.id}
