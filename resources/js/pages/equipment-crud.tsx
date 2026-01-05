@@ -157,14 +157,14 @@ const convertVideoLinkToEmbed = (url: string | null | undefined): string | null 
     // YouTube: https://youtu.be/VIDEO_ID or https://www.youtube.com/watch?v=VIDEO_ID
     const youtubeShortRegex = /(?:youtu\.be\/)([a-zA-Z0-9_-]+)/;
     const youtubeWatchRegex = /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]+)/;
-    
+
     const youtubeShortMatch = trimmedUrl.match(youtubeShortRegex);
     const youtubeWatchMatch = trimmedUrl.match(youtubeWatchRegex);
-    
+
     if (youtubeShortMatch) {
         return `https://www.youtube.com/embed/${youtubeShortMatch[1]}`;
     }
-    
+
     if (youtubeWatchMatch) {
         return `https://www.youtube.com/embed/${youtubeWatchMatch[1]}`;
     }
@@ -172,7 +172,7 @@ const convertVideoLinkToEmbed = (url: string | null | undefined): string | null 
     // Google Drive: https://drive.google.com/file/d/FILE_ID/view...
     const driveRegex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
     const driveMatch = trimmedUrl.match(driveRegex);
-    
+
     if (driveMatch) {
         return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
     }
@@ -582,11 +582,10 @@ const Pagination: React.FC<{
             {getPageNumbers().map((page) => (
                 <button
                     key={page}
-                    className={`rounded border px-3 py-1 ${
-                        page === currentPage
-                            ? 'border-blue-500 bg-blue-600 text-white'
-                            : 'border-gray-600 bg-gray-700 text-white hover:bg-gray-600'
-                    }`}
+                    className={`rounded border px-3 py-1 ${page === currentPage
+                        ? 'border-blue-500 bg-blue-600 text-white'
+                        : 'border-gray-600 bg-gray-700 text-white hover:bg-gray-600'
+                        }`}
                     onClick={() => onPageChange(page)}
                 >
                     {page}
@@ -741,9 +740,8 @@ const CategoryForm: React.FC<{
                                             setErrors((prev) => ({ ...prev, name: '' }));
                                         }
                                     }}
-                                    className={`w-full rounded-lg border bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500 ${
-                                        errors.name ? 'border-red-500' : 'border-gray-600'
-                                    }`}
+                                    className={`w-full rounded-lg border bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500 ${errors.name ? 'border-red-500' : 'border-gray-600'
+                                        }`}
                                     placeholder={t('เช่น sprinkler, pump')}
                                     required
                                 />
@@ -768,9 +766,8 @@ const CategoryForm: React.FC<{
                                             setErrors((prev) => ({ ...prev, display_name: '' }));
                                         }
                                     }}
-                                    className={`w-full rounded-lg border bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500 ${
-                                        errors.display_name ? 'border-red-500' : 'border-gray-600'
-                                    }`}
+                                    className={`w-full rounded-lg border bg-gray-700 p-3 focus:ring-2 focus:ring-blue-500 ${errors.display_name ? 'border-red-500' : 'border-gray-600'
+                                        }`}
                                     placeholder={t('เช่น สปริงเกอร์, ปั๊มน้ำ')}
                                     required
                                 />
@@ -1161,12 +1158,40 @@ const EquipmentSetForm: React.FC<{
                 updatedItems[itemIndex].equipment = undefined;
             }
 
-            // If equipment changed, update equipment reference
+            // If equipment changed, update equipment reference and auto-select category
             if (field === 'equipment_id' && value > 0) {
-                const categoryEquipments =
-                    availableEquipments[updatedItems[itemIndex].category_id] || [];
-                const selectedEquipment = categoryEquipments.find((eq) => eq.id === value);
-                updatedItems[itemIndex].equipment = selectedEquipment;
+                // Search for the equipment in all categories
+                let selectedEquipment: Equipment | undefined;
+                let equipmentCategoryId: number | undefined;
+
+                // If category is already selected (not 0), try that first
+                if (updatedItems[itemIndex].category_id > 0) {
+                    const categoryEquipments =
+                        availableEquipments[updatedItems[itemIndex].category_id] || [];
+                    selectedEquipment = categoryEquipments.find((eq) => eq.id === value);
+                }
+
+                // If not found or category is 0, search in all categories
+                if (!selectedEquipment) {
+                    for (const [catId, equipments] of Object.entries(availableEquipments)) {
+                        const found = equipments.find((eq) => eq.id === value);
+                        if (found) {
+                            selectedEquipment = found;
+                            equipmentCategoryId = parseInt(catId);
+                            break;
+                        }
+                    }
+                }
+
+                if (selectedEquipment) {
+                    updatedItems[itemIndex].equipment = selectedEquipment;
+                    // Auto-update category_id based on the selected equipment
+                    if (equipmentCategoryId) {
+                        updatedItems[itemIndex].category_id = equipmentCategoryId;
+                    } else if (selectedEquipment.category_id) {
+                        updatedItems[itemIndex].category_id = selectedEquipment.category_id;
+                    }
+                }
             }
 
             updatedGroups[groupIndex] = {
@@ -1206,12 +1231,12 @@ const EquipmentSetForm: React.FC<{
                 image: group.image || null,
                 items: cleanedItems,
             };
-            
+
             // ถ้าเป็น group ที่มีอยู่แล้ว (มี id) ให้ส่ง id ไปด้วย
             if (group.id) {
                 groupData.id = group.id;
             }
-            
+
             return groupData;
         });
 
@@ -1462,11 +1487,10 @@ const EquipmentSetForm: React.FC<{
                                                                             disabled={uploadingImages[group.id]}
                                                                         />
                                                                         <div
-                                                                            className={`flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-600 bg-gray-600 transition-all hover:border-gray-500 hover:bg-gray-500 ${
-                                                                                uploadingImages[group.id]
-                                                                                    ? 'pointer-events-none opacity-50'
-                                                                                    : 'cursor-pointer'
-                                                                            }`}
+                                                                            className={`flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-600 bg-gray-600 transition-all hover:border-gray-500 hover:bg-gray-500 ${uploadingImages[group.id]
+                                                                                ? 'pointer-events-none opacity-50'
+                                                                                : 'cursor-pointer'
+                                                                                }`}
                                                                         >
                                                                             {uploadingImages[group.id] ? (
                                                                                 <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
@@ -1580,7 +1604,7 @@ const EquipmentSetForm: React.FC<{
                                                                             className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:border-blue-500 focus:outline-none"
                                                                         >
                                                                             <option value={0}>
-                                                                                {t('เลือกหมวดหมู่')}
+                                                                                {t('หมวดหมู่ทั้งหมด')}
                                                                             </option>
                                                                             {categories.map(
                                                                                 (category) => (
@@ -1602,14 +1626,14 @@ const EquipmentSetForm: React.FC<{
                                                                         {errors[
                                                                             `group_${groupIndex}_item_${itemIndex}_category`
                                                                         ] && (
-                                                                            <p className="mt-1 text-xs text-red-500">
-                                                                                {
-                                                                                    errors[
+                                                                                <p className="mt-1 text-xs text-red-500">
+                                                                                    {
+                                                                                        errors[
                                                                                         `group_${groupIndex}_item_${itemIndex}_category`
-                                                                                    ]
-                                                                                }
-                                                                            </p>
-                                                                        )}
+                                                                                        ]
+                                                                                    }
+                                                                                </p>
+                                                                            )}
                                                                     </div>
 
                                                                     {/* Equipment Selection */}
@@ -1617,60 +1641,45 @@ const EquipmentSetForm: React.FC<{
                                                                         <label className="mb-1 block text-sm font-medium">
                                                                             {t('อุปกรณ์')} *
                                                                         </label>
-                                                                        <select
-                                                                            value={
-                                                                                item.equipment_id
+                                                                        <SearchableDropdown
+                                                                            options={
+                                                                                item.category_id === 0
+                                                                                    ? // Show all equipments from all categories
+                                                                                    Object.values(
+                                                                                        availableEquipments
+                                                                                    ).flat()
+                                                                                    : // Show equipments from selected category only
+                                                                                    availableEquipments[
+                                                                                    item.category_id
+                                                                                    ] || []
                                                                             }
-                                                                            onChange={(e) =>
+                                                                            value={
+                                                                                item.equipment_id || null
+                                                                            }
+                                                                            onChange={(value) =>
                                                                                 updateItemInGroup(
                                                                                     groupIndex,
                                                                                     itemIndex,
                                                                                     'equipment_id',
-                                                                                    parseInt(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    )
+                                                                                    value || 0
                                                                                 )
                                                                             }
-                                                                            disabled={
-                                                                                !item.category_id
-                                                                            }
-                                                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:border-blue-500 focus:outline-none disabled:opacity-50"
-                                                                        >
-                                                                            <option value={0}>
-                                                                                {t('เลือกอุปกรณ์')}
-                                                                            </option>
-                                                                            {(
-                                                                                availableEquipments[
-                                                                                    item.category_id
-                                                                                ] || []
-                                                                            ).map((equipment) => (
-                                                                                <option
-                                                                                    key={
-                                                                                        equipment.id
-                                                                                    }
-                                                                                    value={
-                                                                                        equipment.id
-                                                                                    }
-                                                                                >
-                                                                                    {equipment.name}{' '}
-                                                                                    -{' '}
-                                                                                    {equipment.price.toLocaleString()}{' '}
-                                                                                    ฿
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
+                                                                            placeholder={t(
+                                                                                'พิมพ์เพื่อค้นหาอุปกรณ์...'
+                                                                            )}
+                                                                            loading={false}
+                                                                        />
                                                                         {errors[
                                                                             `group_${groupIndex}_item_${itemIndex}_equipment`
                                                                         ] && (
-                                                                            <p className="mt-1 text-xs text-red-500">
-                                                                                {
-                                                                                    errors[
+                                                                                <p className="mt-1 text-xs text-red-500">
+                                                                                    {
+                                                                                        errors[
                                                                                         `group_${groupIndex}_item_${itemIndex}_equipment`
-                                                                                    ]
-                                                                                }
-                                                                            </p>
-                                                                        )}
+                                                                                        ]
+                                                                                    }
+                                                                                </p>
+                                                                            )}
                                                                     </div>
 
                                                                     {/* Quantity */}
@@ -1698,14 +1707,14 @@ const EquipmentSetForm: React.FC<{
                                                                         {errors[
                                                                             `group_${groupIndex}_item_${itemIndex}_quantity`
                                                                         ] && (
-                                                                            <p className="mt-1 text-xs text-red-500">
-                                                                                {
-                                                                                    errors[
+                                                                                <p className="mt-1 text-xs text-red-500">
+                                                                                    {
+                                                                                        errors[
                                                                                         `group_${groupIndex}_item_${itemIndex}_quantity`
-                                                                                    ]
-                                                                                }
-                                                                            </p>
-                                                                        )}
+                                                                                        ]
+                                                                                    }
+                                                                                </p>
+                                                                            )}
                                                                     </div>
 
                                                                     {/* Subtotal */}
@@ -1802,8 +1811,8 @@ const SearchableDropdown: React.FC<{
                     {loading
                         ? t('กำลังโหลด...')
                         : selectedOption
-                          ? selectedOption.name
-                          : placeholder}
+                            ? selectedOption.name
+                            : placeholder}
                 </span>
                 <ChevronDown
                     className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -1840,11 +1849,10 @@ const SearchableDropdown: React.FC<{
                                     key={option.id}
                                     type="button"
                                     onClick={() => handleSelect(option.id)}
-                                    className={`w-full border-b border-gray-600 p-2 text-left hover:bg-gray-600 ${
-                                        value === option.id
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-200'
-                                    }`}
+                                    className={`w-full border-b border-gray-600 p-2 text-left hover:bg-gray-600 ${value === option.id
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-200'
+                                        }`}
                                 >
                                     <div className="font-medium">{option.name}</div>
                                     {option.product_code && (
@@ -1895,7 +1903,7 @@ const PumpAccessoryForm: React.FC<{
             try {
                 // โหลด Equipment Sets ทั้งหมด
                 const equipmentSets = await api.getEquipmentSets();
-                
+
                 // หา Equipment Set ที่ชื่อ "อุปกรณ์โรงปั๊ม"
                 const pumpEquipmentSet = equipmentSets.find(
                     (set: EquipmentSet) => set.name === 'อุปกรณ์โรงปั๊ม'
@@ -1912,10 +1920,10 @@ const PumpAccessoryForm: React.FC<{
                             const fullSet = await apiRequest(`/equipment-sets/${pumpEquipmentSet.id}`);
                             if (fullSet.groups) {
                                 setAvailableGroups(fullSet.groups);
-                        }
+                            }
                         } catch (error) {
                             console.error('Failed to load equipment set details:', error);
-                    }
+                        }
                     }
                 } else {
                     showAlert.warning(
@@ -1953,8 +1961,8 @@ const PumpAccessoryForm: React.FC<{
 
                     updated[actualIndex] = {
                         ...updated[actualIndex],
-                                                        group_id: groupId,
-                        equipment_set_id: equipmentSet?.id 
+                        group_id: groupId,
+                        equipment_set_id: equipmentSet?.id
                             ? (typeof equipmentSet.id === 'string' ? parseInt(equipmentSet.id) : equipmentSet.id)
                             : null,
                         equipment_id: null, // ล้าง equipment_id เมื่อเลือกกลุ่ม
@@ -1962,9 +1970,9 @@ const PumpAccessoryForm: React.FC<{
                         image: selectedGroup.image || '',
                         price: groupTotalPrice,
                         quantity: 1, // จำนวนกลุ่ม
-                        is_included: updated[actualIndex].is_included !== undefined 
-                            ? updated[actualIndex].is_included 
-                            : true,
+                        is_included: updated[actualIndex].is_included !== undefined
+                            ? updated[actualIndex].is_included
+                            : false,
                         description: selectedGroup.name || '',
                         group: selectedGroup,
                         group_items: selectedGroup.items || [],
@@ -2005,7 +2013,7 @@ const PumpAccessoryForm: React.FC<{
             price: 0,
             stock: 0,
             quantity: 1,
-            is_included: true,
+            is_included: false,
             description: '',
             sort_order: 0,
         };
@@ -2038,7 +2046,7 @@ const PumpAccessoryForm: React.FC<{
                 price: 0,
                 stock: 0,
                 quantity: 1,
-                is_included: true,
+                is_included: false,
                 description: '',
                 sort_order: i,
             });
@@ -2099,7 +2107,7 @@ const PumpAccessoryForm: React.FC<{
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <h4 className="text-lg font-semibold text-orange-400">
-                    {t('อุปกรณ์ประกอบปั๊ม')} ({accessories.length} {t('รายการ')})
+                    {t('เซ็ตอุปกรณ์โรงปั๊มน้ำ')} ({accessories.length} {t('รายการ')})
                 </h4>
                 <div className="flex gap-2">
                     {accessories.length > 0 && (
@@ -2206,9 +2214,8 @@ const PumpAccessoryForm: React.FC<{
                                                 />
                                             ) : null}
                                             <div
-                                                className={`image-placeholder flex h-14 w-14 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${
-                                                    accessory.image ? 'hidden' : 'flex'
-                                                }`}
+                                                className={`image-placeholder flex h-14 w-14 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${accessory.image ? 'hidden' : 'flex'
+                                                    }`}
                                             >
                                                 <ImageIcon className="h-8 w-8 text-gray-400" />
                                             </div>
@@ -2291,7 +2298,7 @@ const PumpAccessoryForm: React.FC<{
                                                 checked={
                                                     accessory.is_included !== undefined
                                                         ? accessory.is_included
-                                                        : true
+                                                        : false
                                                 }
                                                 onChange={(e) =>
                                                     updateAccessory(
@@ -2439,11 +2446,10 @@ const ImageUpload: React.FC<{
             {/* Upload Area */}
             {!currentImage && (
                 <div
-                    className={`relative h-[150px] w-full rounded-lg border-2 border-dashed p-4 text-center transition-all ${
-                        dragActive
-                            ? 'border-blue-400 bg-blue-900/20'
-                            : 'border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600'
-                    } ${loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
+                    className={`relative h-[150px] w-full rounded-lg border-2 border-dashed p-4 text-center transition-all ${dragActive
+                        ? 'border-blue-400 bg-blue-900/20'
+                        : 'border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600'
+                        } ${loading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
@@ -2576,21 +2582,21 @@ const EquipmentForm: React.FC<{
                 equipment.pumpAccessory ||
                 equipment.pump_accessories ||
                 [];
-            
+
             // กรองเฉพาะ accessories ที่มี group_id (ไม่แสดงอุปกรณ์เดี่ยว)
             // แต่ถ้าไม่มี group_id ก็ไม่แสดง (ไม่แสดงอุปกรณ์เดี่ยว)
-            const filteredAccessories = Array.isArray(pumpAccessories) 
+            const filteredAccessories = Array.isArray(pumpAccessories)
                 ? pumpAccessories.filter((acc: PumpAccessory) => {
                     // แสดงเฉพาะที่มี group_id และ group_id > 0
                     return acc.group_id && acc.group_id > 0;
                 })
                 : [];
-            
+
             // ตั้งค่า accessories ทันที (ไม่ต้องรอตรวจสอบ group_id)
             // เพราะ group_id อาจยังมีอยู่จริงใน Equipment Set แม้ว่าจะแก้ไข Equipment Set แล้ว
             // การแก้ไข Equipment Set (เพิ่ม/ลบอุปกรณ์ในกลุ่ม) ไม่ได้ลบ group_id
             setAccessories(filteredAccessories);
-            
+
             // โหลดข้อมูลกลุ่มเพิ่มเติมเพื่อ enrich ข้อมูล (ไม่กรองออก)
             // เพื่อให้แน่ใจว่ามีข้อมูล group และ group_items ที่อัพเดตล่าสุด
             (async () => {
@@ -2599,7 +2605,7 @@ const EquipmentForm: React.FC<{
                     const pumpEquipmentSet = equipmentSets.find(
                         (set: EquipmentSet) => set.name === 'อุปกรณ์โรงปั๊ม'
                     );
-                    
+
                     if (pumpEquipmentSet) {
                         let groups: EquipmentSetGroup[] = [];
                         if (pumpEquipmentSet.groups && pumpEquipmentSet.groups.length > 0) {
@@ -2615,7 +2621,7 @@ const EquipmentForm: React.FC<{
                                 console.error('Failed to load equipment set details:', error);
                             }
                         }
-                        
+
                         // Enrich ข้อมูล accessories ด้วยข้อมูลกลุ่มที่อัพเดตล่าสุด
                         if (groups.length > 0) {
                             setAccessories((prevAccessories) => {
@@ -2626,7 +2632,7 @@ const EquipmentForm: React.FC<{
                                             const accGroupId = typeof acc.group_id === 'string' ? parseInt(acc.group_id) : acc.group_id;
                                             return groupId === accGroupId;
                                         });
-                                        
+
                                         if (group) {
                                             // อัพเดตข้อมูลกลุ่มและรายการอุปกรณ์
                                             return {
@@ -2642,7 +2648,7 @@ const EquipmentForm: React.FC<{
                                     }
                                     return acc;
                                 });
-                                
+
                                 return enriched;
                             });
                         }
@@ -2701,7 +2707,7 @@ const EquipmentForm: React.FC<{
                         !equipment ||
                         (equipment &&
                             (equipment.category_id || equipment.categoryId) !==
-                                formData.category_id)
+                            formData.category_id)
                     ) {
                         setFormData((prev) => ({
                             ...prev,
@@ -2890,9 +2896,8 @@ const EquipmentForm: React.FC<{
         const currentValue = formData.attributes?.[attr.attribute_name];
         const hasError = validationErrors[`attributes.${attr.attribute_name}`];
 
-        const baseInputClass = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white ${
-            hasError ? 'border-red-500' : 'border-gray-600'
-        }`;
+        const baseInputClass = `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white ${hasError ? 'border-red-500' : 'border-gray-600'
+            }`;
 
         let input;
 
@@ -3190,11 +3195,10 @@ const EquipmentForm: React.FC<{
                                             }));
                                         }
                                     }}
-                                    className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${
-                                        validationErrors.product_code
-                                            ? 'border-red-500'
-                                            : 'border-gray-600'
-                                    }`}
+                                    className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${validationErrors.product_code
+                                        ? 'border-red-500'
+                                        : 'border-gray-600'
+                                        }`}
                                     placeholder={t('รหัสสินค้า หรือปล่อยว่าง')}
                                 />
                                 {validationErrors.product_code && (
@@ -3222,9 +3226,8 @@ const EquipmentForm: React.FC<{
                                             }));
                                         }
                                     }}
-                                    className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${
-                                        validationErrors.name ? 'border-red-500' : 'border-gray-600'
-                                    }`}
+                                    className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${validationErrors.name ? 'border-red-500' : 'border-gray-600'
+                                        }`}
                                     required
                                 />
                                 {validationErrors.name && (
@@ -3283,11 +3286,10 @@ const EquipmentForm: React.FC<{
                                             }));
                                         }
                                     }}
-                                    className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${
-                                        validationErrors.price
-                                            ? 'border-red-500'
-                                            : 'border-gray-600'
-                                    }`}
+                                    className={`w-full rounded-lg border bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500 ${validationErrors.price
+                                        ? 'border-red-500'
+                                        : 'border-gray-600'
+                                        }`}
                                     required
                                 />
                                 {validationErrors.price && (
@@ -3695,7 +3697,7 @@ const EquipmentDetailModal: React.FC<{
         const [currentPage, setCurrentPage] = useState(1);
         const [searchTerm, setSearchTerm] = useState('');
         const [filterType, setFilterType] = useState<'all' | 'included' | 'optional'>('all');
-        const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+        const [selectedGroup, setSelectedGroup] = useState<PumpAccessory | null>(null);
         const [groupItemsData, setGroupItemsData] = useState<{ [groupId: number]: EquipmentSetItem[] }>({});
         const [loadingGroups, setLoadingGroups] = useState<Set<number>>(new Set());
 
@@ -3759,7 +3761,7 @@ const EquipmentDetailModal: React.FC<{
                 if (equipmentSetId) {
                     const equipmentSet = await apiRequest(`/equipment-sets/${equipmentSetId}`);
                     const group = equipmentSet.groups?.find((g: EquipmentSetGroup) => g.id === groupId);
-                    
+
                     if (group && group.items) {
                         setGroupItemsData((prev) => ({
                             ...prev,
@@ -3768,7 +3770,7 @@ const EquipmentDetailModal: React.FC<{
                         return group.items;
                     }
                 }
-                
+
                 // ถ้าไม่มี equipmentSetId ให้ลองโหลดจาก Equipment Set ทั้งหมด
                 const equipmentSets = await api.getEquipmentSets();
                 for (const set of equipmentSets) {
@@ -3796,35 +3798,19 @@ const EquipmentDetailModal: React.FC<{
             return [];
         };
 
-        const toggleGroupExpand = async (groupId: number | undefined, equipmentSetId: number | null) => {
-            if (!groupId) return;
-            
-            const isCurrentlyExpanded = expandedGroups.has(groupId);
-            
-            setExpandedGroups((prev) => {
-                const newSet = new Set(prev);
-                if (isCurrentlyExpanded) {
-                    newSet.delete(groupId);
-                } else {
-                    newSet.add(groupId);
-                    // โหลดข้อมูล items เมื่อขยาย (force reload เพื่อให้ได้ข้อมูลล่าสุด)
-                    loadGroupItems(groupId, equipmentSetId, true);
-                }
-                return newSet;
-            });
+        const openGroupDetail = async (accessory: PumpAccessory) => {
+            if (!accessory.group_id) return;
+
+            // โหลดข้อมูล items
+            await loadGroupItems(accessory.group_id, accessory.equipment_set_id || null, true);
+
+            // เปิด popup
+            setSelectedGroup(accessory);
         };
-        
-        // โหลดข้อมูลใหม่เมื่อ accessories เปลี่ยน (เพื่อให้ได้ข้อมูลล่าสุดเมื่อมีการแก้ไข Equipment Set)
-        useEffect(() => {
-            // โหลดข้อมูลใหม่สำหรับกลุ่มที่ขยายอยู่เมื่อ accessories เปลี่ยน
-            expandedGroups.forEach((groupId) => {
-                const accessory = accessories.find((acc) => acc.group_id === groupId);
-                if (accessory) {
-                    loadGroupItems(groupId, accessory.equipment_set_id || null, true);
-                }
-            });
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [accessories.length]); // เปลี่ยนเมื่อจำนวน accessories เปลี่ยน
+
+        const closeGroupDetail = () => {
+            setSelectedGroup(null);
+        };
 
         useEffect(() => {
             setCurrentPage(1);
@@ -3837,7 +3823,7 @@ const EquipmentDetailModal: React.FC<{
                         <div className="flex items-center gap-4">
                             <Wrench className="h-6 w-6 text-orange-400" />
                             <h2 className="text-2xl font-bold text-orange-400">
-                                {t('อุปกรณ์ประกอบปั๊ม')} ({accessories.length} {t('รายการ')})
+                                {t('อุปกรณ์โรงปั๊มน้ำ')} ({accessories.length} {t('รายการ')})
                             </h2>
                         </div>
                         <button
@@ -3873,8 +3859,7 @@ const EquipmentDetailModal: React.FC<{
 
                         <div className="mt-2 text-sm text-gray-400">
                             {t('แสดง')} {filteredGroupAccessories.length + filteredIndividualAccessories.length} {t('จากทั้งหมด')}{' '}
-                            {accessories.length} {t('รายการ')}
-                            ({filteredGroupAccessories.length} {t('กลุ่ม')}, {filteredIndividualAccessories.length} {t('รายการเดี่ยว')})
+                            {accessories.length} {t('set')}
                         </div>
                     </div>
 
@@ -3898,19 +3883,11 @@ const EquipmentDetailModal: React.FC<{
                                         </h3>
                                         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                                             {paginatedGroups.map((accessory, index) => {
-                                                const isExpanded = accessory.group_id 
-                                                    ? expandedGroups.has(accessory.group_id) 
-                                                    : false;
-                                                
                                                 // ใช้ข้อมูลจาก state หรือจาก accessory
-                                                const groupItems = accessory.group_id 
+                                                const groupItems = accessory.group_id
                                                     ? (groupItemsData[accessory.group_id] || accessory.group_items || [])
                                                     : [];
-                                                
-                                                const isLoading = accessory.group_id 
-                                                    ? loadingGroups.has(accessory.group_id)
-                                                    : false;
-                                                
+
                                                 // คำนวณราคารวมจากรายการอุปกรณ์ในกลุ่ม (ใช้ข้อมูลล่าสุด)
                                                 const calculateGroupTotalPrice = () => {
                                                     if (groupItems.length > 0) {
@@ -3923,14 +3900,14 @@ const EquipmentDetailModal: React.FC<{
                                                     // ถ้ายังไม่มี groupItems ให้ใช้ราคาจาก accessory
                                                     return accessory.price || accessory.group?.total_price || 0;
                                                 };
-                                                
+
                                                 const groupTotalPrice = calculateGroupTotalPrice();
-                                                
+
                                                 return (
                                                     <div
                                                         key={accessory.id || index}
                                                         className="group relative cursor-pointer rounded-lg border border-gray-600 bg-gray-700 p-4 transition-all hover:border-orange-400 hover:shadow-lg"
-                                                        onClick={() => accessory.group_id && toggleGroupExpand(accessory.group_id, accessory.equipment_set_id || null)}
+                                                        onClick={() => openGroupDetail(accessory)}
                                                     >
                                                         {/* รูปภาพกลุ่ม */}
                                                         <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-gray-600">
@@ -3963,7 +3940,7 @@ const EquipmentDetailModal: React.FC<{
                                                         </div>
 
                                                         {/* ข้อมูลกลุ่ม */}
-                            <div className="space-y-2">
+                                                        <div className="space-y-2">
                                                             <h4 className="text-sm font-semibold text-white">
                                                                 {accessory.name || accessory.group?.name || `${t('กลุ่มที่')} ${accessory.group_id}`}
                                                             </h4>
@@ -3982,70 +3959,18 @@ const EquipmentDetailModal: React.FC<{
                                                             </div>
                                                             <div className="flex items-center justify-between">
                                                                 <span
-                                                                    className={`rounded-full px-2 py-1 text-xs font-medium ${
-                                                                        accessory.is_included
-                                                                            ? 'bg-green-900 text-green-300'
-                                                                            : 'bg-yellow-900 text-yellow-300'
-                                                                    }`}
+                                                                    className={`rounded-full px-2 py-1 text-xs font-medium ${accessory.is_included
+                                                                        ? 'bg-green-900 text-green-300'
+                                                                        : 'bg-yellow-900 text-yellow-300'
+                                                                        }`}
                                                                 >
                                                                     {accessory.is_included
                                                                         ? t('รวมในชุด')
                                                                         : t('ต้องซื้อเพิ่ม')}
                                                                 </span>
-                                                                <ChevronDown
-                                                                    className={`h-4 w-4 text-gray-400 transition-transform ${
-                                                                        isExpanded ? 'rotate-180' : ''
-                                                                    }`}
-                                                                />
+                                                                <Eye className="h-4 w-4 text-gray-400" />
                                                             </div>
                                                         </div>
-
-                                                        {/* รายการอุปกรณ์ในกลุ่ม (ขยาย) */}
-                                                        {isExpanded && (
-                                                            <div className="mt-4 space-y-2 border-t border-gray-600 pt-4">
-                                                                <h5 className="mb-2 text-xs font-semibold text-gray-300">
-                                                                    {t('รายการอุปกรณ์ในกลุ่ม')}:
-                                                                </h5>
-                                                                {isLoading ? (
-                                                                    <div className="flex items-center justify-center py-4">
-                                                                        <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
-                                                                        <span className="ml-2 text-xs text-gray-400">{t('กำลังโหลด...')}</span>
-                                                                    </div>
-                                                                ) : groupItems.length > 0 ? (
-                                                                    groupItems.map((item, itemIndex) => (
-                                                                        <div
-                                                                            key={item.id || itemIndex}
-                                                                            className="rounded border border-gray-600 bg-gray-800 p-2 text-xs"
-                                                                        >
-                                                                            <div className="flex items-center justify-between">
-                                                                                <div className="flex-1">
-                                                                                    <p className="font-medium text-white">
-                                                                                        {item.equipment?.name || t('ไม่ระบุชื่อ')}
-                                                                                    </p>
-                                                                                    {item.equipment?.product_code && (
-                                                                                        <p className="text-gray-400">
-                                                                                            {t('รหัส')}: {item.equipment.product_code}
-                                                                                        </p>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="text-right">
-                                                                                    <p className="text-gray-400">
-                                                                                        {t('จำนวน')}: {item.quantity || 1}
-                                                                                    </p>
-                                                                                    <p className="font-semibold text-green-400">
-                                                                                        ฿{((item.equipment?.price || item.unit_price || 0) * (item.quantity || 1)).toLocaleString()}
-                                                                                    </p>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))
-                                                                ) : (
-                                                                    <div className="py-4 text-center text-xs text-gray-400">
-                                                                        {t('ไม่มีรายการอุปกรณ์ในกลุ่มนี้')}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -4061,99 +3986,98 @@ const EquipmentDetailModal: React.FC<{
                                         </h3>
                                         <div className="space-y-2">
                                             {filteredIndividualAccessories.map((accessory, index) => (
-                                    <div
-                                        key={accessory.id || index}
-                                        className="rounded-lg border border-gray-600 bg-gray-700 p-1 transition-colors hover:border-orange-400"
-                                    >
-                                        <div className="grid grid-cols-12 items-center gap-4">
-                                            <div className="col-span-1">
-                                                {accessory.image ? (
-                                                    <img
-                                                        src={accessory.image}
-                                                        alt={accessory.name || 'อุปกรณ์'}
-                                                        className="h-12 w-12 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-orange-400 hover:opacity-80"
-                                                        onClick={() =>
-                                                            onImageClick &&
-                                                            onImageClick(
-                                                                accessory.image!,
-                                                                accessory.name ||
-                                                                    'อุปกรณ์ ' + (index + 1)
-                                                            )
-                                                        }
-                                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
-                                                        onError={(e) => {
-                                                            const target =
-                                                                e.target as HTMLImageElement;
-                                                            target.style.display = 'none';
-                                                        }}
-                                                    />
-                                                ) : null}
                                                 <div
-                                                    className={`image-placeholder flex h-12 w-12 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${accessory.image ? 'hidden' : 'flex'}`}
+                                                    key={accessory.id || index}
+                                                    className="rounded-lg border border-gray-600 bg-gray-700 p-1 transition-colors hover:border-orange-400"
                                                 >
-                                                    <Wrench className="h-6 w-6 text-gray-400" />
+                                                    <div className="grid grid-cols-12 items-center gap-4">
+                                                        <div className="col-span-1">
+                                                            {accessory.image ? (
+                                                                <img
+                                                                    src={accessory.image}
+                                                                    alt={accessory.name || 'อุปกรณ์'}
+                                                                    className="h-12 w-12 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-orange-400 hover:opacity-80"
+                                                                    onClick={() =>
+                                                                        onImageClick &&
+                                                                        onImageClick(
+                                                                            accessory.image!,
+                                                                            accessory.name ||
+                                                                            'อุปกรณ์ ' + (index + 1)
+                                                                        )
+                                                                    }
+                                                                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                    onError={(e) => {
+                                                                        const target =
+                                                                            e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            ) : null}
+                                                            <div
+                                                                className={`image-placeholder flex h-12 w-12 items-center justify-center rounded-lg border border-gray-600 bg-gray-600 ${accessory.image ? 'hidden' : 'flex'}`}
+                                                            >
+                                                                <Wrench className="h-6 w-6 text-gray-400" />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="col-span-3">
+                                                            <div className="flex-1">
+                                                                <h4 className="text-sm font-semibold text-white">
+                                                                    {accessory.name || 'ไม่มีชื่อ'}
+                                                                </h4>
+                                                                {accessory.product_code && (
+                                                                    <p className="text-sm text-gray-400">
+                                                                        {t('รหัส')}: {accessory.product_code}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="col-span-5">
+                                                            <div className="flex-1">
+                                                                <h4 className="text-sm text-gray-400">
+                                                                    รายละเอียด
+                                                                </h4>
+                                                                <p className="text-sm text-gray-200">
+                                                                    {accessory.description || '-'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="col-span-1">
+                                                            <span className="text-sm text-gray-400">
+                                                                {t('จำนวน')}
+                                                            </span>
+                                                            <p className="font-semibold text-blue-400">
+                                                                {accessory.quantity || 1} {t('ชิ้น')}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="col-span-1">
+                                                            <span className="text-sm text-gray-400">
+                                                                {t('ราคา')}
+                                                            </span>
+                                                            <p className="font-semibold text-green-400">
+                                                                {accessory.price && accessory.price > 0
+                                                                    ? `฿${accessory.price.toLocaleString()}`
+                                                                    : '-'}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="col-span-1 flex items-center justify-end">
+                                                            <span
+                                                                className={`rounded-full px-3 py-1 text-xs font-medium ${accessory.is_included
+                                                                    ? 'bg-green-900 text-green-300'
+                                                                    : 'bg-yellow-900 text-yellow-300'
+                                                                    }`}
+                                                            >
+                                                                {accessory.is_included
+                                                                    ? t('รวมในชุด')
+                                                                    : t('ต้องซื้อเพิ่ม')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            <div className="col-span-3">
-                                                <div className="flex-1">
-                                                    <h4 className="text-sm font-semibold text-white">
-                                                        {accessory.name || 'ไม่มีชื่อ'}
-                                                    </h4>
-                                                    {accessory.product_code && (
-                                                        <p className="text-sm text-gray-400">
-                                                            {t('รหัส')}: {accessory.product_code}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="col-span-5">
-                                                <div className="flex-1">
-                                                    <h4 className="text-sm text-gray-400">
-                                                        รายละเอียด
-                                                    </h4>
-                                                    <p className="text-sm text-gray-200">
-                                                        {accessory.description || '-'}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="col-span-1">
-                                                <span className="text-sm text-gray-400">
-                                                    {t('จำนวน')}
-                                                </span>
-                                                <p className="font-semibold text-blue-400">
-                                                    {accessory.quantity || 1} {t('ชิ้น')}
-                                                </p>
-                                            </div>
-
-                                            <div className="col-span-1">
-                                                <span className="text-sm text-gray-400">
-                                                    {t('ราคา')}
-                                                </span>
-                                                <p className="font-semibold text-green-400">
-                                                    {accessory.price && accessory.price > 0
-                                                        ? `฿${accessory.price.toLocaleString()}`
-                                                        : '-'}
-                                                </p>
-                                            </div>
-
-                                            <div className="col-span-1 flex items-center justify-end">
-                                                <span
-                                                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                                        accessory.is_included
-                                                            ? 'bg-green-900 text-green-300'
-                                                            : 'bg-yellow-900 text-yellow-300'
-                                                    }`}
-                                                >
-                                                    {accessory.is_included
-                                                        ? t('รวมในชุด')
-                                                        : t('ต้องซื้อเพิ่ม')}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                            ))}
                                         </div>
                                     </div>
                                 )}
@@ -4173,6 +4097,157 @@ const EquipmentDetailModal: React.FC<{
                         </div>
                     )}
                 </div>
+
+                {/* Group Detail Popup */}
+                {selectedGroup && selectedGroup.group_id && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-70 p-4">
+                        <div className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-gray-800 shadow-2xl">
+                            {/* Header */}
+                            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-600 bg-gray-800 p-4">
+                                <div className="flex items-center gap-3">
+                                    <Package className="h-6 w-6 text-orange-400" />
+                                    <div className="flex items-center justify-between w-full">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">
+                                                {selectedGroup.name || selectedGroup.group?.name || `${t('กลุ่มที่')} ${selectedGroup.group_id}`}
+                                            </h3>
+                                            <p className="text-sm text-green-400">
+                                            ราคารวม: {(() => {
+                                                const groupItems = groupItemsData[selectedGroup.group_id] || selectedGroup.group_items || [];
+                                                const totalPrice = groupItems.length > 0
+                                                    ? groupItems.reduce((sum: number, item: EquipmentSetItem) => {
+                                                        const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                                        const itemQuantity = Number(item.quantity || 1);
+                                                        return sum + (itemPrice * itemQuantity);
+                                                    }, 0)
+                                                    : (selectedGroup.price || selectedGroup.group?.total_price || 0);
+                                                return totalPrice > 0 ? `${totalPrice.toLocaleString()}` : '-';
+                                            })()} บาท
+                                            </p>
+                                        </div>
+                                        
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={closeGroupDetail}
+                                    className="p-2 text-gray-400 transition-colors hover:text-white"
+                                >
+                                    <X className="h-6 w-6" />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6">
+                                {/* รูปภาพกลุ่ม */}
+                                {(selectedGroup.image || selectedGroup.group?.image) && (
+                                    <div className="mb-6">
+                                        <img
+                                            src={selectedGroup.image || selectedGroup.group?.image}
+                                            alt={selectedGroup.name || selectedGroup.group?.name || 'กลุ่มอุปกรณ์'}
+                                            className="w-full max-h-64 cursor-pointer rounded-lg object-contain"
+                                            onClick={() => {
+                                                const imageUrl = selectedGroup.image || selectedGroup.group?.image;
+                                                if (onImageClick && imageUrl) {
+                                                    onImageClick(
+                                                        imageUrl,
+                                                        selectedGroup.name || selectedGroup.group?.name || 'กลุ่มอุปกรณ์'
+                                                    );
+                                                }
+                                            }}
+                                            title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* รายการอุปกรณ์ในกลุ่ม */}
+                                <div>
+                                    <h4 className="mb-4 flex items-center gap-2 text-lg font-semibold text-orange-400">
+                                        <Package className="h-5 w-5" />
+                                        {t('รายการอุปกรณ์ในกลุ่ม')}
+                                    </h4>
+
+                                    {loadingGroups.has(selectedGroup.group_id) ? (
+                                        <div className="flex items-center justify-center py-8">
+                                            <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+                                            <span className="ml-3 text-gray-400">{t('กำลังโหลด...')}</span>
+                                        </div>
+                                    ) : (() => {
+                                        const groupItems = groupItemsData[selectedGroup.group_id] || selectedGroup.group_items || [];
+                                        return groupItems.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {groupItems.map((item: EquipmentSetItem, itemIndex: number) => (
+                                                    <div
+                                                        key={item.id || itemIndex}
+                                                        className="flex items-center gap-4 rounded-lg border border-gray-600 bg-gray-700 p-4 transition-colors hover:border-orange-400"
+                                                    >
+                                                        {/* รูปอุปกรณ์ */}
+                                                        <div className="flex-shrink-0">
+                                                            {item.equipment?.image ? (
+                                                                <img
+                                                                    src={item.equipment.image}
+                                                                    alt={item.equipment.name}
+                                                                    className="h-16 w-16 cursor-pointer rounded-lg border border-gray-600 object-cover"
+                                                                    onClick={() => {
+                                                                        if (onImageClick && item.equipment?.image) {
+                                                                            onImageClick(
+                                                                                item.equipment.image,
+                                                                                item.equipment.name || 'อุปกรณ์'
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                />
+                                                            ) : (
+                                                                <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-gray-600 bg-gray-600">
+                                                                    <Package className="h-8 w-8 text-gray-400" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* ข้อมูลอุปกรณ์ */}
+                                                        <div className="flex-1">
+                                                            <h5 className="font-semibold text-white">
+                                                                {item.equipment?.name || t('ไม่ระบุชื่อ')}
+                                                            </h5>
+                                                            {item.equipment?.product_code && (
+                                                                <p className="text-sm text-gray-400">
+                                                                    {t('รหัส')}: {item.equipment.product_code}
+                                                                </p>
+                                                            )}
+                                                            {item.equipment?.brand && (
+                                                                <p className="text-sm text-gray-400">
+                                                                    {t('ยี่ห้อ')}: {item.equipment.brand}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        {/* จำนวนและราคา */}
+                                                        <div className="text-right">
+                                                            <div className="text-sm text-gray-400">
+                                                                {t('จำนวน')}: <span className="font-semibold text-blue-400">{item.quantity || 1}</span>
+                                                            </div>
+                                                            <div className="text-sm text-gray-400">
+                                                                {t('ราคา/หน่วย')}: <span className="font-semibold text-white">฿{((item.equipment?.price || item.unit_price || 0)).toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="mt-1 text-base font-bold text-green-400">
+                                                                ฿{((item.equipment?.price || item.unit_price || 0) * (item.quantity || 1)).toLocaleString()}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="py-8 text-center text-gray-400">
+                                                <Package className="mx-auto h-12 w-12 text-gray-500" />
+                                                <p className="mt-2">{t('ไม่มีรายการอุปกรณ์ในกลุ่มนี้')}</p>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -4258,11 +4333,10 @@ const EquipmentDetailModal: React.FC<{
 
                             <div className="mt-4">
                                 <span
-                                    className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-                                        equipment.is_active
-                                            ? 'bg-green-900 text-green-300'
-                                            : 'bg-red-900 text-red-300'
-                                    }`}
+                                    className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${equipment.is_active
+                                        ? 'bg-green-900 text-green-300'
+                                        : 'bg-red-900 text-red-300'
+                                        }`}
                                 >
                                     {equipment.is_active ? (
                                         <>
@@ -4428,8 +4502,8 @@ const EquipmentDetailModal: React.FC<{
                                         <p className="font-medium">
                                             {equipment.updated_at
                                                 ? new Date(equipment.updated_at).toLocaleDateString(
-                                                      'th-TH'
-                                                  )
+                                                    'th-TH'
+                                                )
                                                 : '-'}
                                         </p>
                                     </div>
@@ -4440,8 +4514,8 @@ const EquipmentDetailModal: React.FC<{
                                         <p className="font-medium">
                                             {equipment.created_at
                                                 ? new Date(equipment.created_at).toLocaleDateString(
-                                                      'th-TH'
-                                                  )
+                                                    'th-TH'
+                                                )
                                                 : '-'}
                                         </p>
                                     </div>
@@ -4778,7 +4852,7 @@ const EquipmentCRUD: React.FC = () => {
     // รวม equipment sets groups เข้ากับรายการอุปกรณ์
     const combinedItems = useMemo(() => {
         // ถ้าเลือก set แล้ว ให้แสดงเฉพาะ groups ไม่แสดง equipment items
-        const equipmentItems = selectedEquipmentSetId === null 
+        const equipmentItems = selectedEquipmentSetId === null
             ? filteredAndSortedEquipments.map((eq) => ({
                 type: 'equipment' as const,
                 id: eq.id,
@@ -4803,7 +4877,7 @@ const EquipmentCRUD: React.FC = () => {
                         const categoryId = firstItem?.equipment?.category_id || firstItem?.category_id;
                         const category = categories.find((cat) => cat.id === categoryId);
                         const categoryName = category?.display_name || category?.name || t('ไม่ระบุหมวดหมู่');
-                        
+
                         return {
                             type: 'group' as const,
                             id: `group_${set.id}_${group.id}`,
@@ -4824,22 +4898,22 @@ const EquipmentCRUD: React.FC = () => {
                             groupItem.data.categoryName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                             groupItem.data.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                             groupItem.data.equipmentSetName?.toLowerCase().includes(debouncedSearch.toLowerCase());
-                        
+
                         // กรองตาม category (ถ้าเลือก set แล้วไม่ต้องกรองตาม category)
                         const categoryMatch = selectedEquipmentSetId !== null || selectedCategoryId === null || groupItem.data.categoryId === selectedCategoryId;
-                        
+
                         // กรองตาม price range
-                        const priceMatch = 
+                        const priceMatch =
                             (groupItem.data.total_price || 0) >= filters.priceRange[0] &&
                             (groupItem.data.total_price || 0) <= filters.priceRange[1];
-                        
+
                         return searchMatch && categoryMatch && priceMatch;
                     })
             );
 
         // รวมและเรียงลำดับ
         const combined = [...equipmentItems, ...groupItems];
-        
+
         // เรียงลำดับตาม filters
         combined.sort((a, b) => {
             if (filters.sortBy === 'name') {
@@ -5531,7 +5605,7 @@ const EquipmentCRUD: React.FC = () => {
                                             type="checkbox"
                                             checked={
                                                 selectedItems.length ===
-                                                    paginatedItems.filter(item => item.type === 'equipment').length &&
+                                                paginatedItems.filter(item => item.type === 'equipment').length &&
                                                 paginatedItems.filter(item => item.type === 'equipment').length > 0
                                             }
                                             onChange={toggleSelectAll}
@@ -5614,7 +5688,7 @@ const EquipmentCRUD: React.FC = () => {
                                                 </div>
                                             );
                                         }
-                                        
+
                                         const equipment = item.data;
                                         return (
                                             <div
@@ -5645,8 +5719,8 @@ const EquipmentCRUD: React.FC = () => {
                                                                 setShowEquipmentForm(true);
                                                                 setFormAccessories(
                                                                     equipment.pumpAccessories ||
-                                                                        equipment.pumpAccessory ||
-                                                                        []
+                                                                    equipment.pumpAccessory ||
+                                                                    []
                                                                 );
                                                             }}
                                                             className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-900"
@@ -5736,7 +5810,7 @@ const EquipmentCRUD: React.FC = () => {
 
                                                 {equipment.attributes &&
                                                     Object.keys(equipment.attributes || {}).length >
-                                                        0 && (
+                                                    0 && (
                                                         <div className="mt-2 text-xs">
                                                             <div className="mb-1 text-gray-400">
                                                                 {t('คุณสมบัติ:')}
@@ -5751,9 +5825,9 @@ const EquipmentCRUD: React.FC = () => {
                                                                         if (Array.isArray(value)) {
                                                                             if (
                                                                                 value.length ===
-                                                                                    2 &&
+                                                                                2 &&
                                                                                 typeof value[0] ===
-                                                                                    'number'
+                                                                                'number'
                                                                             ) {
                                                                                 displayValue = `${value[0]}-${value[1]}`;
                                                                             } else {
@@ -5787,24 +5861,24 @@ const EquipmentCRUD: React.FC = () => {
                                                                                 title={`${key}: ${displayValue}`}
                                                                             >
                                                                                 {displayValue.length >
-                                                                                10
+                                                                                    10
                                                                                     ? displayValue.substring(
-                                                                                          0,
-                                                                                          10
-                                                                                      ) + '...'
+                                                                                        0,
+                                                                                        10
+                                                                                    ) + '...'
                                                                                     : displayValue}
                                                                             </span>
                                                                         );
                                                                     })}
                                                                 {equipment.attributes && Object.keys(equipment.attributes)
                                                                     .length > 2 && (
-                                                                    <span className="rounded bg-gray-700 px-2 py-1 text-gray-400 shadow-sm">
-                                                                        +
-                                                                        {Object.keys(
-                                                                            equipment.attributes || {}
-                                                                        ).length - 2}
-                                                                    </span>
-                                                                )}
+                                                                        <span className="rounded bg-gray-700 px-2 py-1 text-gray-400 shadow-sm">
+                                                                            +
+                                                                            {Object.keys(
+                                                                                equipment.attributes || {}
+                                                                            ).length - 2}
+                                                                        </span>
+                                                                    )}
                                                             </div>
                                                         </div>
                                                     )}
@@ -5847,7 +5921,7 @@ const EquipmentCRUD: React.FC = () => {
                                                         type="checkbox"
                                                         checked={
                                                             selectedItems.length ===
-                                                                paginatedItems.filter(item => item.type === 'equipment').length &&
+                                                            paginatedItems.filter(item => item.type === 'equipment').length &&
                                                             paginatedItems.filter(item => item.type === 'equipment').length > 0
                                                         }
                                                         onChange={toggleSelectAll}
@@ -5958,132 +6032,130 @@ const EquipmentCRUD: React.FC = () => {
                                                         </tr>
                                                     );
                                                 }
-                                                
+
                                                 const equipment = item.data;
                                                 return (
-                                                <tr
-                                                    key={equipment.id}
-                                                    className={`cursor-pointer border-b border-gray-600 transition-colors hover:bg-gray-600 ${
-                                                        selectedItems.includes(equipment.id)
+                                                    <tr
+                                                        key={equipment.id}
+                                                        className={`cursor-pointer border-b border-gray-600 transition-colors hover:bg-gray-600 ${selectedItems.includes(equipment.id)
                                                             ? 'bg-blue-900'
                                                             : 'bg-gray-700'
-                                                    }`}
-                                                    onClick={() => handleViewEquipment(equipment)}
-                                                >
-                                                    <td
-                                                        className="px-3 text-center"
-                                                        onClick={(e) => e.stopPropagation()}
+                                                            }`}
+                                                        onClick={() => handleViewEquipment(equipment)}
                                                     >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedItems.includes(
-                                                                equipment.id
-                                                            )}
-                                                            onChange={() =>
-                                                                toggleItemSelection(equipment.id)
-                                                            }
-                                                            className="h-4 w-4"
-                                                        />
-                                                    </td>
-                                                    <td className="px-3 text-center align-middle">
-                                                        <div className="flex items-center justify-center">
-                                                            {equipment.image ? (
-                                                                <img
-                                                                    src={equipment.image}
-                                                                    alt={equipment.name}
-                                                                    className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        openImageModal(
-                                                                            equipment.image!,
-                                                                            equipment.name
-                                                                        );
-                                                                    }}
-                                                                    title={t(
-                                                                        'คลิกเพื่อดูรูปขนาดใหญ่'
-                                                                    )}
-                                                                    onError={(e) => {
-                                                                        const target =
-                                                                            e.target as HTMLImageElement;
-                                                                        target.style.display =
-                                                                            'none';
-                                                                        const parent =
-                                                                            target.parentElement;
-                                                                        if (parent) {
-                                                                            const placeholder =
-                                                                                parent.querySelector(
-                                                                                    '.image-placeholder'
-                                                                                ) as HTMLElement;
-                                                                            if (placeholder)
-                                                                                placeholder.style.display =
-                                                                                    'flex';
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            ) : null}
-                                                            <div
-                                                                className={`image-placeholder flex h-10 w-10 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm ${equipment.image ? 'hidden' : 'flex'}`}
-                                                            >
-                                                                <ImageIcon className="h-5 w-5 text-gray-400" />
+                                                        <td
+                                                            className="px-3 text-center"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedItems.includes(
+                                                                    equipment.id
+                                                                )}
+                                                                onChange={() =>
+                                                                    toggleItemSelection(equipment.id)
+                                                                }
+                                                                className="h-4 w-4"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 text-center align-middle">
+                                                            <div className="flex items-center justify-center">
+                                                                {equipment.image ? (
+                                                                    <img
+                                                                        src={equipment.image}
+                                                                        alt={equipment.name}
+                                                                        className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            openImageModal(
+                                                                                equipment.image!,
+                                                                                equipment.name
+                                                                            );
+                                                                        }}
+                                                                        title={t(
+                                                                            'คลิกเพื่อดูรูปขนาดใหญ่'
+                                                                        )}
+                                                                        onError={(e) => {
+                                                                            const target =
+                                                                                e.target as HTMLImageElement;
+                                                                            target.style.display =
+                                                                                'none';
+                                                                            const parent =
+                                                                                target.parentElement;
+                                                                            if (parent) {
+                                                                                const placeholder =
+                                                                                    parent.querySelector(
+                                                                                        '.image-placeholder'
+                                                                                    ) as HTMLElement;
+                                                                                if (placeholder)
+                                                                                    placeholder.style.display =
+                                                                                        'flex';
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                ) : null}
+                                                                <div
+                                                                    className={`image-placeholder flex h-10 w-10 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm ${equipment.image ? 'hidden' : 'flex'}`}
+                                                                >
+                                                                    <ImageIcon className="h-5 w-5 text-gray-400" />
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 text-center font-medium text-white">
-                                                        {equipment.product_code ||
-                                                            equipment.productCode ||
-                                                            '-'}
-                                                    </td>
-                                                    <td className="max-w-xs truncate px-3">
-                                                        {equipment.name}
-                                                    </td>
-                                                    <td className="px-3 text-center">
-                                                        {equipment.brand || '-'}
-                                                    </td>
-                                                    <td className="px-3 text-center">
-                                                        <span className="rounded bg-gray-600 px-2 py-1 text-xs shadow-sm">
-                                                            {
-                                                                categories.find(
-                                                                    (c) =>
-                                                                        c.id ===
-                                                                        equipment.category_id
-                                                                )?.name
-                                                            }
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-3 text-center font-semibold text-green-400">
-                                                        ฿{equipment.price.toLocaleString()}
-                                                    </td>
-                                                    <td className="px-3 text-center">
-                                                        {equipment.stock ? (
-                                                            <span className="font-semibold text-blue-400">
-                                                                {equipment.stock.toLocaleString()}
+                                                        </td>
+                                                        <td className="px-3 text-center font-medium text-white">
+                                                            {equipment.product_code ||
+                                                                equipment.productCode ||
+                                                                '-'}
+                                                        </td>
+                                                        <td className="max-w-xs truncate px-3">
+                                                            {equipment.name}
+                                                        </td>
+                                                        <td className="px-3 text-center">
+                                                            {equipment.brand || '-'}
+                                                        </td>
+                                                        <td className="px-3 text-center">
+                                                            <span className="rounded bg-gray-600 px-2 py-1 text-xs shadow-sm">
+                                                                {
+                                                                    categories.find(
+                                                                        (c) =>
+                                                                            c.id ===
+                                                                            equipment.category_id
+                                                                    )?.name
+                                                                }
                                                             </span>
-                                                        ) : (
-                                                            '-'
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 text-center">
-                                                        <span
-                                                            className={`flex w-fit items-center rounded-full px-2 py-1 text-xs shadow-sm ${
-                                                                equipment.is_active
+                                                        </td>
+                                                        <td className="px-3 text-center font-semibold text-green-400">
+                                                            ฿{equipment.price.toLocaleString()}
+                                                        </td>
+                                                        <td className="px-3 text-center">
+                                                            {equipment.stock ? (
+                                                                <span className="font-semibold text-blue-400">
+                                                                    {equipment.stock.toLocaleString()}
+                                                                </span>
+                                                            ) : (
+                                                                '-'
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 text-center">
+                                                            <span
+                                                                className={`flex w-fit items-center rounded-full px-2 py-1 text-xs shadow-sm ${equipment.is_active
                                                                     ? 'bg-green-900 text-green-300'
                                                                     : 'bg-red-900 text-red-300'
-                                                            }`}
-                                                        >
-                                                            {equipment.is_active ? (
-                                                                <>
-                                                                    <CheckCircle className="mr-1 h-3 w-3" />{' '}
-                                                                    {t('ใช้งาน')}
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <XCircle className="mr-1 h-3 w-3" />{' '}
-                                                                    {t('ปิดใช้งาน')}
-                                                                </>
-                                                            )}
-                                                        </span>
-                                                    </td>
-                                                    {/* <td className="px-3 text-center">
+                                                                    }`}
+                                                            >
+                                                                {equipment.is_active ? (
+                                                                    <>
+                                                                        <CheckCircle className="mr-1 h-3 w-3" />{' '}
+                                                                        {t('ใช้งาน')}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <XCircle className="mr-1 h-3 w-3" />{' '}
+                                                                        {t('ปิดใช้งาน')}
+                                                                    </>
+                                                                )}
+                                                            </span>
+                                                        </td>
+                                                        {/* <td className="px-3 text-center">
                                                         <div className="flex items-center gap-2">
                                                             {equipment.attributes &&
                                                                 Object.keys(equipment.attributes)
@@ -6114,47 +6186,47 @@ const EquipmentCRUD: React.FC = () => {
                                                                 )}
                                                         </div>
                                                     </td> */}
-                                                    <td
-                                                        className="px-6 py-4 text-center"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleViewEquipment(equipment)
-                                                                }
-                                                                className="rounded p-2 text-blue-400 shadow-sm transition-colors hover:bg-blue-900"
-                                                                title={t('ดูรายละเอียด')}
-                                                            >
-                                                                <Eye className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingEquipment(equipment);
-                                                                    setShowEquipmentForm(true);
-                                                                    setFormAccessories(
-                                                                        equipment.pumpAccessories ||
+                                                        <td
+                                                            className="px-6 py-4 text-center"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleViewEquipment(equipment)
+                                                                    }
+                                                                    className="rounded p-2 text-blue-400 shadow-sm transition-colors hover:bg-blue-900"
+                                                                    title={t('ดูรายละเอียด')}
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingEquipment(equipment);
+                                                                        setShowEquipmentForm(true);
+                                                                        setFormAccessories(
+                                                                            equipment.pumpAccessories ||
                                                                             equipment.pumpAccessory ||
                                                                             []
-                                                                    );
-                                                                }}
-                                                                className="rounded p-2 text-green-400 shadow-sm transition-colors hover:bg-green-900"
-                                                                title={t('แก้ไข')}
-                                                            >
-                                                                <Edit2 className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() =>
-                                                                    handleDeleteEquipment(equipment)
-                                                                }
-                                                                className="rounded p-2 text-red-400 shadow-sm transition-colors hover:bg-red-900"
-                                                                title={t('ลบ')}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                                        );
+                                                                    }}
+                                                                    className="rounded p-2 text-green-400 shadow-sm transition-colors hover:bg-green-900"
+                                                                    title={t('แก้ไข')}
+                                                                >
+                                                                    <Edit2 className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleDeleteEquipment(equipment)
+                                                                    }
+                                                                    className="rounded p-2 text-red-400 shadow-sm transition-colors hover:bg-red-900"
+                                                                    title={t('ลบ')}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
                                                 );
                                             })}
                                         </tbody>
@@ -6225,8 +6297,8 @@ const EquipmentCRUD: React.FC = () => {
                         setShowEquipmentForm(true);
                         setFormAccessories(
                             selectedEquipment.pumpAccessories ||
-                                selectedEquipment.pumpAccessory ||
-                                []
+                            selectedEquipment.pumpAccessory ||
+                            []
                         );
                         setShowEquipmentDetail(false);
                         setSelectedEquipment(undefined);
