@@ -28,11 +28,13 @@ interface User {
     id: number;
     name: string;
     email: string;
+    is_admin?: boolean;
 }
 
 // 2. State & Hooks Component
 function FreeArticles() {
-    const { article } = usePage<PageProps>().props;
+    const page = usePage<PageProps>();
+    const { article } = page.props;
 
     // Format date
     const formatDate = (dateString: string | null) => {
@@ -78,7 +80,7 @@ function FreeArticles() {
                     <span className="font-medium">กลับไปหน้าข่าวสาร</span>
                 </button>
 
-                <article className="rounded-xl bg-slate-800/80 p-6 backdrop-blur-sm md:p-8">
+                <article className="rounded-xl bg-slate-800/80 backdrop-blur-sm p-6 md:p-8">
                     {/* Article Header */}
                     <div className="mb-6">
                         {/* Category Tag */}

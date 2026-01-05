@@ -10,18 +10,28 @@ interface User {
     is_admin?: boolean;
 }
 
+interface Article {
+    id: number;
+    title: string;
+    content: string;
+    image_url: string;
+}
+
 interface PageProps {
     auth: {
         user: User | null;
     };
+    article?: Article;
     [key: string]: unknown;
 }
 
 export default function CreateArticle() {
     const page = usePage<PageProps>();
     const isAdmin = page.props.auth?.user?.is_admin || false;
+    const article = page.props.article;
+    const isEditMode = !!article;
 
-    const [imagePreview, setImagePreview] = useState<string>('');
+    const [imagePreview, setImagePreview] = useState<string>(article?.image_url || '');
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [translations, setTranslations] = useState(getTranslations());
@@ -51,12 +61,19 @@ export default function CreateArticle() {
         }
     }, [isAdmin]);
 
+    // Set image preview when article is loaded
+    useEffect(() => {
+        if (article?.image_url) {
+            setImagePreview(article.image_url);
+        }
+    }, [article]);
+
     // 1. ใช้ useForm เพื่อจัดการ state ของฟอร์ม
     // มันจะช่วยจัดการ errors, processing state ให้อัตโนมัติ
-    const { data, setData, post, processing, errors } = useForm({
-        title: '',
-        content: '',
-        image_url: '',
+    const { data, setData, post, put, processing, errors } = useForm({
+        title: article?.title || '',
+        content: article?.content || '',
+        image_url: article?.image_url || '',
     });
 
     // ฟังก์ชันสำหรับอัปโหลดรูปภาพ
@@ -126,17 +143,28 @@ export default function CreateArticle() {
     // 2. ฟังก์ชันเมื่อ Submit
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        // 3. ยิง 'post' ไปยัง route ที่เราสร้างใน Laravel
-        // Inertia จะจัดการทุกอย่างให้ (validation errors, redirects)
-        post('/admin/articles', {
-            onSuccess: () => {
-                // เมื่อบันทึกสำเร็จ จะ redirect ไปหน้า account ตามที่กำหนดใน controller
-                console.log(translations.articleCreatedSuccessfully);
-            },
-            onError: (errors) => {
-                console.error(translations.errorOccurred, errors);
-            }
-        }); 
+        if (isEditMode && article) {
+            // Update existing article
+            put(`/admin/articles/${article.id}`, {
+                onSuccess: () => {
+                    router.visit('/free-plan/news');
+                },
+                onError: (errors) => {
+                    console.error(translations.errorOccurred, errors);
+                }
+            });
+        } else {
+            // Create new article
+            post('/admin/articles', {
+                onSuccess: () => {
+                    // เมื่อบันทึกสำเร็จ จะ redirect ไปหน้า account ตามที่กำหนดใน controller
+                    console.log(translations.articleCreatedSuccessfully);
+                },
+                onError: (errors) => {
+                    console.error(translations.errorOccurred, errors);
+                }
+            });
+        }
     }
 
     // If not admin, show access denied message
@@ -167,7 +195,7 @@ export default function CreateArticle() {
 
     return (
         <>
-            <Head title={translations.createNewArticle} />
+            <Head title={isEditMode ? (translations.editArticle || 'แก้ไขบทความ') : translations.createNewArticle} />
             <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
                 {/* Custom Navbar */}
                 <FreeNav />
@@ -199,7 +227,9 @@ export default function CreateArticle() {
                         </button>
                     </div>
 
-                    <h1 className="text-3xl font-bold text-white mb-6">{translations.createNewArticle}</h1>
+                    <h1 className="text-3xl font-bold text-white mb-6">
+                        {isEditMode ? (translations.editArticle || 'แก้ไขบทความ') : translations.createNewArticle}
+                    </h1>
 
                 <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
                     <div>

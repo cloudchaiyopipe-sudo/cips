@@ -56,11 +56,9 @@ class RegisteredUserController extends Controller
             return redirect()->route('equipment-crud');
         }
         
-        if ($user->isSuperUser()) {
-            return redirect()->route('fields');
-        }
-        
-        // Default: redirect to free-plan for regular users
-        return redirect()->route('free-plan');
+        // All users (including super users) redirect to new-home
+        // From new-home, users can click "Mobile Mode" to go to free plan
+        // or "Continue to App" to go to fields page
+        return redirect()->route('home');
     }
 }
