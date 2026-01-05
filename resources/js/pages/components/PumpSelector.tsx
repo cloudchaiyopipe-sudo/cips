@@ -68,6 +68,31 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const [isLoadingAccessories, setIsLoadingAccessories] = useState(false);
     const [searchTerm, setSearchTerm] = useState<string>(''); // สำหรับ showAddAccessoryModal
     const [searchTermAccessories, setSearchTermAccessories] = useState<string>(''); // สำหรับ showAccessoriesModal
+    // เก็บ selectedGroupId ใน localStorage เพื่อไม่ให้ reset เมื่อเปลี่ยน tab
+    const getStoredSelectedGroupId = (pumpId: number | undefined): number | string | null => {
+        if (!pumpId) return null;
+        try {
+            const stored = localStorage.getItem(`pump_${pumpId}_selectedGroupId`);
+            return stored ? (isNaN(Number(stored)) ? stored : Number(stored)) : null;
+        } catch {
+            return null;
+        }
+    };
+    
+    const storeSelectedGroupId = (pumpId: number | undefined, groupId: number | string | null) => {
+        if (!pumpId) return;
+        try {
+            if (groupId) {
+                localStorage.setItem(`pump_${pumpId}_selectedGroupId`, String(groupId));
+            } else {
+                localStorage.removeItem(`pump_${pumpId}_selectedGroupId`);
+            }
+        } catch {
+            // Ignore localStorage errors
+        }
+    };
+    
+    const [selectedGroupId, setSelectedGroupId] = useState<number | string | null>(null); // สำหรับเลือกกลุ่ม
     const { t } = useLanguage();
 
     const requiredFlow = results.flows.main;
@@ -675,6 +700,34 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const currentPump = selectedPump || results.autoSelectedPump; // ใช้ selectedPump หรือ autoSelectedPump
     const autoSelectedPump = results.autoSelectedPump;
     const analyzedPumps = useMemo(() => results.analyzedPumps || [], [results.analyzedPumps]);
+    
+    // Initialize selectedGroupId จาก localStorage เมื่อ component mount หรือ pump เปลี่ยน
+    // ใช้ useRef เพื่อป้องกันการ reset เมื่อ component remount
+    const hasInitializedRef = useRef<number | undefined>(undefined);
+    useEffect(() => {
+        if (currentPump?.id) {
+            const currentPumpId = currentPump.id;
+            // ถ้า pump เปลี่ยน หรือยังไม่ได้ initialize ให้โหลดจาก localStorage
+            if (hasInitializedRef.current !== currentPumpId) {
+                const storedGroupId = getStoredSelectedGroupId(currentPumpId);
+                if (storedGroupId !== null) {
+                    setSelectedGroupId(storedGroupId);
+                } else if (currentPump?.pumpAccessories) {
+                    // ถ้าไม่มีใน localStorage ให้ใช้กลุ่มแรก
+                    const groupAccessories = currentPump.pumpAccessories.filter((acc: any) => 
+                        acc.group_id && acc.group_id > 0
+                    );
+                    if (groupAccessories.length > 0) {
+                        const firstGroupId = groupAccessories[0]?.group_id || null;
+                        setSelectedGroupId(firstGroupId);
+                        storeSelectedGroupId(currentPumpId, firstGroupId);
+                    }
+                }
+                hasInitializedRef.current = currentPumpId;
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPump?.id]);
 
     // ใช้ useRef เพื่อป้องกันการเรียก fetch ซ้ำๆ
     const isFetchingRef = useRef(false);
@@ -967,10 +1020,56 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             return true;
         });
 
-        return deduplicated.sort(
+        // Enrich ข้อมูล accessories ที่มี equipment_id แต่ไม่มี image_url
+        // โดยดึงข้อมูลจาก availableAccessories หรือ addedAccessories
+        const enriched = deduplicated.map((acc: any) => {
+            // ถ้ามี image_url อยู่แล้ว ไม่ต้อง enrich
+            if (acc.image_url || acc.image || acc.imageUrl) {
+                return acc;
+            }
+
+            // หา equipment_id
+            const equipmentId = acc.equipment_id || acc.originalId;
+            if (!equipmentId) {
+                return acc;
+            }
+
+            // หาจาก availableAccessories
+            const availableAcc = availableAccessories.find((a: any) => 
+                a.id === equipmentId || a.equipment_id === equipmentId
+            );
+            if (availableAcc && (availableAcc.image_url || availableAcc.image || availableAcc.imageUrl)) {
+                return {
+                    ...acc,
+                    image_url: availableAcc.image_url || availableAcc.image || availableAcc.imageUrl,
+                    image: availableAcc.image || availableAcc.image_url || availableAcc.imageUrl,
+                    imageUrl: availableAcc.imageUrl || availableAcc.image_url || availableAcc.image,
+                };
+            }
+
+            // หาจาก addedAccessories
+            const addedAcc = addedAccessories.find((a: any) => 
+                (a.originalId === equipmentId || a.equipment_id === equipmentId) &&
+                (a.image_url || a.image || a.imageUrl)
+            );
+            if (addedAcc) {
+                return {
+                    ...acc,
+                    image_url: addedAcc.image_url || addedAcc.image || addedAcc.imageUrl,
+                    image: addedAcc.image || addedAcc.image_url || addedAcc.imageUrl,
+                    imageUrl: addedAcc.imageUrl || addedAcc.image_url || addedAcc.image,
+                };
+            }
+
+            return acc;
+        });
+
+        const sorted = enriched.sort(
             (a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)
         );
-    }, [currentPump?.pumpAccessories, removedAccessoryIds, addedAccessories]);
+
+        return sorted;
+    }, [currentPump?.pumpAccessories, removedAccessoryIds, addedAccessories, availableAccessories]);
 
     // เมื่อเปิด modal ให้ดึงข้อมูลอุปกรณ์ (เรียกแค่ครั้งเดียวเมื่อเปิด modal)
     useEffect(() => {
@@ -986,6 +1085,95 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showAddAccessoryModal]);
+
+    // เมื่อเปิด modal "🔧 อุปกรณ์โรงปั๊มน้ำ" ให้ fetch equipment data สำหรับ accessories ที่ไม่มี image_url
+    useEffect(() => {
+        if (!showAccessoriesModal || !currentPump?.pumpAccessories) {
+            return;
+        }
+
+        // หา accessories ที่มี equipment_id แต่ไม่มี image_url
+        const accessoriesNeedingData = currentPump.pumpAccessories.filter((acc: any) => {
+            const hasImage = acc.image_url || acc.image || acc.imageUrl;
+            const hasEquipmentId = acc.equipment_id;
+            return !hasImage && hasEquipmentId;
+        });
+
+        if (accessoriesNeedingData.length === 0) {
+            return;
+        }
+
+        // Fetch equipment data สำหรับ accessories ที่ต้องการ
+        const fetchEquipmentData = async () => {
+            const equipmentIds = accessoriesNeedingData
+                .map((acc: any) => acc.equipment_id)
+                .filter(Boolean);
+
+            if (equipmentIds.length === 0) {
+                return;
+            }
+
+            try {
+                // Fetch equipment data จาก API
+                const responses = await Promise.all(
+                    equipmentIds.map(async (id: number) => {
+                        try {
+                            const response = await fetch(`/api/equipments/${id}`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                return data;
+                            }
+                            return null;
+                        } catch (error) {
+                            console.error(`Error fetching equipment ${id}:`, error);
+                            return null;
+                        }
+                    })
+                );
+
+                const equipmentDataMap = new Map();
+                responses.forEach((data) => {
+                    if (data && data.id) {
+                        equipmentDataMap.set(data.id, data);
+                    }
+                });
+
+                // อัพเดต availableAccessories ด้วยข้อมูลที่ได้
+                if (equipmentDataMap.size > 0) {
+                    setAvailableAccessories((prev) => {
+                        const existingIds = new Set(prev.map((a: any) => a.id || a.equipment_id));
+                        const newItems = Array.from(equipmentDataMap.values())
+                            .filter((eq: any) => !existingIds.has(eq.id))
+                            .map((equipment: any) => ({
+                                id: equipment.id,
+                                equipment_id: equipment.id,
+                                product_code: equipment.product_code || equipment.productCode,
+                                name: equipment.name,
+                                image: equipment.image || equipment.image_url || equipment.imageUrl,
+                                image_url: equipment.image_url || equipment.imageUrl || equipment.image,
+                                imageUrl: equipment.imageUrl || equipment.image_url || equipment.image,
+                                price: equipment.price || 0,
+                                quantity: 1,
+                                is_included: false,
+                                sort_order: 0,
+                                accessory_type: equipment.category?.name || 'other',
+                                specifications: equipment.attributes_raw || {},
+                                description: equipment.description || '',
+                                brand: equipment.brand,
+                                isAlreadyAdded: false,
+                            }));
+
+                        return [...prev, ...newItems];
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching equipment data:', error);
+            }
+        };
+
+        fetchEquipmentData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showAccessoriesModal, currentPump?.pumpAccessories]);
 
     // สร้าง dependency string สำหรับ useEffect
     const addedAccessoriesIds = useMemo(() => {
@@ -1481,6 +1669,49 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         setHasAutoSelected(false);
     }, [analyzedPumps]);
 
+    // ใช้ useRef เพื่อเก็บค่า pump id ก่อนหน้า
+    const prevPumpIdRef = useRef<number | undefined>(undefined);
+    
+    // Reset selectedGroupId เมื่อ currentPump เปลี่ยน (เฉพาะเมื่อ pump เปลี่ยนจริงๆ)
+    useEffect(() => {
+        const currentPumpId = currentPump?.id;
+        const prevPumpId = prevPumpIdRef.current;
+        
+        // ถ้า pump id เปลี่ยนจริงๆ (เปลี่ยนปั๊ม) ให้ reset selectedGroupId
+        if (currentPumpId !== prevPumpId) {
+            prevPumpIdRef.current = currentPumpId;
+            
+            if (currentPump?.pumpAccessories) {
+                const groupAccessories = currentPump.pumpAccessories.filter((acc: any) => 
+                    acc.group_id && acc.group_id > 0
+                );
+                if (groupAccessories.length > 0) {
+                    // โหลดค่า selectedGroupId จาก localStorage หรือใช้กลุ่มแรก
+                    const storedGroupId = getStoredSelectedGroupId(currentPumpId);
+                    const groupExists = storedGroupId && groupAccessories.some((acc: any) => acc.group_id === storedGroupId);
+                    const defaultGroupId = groupExists ? storedGroupId : (groupAccessories[0]?.group_id || null);
+                    setSelectedGroupId(defaultGroupId);
+                    storeSelectedGroupId(currentPumpId, defaultGroupId);
+                } else {
+                    setSelectedGroupId(null);
+                    storeSelectedGroupId(currentPumpId, null);
+                }
+            } else {
+                setSelectedGroupId(null);
+                storeSelectedGroupId(currentPumpId, null);
+            }
+        }
+        // ไม่ต้องทำอะไรถ้า pump id ไม่เปลี่ยน (ไม่ reset selectedGroupId)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPump?.id]); // ใช้แค่ currentPump?.id เพื่อไม่ให้ reset เมื่อ pumpAccessories เปลี่ยน
+    
+    // บันทึก selectedGroupId ลง localStorage เมื่อมีการเปลี่ยนแปลง
+    useEffect(() => {
+        if (currentPump?.id && selectedGroupId !== null) {
+            storeSelectedGroupId(currentPump.id, selectedGroupId);
+        }
+    }, [selectedGroupId, currentPump?.id]);
+
     const requiredHorsepower = useMemo(() => {
         const requiredFlowLPM =
             projectMode === 'garden'
@@ -1569,24 +1800,24 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         );
     };
 
-    const renderAccessoryImage = (accessory: any, size: 'small' | 'normal' = 'normal') => {
+    // Component สำหรับแสดงรูปภาพอุปกรณ์ที่ handle error ได้ดี
+    const AccessoryImage: React.FC<{
+        accessory: any;
+        size: 'small' | 'normal';
+        onImageClick?: (url: string, name: string) => void;
+        showPlaceholder?: boolean;
+    }> = ({ accessory, size, onImageClick, showPlaceholder = true }) => {
+        const [imageError, setImageError] = useState(false);
+        const [imageLoading, setImageLoading] = useState(true);
         const imageUrl = accessory.image_url || accessory.image || accessory.imageUrl;
-        const imageSize = size === 'small' ? 'h-8 w-8' : 'h-10 w-10';
+        const imageSize = size === 'small' ? 'h-16 w-16' : 'w-full h-full';
+        const accessoryKey = accessory.id || accessory.equipment_id || accessory.originalId || 'acc';
 
-        if (imageUrl) {
-            return (
-                <img
-                    src={imageUrl}
-                    alt={accessory.name}
-                    className={`${imageSize} cursor-pointer rounded border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80 flex-shrink-0`}
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                    onClick={() => openImageModal(imageUrl, accessory.name)}
-                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
-                />
-            );
-        }
+        // Reset error state when imageUrl or accessory changes
+        useEffect(() => {
+            setImageError(false);
+            setImageLoading(true);
+        }, [imageUrl, accessoryKey]);
 
         const getIconForType = (type: string) => {
             const icons = {
@@ -1598,11 +1829,65 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             return icons[type as keyof typeof icons] || '🔧';
         };
 
-        const iconSize = size === 'small' ? 'h-16 w-16' : 'h-16 w-16';
+        const iconSize = size === 'small' ? 'h-16 w-16' : 'w-full h-full';
+
+        // ถ้าไม่มี imageUrl หรือ error และต้องการแสดง placeholder
+        if ((!imageUrl || imageError) && showPlaceholder) {
+            return (
+                <div className={`flex ${iconSize} items-center justify-center rounded border border-gray-600 bg-gray-600 text-sm flex-shrink-0`}>
+                    {getIconForType(accessory.accessory_type)}
+                </div>
+            );
+        }
+
+        // ถ้าไม่มี imageUrl และไม่ต้องการแสดง placeholder ให้ return null
+        if (!imageUrl || imageError) {
+            return null;
+        }
+
         return (
-            <div className={`flex ${iconSize} items-center justify-center rounded border border-gray-600 bg-gray-600 text-sm flex-shrink-0`}>
-                {getIconForType(accessory.accessory_type)}
-            </div>
+            <img
+                key={`img_${accessoryKey}_${imageUrl}`}
+                src={imageUrl}
+                alt={accessory.name || 'Accessory'}
+                className={`${imageSize} cursor-pointer rounded border border-gray-600 object-contain transition-opacity hover:border-blue-400 hover:opacity-80 flex-shrink-0 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                onError={(e) => {
+                    console.warn('Image failed to load:', imageUrl, accessory);
+                    setImageError(true);
+                    setImageLoading(false);
+                }}
+                onLoad={() => {
+                    setImageLoading(false);
+                }}
+                onClick={(e) => {
+                    e.stopPropagation(); // ป้องกันไม่ให้ event bubble ขึ้นไปยัง parent
+                    if (onImageClick && imageUrl) {
+                        onImageClick(imageUrl, accessory.name || 'Accessory');
+                    }
+                }}
+                title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+            />
+        );
+    };
+
+    const renderAccessoryImage = (accessory: any, size: 'small' | 'normal' = 'normal', showPlaceholder: boolean = true) => {
+        const imageUrl = accessory.image_url || accessory.image || accessory.imageUrl;
+        
+        // ถ้าไม่มี imageUrl และไม่ต้องการแสดง placeholder ให้ return null
+        if (!imageUrl && !showPlaceholder) {
+            return null;
+        }
+        
+        const componentKey = `acc_img_${accessory.id || accessory.equipment_id || accessory.originalId || 'acc'}_${imageUrl || 'noimg'}`;
+        
+        return (
+            <AccessoryImage
+                key={componentKey}
+                accessory={accessory}
+                size={size}
+                onImageClick={openImageModal}
+                showPlaceholder={showPlaceholder}
+            />
         );
     };
 
@@ -2025,41 +2310,241 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
 
 
-                    {currentPump.pumpAccessories && currentPump.pumpAccessories.length > 0 && (
-                        <div className="mt-3 rounded bg-purple-900 p-3">
-                            <div className="flex items-center justify-between">
-                                <h5 className="text-sm font-medium text-purple-300">
-                                    🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length}{' '}
-                                    {t('รายการ')})
-                                </h5>
-                                <button
-                                    onClick={() => setShowAccessoriesModal(true)}
-                                    className="rounded bg-purple-600 px-3 py-1 text-xs text-white transition-colors hover:bg-purple-500"
-                                >
-                                    {t('ดูอุปกรณ์')}
-                                </button>
-                            </div>
-                            {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
-                                <div className="mt-2 text-xs text-purple-200">
-                                    <span>{t('ราคาอุปกรณ์เสริม:')}</span>{' '}
-                                    <span className="font-medium text-yellow-300">
-                                        +
-                                        {currentPump.pumpAccessories
-                                            .filter((acc: any) => !acc.is_included)
-                                            .reduce(
-                                                (sum: number, acc: any) =>
-                                                    sum +
-                                                    Number(acc.price || 0) *
-                                                    (acc.quantity || 1),
-                                                0
-                                            )
-                                            .toLocaleString()}{' '}
-                                        {t('บาท')}
-                                    </span>
+                    {currentPump.pumpAccessories && currentPump.pumpAccessories.length > 0 && (() => {
+                        // กรองเฉพาะ accessories ที่มี group_id (เป็นกลุ่ม)
+                        const groupAccessories = currentPump.pumpAccessories.filter((acc: any) => 
+                            acc.group_id && acc.group_id > 0
+                        );
+
+                        // ถ้าไม่มี groupAccessories ให้แสดงแบบเดิม
+                        if (groupAccessories.length === 0) {
+                            return (
+                                <div className="mt-3 rounded bg-purple-900 p-3">
+                                    <div className="flex items-center justify-between">
+                                        <h5 className="text-sm font-medium text-purple-300">
+                                            🔧 {t('อุปกรณ์ประกอบ')} ({currentPump.pumpAccessories.length}{' '}
+                                            {t('รายการ')})
+                                        </h5>
+                                        <button
+                                            onClick={() => setShowAccessoriesModal(true)}
+                                            className="rounded bg-purple-600 px-3 py-1 text-xs text-white transition-colors hover:bg-purple-500"
+                                        >
+                                            {t('ดูอุปกรณ์')}
+                                        </button>
+                                    </div>
+                                    {currentPump.pumpAccessories.some((acc: any) => !acc.is_included) && (
+                                        <div className="mt-2 text-xs text-purple-200">
+                                            <span>{t('ราคาอุปกรณ์เสริม:')}</span>{' '}
+                                            <span className="font-medium text-yellow-300">
+                                                +
+                                                {currentPump.pumpAccessories
+                                                    .filter((acc: any) => !acc.is_included)
+                                                    .reduce(
+                                                        (sum: number, acc: any) =>
+                                                            sum +
+                                                            Number(acc.price || 0) *
+                                                            (acc.quantity || 1),
+                                                        0
+                                                    )
+                                                    .toLocaleString()}{' '}
+                                                {t('บาท')}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            );
+                        }
+
+                        // ใช้ selectedGroupId โดยตรง (ไม่ใช้ fallback เพื่อไม่ให้ reset dropdown)
+                        // ถ้า selectedGroupId เป็น null ให้ใช้กลุ่มแรกเป็น default เฉพาะในการหา selectedGroup
+                        const effectiveGroupId = selectedGroupId ?? (groupAccessories[0]?.group_id || null);
+
+                        // หากลุ่มที่เลือก
+                        const selectedGroup = groupAccessories.find((acc: any) => 
+                            acc.group_id === effectiveGroupId
+                        );
+
+                        // ดึงรายการอุปกรณ์ของกลุ่มที่เลือก
+                        const selectedGroupItems = selectedGroup?.group_items || selectedGroup?.group?.items || [];
+
+                        return (
+                            <div className="mt-3 rounded bg-purple-900 p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h5 className="text-sm font-medium text-purple-300">
+                                        🔧 {t('อุปกรณ์ประกอบ')} ({groupAccessories.length}{' '}
+                                        {t('กลุ่ม')})
+                                    </h5>
+                                    <button
+                                        onClick={() => setShowAccessoriesModal(true)}
+                                        className="rounded bg-purple-600 px-3 py-1 text-xs text-white transition-colors hover:bg-purple-500"
+                                    >
+                                        {t('ดูอุปกรณ์')}
+                                    </button>
+                                </div>
+
+                                {/* 2 คอลัมน์ */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* คอลัมน์แรก: แสดงเฉพาะรูปภาพเต็มพื้นที่แนวตั้ง */}
+                                    <div className="flex flex-col h-full min-h-[380px] max-h-[400px]">
+                                        {/* ช่องเลือกกลุ่ม */}
+                                        <div className="mb-3">
+                                            <label className="text-xs font-medium text-purple-200 block mb-1">
+                                                {t('เลือกกลุ่มอุปกรณ์:')}
+                                            </label>
+                                            <select
+                                                value={selectedGroupId || ''}
+                                                onChange={(e) => {
+                                                    const groupId = e.target.value ? (isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value)) : null;
+                                                    setSelectedGroupId(groupId);
+                                                }}
+                                                className="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                            >
+                                                {groupAccessories.map((acc: any) => {
+                                                    const groupId = acc.group_id;
+                                                    const groupName = acc.group?.name || acc.name || `${t('กลุ่มที่')} ${groupId}`;
+                                                    
+                                                    // คำนวณราคารวมจากรายการอุปกรณ์ในกลุ่ม (ใช้ข้อมูลล่าสุด)
+                                                    const groupItems = acc.group_items || acc.group?.items || [];
+                                                    const calculatedGroupPrice = groupItems.length > 0
+                                                        ? groupItems.reduce((sum: number, item: any) => {
+                                                              const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                                              const itemQuantity = Number(item.quantity || 1);
+                                                              return sum + (itemPrice * itemQuantity);
+                                                          }, 0)
+                                                        : (acc.price || acc.group?.total_price || 0);
+                                                    
+                                                    return (
+                                                        <option key={groupId} value={groupId}>
+                                                            {groupName} - {calculatedGroupPrice.toLocaleString()} {t('บาท')}
+                                                        </option>
+                                                    );
+                                                })}
+                                            </select>
+                                        </div>
+                                        {/* ส่วนแสดงรูปภาพ */}
+                                        <div className="flex-1 flex items-center justify-center min-h-0">
+                                            {selectedGroup && (selectedGroup.group?.image || selectedGroup.image) ? (
+                                                <img
+                                                    src={selectedGroup.group?.image || selectedGroup.image}
+                                                    alt={selectedGroup.group?.name || selectedGroup.name}
+                                                    className="h-full w-full object-contain rounded border border-gray-600 bg-gray-800 cursor-pointer transition-opacity hover:opacity-80"
+                                                    onError={e => {
+                                                        (e.target as HTMLImageElement).style.display = "none";
+                                                    }}
+                                                    onClick={() => {
+                                                        const imageUrl = selectedGroup.group?.image || selectedGroup.image;
+                                                        const imageName = selectedGroup.group?.name || selectedGroup.name || t('รูปภาพกลุ่มอุปกรณ์');
+                                                        if (imageUrl) {
+                                                            openImageModal(imageUrl, imageName);
+                                                        }
+                                                    }}
+                                                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                />
+                                            ) : (
+                                                <div 
+                                                    className="flex items-center justify-center rounded border border-gray-600 bg-gray-700 text-xs text-gray-400 w-full h-full"
+                                                >
+                                                    {t('ไม่มีรูป')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* คอลัมน์ที่สอง: รายการอุปกรณ์ของกลุ่ม */}
+                                    <div className="flex flex-col h-full min-h-[380px] max-h-[400px]">
+                                        <label className="text-xs font-medium text-purple-200">
+                                            {t('รายการอุปกรณ์ในกลุ่ม:')} ({selectedGroupItems.length}) {t('รายการ')}
+                                        </label>
+                                        <div
+                                            className="rounded bg-gray-800 p-3 border border-gray-600 flex-1"
+                                            style={{
+                                                minHeight: 0,
+                                                height: '100%',
+                                                overflowY: selectedGroupItems.length > 5 ? 'auto' : 'visible',
+                                            }}
+                                        >
+                                            {selectedGroupItems.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {selectedGroupItems.map((item: any, index: number) => {
+                                                        const equipment = item.equipment || item;
+                                                        const itemImage = equipment?.image || equipment?.image_url || equipment?.imageUrl || '';
+                                                        const itemName = equipment?.name || item.name || '';
+                                                        const itemPrice = item.unit_price || item.total_price || equipment?.price || 0;
+                                                        const itemQuantity = item.quantity || 1;
+                                                        const itemTotalPrice = itemPrice * itemQuantity;
+
+                                                        return (
+                                                            <div
+                                                                key={item.id || index}
+                                                                className="flex items-center space-x-3 p-2 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+                                                            >
+                                                                {itemImage ? (
+                                                                    <img
+                                                                        src={itemImage}
+                                                                        alt={itemName}
+                                                                        className="w-12 h-12 object-contain rounded border border-gray-600 flex-shrink-0 cursor-pointer transition-opacity hover:opacity-80"
+                                                                        onError={(e) => {
+                                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            if (itemImage) {
+                                                                                openImageModal(itemImage, itemName);
+                                                                            }
+                                                                        }}
+                                                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-12 h-12 flex items-center justify-center rounded border border-gray-600 bg-gray-600 text-xs text-gray-400 flex-shrink-0">
+                                                                        {t('ไม่มีรูป')}
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-medium text-white truncate">
+                                                                        {itemName}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-400">
+                                                                        {t('จำนวน:')} {itemQuantity} {t('ชิ้น')}
+                                                                    </p>
+                                                                    <p className="text-xs text-purple-300">
+                                                                        {itemPrice.toLocaleString()} {t('บาท')} × {itemQuantity} = {itemTotalPrice.toLocaleString()} {t('บาท')}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-4 text-gray-400 text-sm">
+                                                    {t('ไม่มีรายการอุปกรณ์ในกลุ่มนี้')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* แสดงราคารวม */}
+                                {selectedGroup && !selectedGroup.is_included && (
+                                    <div className="mt-3 text-xs text-purple-200 border-t border-purple-700 pt-2">
+                                        <span>{t('ราคาอุปกรณ์เสริม:')}</span>{' '}
+                                        <span className="font-medium text-yellow-300">
+                                            +
+                                            {(() => {
+                                                // คำนวณราคารวมจากรายการอุปกรณ์ในกลุ่ม (ใช้ข้อมูลล่าสุด)
+                                                const calculatedPrice = selectedGroupItems.length > 0
+                                                    ? selectedGroupItems.reduce((sum: number, item: any) => {
+                                                          const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                                          const itemQuantity = Number(item.quantity || 1);
+                                                          return sum + (itemPrice * itemQuantity);
+                                                      }, 0)
+                                                    : (selectedGroup.price || 0);
+                                                return calculatedPrice.toLocaleString();
+                                            })()}{' '}
+                                            {t('บาท')}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {(() => {
                         const adequacy = evaluatePumpAdequacy(currentPump);
@@ -2091,7 +2576,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
             {showImageModal && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-75"
                     onClick={closeImageModal}
                 >
                     <div
@@ -2120,271 +2605,152 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 </div>
             )}
 
-            {showAccessoriesModal && currentPump && currentPump.pumpAccessories && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
-                    onClick={() => setShowAccessoriesModal(false)}
-                >
+            {showAccessoriesModal && currentPump && currentPump.pumpAccessories && (() => {
+                // กรองเฉพาะ accessories ที่มี group_id (เป็นกลุ่ม)
+                const groupAccessories = currentPump.pumpAccessories.filter((acc: any) => 
+                    acc.group_id && acc.group_id > 0
+                );
+
+                // หากลุ่มที่เลือก
+                const currentGroupId = selectedGroupId || (groupAccessories[0]?.group_id || null);
+                const selectedGroup = groupAccessories.find((acc: any) => 
+                    acc.group_id === currentGroupId
+                );
+
+                // ดึงรายการอุปกรณ์ของกลุ่มที่เลือก
+                const selectedGroupItems = selectedGroup?.group_items || selectedGroup?.group?.items || [];
+
+                return (
                     <div
-                        className="relative mx-4 max-h-[90vh] w-full max-w-[90vw] overflow-hidden rounded-lg bg-gray-800 shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                        onClick={() => setShowAccessoriesModal(false)}
                     >
-                        <div className="flex items-center justify-between bg-purple-900 px-4 py-3">
-                            <h3 className="text-lg font-medium text-white">
-                                🔧 {t('อุปกรณ์โรงปั๊มน้ำ')} - {currentPump.name}
-                            </h3>
-                            <div className="flex items-center space-x-2">
-                                <button
-                                    onClick={() => {
-                                        modalOpenedRef.current = false;
-                                        setShowAddAccessoryModal(true);
-                                    }}
-                                    className="rounded bg-green-600 px-3 py-1 text-sm text-white transition-colors hover:bg-green-500"
-                                    title={t('เพิ่มอุปกรณ์')}
-                                >
-                                    ➕ {t('เพิ่มอุปกรณ์')}
-                                </button>
-                                <button
-                                    onClick={async () => {
-                                        // บันทึกการเปลี่ยนแปลงก่อนปิด modal
-                                        // ใช้ setTimeout เพื่อให้แน่ใจว่า state อัพเดตแล้ว
-                                        await new Promise(resolve => setTimeout(resolve, 50));
-                                        saveAccessoriesChanges();
-                                        // รออีกนิดเพื่อให้ onPumpChange ทำงาน
-                                        await new Promise(resolve => setTimeout(resolve, 50));
-                                        setShowAccessoriesModal(false);
-                                    }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
-                                    title={t('ปิด')}
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="p-4">
-                            {/* Search input */}
-                            <div className="mb-3">
-                                <input
-                                    type="text"
-                                    value={searchTermAccessories}
-                                    onChange={(e) => setSearchTermAccessories(e.target.value)}
-                                    placeholder={t('พิมพ์เพื่อค้นหาอุปกรณ์...')}
-                                    className="w-full rounded border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div className="scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 max-h-[500px] overflow-y-auto pr-2">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                    {getDisplayedAccessories
-                                        .filter((accessory: any) => {
-                                            if (!searchTermAccessories) return true;
-                                            const search = searchTermAccessories.toLowerCase();
-                                            return (
-                                                accessory.name?.toLowerCase().includes(search) ||
-                                                accessory.product_code?.toLowerCase().includes(search) ||
-                                                accessory.size?.toLowerCase().includes(search) ||
-                                                accessory.accessory_type?.toLowerCase().includes(search) ||
-                                                accessory.description?.toLowerCase().includes(search)
-                                            );
-                                        })
-                                        .map((accessory: any, index: number) => {
-                                            const isRemoved = removedAccessoryIds.has(accessory.id);
-                                            const isTemporary = accessory.isTemporary ||
-                                                (typeof accessory.id === 'string' && accessory.id.startsWith('temp_')) ||
-                                                (accessory.id?.toString && accessory.id.toString().startsWith('temp_'));
-
-                                            return (
-                                                <div
-                                                    key={accessory.id
-                                                        ? `display_${accessory.id}_${index}`
-                                                        : `display_temp_${index}_${accessory.originalId || Date.now()}`}
-                                                    className={`flex flex-row h-full rounded-lg overflow-hidden shadow bg-gradient-to-br ${
-                                                        isTemporary
-                                                            ? 'from-green-900/80 to-green-800 border border-green-500'
-                                                            : 'from-gray-700/80 to-gray-800'
-                                                    }`}
-                                                >
-                                                    {/* Column 1: Bigger Image */}
-                                                    <div className="flex flex-col justify-center items-center px-2 py-2 w-2/5 sm:w-5/12 md:w-1/2 lg:w-[45%] max-w-[160px]">
-                                                        <div className="w-full flex flex-col items-center">
-                                                            <div className="w-full aspect-square flex items-center justify-center bg-gray-900/60 rounded-lg overflow-hidden">
-                                                                {renderAccessoryImage(accessory, "normal") ||
-                                                                    (
-                                                                        <div className="w-full h-28 flex justify-center items-center text-xs text-gray-300 bg-gray-700 rounded">
-                                                                            {t('ไม่มีรูปภาพ')}
-                                                                        </div>
-                                                                    )
-                                                                }
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Column 2: Info (name, type, size, desc, quantity) */}
-                                                    <div className="flex flex-col px-2 py-2 flex-1 overflow-hidden min-w-0">
-                                                        <div className="flex items-center space-x-2">
-                                                            <p className="font-medium text-white text-base truncate">
-                                                                {accessory.name}
-                                                            </p>
-                                                            {isTemporary && (
-                                                                <span className="text-xs bg-green-600 text-white px-1.5 py-0.5 rounded flex-shrink-0">
-                                                                    {t('ใหม่')}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {/* <p className="text-xs capitalize text-gray-400 truncate">
-                                                            {accessory.accessory_type?.replace('_', ' ')}
-                                                            {accessory.size && ` • ${accessory.size}`}
-                                                        </p> */}
-                                                        {accessory.description && (
-                                                            <p className="text-sm text-gray-400 mt-0.5 line-clamp-2">
-                                                                {accessory.description}
-                                                            </p>
-                                                        )}
-                                                        {/* Quantity control */}
-                                                        <div className="flex items-center space-x-2 mt-1">
-                                                            <label className="text-xs text-gray-400 whitespace-nowrap" htmlFor={`qty_${accessory.id}`}>
-                                                                {t('จำนวน:')}
-                                                            </label>
-                                                            <input
-                                                                id={`qty_${accessory.id}`}
-                                                                key={`qty_input_${accessory.id}_${accessory.quantity || 1}`}
-                                                                type="number"
-                                                                min="1"
-                                                                value={accessory.quantity || 1}
-                                                                onChange={(e) => {
-                                                                    e.stopPropagation();
-                                                                    const inputValue = e.target.value;
-                                                                    if (inputValue === '' || inputValue === '-') {
-                                                                        return;
-                                                                    }
-                                                                    const newQuantity = parseInt(inputValue, 10);
-                                                                    if (!isNaN(newQuantity) && newQuantity >= 1) {
-                                                                        const isTemp = accessory.isTemporary ||
-                                                                            (typeof accessory.id === 'string' && accessory.id.startsWith('temp_')) ||
-                                                                            (accessory.id?.toString && accessory.id.toString().startsWith('temp_'));
-                                                                        handleUpdateQuantity(accessory.id, newQuantity, isTemp);
-                                                                    }
-                                                                }}
-                                                                onBlur={(e) => {
-                                                                    const value = e.target.value.trim();
-                                                                    if (!value || isNaN(parseInt(value, 10)) || parseInt(value, 10) < 1) {
-                                                                        e.target.value = '1';
-                                                                        const isTemp = accessory.isTemporary ||
-                                                                            (typeof accessory.id === 'string' && accessory.id.startsWith('temp_')) ||
-                                                                            (accessory.id?.toString && accessory.id.toString().startsWith('temp_'));
-                                                                        handleUpdateQuantity(accessory.id, 1, isTemp);
-                                                                        setTimeout(() => {
-                                                                            saveAccessoriesChanges();
-                                                                        }, 100);
-                                                                    } else {
-                                                                        setTimeout(() => {
-                                                                            saveAccessoriesChanges();
-                                                                        }, 100);
-                                                                    }
-                                                                }}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter' || e.key === 'Escape') {
-                                                                        e.stopPropagation();
-                                                                    }
-                                                                }}
-                                                                onFocus={(e) => {
-                                                                    e.stopPropagation();
-                                                                    e.target.select();
-                                                                }}
-                                                                className="w-14 rounded bg-gray-600 px-1.5 py-0.5 text-center text-xs text-white focus:bg-gray-500 focus:outline-none"
-                                                            />
-                                                            <span className="text-xs text-gray-400 whitespace-nowrap">
-                                                                {t('ชิ้น')}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Column 3: Price, Included, Remove */}
-                                                    <div className="flex flex-col justify-between items-end px-2 py-2 w-[90px] sm:w-[100px] md:w-[120px] min-w-[72px]">
-                                                        <div className="flex flex-col items-end space-y-0.5 mb-2">
-                                                            {!accessory.is_included && (
-                                                                <div className="text-xs text-gray-400 whitespace-nowrap">
-                                                                    <span className="font-medium text-yellow-300">
-                                                                        {(
-                                                                            Number(accessory.price || 0) *
-                                                                            (accessory.quantity || 1)
-                                                                        ).toLocaleString()}{' '}
-                                                                        {t('บาท')}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            <div
-                                                                className={`text-xs font-medium whitespace-nowrap ${
-                                                                    accessory.is_included
-                                                                        ? 'text-green-300'
-                                                                        : 'text-yellow-300'
-                                                                }`}
-                                                            >
-                                                                {accessory.is_included ? <span>✅ {t('รวม')}</span> : <span>💰 {t('ซื้อแยก')}</span>}
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (isTemporary) {
-                                                                    handleRemoveTemporaryAccessory(accessory);
-                                                                } else {
-                                                                    handleRemoveAccessory(accessory.id);
-                                                                }
-                                                            }}
-                                                            className="rounded bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-500 flex-shrink-0"
-                                                            title={t('ลบออก')}
-                                                        >
-                                                            🗑️ {t('ลบ')}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                        <div
+                            className="relative mx-4 max-h-[90vh] w-full max-w-[90vw] overflow-hidden rounded-lg bg-gray-800 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between bg-purple-900 px-4 py-3">
+                                <h3 className="text-lg font-medium text-white">
+                                    🔧 {selectedGroup?.group?.name || selectedGroup?.name || t('อุปกรณ์โรงปั๊มน้ำ')} - {currentPump.name}
+                                </h3>
+                                <div className="flex items-center space-x-2">
+                                    <button
+                                        onClick={async () => {
+                                            // บันทึกการเปลี่ยนแปลงก่อนปิด modal
+                                            // ใช้ setTimeout เพื่อให้แน่ใจว่า state อัพเดตแล้ว
+                                            await new Promise(resolve => setTimeout(resolve, 50));
+                                            saveAccessoriesChanges();
+                                            // รออีกนิดเพื่อให้ onPumpChange ทำงาน
+                                            await new Promise(resolve => setTimeout(resolve, 50));
+                                            setShowAccessoriesModal(false);
+                                        }}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
+                                        title={t('ปิด')}
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             </div>
 
-                            {(() => {
-                                const filteredAccessories = getDisplayedAccessories.filter((acc: any) => {
-                                    if (!searchTermAccessories) return true;
-                                    const search = searchTermAccessories.toLowerCase();
-                                    return (
-                                        acc.name?.toLowerCase().includes(search) ||
-                                        acc.product_code?.toLowerCase().includes(search) ||
-                                        acc.size?.toLowerCase().includes(search) ||
-                                        acc.accessory_type?.toLowerCase().includes(search) ||
-                                        acc.description?.toLowerCase().includes(search)
-                                    );
-                                });
-                                const totalPrice = filteredAccessories
-                                    .filter((acc: any) => !acc.is_included)
-                                    .reduce(
-                                        (sum: number, acc: any) =>
-                                            sum +
-                                            Number(acc.price || 0) *
-                                            (acc.quantity || 1),
-                                        0
-                                    );
+                            <div className="p-4">
+                                {/* Search input */}
+                                <div className="mb-3">
+                                    <input
+                                        type="text"
+                                        value={searchTermAccessories}
+                                        onChange={(e) => setSearchTermAccessories(e.target.value)}
+                                        placeholder={t('พิมพ์เพื่อค้นหาอุปกรณ์...')}
+                                        className="w-full rounded border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
 
-                                return totalPrice > 0 ? (
+                                <div className="scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 max-h-[500px] overflow-y-auto pr-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                        {selectedGroupItems
+                                            .filter((item: any) => {
+                                                if (!searchTermAccessories) return true;
+                                                const search = searchTermAccessories.toLowerCase();
+                                                const equipment = item.equipment || item;
+                                                const itemName = equipment?.name || item.name || '';
+                                                return itemName.toLowerCase().includes(search);
+                                            })
+                                            .map((item: any, index: number) => {
+                                                const equipment = item.equipment || item;
+                                                const itemImage = equipment?.image || equipment?.image_url || equipment?.imageUrl || '';
+                                                const itemName = equipment?.name || item.name || '';
+                                                const itemPrice = item.unit_price || item.total_price || equipment?.price || 0;
+                                                const itemQuantity = item.quantity || 1;
+                                                const itemTotalPrice = itemPrice * itemQuantity;
+
+                                                return (
+                                                    <div
+                                                        key={item.id || index}
+                                                        className="flex items-center space-x-3 p-3 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+                                                    >
+                                                        {itemImage ? (
+                                                            <img
+                                                                src={itemImage}
+                                                                alt={itemName}
+                                                                className="w-16 h-16 object-contain rounded border border-gray-600 flex-shrink-0 cursor-pointer"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                                onClick={() => {
+                                                                    if (itemImage) {
+                                                                        openImageModal(itemImage, itemName);
+                                                                    }
+                                                                }}
+                                                                title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                            />
+                                                        ) : (
+                                                            <div className="w-16 h-16 flex items-center justify-center rounded border border-gray-600 bg-gray-600 text-xs text-gray-400 flex-shrink-0">
+                                                                {t('ไม่มีรูป')}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-white">
+                                                                {itemName}
+                                                            </p>
+                                                            <p className="text-xs text-gray-400">
+                                                                {t('จำนวน:')} {itemQuantity} {t('ชิ้น')}
+                                                            </p>
+                                                            <p className="text-xs text-purple-300">
+                                                                {itemPrice.toLocaleString()} {t('บาท')} × {itemQuantity} = {itemTotalPrice.toLocaleString()} {t('บาท')}
+                                                            </p>
+                                                            {equipment?.description && (
+                                                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                                                    {equipment.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                </div>
+
+                                {/* แสดงราคารวม */}
+                                {selectedGroupItems.length > 0 && (
                                     <div className="mt-4 rounded bg-purple-800 p-3">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-purple-200">
-                                                {t('รวมราคาอุปกรณ์เสริม:')}
+                                                {t('ราคารวมทั้งหมด:')}
                                             </span>
                                             <span className="font-medium text-yellow-300">
-                                                +{totalPrice.toLocaleString()} {t('บาท')}
+                                                {selectedGroupItems.reduce((sum: number, item: any) => {
+                                                    const itemPrice = item.unit_price || item.total_price || item.equipment?.price || 0;
+                                                    const itemQuantity = item.quantity || 1;
+                                                    return sum + (itemPrice * itemQuantity);
+                                                }, 0).toLocaleString()} {t('บาท')}
                                             </span>
                                         </div>
                                     </div>
-                                ) : null;
-                            })()}
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {showAddAccessoryModal && (
                 <div
@@ -2492,7 +2858,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                                     }}
                                                 >
                                                     <div className={`flex items-center space-x-4 flex-1 ${accessory.isAlreadyAdded ? 'opacity-50' : ''}`}>
-                                                        {renderAccessoryImage(accessory)}
+                                                        {renderAccessoryImage(accessory, 'small')}
                                                         <div className="text-sm">
                                                             <div className="flex items-center space-x-2">
                                                                 <p className={`font-medium ${accessory.isAlreadyAdded ? 'text-gray-500 line-through' : 'text-white'}`}>

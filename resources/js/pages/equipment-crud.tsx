@@ -266,6 +266,8 @@ interface PumpAccessory {
     id?: number;
     pump_id?: number;
     equipment_id?: number | null;
+    group_id?: number | null; // สำหรับเก็บ group_id จาก Equipment Set
+    equipment_set_id?: number | null; // สำหรับเก็บ equipment_set_id
     product_code?: string;
     name: string;
     image?: string;
@@ -276,6 +278,9 @@ interface PumpAccessory {
     is_included: boolean;
     sort_order: number;
     description?: string;
+    // สำหรับเก็บข้อมูลกลุ่ม (เมื่อเพิ่มจาก Equipment Set)
+    group?: EquipmentSetGroup;
+    group_items?: EquipmentSetItem[]; // รายการอุปกรณ์ในกลุ่ม
 }
 
 interface FilterOptions {
@@ -300,10 +305,12 @@ interface EquipmentSetItem {
 
 interface EquipmentSetGroup {
     id: string | number;
+    name?: string;
     sort_order?: number;
     total_price?: number;
     items_count?: number;
     items: EquipmentSetItem[];
+    image?: string;
 }
 
 interface EquipmentSet {
@@ -931,7 +938,8 @@ const EquipmentSetForm: React.FC<{
     categories: EquipmentCategory[];
     onSave: (equipmentSet: Partial<EquipmentSet>) => void;
     onCancel: () => void;
-}> = ({ equipmentSet, categories, onSave, onCancel }) => {
+    onImageClick?: (src: string, alt: string) => void;
+}> = ({ equipmentSet, categories, onSave, onCancel, onImageClick }) => {
     const { t } = useLanguage();
 
     const [formData, setFormData] = useState({
@@ -953,6 +961,7 @@ const EquipmentSetForm: React.FC<{
         [categoryId: number]: Equipment[];
     }>({});
     const [collapsedGroups, setCollapsedGroups] = useState<{ [key: string]: boolean }>({});
+    const [uploadingImages, setUploadingImages] = useState<{ [groupId: string | number]: boolean }>({});
 
     // Load equipments when categories change
     useEffect(() => {
@@ -1077,6 +1086,26 @@ const EquipmentSetForm: React.FC<{
         });
     };
 
+    const handleGroupImageUpload = async (groupIndex: number, file: File) => {
+        const groupId = formData.groups[groupIndex].id;
+        setUploadingImages((prev) => ({ ...prev, [groupId]: true }));
+
+        try {
+            const result = await api.uploadImage(file);
+            updateGroup(groupIndex, 'image', result.url);
+            showAlert.success(t('อัปโหลดสำเร็จ'), t('รูปภาพได้รับการอัปโหลดเรียบร้อยแล้ว'));
+        } catch (error) {
+            console.error('Failed to upload image:', error);
+            showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถอัปโหลดรูปภาพได้'));
+        } finally {
+            setUploadingImages((prev) => ({ ...prev, [groupId]: false }));
+        }
+    };
+
+    const handleGroupImageRemove = (groupIndex: number) => {
+        updateGroup(groupIndex, 'image', '');
+    };
+
     const addItemToGroup = (groupIndex: number) => {
         const newItem: EquipmentSetItem = {
             id: `new_item_${Date.now()}_${Math.random()}`,
@@ -1155,11 +1184,47 @@ const EquipmentSetForm: React.FC<{
     const handleSubmit = () => {
         if (!validateForm()) return;
 
+        // Clean up groups data before sending
+        const cleanedGroups = formData.groups.map((group) => {
+            // Clean up items - only send necessary fields
+            const cleanedItems = group.items
+                .filter((item) => {
+                    // Only include items that have equipment_id
+                    const equipmentId = item.equipment_id || item.equipment?.id;
+                    return equipmentId && equipmentId > 0;
+                })
+                .map((item) => ({
+                    category_id: item.category_id || item.equipment?.category_id || 0,
+                    equipment_id: item.equipment_id || item.equipment?.id || 0,
+                    quantity: item.quantity || 1,
+                }));
+
+            // Return only necessary group fields
+            // รวม id ด้วยเมื่อแก้ไข (เพื่อให้ backend รู้ว่าเป็น group เดิม)
+            const groupData: any = {
+                name: group.name || null,
+                image: group.image || null,
+                items: cleanedItems,
+            };
+            
+            // ถ้าเป็น group ที่มีอยู่แล้ว (มี id) ให้ส่ง id ไปด้วย
+            if (group.id) {
+                groupData.id = group.id;
+            }
+            
+            return groupData;
+        });
+
         const dataToSend = {
-            ...formData,
-            id: equipmentSet?.id || `set_${Date.now()}`,
+            name: formData.name,
+            groups: cleanedGroups,
             total_price: calculateTotalPrice(),
         };
+
+        // Only include id if editing
+        if (equipmentSet?.id) {
+            (dataToSend as any).id = equipmentSet.id;
+        }
 
         onSave(dataToSend as Partial<EquipmentSet>);
     };
@@ -1266,9 +1331,33 @@ const EquipmentSetForm: React.FC<{
                                                     </button>
                                                     <h4 className="text-lg font-medium">
                                                         # {t('กลุ่มที่')} {groupIndex + 1}
+                                                        {group.name && (
+                                                            <span className="ml-2 text-base font-normal text-gray-300">
+                                                                - {group.name}
+                                                            </span>
+                                                        )}
                                                     </h4>
                                                     {isCollapsed && (
                                                         <div className="flex items-center gap-4 text-sm text-gray-400">
+                                                            {group.image && (
+                                                                <img
+                                                                    src={group.image}
+                                                                    alt={group.name || `${t('กลุ่มที่')} ${groupIndex + 1}`}
+                                                                    className="h-8 w-8 cursor-pointer rounded border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                    onClick={() =>
+                                                                        onImageClick &&
+                                                                        onImageClick(
+                                                                            group.image!,
+                                                                            group.name || `${t('กลุ่มที่')} ${groupIndex + 1}`
+                                                                        )
+                                                                    }
+                                                                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            )}
                                                             <span>
                                                                 ({groupItemCount} {t('รายการ')})
                                                             </span>
@@ -1301,6 +1390,118 @@ const EquipmentSetForm: React.FC<{
                                                 </div>
                                             </div>
 
+                                            {/* Group Name and Image Section */}
+                                            {!isCollapsed && (
+                                                <div className="mt-4 border-t border-gray-600 pt-4">
+                                                    {/* Flex row for image and name */}
+                                                    <div className="flex flex-row items-start gap-6">
+                                                        {/* Group Image Upload */}
+                                                        <div className="flex flex-col min-w-[104px]">
+                                                            {group.image ? (
+                                                                <div className="flex items-center gap-3">
+                                                                    <img
+                                                                        src={group.image}
+                                                                        alt={group.name || `${t('กลุ่มที่')} ${groupIndex + 1}`}
+                                                                        className="h-24 w-24 cursor-pointer rounded-lg border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                        onClick={() =>
+                                                                            onImageClick &&
+                                                                            onImageClick(
+                                                                                group.image!,
+                                                                                group.name || `${t('กลุ่มที่')} ${groupIndex + 1}`
+                                                                            )
+                                                                        }
+                                                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                        onError={(e) => {
+                                                                            const target = e.target as HTMLImageElement;
+                                                                            target.style.display = 'none';
+                                                                            const parent = target.parentElement;
+                                                                            if (parent) {
+                                                                                const placeholder =
+                                                                                    parent.querySelector(
+                                                                                        '.group-image-placeholder'
+                                                                                    ) as HTMLElement;
+                                                                                if (placeholder)
+                                                                                    placeholder.style.display = 'flex';
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <div
+                                                                        className="group-image-placeholder hidden h-24 w-24 items-center justify-center rounded-lg border border-gray-600 bg-gray-600"
+                                                                    >
+                                                                        <ImageIcon className="h-8 w-8 text-gray-400" />
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleGroupImageRemove(groupIndex)}
+                                                                        className="rounded bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-700"
+                                                                        title={t('ลบรูปภาพ')}
+                                                                    >
+                                                                        <X className="h-4 w-4" />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2">
+                                                                    <label className="cursor-pointer">
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="image/*"
+                                                                            className="hidden"
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0];
+                                                                                if (file) {
+                                                                                    if (!file.type.startsWith('image/')) {
+                                                                                        showAlert.error(
+                                                                                            t('ไฟล์ไม่ถูกต้อง'),
+                                                                                            t('กรุณาเลือกไฟล์รูปภาพ')
+                                                                                        );
+                                                                                        return;
+                                                                                    }
+                                                                                    handleGroupImageUpload(groupIndex, file);
+                                                                                }
+                                                                            }}
+                                                                            disabled={uploadingImages[group.id]}
+                                                                        />
+                                                                        <div
+                                                                            className={`flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-600 bg-gray-600 transition-all hover:border-gray-500 hover:bg-gray-500 ${
+                                                                                uploadingImages[group.id]
+                                                                                    ? 'pointer-events-none opacity-50'
+                                                                                    : 'cursor-pointer'
+                                                                            }`}
+                                                                        >
+                                                                            {uploadingImages[group.id] ? (
+                                                                                <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+                                                                            ) : (
+                                                                                <div className="flex flex-col items-center">
+                                                                                    <Camera className="h-6 w-6 text-gray-400" />
+                                                                                    <p className="mt-1 text-xs text-gray-400">
+                                                                                        {t('อัปโหลด')}
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </label>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {/* Group Name */}
+                                                        <div className="flex-1">
+                                                            <label className="mb-2 block text-sm font-medium text-gray-300">
+                                                                {t('ชื่อชุดอุปกรณ์')}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={group.name || ''}
+                                                                onChange={(e) =>
+                                                                    updateGroup(groupIndex, 'name', e.target.value)
+                                                                }
+                                                                className="w-full rounded-lg border border-gray-600 bg-gray-600 p-3 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                placeholder={t('เช่น ชุด PVC 3 นิ้ว')}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {!isCollapsed && (
                                                 <div className="mt-4">
                                                     {errors[`group_${groupIndex}_items`] && (
@@ -1313,7 +1514,7 @@ const EquipmentSetForm: React.FC<{
                                                         {group.items.map((item, itemIndex) => (
                                                             <div
                                                                 key={item.id}
-                                                                className="rounded border border-gray-600 bg-gray-800 p-3"
+                                                                className="rounded border border-gray-600 bg-gray-800 p-1"
                                                             >
                                                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
                                                                     {/* Item Number & Actions */}
@@ -1336,7 +1537,7 @@ const EquipmentSetForm: React.FC<{
                                                                     </div>
 
                                                                     {/* Equipment Image */}
-                                                                    <div className="col-span-2 flex items-center justify-center">
+                                                                    <div className="col-span-1 flex items-center justify-center">
                                                                         {item.equipment?.image ? (
                                                                             <img
                                                                                 src={
@@ -1359,7 +1560,7 @@ const EquipmentSetForm: React.FC<{
                                                                         )}
                                                                     </div>
 
-                                                                    <div className="col-span-3">
+                                                                    <div className="col-span-2">
                                                                         <label className="mb-1 block text-sm font-medium">
                                                                             {t('หมวดหมู่')} *
                                                                         </label>
@@ -1412,7 +1613,7 @@ const EquipmentSetForm: React.FC<{
                                                                     </div>
 
                                                                     {/* Equipment Selection */}
-                                                                    <div className="col-span-4">
+                                                                    <div className="col-span-6">
                                                                         <label className="mb-1 block text-sm font-medium">
                                                                             {t('อุปกรณ์')} *
                                                                         </label>
@@ -1676,9 +1877,9 @@ const PumpAccessoryForm: React.FC<{
 }> = ({ accessories, onChange, onImageClick }) => {
     const { t } = useLanguage();
 
-    const [availableEquipments, setAvailableEquipments] = useState<Equipment[]>([]);
+    const [availableGroups, setAvailableGroups] = useState<EquipmentSetGroup[]>([]);
     const [loading, setLoading] = useState(false);
-    const [equipmentDetails, setEquipmentDetails] = useState<{ [key: number]: Equipment }>({});
+    const [equipmentSet, setEquipmentSet] = useState<EquipmentSet | null>(null);
 
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
@@ -1689,108 +1890,100 @@ const PumpAccessoryForm: React.FC<{
     );
 
     useEffect(() => {
-        const loadAvailableEquipments = async () => {
+        const loadAvailableGroups = async () => {
             setLoading(true);
             try {
-                const response = await apiRequest('/equipments');
+                // โหลด Equipment Sets ทั้งหมด
+                const equipmentSets = await api.getEquipmentSets();
+                
+                // หา Equipment Set ที่ชื่อ "อุปกรณ์โรงปั๊ม"
+                const pumpEquipmentSet = equipmentSets.find(
+                    (set: EquipmentSet) => set.name === 'อุปกรณ์โรงปั๊ม'
+                );
 
-                const pumpEquipments = response.filter((eq: Equipment) => {
-                    const categoryMatches = [
-                        eq.category?.name === 'pump_equipment',
-                        eq.category?.display_name === 'อุปกรณ์ปั๊ม',
-                    ];
-
-                    return categoryMatches.some((match) => match === true);
-                });
-
-                setAvailableEquipments(pumpEquipments);
-
-                if (pumpEquipments.length === 0) {
-                    try {
-                        const pumpResponse = await apiRequest('/equipments/pump-equipments');
-                        if (pumpResponse && pumpResponse.length > 0) {
-                            setAvailableEquipments(pumpResponse);
+                if (pumpEquipmentSet) {
+                    setEquipmentSet(pumpEquipmentSet);
+                    // โหลด groups จาก Equipment Set
+                    if (pumpEquipmentSet.groups && pumpEquipmentSet.groups.length > 0) {
+                        setAvailableGroups(pumpEquipmentSet.groups);
+                    } else {
+                        // ถ้ายังไม่มี groups ให้โหลดใหม่
+                        try {
+                            const fullSet = await apiRequest(`/equipment-sets/${pumpEquipmentSet.id}`);
+                            if (fullSet.groups) {
+                                setAvailableGroups(fullSet.groups);
                         }
-                    } catch (pumpError) {
-                        console.error('Pump equipments API failed:', pumpError);
+                        } catch (error) {
+                            console.error('Failed to load equipment set details:', error);
                     }
+                    }
+                } else {
+                    showAlert.warning(
+                        t('ไม่พบ Equipment Set'),
+                        t('ไม่พบ Equipment Set ที่ชื่อ "อุปกรณ์โรงปั๊ม" กรุณาสร้างก่อน')
+                    );
                 }
             } catch (error) {
-                console.error('Failed to load equipments:', error);
-                showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถโหลดรายการอุปกรณ์ได้'));
+                console.error('Failed to load equipment sets:', error);
+                showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถโหลดรายการ Equipment Set ได้'));
             } finally {
                 setLoading(false);
             }
         };
 
-        loadAvailableEquipments();
+        loadAvailableGroups();
     }, [t]);
-
-    const fetchEquipmentDetails = async (equipmentId: number) => {
-        if (equipmentDetails[equipmentId]) {
-            return equipmentDetails[equipmentId];
-        }
-
-        try {
-            const response = await apiRequest(`/equipments/${equipmentId}`);
-
-            setEquipmentDetails((prev) => ({
-                ...prev,
-                [equipmentId]: response,
-            }));
-
-            return response;
-        } catch (error) {
-            console.error(`Failed to fetch equipment ${equipmentId} details:`, error);
-            return null;
-        }
-    };
 
     const updateAccessory = async (index: number, field: keyof PumpAccessory, value: any) => {
         const actualIndex = (currentPage - 1) * itemsPerPage + index;
         const updated = [...accessories];
 
-        if (field === 'equipment_id') {
+        if (field === 'group_id') {
             if (value) {
-                let selectedEquipment = availableEquipments.find((eq) => eq.id === value);
+                const groupId = typeof value === 'string' ? parseInt(value) : value;
+                const selectedGroup = availableGroups.find((group) => group.id === groupId);
 
-                if (!selectedEquipment?.description || selectedEquipment.description === '') {
-                    const fullDetails = await fetchEquipmentDetails(value);
-                    if (fullDetails) {
-                        selectedEquipment = {
-                            ...selectedEquipment,
-                            ...fullDetails,
-                            description:
-                                fullDetails.description || selectedEquipment?.description || '',
-                        };
-                    }
-                }
+                if (selectedGroup) {
+                    // คำนวณราคารวมของกลุ่ม
+                    const groupTotalPrice = selectedGroup.items?.reduce((total, item) => {
+                        const price = item.equipment?.price || item.unit_price || 0;
+                        const quantity = item.quantity || 1;
+                        return total + price * quantity;
+                    }, 0) || 0;
 
-                if (selectedEquipment) {
                     updated[actualIndex] = {
                         ...updated[actualIndex],
-                        equipment_id: value,
-                        name: selectedEquipment.name || '',
-                        image: selectedEquipment.image || '',
-                        price: selectedEquipment.price || 0,
-                        stock: selectedEquipment.stock || 0,
-                        product_code:
-                            selectedEquipment.product_code || selectedEquipment.productCode || '',
-                        description: selectedEquipment.description || '',
+                                                        group_id: groupId,
+                        equipment_set_id: equipmentSet?.id 
+                            ? (typeof equipmentSet.id === 'string' ? parseInt(equipmentSet.id) : equipmentSet.id)
+                            : null,
+                        equipment_id: null, // ล้าง equipment_id เมื่อเลือกกลุ่ม
+                        name: selectedGroup.name || `${t('กลุ่มที่')} ${selectedGroup.id}`,
+                        image: selectedGroup.image || '',
+                        price: groupTotalPrice,
+                        quantity: 1, // จำนวนกลุ่ม
+                        is_included: updated[actualIndex].is_included !== undefined 
+                            ? updated[actualIndex].is_included 
+                            : true,
+                        description: selectedGroup.name || '',
+                        group: selectedGroup,
+                        group_items: selectedGroup.items || [],
                     };
                 } else {
-                    console.warn(`Equipment with ID ${value} not found`);
+                    console.warn(`Group with ID ${value} not found`);
                 }
             } else {
                 updated[actualIndex] = {
                     ...updated[actualIndex],
-                    equipment_id: null,
+                    group_id: null,
+                    equipment_set_id: null,
                     name: '',
                     image: '',
                     price: 0,
-                    stock: 0,
                     product_code: '',
                     description: '',
+                    group: undefined,
+                    group_items: undefined,
                 };
             }
         } else {
@@ -1802,6 +1995,8 @@ const PumpAccessoryForm: React.FC<{
 
     const addAccessory = () => {
         const newAccessory: PumpAccessory = {
+            group_id: null,
+            equipment_set_id: null,
             equipment_id: null,
             product_code: '',
             name: '',
@@ -2020,23 +2215,46 @@ const PumpAccessoryForm: React.FC<{
                                         </div>
                                     </div>
 
-                                    {/* Equipment selector */}
+                                    {/* Group selector */}
                                     <div className="col-span-3">
-                                        <SearchableDropdown
-                                            options={availableEquipments}
-                                            value={accessory.equipment_id || null}
-                                            onChange={(value) =>
-                                                updateAccessory(index, 'equipment_id', value)
+                                        <select
+                                            value={accessory.group_id || ''}
+                                            onChange={(e) =>
+                                                updateAccessory(
+                                                    index,
+                                                    'group_id',
+                                                    e.target.value ? parseInt(e.target.value) : null
+                                                )
                                             }
-                                            placeholder={t('เลือกอุปกรณ์จากรายการ')}
-                                            loading={loading}
-                                        />
+                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:ring-2 focus:ring-orange-500"
+                                            disabled={loading}
+                                        >
+                                            <option value="">{t('เลือกกลุ่มจาก Equipment Set')}</option>
+                                            {availableGroups.map((group) => (
+                                                <option key={group.id} value={group.id}>
+                                                    {group.name || `${t('กลุ่มที่')} ${group.id}`}
+                                                    {group.items && ` (${group.items.length} ${t('รายการ')})`}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
 
-                                    {/* Equipment details - readonly display */}
+                                    {/* Group details - readonly display */}
                                     <div className="col-span-4">
                                         <div className="rounded text-sm text-gray-300">
-                                            {accessory.description && (
+                                            {accessory.group && (
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">
+                                                        {accessory.group.name || `${t('กลุ่มที่')} ${accessory.group.id}`}
+                                                    </div>
+                                                    {accessory.group_items && accessory.group_items.length > 0 && (
+                                                        <div className="text-xs text-gray-400">
+                                                            {accessory.group_items.length} {t('รายการอุปกรณ์')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {!accessory.group && accessory.description && (
                                                 <div className="text-sm text-gray-400">
                                                     {accessory.description}
                                                 </div>
@@ -2358,7 +2576,82 @@ const EquipmentForm: React.FC<{
                 equipment.pumpAccessory ||
                 equipment.pump_accessories ||
                 [];
-            setAccessories(Array.isArray(pumpAccessories) ? pumpAccessories : []);
+            
+            // กรองเฉพาะ accessories ที่มี group_id (ไม่แสดงอุปกรณ์เดี่ยว)
+            // แต่ถ้าไม่มี group_id ก็ไม่แสดง (ไม่แสดงอุปกรณ์เดี่ยว)
+            const filteredAccessories = Array.isArray(pumpAccessories) 
+                ? pumpAccessories.filter((acc: PumpAccessory) => {
+                    // แสดงเฉพาะที่มี group_id และ group_id > 0
+                    return acc.group_id && acc.group_id > 0;
+                })
+                : [];
+            
+            // ตั้งค่า accessories ทันที (ไม่ต้องรอตรวจสอบ group_id)
+            // เพราะ group_id อาจยังมีอยู่จริงใน Equipment Set แม้ว่าจะแก้ไข Equipment Set แล้ว
+            // การแก้ไข Equipment Set (เพิ่ม/ลบอุปกรณ์ในกลุ่ม) ไม่ได้ลบ group_id
+            setAccessories(filteredAccessories);
+            
+            // โหลดข้อมูลกลุ่มเพิ่มเติมเพื่อ enrich ข้อมูล (ไม่กรองออก)
+            // เพื่อให้แน่ใจว่ามีข้อมูล group และ group_items ที่อัพเดตล่าสุด
+            (async () => {
+                try {
+                    const equipmentSets = await api.getEquipmentSets();
+                    const pumpEquipmentSet = equipmentSets.find(
+                        (set: EquipmentSet) => set.name === 'อุปกรณ์โรงปั๊ม'
+                    );
+                    
+                    if (pumpEquipmentSet) {
+                        let groups: EquipmentSetGroup[] = [];
+                        if (pumpEquipmentSet.groups && pumpEquipmentSet.groups.length > 0) {
+                            groups = pumpEquipmentSet.groups;
+                        } else {
+                            // ถ้ายังไม่มี groups ให้โหลดใหม่
+                            try {
+                                const fullSet = await apiRequest(`/equipment-sets/${pumpEquipmentSet.id}`);
+                                if (fullSet.groups) {
+                                    groups = fullSet.groups;
+                                }
+                            } catch (error) {
+                                console.error('Failed to load equipment set details:', error);
+                            }
+                        }
+                        
+                        // Enrich ข้อมูล accessories ด้วยข้อมูลกลุ่มที่อัพเดตล่าสุด
+                        if (groups.length > 0) {
+                            setAccessories((prevAccessories) => {
+                                const enriched = prevAccessories.map((acc: PumpAccessory) => {
+                                    if (acc.group_id && acc.group_id > 0) {
+                                        const group = groups.find((g: EquipmentSetGroup) => {
+                                            const groupId = typeof g.id === 'string' ? parseInt(g.id) : g.id;
+                                            const accGroupId = typeof acc.group_id === 'string' ? parseInt(acc.group_id) : acc.group_id;
+                                            return groupId === accGroupId;
+                                        });
+                                        
+                                        if (group) {
+                                            // อัพเดตข้อมูลกลุ่มและรายการอุปกรณ์
+                                            return {
+                                                ...acc,
+                                                group: group,
+                                                group_items: group.items || [],
+                                                // อัพเดตราคาและชื่อจากกลุ่ม (ถ้ามี)
+                                                price: acc.price || group.total_price || 0,
+                                                name: acc.name || group.name || acc.name,
+                                                image: acc.image || group.image || acc.image,
+                                            };
+                                        }
+                                    }
+                                    return acc;
+                                });
+                                
+                                return enriched;
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to enrich group data:', error);
+                    // ไม่ต้องทำอะไร ถ้าโหลดไม่สำเร็จก็ใช้ข้อมูลเดิม
+                }
+            })();
         } else {
             setFormData({
                 category_id: categories[0]?.id || 1,
@@ -2505,11 +2798,12 @@ const EquipmentForm: React.FC<{
 
         const processedAccessories = accessories
             .filter((acc) => {
+                const hasGroupId = acc.group_id && acc.group_id > 0;
                 const hasEquipmentId = acc.equipment_id && acc.equipment_id > 0;
                 const hasManualData =
                     acc.name && acc.name.trim() !== '' && acc.price && acc.price > 0;
 
-                return hasEquipmentId || hasManualData;
+                return hasGroupId || hasEquipmentId || hasManualData;
             })
             .map((acc, index) => {
                 const processedAcc: any = {
@@ -2518,8 +2812,20 @@ const EquipmentForm: React.FC<{
                     sort_order: Number(acc.sort_order !== undefined ? acc.sort_order : index),
                 };
 
-                if (acc.equipment_id && acc.equipment_id > 0) {
+                // ถ้ามี group_id ให้เก็บ group_id และ equipment_set_id
+                if (acc.group_id && acc.group_id > 0) {
+                    processedAcc.group_id = Number(acc.group_id);
+                    processedAcc.equipment_set_id = acc.equipment_set_id ? Number(acc.equipment_set_id) : null;
+                    processedAcc.equipment_id = null; // ล้าง equipment_id เมื่อใช้ group
+                    processedAcc.name = acc.name || acc.group?.name || '';
+                    processedAcc.image = acc.image || acc.group?.image || '';
+                    processedAcc.price = Number(acc.price) || 0;
+                    processedAcc.description = acc.description || acc.group?.name || '';
+                } else if (acc.equipment_id && acc.equipment_id > 0) {
+                    // รองรับแบบเดิม (equipment_id)
                     processedAcc.equipment_id = Number(acc.equipment_id);
+                    processedAcc.group_id = null;
+                    processedAcc.equipment_set_id = null;
                     processedAcc.name = acc.name || '';
                     processedAcc.price = Number(acc.price) || 0;
                     processedAcc.product_code = acc.product_code || '';
@@ -2528,7 +2834,10 @@ const EquipmentForm: React.FC<{
                     processedAcc.stock = acc.stock ? Number(acc.stock) : 0;
                     processedAcc.description = acc.description || '';
                 } else {
+                    // ข้อมูลที่กรอกเอง
                     processedAcc.equipment_id = null;
+                    processedAcc.group_id = null;
+                    processedAcc.equipment_set_id = null;
                     processedAcc.product_code = acc.product_code || '';
                     processedAcc.name = acc.name || '';
                     processedAcc.image = acc.image || '';
@@ -2559,10 +2868,6 @@ const EquipmentForm: React.FC<{
 
             if (error.response && error.response.data) {
                 console.error('Server response:', error.response.data);
-
-                if (error.response.data.debug) {
-                    console.log('Server debug info:', error.response.data.debug);
-                }
 
                 if (error.response.data.errors) {
                     setValidationErrors(error.response.data.errors);
@@ -3374,8 +3679,12 @@ const EquipmentDetailModal: React.FC<{
     };
 
     const attributes = getAllAttributes();
-    const pumpAccessories =
+    const allPumpAccessories =
         updatedAccessories || equipment.pumpAccessories || equipment.pumpAccessory || [];
+    // กรองเฉพาะ accessories ที่มี group_id (ไม่แสดงอุปกรณ์เดี่ยว)
+    const pumpAccessories = Array.isArray(allPumpAccessories)
+        ? allPumpAccessories.filter((acc: PumpAccessory) => acc.group_id && acc.group_id > 0)
+        : [];
 
     const PumpAccessoriesModal: React.FC<{
         accessories: PumpAccessory[];
@@ -3386,10 +3695,34 @@ const EquipmentDetailModal: React.FC<{
         const [currentPage, setCurrentPage] = useState(1);
         const [searchTerm, setSearchTerm] = useState('');
         const [filterType, setFilterType] = useState<'all' | 'included' | 'optional'>('all');
+        const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+        const [groupItemsData, setGroupItemsData] = useState<{ [groupId: number]: EquipmentSetItem[] }>({});
+        const [loadingGroups, setLoadingGroups] = useState<Set<number>>(new Set());
 
-        const itemsPerPage = 10;
+        const itemsPerPage = 12; // สำหรับ Grid view
 
-        const filteredAccessories = accessories.filter((accessory) => {
+        // กรองเฉพาะ accessories ที่มี group_id (ไม่แสดงอุปกรณ์เดี่ยว)
+        const groupAccessories = accessories.filter((acc) => acc.group_id && acc.group_id > 0);
+        // ไม่แสดงอุปกรณ์เดี่ยวแล้ว
+        const individualAccessories: PumpAccessory[] = [];
+
+        const filteredGroupAccessories = groupAccessories.filter((accessory) => {
+            const matchesSearch =
+                searchTerm === '' ||
+                (accessory.name &&
+                    accessory.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (accessory.group?.name &&
+                    accessory.group.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            const matchesFilter =
+                filterType === 'all' ||
+                (filterType === 'included' && accessory.is_included) ||
+                (filterType === 'optional' && !accessory.is_included);
+
+            return matchesSearch && matchesFilter;
+        });
+
+        const filteredIndividualAccessories = individualAccessories.filter((accessory) => {
             const matchesSearch =
                 searchTerm === '' ||
                 (accessory.name &&
@@ -3407,11 +3740,91 @@ const EquipmentDetailModal: React.FC<{
             return matchesSearch && matchesFilter;
         });
 
-        const totalPages = Math.ceil(filteredAccessories.length / itemsPerPage);
-        const paginatedAccessories = filteredAccessories.slice(
+        const totalPages = Math.ceil(filteredGroupAccessories.length / itemsPerPage);
+        const paginatedGroups = filteredGroupAccessories.slice(
             (currentPage - 1) * itemsPerPage,
             currentPage * itemsPerPage
         );
+
+        const loadGroupItems = async (groupId: number, equipmentSetId: number | null, forceReload: boolean = false) => {
+            // ถ้ามีข้อมูลอยู่แล้วและไม่ force reload ไม่ต้องโหลดใหม่
+            if (!forceReload && groupItemsData[groupId]) {
+                return groupItemsData[groupId];
+            }
+
+            setLoadingGroups((prev) => new Set(prev).add(groupId));
+
+            try {
+                // โหลด Equipment Set เพื่อดึงข้อมูล groups และ items (โหลดใหม่เสมอเพื่อให้ได้ข้อมูลล่าสุด)
+                if (equipmentSetId) {
+                    const equipmentSet = await apiRequest(`/equipment-sets/${equipmentSetId}`);
+                    const group = equipmentSet.groups?.find((g: EquipmentSetGroup) => g.id === groupId);
+                    
+                    if (group && group.items) {
+                        setGroupItemsData((prev) => ({
+                            ...prev,
+                            [groupId]: group.items,
+                        }));
+                        return group.items;
+                    }
+                }
+                
+                // ถ้าไม่มี equipmentSetId ให้ลองโหลดจาก Equipment Set ทั้งหมด
+                const equipmentSets = await api.getEquipmentSets();
+                for (const set of equipmentSets) {
+                    if (set.groups) {
+                        const group = set.groups.find((g: EquipmentSetGroup) => g.id === groupId);
+                        if (group && group.items) {
+                            setGroupItemsData((prev) => ({
+                                ...prev,
+                                [groupId]: group.items,
+                            }));
+                            return group.items;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to load group items for group ${groupId}:`, error);
+            } finally {
+                setLoadingGroups((prev) => {
+                    const newSet = new Set(prev);
+                    newSet.delete(groupId);
+                    return newSet;
+                });
+            }
+
+            return [];
+        };
+
+        const toggleGroupExpand = async (groupId: number | undefined, equipmentSetId: number | null) => {
+            if (!groupId) return;
+            
+            const isCurrentlyExpanded = expandedGroups.has(groupId);
+            
+            setExpandedGroups((prev) => {
+                const newSet = new Set(prev);
+                if (isCurrentlyExpanded) {
+                    newSet.delete(groupId);
+                } else {
+                    newSet.add(groupId);
+                    // โหลดข้อมูล items เมื่อขยาย (force reload เพื่อให้ได้ข้อมูลล่าสุด)
+                    loadGroupItems(groupId, equipmentSetId, true);
+                }
+                return newSet;
+            });
+        };
+        
+        // โหลดข้อมูลใหม่เมื่อ accessories เปลี่ยน (เพื่อให้ได้ข้อมูลล่าสุดเมื่อมีการแก้ไข Equipment Set)
+        useEffect(() => {
+            // โหลดข้อมูลใหม่สำหรับกลุ่มที่ขยายอยู่เมื่อ accessories เปลี่ยน
+            expandedGroups.forEach((groupId) => {
+                const accessory = accessories.find((acc) => acc.group_id === groupId);
+                if (accessory) {
+                    loadGroupItems(groupId, accessory.equipment_set_id || null, true);
+                }
+            });
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [accessories.length]); // เปลี่ยนเมื่อจำนวน accessories เปลี่ยน
 
         useEffect(() => {
             setCurrentPage(1);
@@ -3459,13 +3872,14 @@ const EquipmentDetailModal: React.FC<{
                         </div>
 
                         <div className="mt-2 text-sm text-gray-400">
-                            {t('แสดง')} {filteredAccessories.length} {t('จากทั้งหมด')}{' '}
+                            {t('แสดง')} {filteredGroupAccessories.length + filteredIndividualAccessories.length} {t('จากทั้งหมด')}{' '}
                             {accessories.length} {t('รายการ')}
+                            ({filteredGroupAccessories.length} {t('กลุ่ม')}, {filteredIndividualAccessories.length} {t('รายการเดี่ยว')})
                         </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6">
-                        {filteredAccessories.length === 0 ? (
+                        {filteredGroupAccessories.length === 0 && filteredIndividualAccessories.length === 0 ? (
                             <div className="flex h-full items-center justify-center">
                                 <div className="text-center">
                                     <Wrench className="mx-auto h-16 w-16 text-gray-500" />
@@ -3475,8 +3889,178 @@ const EquipmentDetailModal: React.FC<{
                                 </div>
                             </div>
                         ) : (
+                            <div className="space-y-6">
+                                {/* แสดงกลุ่มแบบ Grid */}
+                                {filteredGroupAccessories.length > 0 && (
+                                    <div>
+                                        <h3 className="mb-4 text-lg font-semibold text-orange-400">
+                                            {t('กลุ่มอุปกรณ์')} ({filteredGroupAccessories.length} {t('กลุ่ม')})
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                                            {paginatedGroups.map((accessory, index) => {
+                                                const isExpanded = accessory.group_id 
+                                                    ? expandedGroups.has(accessory.group_id) 
+                                                    : false;
+                                                
+                                                // ใช้ข้อมูลจาก state หรือจาก accessory
+                                                const groupItems = accessory.group_id 
+                                                    ? (groupItemsData[accessory.group_id] || accessory.group_items || [])
+                                                    : [];
+                                                
+                                                const isLoading = accessory.group_id 
+                                                    ? loadingGroups.has(accessory.group_id)
+                                                    : false;
+                                                
+                                                // คำนวณราคารวมจากรายการอุปกรณ์ในกลุ่ม (ใช้ข้อมูลล่าสุด)
+                                                const calculateGroupTotalPrice = () => {
+                                                    if (groupItems.length > 0) {
+                                                        return groupItems.reduce((sum: number, item: EquipmentSetItem) => {
+                                                            const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                                            const itemQuantity = Number(item.quantity || 1);
+                                                            return sum + (itemPrice * itemQuantity);
+                                                        }, 0);
+                                                    }
+                                                    // ถ้ายังไม่มี groupItems ให้ใช้ราคาจาก accessory
+                                                    return accessory.price || accessory.group?.total_price || 0;
+                                                };
+                                                
+                                                const groupTotalPrice = calculateGroupTotalPrice();
+                                                
+                                                return (
+                                                    <div
+                                                        key={accessory.id || index}
+                                                        className="group relative cursor-pointer rounded-lg border border-gray-600 bg-gray-700 p-4 transition-all hover:border-orange-400 hover:shadow-lg"
+                                                        onClick={() => accessory.group_id && toggleGroupExpand(accessory.group_id, accessory.equipment_set_id || null)}
+                                                    >
+                                                        {/* รูปภาพกลุ่ม */}
+                                                        <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-gray-600">
+                                                            {accessory.image || accessory.group?.image ? (
+                                                                <img
+                                                                    src={accessory.image || accessory.group?.image}
+                                                                    alt={accessory.name || accessory.group?.name || 'กลุ่มอุปกรณ์'}
+                                                                    className="h-full w-full cursor-pointer object-cover transition-transform group-hover:scale-105"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const imageUrl = accessory.image || accessory.group?.image;
+                                                                        if (onImageClick && imageUrl) {
+                                                                            onImageClick(
+                                                                                imageUrl,
+                                                                                accessory.name || accessory.group?.name || 'กลุ่มอุปกรณ์'
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <div className="flex h-full w-full items-center justify-center">
+                                                                    <Package className="h-12 w-12 text-gray-400" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* ข้อมูลกลุ่ม */}
                             <div className="space-y-2">
-                                {paginatedAccessories.map((accessory, index) => (
+                                                            <h4 className="text-sm font-semibold text-white">
+                                                                {accessory.name || accessory.group?.name || `${t('กลุ่มที่')} ${accessory.group_id}`}
+                                                            </h4>
+                                                            {(groupItems.length > 0 || accessory.group_items?.length) && (
+                                                                <p className="text-xs text-gray-400">
+                                                                    {groupItems.length > 0 ? groupItems.length : (accessory.group_items?.length || 0)} {t('รายการอุปกรณ์')}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-xs text-gray-400">{t('ราคารวม')}</span>
+                                                                <span className="text-sm font-bold text-green-400">
+                                                                    {groupTotalPrice > 0
+                                                                        ? `฿${groupTotalPrice.toLocaleString()}`
+                                                                        : '-'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between">
+                                                                <span
+                                                                    className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                                                        accessory.is_included
+                                                                            ? 'bg-green-900 text-green-300'
+                                                                            : 'bg-yellow-900 text-yellow-300'
+                                                                    }`}
+                                                                >
+                                                                    {accessory.is_included
+                                                                        ? t('รวมในชุด')
+                                                                        : t('ต้องซื้อเพิ่ม')}
+                                                                </span>
+                                                                <ChevronDown
+                                                                    className={`h-4 w-4 text-gray-400 transition-transform ${
+                                                                        isExpanded ? 'rotate-180' : ''
+                                                                    }`}
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* รายการอุปกรณ์ในกลุ่ม (ขยาย) */}
+                                                        {isExpanded && (
+                                                            <div className="mt-4 space-y-2 border-t border-gray-600 pt-4">
+                                                                <h5 className="mb-2 text-xs font-semibold text-gray-300">
+                                                                    {t('รายการอุปกรณ์ในกลุ่ม')}:
+                                                                </h5>
+                                                                {isLoading ? (
+                                                                    <div className="flex items-center justify-center py-4">
+                                                                        <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
+                                                                        <span className="ml-2 text-xs text-gray-400">{t('กำลังโหลด...')}</span>
+                                                                    </div>
+                                                                ) : groupItems.length > 0 ? (
+                                                                    groupItems.map((item, itemIndex) => (
+                                                                        <div
+                                                                            key={item.id || itemIndex}
+                                                                            className="rounded border border-gray-600 bg-gray-800 p-2 text-xs"
+                                                                        >
+                                                                            <div className="flex items-center justify-between">
+                                                                                <div className="flex-1">
+                                                                                    <p className="font-medium text-white">
+                                                                                        {item.equipment?.name || t('ไม่ระบุชื่อ')}
+                                                                                    </p>
+                                                                                    {item.equipment?.product_code && (
+                                                                                        <p className="text-gray-400">
+                                                                                            {t('รหัส')}: {item.equipment.product_code}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="text-right">
+                                                                                    <p className="text-gray-400">
+                                                                                        {t('จำนวน')}: {item.quantity || 1}
+                                                                                    </p>
+                                                                                    <p className="font-semibold text-green-400">
+                                                                                        ฿{((item.equipment?.price || item.unit_price || 0) * (item.quantity || 1)).toLocaleString()}
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="py-4 text-center text-xs text-gray-400">
+                                                                        {t('ไม่มีรายการอุปกรณ์ในกลุ่มนี้')}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* แสดงรายการเดี่ยว (ถ้ามี) */}
+                                {filteredIndividualAccessories.length > 0 && (
+                                    <div>
+                                        <h3 className="mb-4 text-lg font-semibold text-orange-400">
+                                            {t('อุปกรณ์เดี่ยว')} ({filteredIndividualAccessories.length} {t('รายการ')})
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {filteredIndividualAccessories.map((accessory, index) => (
                                     <div
                                         key={accessory.id || index}
                                         className="rounded-lg border border-gray-600 bg-gray-700 p-1 transition-colors hover:border-orange-400"
@@ -3501,16 +4085,6 @@ const EquipmentDetailModal: React.FC<{
                                                             const target =
                                                                 e.target as HTMLImageElement;
                                                             target.style.display = 'none';
-                                                            const parent = target.parentElement;
-                                                            if (parent) {
-                                                                const placeholder =
-                                                                    parent.querySelector(
-                                                                        '.image-placeholder'
-                                                                    ) as HTMLElement;
-                                                                if (placeholder)
-                                                                    placeholder.style.display =
-                                                                        'flex';
-                                                            }
                                                         }}
                                                     />
                                                 ) : null}
@@ -3580,6 +4154,9 @@ const EquipmentDetailModal: React.FC<{
                                         </div>
                                     </div>
                                 ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -3590,7 +4167,7 @@ const EquipmentDetailModal: React.FC<{
                                 currentPage={currentPage}
                                 totalPages={totalPages}
                                 onPageChange={setCurrentPage}
-                                totalItems={filteredAccessories.length}
+                                totalItems={filteredGroupAccessories.length}
                                 itemsPerPage={itemsPerPage}
                             />
                         </div>
@@ -4035,6 +4612,7 @@ const EquipmentCRUD: React.FC = () => {
     const [categories, setCategories] = useState<EquipmentCategory[]>([]);
     const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+    const [selectedEquipmentSetId, setSelectedEquipmentSetId] = useState<number | string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
 
@@ -4071,6 +4649,8 @@ const EquipmentCRUD: React.FC = () => {
     const [showEquipmentSetForm, setShowEquipmentSetForm] = useState(false);
     const [editingEquipmentSet, setEditingEquipmentSet] = useState<EquipmentSet | undefined>();
     const [showEquipmentSetList, setShowEquipmentSetList] = useState(false);
+    const [showGroupItemsModal, setShowGroupItemsModal] = useState(false);
+    const [selectedGroup, setSelectedGroup] = useState<(EquipmentSetGroup & { categoryName?: string; equipmentSetName?: string; categoryId?: number }) | null>(null);
 
     const debouncedSearch = useDebounce(filters.search, 300);
 
@@ -4195,15 +4775,105 @@ const EquipmentCRUD: React.FC = () => {
         return result;
     }, [equipments, filters, selectedCategoryId, debouncedSearch]);
 
-    const totalPages = Math.ceil(filteredAndSortedEquipments.length / itemsPerPage);
-    const paginatedEquipments = filteredAndSortedEquipments.slice(
+    // รวม equipment sets groups เข้ากับรายการอุปกรณ์
+    const combinedItems = useMemo(() => {
+        // ถ้าเลือก set แล้ว ให้แสดงเฉพาะ groups ไม่แสดง equipment items
+        const equipmentItems = selectedEquipmentSetId === null 
+            ? filteredAndSortedEquipments.map((eq) => ({
+                type: 'equipment' as const,
+                id: eq.id,
+                data: eq,
+            }))
+            : [];
+
+        // สร้างรายการกลุ่มจาก equipment sets และกรองตาม search และ category
+        const groupItems = equipmentSets
+            .filter((set) => {
+                // กรอง equipment sets ตาม selectedEquipmentSetId
+                if (selectedEquipmentSetId !== null) {
+                    return String(set.id) === String(selectedEquipmentSetId);
+                }
+                return true;
+            })
+            .flatMap((set) =>
+                set.groups
+                    .map((group, groupIndex) => {
+                        // หา category จากอุปกรณ์แรกในกลุ่ม
+                        const firstItem = group.items?.[0];
+                        const categoryId = firstItem?.equipment?.category_id || firstItem?.category_id;
+                        const category = categories.find((cat) => cat.id === categoryId);
+                        const categoryName = category?.display_name || category?.name || t('ไม่ระบุหมวดหมู่');
+                        
+                        return {
+                            type: 'group' as const,
+                            id: `group_${set.id}_${group.id}`,
+                            data: {
+                                ...group,
+                                equipmentSetId: set.id,
+                                equipmentSetName: set.name,
+                                categoryName: categoryName,
+                                categoryId: categoryId,
+                                groupIndex: groupIndex + 1, // 1-based index for display
+                            },
+                        };
+                    })
+                    .filter((groupItem) => {
+                        // กรองตาม search
+                        const searchMatch =
+                            debouncedSearch === '' ||
+                            groupItem.data.categoryName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                            groupItem.data.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                            groupItem.data.equipmentSetName?.toLowerCase().includes(debouncedSearch.toLowerCase());
+                        
+                        // กรองตาม category (ถ้าเลือก set แล้วไม่ต้องกรองตาม category)
+                        const categoryMatch = selectedEquipmentSetId !== null || selectedCategoryId === null || groupItem.data.categoryId === selectedCategoryId;
+                        
+                        // กรองตาม price range
+                        const priceMatch = 
+                            (groupItem.data.total_price || 0) >= filters.priceRange[0] &&
+                            (groupItem.data.total_price || 0) <= filters.priceRange[1];
+                        
+                        return searchMatch && categoryMatch && priceMatch;
+                    })
+            );
+
+        // รวมและเรียงลำดับ
+        const combined = [...equipmentItems, ...groupItems];
+        
+        // เรียงลำดับตาม filters
+        combined.sort((a, b) => {
+            if (filters.sortBy === 'name') {
+                const aName = a.type === 'equipment' ? a.data.name : (a.data.name || a.data.categoryName || '');
+                const bName = b.type === 'equipment' ? b.data.name : (b.data.name || b.data.categoryName || '');
+                if (filters.sortOrder === 'asc') {
+                    return aName.localeCompare(bName, 'th', { numeric: true });
+                } else {
+                    return bName.localeCompare(aName, 'th', { numeric: true });
+                }
+            } else if (filters.sortBy === 'price') {
+                const aPrice = a.type === 'equipment' ? Number(a.data.price || 0) : (a.data.total_price || 0);
+                const bPrice = b.type === 'equipment' ? Number(b.data.price || 0) : (b.data.total_price || 0);
+                if (filters.sortOrder === 'asc') {
+                    return aPrice > bPrice ? 1 : aPrice < bPrice ? -1 : 0;
+                } else {
+                    return aPrice < bPrice ? 1 : aPrice > bPrice ? -1 : 0;
+                }
+            }
+            return 0;
+        });
+
+        return combined;
+    }, [filteredAndSortedEquipments, equipmentSets, categories, filters.sortBy, filters.sortOrder, debouncedSearch, selectedCategoryId, selectedEquipmentSetId, filters.priceRange, t]);
+
+    const totalPages = Math.ceil(combinedItems.length / itemsPerPage);
+    const paginatedItems = combinedItems.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [filters, selectedCategoryId]);
+    }, [filters, selectedCategoryId, selectedEquipmentSetId]);
 
     const handleSaveEquipment = async (equipmentData: Partial<Equipment>) => {
         setSaving(true);
@@ -4376,8 +5046,9 @@ const EquipmentCRUD: React.FC = () => {
     };
 
     const toggleSelectAll = () => {
+        const equipmentItems = paginatedItems.filter(item => item.type === 'equipment');
         setSelectedItems((prev) =>
-            prev.length === paginatedEquipments.length ? [] : paginatedEquipments.map((eq) => eq.id)
+            prev.length === equipmentItems.length ? [] : equipmentItems.map((item) => item.data.id)
         );
     };
 
@@ -4643,11 +5314,35 @@ const EquipmentCRUD: React.FC = () => {
                                                         .map((group, index) => (
                                                             <div
                                                                 key={group.id}
-                                                                className="text-sm text-gray-400"
+                                                                className="flex items-center gap-2 text-sm text-gray-400"
                                                             >
-                                                                • {t('กลุ่มที่')} {index + 1} (
-                                                                {group.items?.length || 0}{' '}
-                                                                {t('รายการ')})
+                                                                {group.image ? (
+                                                                    <img
+                                                                        src={group.image}
+                                                                        alt={`${t('กลุ่มที่')} ${index + 1}`}
+                                                                        className="h-8 w-8 cursor-pointer rounded border border-gray-600 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                        onClick={() =>
+                                                                            openImageModal(
+                                                                                group.image!,
+                                                                                `${equipmentSet.name} - ${t('กลุ่มที่')} ${index + 1}`
+                                                                            )
+                                                                        }
+                                                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                        onError={(e) => {
+                                                                            const target = e.target as HTMLImageElement;
+                                                                            target.style.display = 'none';
+                                                                        }}
+                                                                    />
+                                                                ) : null}
+                                                                <span>
+                                                                    {group.name ? (
+                                                                        <span className="ml-1 text-gray-300">
+                                                                            • {group.name}
+                                                                        </span>
+                                                                    ) : (<span className="ml-1 text-gray-300">• {t('กลุ่มที่')} {index + 1}</span>)} (
+                                                                    {group.items?.length || 0}{' '}
+                                                                    {t('รายการ')})
+                                                                </span>
                                                             </div>
                                                         ))}
                                                     {(equipmentSet.groups?.length || 0) > 3 && (
@@ -4700,22 +5395,44 @@ const EquipmentCRUD: React.FC = () => {
                                 <div className="flex items-center gap-2">
                                     <Filter className="h-5 w-5 text-gray-400" />
                                     <select
-                                        value={selectedCategoryId || ''}
+                                        value={selectedEquipmentSetId ? `set_${selectedEquipmentSetId}` : (selectedCategoryId ? `cat_${selectedCategoryId}` : '')}
                                         onChange={(e) => {
-                                            const categoryId = e.target.value
-                                                ? parseInt(e.target.value)
-                                                : null;
-                                            setSelectedCategoryId(categoryId);
-                                            setFilters((prev) => ({ ...prev, categoryId }));
+                                            const value = e.target.value;
+                                            if (value.startsWith('set_')) {
+                                                const setId = value.replace('set_', '');
+                                                setSelectedEquipmentSetId(setId);
+                                                setSelectedCategoryId(null);
+                                                setFilters((prev) => ({ ...prev, categoryId: null }));
+                                            } else if (value.startsWith('cat_')) {
+                                                const categoryId = parseInt(value.replace('cat_', ''));
+                                                setSelectedCategoryId(categoryId);
+                                                setSelectedEquipmentSetId(null);
+                                                setFilters((prev) => ({ ...prev, categoryId }));
+                                            } else {
+                                                setSelectedCategoryId(null);
+                                                setSelectedEquipmentSetId(null);
+                                                setFilters((prev) => ({ ...prev, categoryId: null }));
+                                            }
                                         }}
                                         className="rounded-lg border border-gray-500 bg-gray-600 p-3 text-white shadow-sm focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="">{t('ทุกหมวดหมู่')}</option>
-                                        {categories.map((category) => (
-                                            <option key={category.id} value={category.id}>
-                                                {category.display_name}
-                                            </option>
-                                        ))}
+                                        <optgroup label={t('หมวดหมู่')}>
+                                            {categories.map((category) => (
+                                                <option key={category.id} value={`cat_${category.id}`}>
+                                                    {category.display_name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                        {equipmentSets.length > 0 && (
+                                            <optgroup label={t('ชุดอุปกรณ์')}>
+                                                {equipmentSets.map((set) => (
+                                                    <option key={set.id} value={`set_${set.id}`}>
+                                                        {set.name}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
                                     </select>
                                 </div>
 
@@ -4804,8 +5521,8 @@ const EquipmentCRUD: React.FC = () => {
 
                             <div className="flex items-center justify-between text-sm text-gray-300">
                                 <div>
-                                    {t('แสดง')} {paginatedEquipments.length} {t('จากทั้งหมด')}{' '}
-                                    {filteredAndSortedEquipments.length} {t('รายการ')}
+                                    {t('แสดง')} {paginatedItems.length} {t('จากทั้งหมด')}{' '}
+                                    {combinedItems.length} {t('รายการ')}
                                 </div>
 
                                 {viewMode === 'table' && (
@@ -4814,8 +5531,8 @@ const EquipmentCRUD: React.FC = () => {
                                             type="checkbox"
                                             checked={
                                                 selectedItems.length ===
-                                                    paginatedEquipments.length &&
-                                                paginatedEquipments.length > 0
+                                                    paginatedItems.filter(item => item.type === 'equipment').length &&
+                                                paginatedItems.filter(item => item.type === 'equipment').length > 0
                                             }
                                             onChange={toggleSelectAll}
                                             className="h-4 w-4"
@@ -4828,16 +5545,16 @@ const EquipmentCRUD: React.FC = () => {
                     </div>
 
                     <div className="p-6">
-                        {filteredAndSortedEquipments.length === 0 ? (
+                        {combinedItems.length === 0 ? (
                             <div className="py-12 text-center">
                                 <Package className="mx-auto mb-4 h-16 w-16 text-gray-500" />
                                 <div className="text-lg text-gray-400">
-                                    {t('ไม่พบข้อมูลสินค้า')}
+                                    {t('ไม่พบข้อมูล')}
                                 </div>
-                                {equipments.length === 0 ? (
+                                {equipments.length === 0 && equipmentSets.length === 0 ? (
                                     <div className="mt-2 text-sm text-gray-500">
-                                        {t('ยังไม่มีสินค้าในระบบ')} {t('คลิกปุ่ม')} "
-                                        {t('เพิ่มสินค้า')}" {t('เพื่อเริ่มต้น')}
+                                        {t('ยังไม่มีสินค้าหรือชุดอุปกรณ์ในระบบ')} {t('คลิกปุ่ม')} "
+                                        {t('เพิ่มสินค้า')}" {t('หรือ')} "{t('เพิ่มเซ็ตอุปกรณ์')}" {t('เพื่อเริ่มต้น')}
                                     </div>
                                 ) : (
                                     <div className="mt-2 text-sm text-gray-500">
@@ -4848,7 +5565,57 @@ const EquipmentCRUD: React.FC = () => {
                         ) : viewMode === 'grid' ? (
                             <>
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                                    {paginatedEquipments.map((equipment) => {
+                                    {paginatedItems.map((item) => {
+                                        if (item.type === 'group') {
+                                            const group = item.data;
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    className="group cursor-pointer rounded-lg border border-purple-600 bg-purple-900/20 p-4 transition-all hover:border-purple-400 hover:shadow-xl hover:shadow-purple-500/20"
+                                                    onClick={() => {
+                                                        setSelectedGroup(group);
+                                                        setShowGroupItemsModal(true);
+                                                    }}
+                                                >
+                                                    <div className="mb-3 flex items-start justify-between">
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className="mb-1 truncate text-sm font-semibold text-purple-300 group-hover:text-purple-200">
+                                                                {group.name || `${t('กลุ่มที่')} ${group.groupIndex || 1}`}
+                                                            </h3>
+                                                            <p className="truncate text-xs text-gray-400">
+                                                                {group.items?.length || 0} {t('รายการ')}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    {group.image ? (
+                                                        <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-lg bg-gray-700">
+                                                            <img
+                                                                src={group.image}
+                                                                alt={group.name || group.categoryName}
+                                                                className="h-full w-full object-cover"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mb-3 flex aspect-square w-full items-center justify-center rounded-lg bg-gray-700">
+                                                            <Package className="h-12 w-12 text-gray-500" />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-400">
+                                                            {t('ราคารวม')}
+                                                        </span>
+                                                        <span className="text-sm font-bold text-green-400">
+                                                            {group.total_price?.toLocaleString() || 0} ฿
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        const equipment = item.data;
                                         return (
                                             <div
                                                 key={equipment.id}
@@ -4968,7 +5735,7 @@ const EquipmentCRUD: React.FC = () => {
                                                 )}
 
                                                 {equipment.attributes &&
-                                                    Object.keys(equipment.attributes).length >
+                                                    Object.keys(equipment.attributes || {}).length >
                                                         0 && (
                                                         <div className="mt-2 text-xs">
                                                             <div className="mb-1 text-gray-400">
@@ -4976,7 +5743,7 @@ const EquipmentCRUD: React.FC = () => {
                                                             </div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {Object.entries(
-                                                                    equipment.attributes
+                                                                    equipment.attributes || {}
                                                                 )
                                                                     .slice(0, 2)
                                                                     .map(([key, value]) => {
@@ -5029,12 +5796,12 @@ const EquipmentCRUD: React.FC = () => {
                                                                             </span>
                                                                         );
                                                                     })}
-                                                                {Object.keys(equipment.attributes)
+                                                                {equipment.attributes && Object.keys(equipment.attributes)
                                                                     .length > 2 && (
                                                                     <span className="rounded bg-gray-700 px-2 py-1 text-gray-400 shadow-sm">
                                                                         +
                                                                         {Object.keys(
-                                                                            equipment.attributes
+                                                                            equipment.attributes || {}
                                                                         ).length - 2}
                                                                     </span>
                                                                 )}
@@ -5080,8 +5847,8 @@ const EquipmentCRUD: React.FC = () => {
                                                         type="checkbox"
                                                         checked={
                                                             selectedItems.length ===
-                                                                paginatedEquipments.length &&
-                                                            paginatedEquipments.length > 0
+                                                                paginatedItems.filter(item => item.type === 'equipment').length &&
+                                                            paginatedItems.filter(item => item.type === 'equipment').length > 0
                                                         }
                                                         onChange={toggleSelectAll}
                                                         className="h-4 w-4"
@@ -5118,7 +5885,82 @@ const EquipmentCRUD: React.FC = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {paginatedEquipments.map((equipment) => (
+                                            {paginatedItems.map((item) => {
+                                                if (item.type === 'group') {
+                                                    const group = item.data;
+                                                    return (
+                                                        <tr
+                                                            key={item.id}
+                                                            className="cursor-pointer border-b border-purple-600 bg-purple-900/20 transition-colors hover:bg-purple-900/40"
+                                                            onClick={() => {
+                                                                setSelectedGroup(group);
+                                                                setShowGroupItemsModal(true);
+                                                            }}
+                                                        >
+                                                            <td className="px-3 text-center" colSpan={2}>
+                                                                {group.image ? (
+                                                                    <img
+                                                                        src={group.image}
+                                                                        alt={group.name || group.categoryName}
+                                                                        className="h-10 w-10 mx-auto rounded border border-gray-600 object-cover"
+                                                                        onError={(e) => {
+                                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <Package className="mx-auto h-10 w-10 text-gray-500" />
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 text-center">
+                                                                <span className="text-purple-300">📦 {t('ชุดอุปกรณ์')}</span>
+                                                            </td>
+                                                            <td className="px-3">
+                                                                <div>
+                                                                    <div className="font-semibold text-purple-300">
+                                                                        {group.name || `${t('กลุ่มที่')} ${group.groupIndex || 1}`}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 text-center">-</td>
+                                                            <td className="px-6 text-center">
+                                                                <span className="text-purple-300">
+                                                                    {group.equipmentSetName || group.categoryName}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 text-center">
+                                                                <span className="font-semibold text-green-400">
+                                                                    {group.total_price?.toLocaleString() || 0} ฿
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 text-center">
+                                                                <span className="text-gray-400">
+                                                                    {group.items?.length || 0} {t('รายการ')}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 text-center">
+                                                                <span className="rounded bg-purple-600 px-2 py-1 text-xs text-white">
+                                                                    {t('ชุดอุปกรณ์')}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 text-center">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedGroup(group);
+                                                                        setShowGroupItemsModal(true);
+                                                                    }}
+                                                                    className="rounded bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-700"
+                                                                    title={t('ดูรายการอุปกรณ์')}
+                                                                >
+                                                                    {t('ดูรายการ')}
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
+                                                
+                                                const equipment = item.data;
+                                                return (
                                                 <tr
                                                     key={equipment.id}
                                                     className={`cursor-pointer border-b border-gray-600 transition-colors hover:bg-gray-600 ${
@@ -5313,7 +6155,8 @@ const EquipmentCRUD: React.FC = () => {
                                                         </div>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -5322,7 +6165,7 @@ const EquipmentCRUD: React.FC = () => {
                                     currentPage={currentPage}
                                     totalPages={totalPages}
                                     onPageChange={setCurrentPage}
-                                    totalItems={filteredAndSortedEquipments.length}
+                                    totalItems={combinedItems.length}
                                     itemsPerPage={itemsPerPage}
                                 />
                             </>
@@ -5365,6 +6208,7 @@ const EquipmentCRUD: React.FC = () => {
                         setShowEquipmentSetForm(false);
                         setEditingEquipmentSet(undefined);
                     }}
+                    onImageClick={openImageModal}
                 />
             )}
 
@@ -5389,6 +6233,152 @@ const EquipmentCRUD: React.FC = () => {
                     }}
                     onImageClick={openImageModal}
                 />
+            )}
+
+            {/* Modal สำหรับแสดงรายการอุปกรณ์ในกลุ่ม */}
+            {showGroupItemsModal && selectedGroup && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
+                    <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-gray-800 shadow-2xl">
+                        <div className="sticky top-0 flex items-center justify-between bg-purple-900 px-6 py-4">
+                            <div>
+                                <h3 className="text-xl font-bold text-white">
+                                    {selectedGroup.categoryName}
+                                </h3>
+                                {selectedGroup.name && (
+                                    <p className="text-sm text-purple-200">
+                                        {selectedGroup.name}
+                                    </p>
+                                )}
+                                {selectedGroup.equipmentSetName && (
+                                    <p className="text-xs text-purple-300">
+                                        {t('จากเซ็ต')}: {selectedGroup.equipmentSetName}
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowGroupItemsModal(false);
+                                    setSelectedGroup(null);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
+                                title={t('ปิด')}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {selectedGroup.image && (
+                                <div className="mb-4 flex justify-center">
+                                    <img
+                                        src={selectedGroup.image}
+                                        alt={selectedGroup.name || selectedGroup.categoryName}
+                                        className="h-48 w-auto max-w-full cursor-pointer rounded-lg border border-gray-600 object-contain transition-opacity hover:border-blue-400 hover:opacity-80"
+                                        onClick={() =>
+                                            selectedGroup.image && openImageModal(
+                                                selectedGroup.image,
+                                                selectedGroup.name || selectedGroup.categoryName || ''
+                                            )
+                                        }
+                                        title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            <div className="mb-4 rounded-lg bg-gray-700 p-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-300">
+                                        {t('จำนวนรายการ')}:
+                                    </span>
+                                    <span className="font-semibold text-white">
+                                        {selectedGroup.items?.length || 0} {t('รายการ')}
+                                    </span>
+                                </div>
+                                <div className="mt-2 flex items-center justify-between">
+                                    <span className="text-sm text-gray-300">
+                                        {t('ราคารวม')}:
+                                    </span>
+                                    <span className="text-lg font-bold text-green-400">
+                                        {selectedGroup.total_price?.toLocaleString() || 0} ฿
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h4 className="text-lg font-semibold text-white">
+                                    {t('รายการอุปกรณ์')}
+                                </h4>
+                                {selectedGroup.items && selectedGroup.items.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {selectedGroup.items.map((item, index) => (
+                                            <div
+                                                key={item.id || index}
+                                                className="rounded-lg border border-gray-600 bg-gray-700 p-4"
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    {item.equipment?.image && (
+                                                        <img
+                                                            src={item.equipment.image}
+                                                            alt={item.equipment.name || 'Equipment'}
+                                                            className="h-16 w-16 cursor-pointer rounded border border-gray-500 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                            onClick={() =>
+                                                                openImageModal(
+                                                                    item.equipment!.image!,
+                                                                    item.equipment!.name || 'Equipment'
+                                                                )
+                                                            }
+                                                            title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                            }}
+                                                        />
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <div className="flex items-start justify-between">
+                                                            <div>
+                                                                <h5 className="font-semibold text-white">
+                                                                    {item.equipment?.name || item.equipment?.product_code || t('ไม่ระบุชื่อ')}
+                                                                </h5>
+                                                                {item.equipment?.product_code && (
+                                                                    <p className="text-sm text-gray-400">
+                                                                        {t('รหัสสินค้า')}: {item.equipment.product_code}
+                                                                    </p>
+                                                                )}
+                                                                {item.equipment?.brand && (
+                                                                    <p className="text-sm text-blue-400">
+                                                                        {t('แบรนด์')}: {item.equipment.brand}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-sm text-gray-400">
+                                                                    {t('จำนวน')}: {item.quantity}
+                                                                </div>
+                                                                <div className="text-sm text-gray-400">
+                                                                    {t('ราคาต่อหน่วย')}: ฿{item.unit_price?.toLocaleString() || 0}
+                                                                </div>
+                                                                <div className="text-lg font-bold text-green-400">
+                                                                    {t('รวม')}: ฿{item.total_price?.toLocaleString() || (item.quantity * (item.unit_price || 0)).toLocaleString()}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="py-8 text-center text-gray-400">
+                                        {t('ไม่มีรายการอุปกรณ์ในกลุ่มนี้')}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <ImageModal

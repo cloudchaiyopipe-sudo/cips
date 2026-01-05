@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 
 interface UpgradeTierModalProps {
     isOpen: boolean;
@@ -22,13 +24,13 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
         {
             id: 'free',
             name: 'Free',
-            price: 0,
-            monthlyTokens: 100,
+            price: 'Free',
+            monthlyTokens: 'xxx',
             features: [
-                '100 tokens per month',
-                'Basic irrigation planning',
-                'Standard support',
-                'Limited AI features',
+                '100 โทเค็นต่อเดือน',
+                'การวางแผนการชลประทานพื้นฐาน',
+                'การสนับสนุนมาตรฐาน',
+                'ฟีเจอร์ AI จำกัด',
             ],
             color: 'gray',
             popular: false,
@@ -36,15 +38,15 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
         {
             id: 'pro',
             name: 'Pro',
-            price: 299,
-            monthlyTokens: 500,
+            price: 'xxx',
+            monthlyTokens: 'xxx',
             features: [
-                '500 tokens per month',
-                'Advanced irrigation planning',
-                'Priority support',
-                'Full AI features',
-                'Export capabilities',
-                'Advanced analytics',
+                '500 โทเค็นต่อเดือน',
+                'การวางแผนการชลประทานขั้นสูง',
+                'การสนับสนุนแบบพิเศษ',
+                'ฟีเจอร์ AI แบบเต็มรูปแบบ',
+                'ความสามารถในการส่งออก',
+                'การวิเคราะห์ขั้นสูง',
             ],
             color: 'blue',
             popular: true,
@@ -52,17 +54,17 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
         {
             id: 'advanced',
             name: 'Advanced',
-            price: 599,
-            monthlyTokens: 1000,
+            price: 'xxx',
+            monthlyTokens: 'xxx',
             features: [
-                '1000 tokens per month',
-                'Premium irrigation planning',
-                '24/7 priority support',
-                'All AI features',
-                'Unlimited exports',
-                'Advanced analytics',
-                'Custom integrations',
-                'API access',
+                '1000 โทเค็นต่อเดือน',
+                'การวางแผนการชลประทานระดับพรีเมียม',
+                'การสนับสนุนแบบพิเศษ 24/7',
+                'ฟีเจอร์ AI ทั้งหมด',
+                'การส่งออกไม่จำกัด',
+                'การวิเคราะห์ขั้นสูง',
+                'การเชื่อมต่อแบบกำหนดเอง',
+                'การเข้าถึง API',
             ],
             color: 'purple',
             popular: false,
@@ -102,17 +104,9 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
         }
     };
 
-    const getTotalPrice = (tier: any, months: number) => {
+    const getTotalPrice = (tier: any) => {
         if (tier.id === 'free') return 0;
-        return tier.price * months;
-    };
-
-    const getDiscount = (tier: any, months: number) => {
-        if (tier.id === 'free' || months === 1) return 0;
-        const monthlyPrice = tier.price;
-        const totalPrice = monthlyPrice * months;
-        const discount = Math.floor(totalPrice * 0.1); // 10% discount for multi-month
-        return discount;
+        return tier.price;
     };
 
     return (
@@ -121,9 +115,9 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                 {/* Header */}
                 <div className="mb-8 flex items-center justify-between">
                     <div>
-                        <h2 className="mb-2 text-3xl font-bold text-white">Upgrade Your Plan</h2>
+                        <h2 className="mb-2 text-3xl font-bold text-white">อัปเกรดแผนของคุณ</h2>
                         <p className="text-gray-400">
-                            Choose the perfect plan for your irrigation needs
+                            เลือกแผนที่เหมาะกับความต้องการการชลประทานของคุณ
                         </p>
                     </div>
                     <button
@@ -148,7 +142,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
 
                 {/* Current Tier Info */}
                 <div className="mb-8 rounded-lg border border-gray-700 bg-gray-800 p-6">
-                    <h3 className="mb-2 text-lg font-semibold text-white">Current Plan</h3>
+                    <h3 className="mb-2 text-lg font-semibold text-white">แผนปัจจุบัน</h3>
                     <div className="flex items-center gap-3">
                         <span className="text-2xl">🆓</span>
                         <div>
@@ -157,7 +151,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                             </div>
                             <div className="text-sm text-gray-400">
                                 {tiers.find((t) => t.id === currentTier)?.monthlyTokens || 100}{' '}
-                                tokens per month
+                                โทเค็นต่อเดือน
                             </div>
                         </div>
                     </div>
@@ -165,19 +159,17 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
 
                 {/* Tier Selection */}
                 <div className="mb-8">
-                    <h3 className="mb-4 text-xl font-semibold text-white">Choose Your Plan</h3>
+                    <h3 className="mb-4 text-xl font-semibold text-white">เลือกแผนของคุณ</h3>
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                         {tiers.map((tier) => {
                             const colors = getTierColor(tier.color);
                             const isSelected = selectedTier === tier.id;
                             const isCurrentTier = currentTier === tier.id;
-                            const totalPrice = getTotalPrice(tier, selectedMonths);
-                            const discount = getDiscount(tier, selectedMonths);
 
                             return (
                                 <div
                                     key={tier.id}
-                                    className={`relative cursor-pointer rounded-lg border-2 p-6 transition-all ${
+                                    className={`relative flex flex-col h-full cursor-pointer rounded-lg border-2 p-6 transition-all ${
                                         isSelected
                                             ? `${colors.border} bg-gray-800`
                                             : 'border-gray-700 bg-gray-800 hover:border-gray-600'
@@ -187,7 +179,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                     {tier.popular && (
                                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
                                             <span className="whitespace-nowrap rounded-full bg-green-500 px-2 py-1 text-xs font-medium text-white">
-                                                Most Popular
+                                                ยอดนิยม
                                             </span>
                                         </div>
                                     )}
@@ -195,18 +187,18 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                     {isCurrentTier && (
                                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
                                             <span className="whitespace-nowrap rounded-full bg-blue-500 px-2 py-1 text-xs font-medium text-white">
-                                                Current Plan
+                                                แผนปัจจุบัน
                                             </span>
                                         </div>
                                     )}
 
-                                    <div className="text-center">
+                                    <div className="flex-1 flex flex-col justify-start text-center">
                                         <div className="mb-4">
                                             <div className="text-3xl font-bold text-white">
                                                 {tier.name}
                                             </div>
                                             <div className="text-sm text-gray-400">
-                                                {tier.monthlyTokens} tokens/month
+                                                {tier.monthlyTokens} โทเค็น/เดือน
                                             </div>
                                         </div>
 
@@ -214,7 +206,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                             <div className="text-2xl font-bold text-white">
                                                 ฿{tier.price}
                                             </div>
-                                            <div className="text-sm text-gray-400">per month</div>
+                                            <div className="text-sm text-gray-400">ต่อเดือน</div>
                                         </div>
 
                                         <div className="space-y-2 text-left">
@@ -240,25 +232,62 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                                 </div>
                                             ))}
                                         </div>
+                                    </div>
 
+                                    <div className="mt-6">
                                         {isCurrentTier ? (
                                             <button
                                                 disabled
-                                                className="mt-6 w-full cursor-not-allowed rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-gray-400"
+                                                className="w-full cursor-not-allowed rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-gray-400"
+                                                style={{ marginTop: "auto" }}
                                             >
-                                                Current Plan
+                                                แผนปัจจุบัน
                                             </button>
                                         ) : (
-                                            <button
-                                                onClick={() => setSelectedTier(tier.id)}
-                                                className={`mt-6 w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
-                                                    isSelected
-                                                        ? `${colors.bg} ${colors.hover}`
-                                                        : 'bg-gray-600 hover:bg-gray-700'
-                                                }`}
-                                            >
-                                                {isSelected ? 'Selected' : 'Select Plan'}
-                                            </button>
+                                            tier.name === 'free' ? (
+                                                <button
+                                                    disabled
+                                                    className="w-full cursor-not-allowed rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-gray-400"
+                                                    style={{ marginTop: "auto" }}
+                                                >
+                                                    แผนฟรี
+                                                </button>
+                                            ) : tier.name === 'Pro' ? (
+                                                <button
+                                                    disabled
+                                                    className="w-full cursor-not-allowed rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-gray-400"
+                                                    style={{ marginTop: "auto" }}
+                                                >
+                                                    ยังไม่เปิดให้ใช้งาน
+                                                </button>
+                                            ) : tier.name === 'Advanced' ? (
+                                                <button
+                                                    onClick={() => {
+                                                        router.visit('/fields');
+                                                        onClose();
+                                                    }}
+                                                    className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
+                                                        isSelected
+                                                            ? `${colors.bg} ${colors.hover}`
+                                                            : 'bg-gray-600 hover:bg-gray-700'
+                                                    }`}
+                                                    style={{ marginTop: "auto" }}
+                                                >
+                                                    ทดลองใช้ฟรี
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setSelectedTier(tier.id)}
+                                                    className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
+                                                        isSelected
+                                                            ? `${colors.bg} ${colors.hover}`
+                                                            : 'bg-gray-600 hover:bg-gray-700'
+                                                    }`}
+                                                    style={{ marginTop: "auto" }}
+                                                >
+                                                    {isSelected ? 'เลือกแล้ว' : 'เลือกแผน'}
+                                                </button>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -270,13 +299,11 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                 {/* Billing Period */}
                 {selectedTier && selectedTier !== 'free' && (
                     <div className="mb-8">
-                        <h3 className="mb-4 text-xl font-semibold text-white">Billing Period</h3>
+                        <h3 className="mb-4 text-xl font-semibold text-white">ระยะเวลาการเรียกเก็บเงิน</h3>
                         <div className="flex gap-4">
                             {[1, 3, 6, 12].map((months) => {
                                 const tier = tiers.find((t) => t.id === selectedTier);
-                                const totalPrice = getTotalPrice(tier!, months);
-                                const discount = getDiscount(tier!, months);
-                                const finalPrice = totalPrice - discount;
+                                const totalPrice = getTotalPrice(tier!);
 
                                 return (
                                     <button
@@ -289,14 +316,9 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                         }`}
                                     >
                                         <div className="text-lg font-bold text-white">
-                                            {months} {months === 1 ? 'Month' : 'Months'}
+                                            {months} {months === 1 ? 'เดือน' : 'เดือน'}
                                         </div>
-                                        <div className="text-sm text-gray-400">฿{finalPrice}</div>
-                                        {discount > 0 && (
-                                            <div className="text-xs text-green-400">
-                                                Save ฿{discount}
-                                            </div>
-                                        )}
+                                        <div className="text-sm text-gray-400">฿{totalPrice}</div>
                                     </button>
                                 );
                             })}
@@ -307,49 +329,26 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                 {/* Price Summary */}
                 {selectedTier && selectedTier !== 'free' && (
                     <div className="mb-8 rounded-lg border border-gray-700 bg-gray-800 p-6">
-                        <h3 className="mb-4 text-xl font-semibold text-white">Order Summary</h3>
+                        <h3 className="mb-4 text-xl font-semibold text-white">สรุปคำสั่งซื้อ</h3>
                         <div className="space-y-2">
                             <div className="flex justify-between text-gray-300">
                                 <span>
-                                    {tiers.find((t) => t.id === selectedTier)?.name} Plan (
-                                    {selectedMonths} {selectedMonths === 1 ? 'month' : 'months'})
+                                    แผน {tiers.find((t) => t.id === selectedTier)?.name} (
+                                    {selectedMonths} {selectedMonths === 1 ? 'เดือน' : 'เดือน'})
                                 </span>
                                 <span>
                                     ฿
                                     {getTotalPrice(
                                         tiers.find((t) => t.id === selectedTier)!,
-                                        selectedMonths
                                     )}
                                 </span>
                             </div>
-                            {getDiscount(
-                                tiers.find((t) => t.id === selectedTier)!,
-                                selectedMonths
-                            ) > 0 && (
-                                <div className="flex justify-between text-green-400">
-                                    <span>Multi-month discount (10%)</span>
-                                    <span>
-                                        -฿
-                                        {getDiscount(
-                                            tiers.find((t) => t.id === selectedTier)!,
-                                            selectedMonths
-                                        )}
-                                    </span>
-                                </div>
-                            )}
                             <div className="border-t border-gray-700 pt-2">
                                 <div className="flex justify-between text-lg font-bold text-white">
-                                    <span>Total</span>
+                                    <span>รวม</span>
                                     <span>
                                         ฿
-                                        {getTotalPrice(
-                                            tiers.find((t) => t.id === selectedTier)!,
-                                            selectedMonths
-                                        ) -
-                                            getDiscount(
-                                                tiers.find((t) => t.id === selectedTier)!,
-                                                selectedMonths
-                                            )}
+                                        {getTotalPrice(tiers.find((t) => t.id === selectedTier)!)}
                                     </span>
                                 </div>
                             </div>
@@ -363,14 +362,15 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                         onClick={onClose}
                         className="rounded-lg border border-gray-600 px-6 py-3 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
                     >
-                        Cancel
+                        ยกเลิก
                     </button>
                     {selectedTier && selectedTier !== 'free' && (
                         <button
+                            disabled={true}
                             onClick={handleUpgrade}
-                            className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700"
+                            className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white opacity-50 cursor-not-allowed transition-colors"
                         >
-                            Upgrade to {tiers.find((t) => t.id === selectedTier)?.name}
+                            อัปเกรดเป็น {tiers.find((t) => t.id === selectedTier)?.name}
                         </button>
                     )}
                 </div>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Coordinate, PlantLocation, IrrigationZone } from './irrigationZoneUtils';
 import { getPolygonCenter } from './horticultureUtils';
 

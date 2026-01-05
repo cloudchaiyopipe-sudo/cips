@@ -303,26 +303,26 @@ export interface SprinklerConfig {
     updatedAt: string;
 }
 export const ZONE_COLORS = [
-    '#3498DB', // 1. Blue
-    '#8B4513', // 2. Saddle Brown (replaces orange-like)
-    '#1ABC9C', // 3. Turquoise
-    '#34495E', // 4. Dark Blue Gray
-    '#D2691E', // 5. Chocolate (replaces orange-like)
-    '#16A085', // 6. Dark Turquoise
-    '#2980B9', // 7. Dark Blue
-    '#1E3A8A', // 8. Navy Blue
-    '#7F8C8D', // 9. Gray
-    '#95A5A6', // 10. Light Gray
-    '#BDC3C7', // 11. Silver
-    '#5DADE2', // 12. Light Blue
-    '#48C9B0', // 13. Medium Turquoise
-    '#85929E', // 14. Medium Gray
-    '#AAB7B8', // 15. Light Gray Blue
-    '#566573', // 16. Dark Gray
-    '#2E86AB', // 17. Ocean Blue
-    '#BC8F8F', // 18. Rosy Brown (replaces light orange)
-    '#85C1E9', // 19. Sky Blue
-    '#45B7D1', // 20. Cyan Blue
+    '#EF4444', // 1. Red (แดง)
+    '#FBBF24', // 2. Yellow (เหลือง)
+    '#3B82F6', // 3. Blue (น้ำเงิน)
+    '#10B981', // 4. Green (เขียว)
+    '#EC4899', // 5. Pink (ชมพู)
+    '#8B5CF6', // 6. Purple (ม่วง)
+    '#F97316', // 7. Orange (ส้ม)
+    '#06B6D4', // 8. Cyan (ฟ้าอมเขียว)
+    '#14B8A6', // 9. Teal (เขียวอมฟ้า)
+    '#6366F1', // 10. Indigo (คราม)
+    '#A855F7', // 11. Violet (ม่วงอ่อน)
+    '#F59E0B', // 12. Amber (อำพัน)
+    '#84CC16', // 13. Lime (เขียวอ่อน)
+    '#22D3EE', // 14. Light Cyan (ฟ้าอ่อน)
+    '#34D399', // 15. Emerald (มรกต)
+    '#0EA5E9', // 16. Sky Blue (ฟ้าสดใส)
+    '#C084FC', // 17. Light Purple (ม่วงอ่อน)
+    '#FB7185', // 18. Light Rose (ชมพูอ่อน)
+    '#60A5FA', // 19. Light Blue (น้ำเงินอ่อน)
+    '#F43F5E', // 20. Rose (กุหลาบ)
 ];
 
 export const EXCLUSION_COLORS = {

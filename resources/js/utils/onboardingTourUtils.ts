@@ -182,15 +182,6 @@ export const getInitialTourSteps = (t: (key: string) => string): TourStep[] => {
             highlight: true,
         },
         {
-            id: 'auto_lateral_pipe',
-            target: 'auto-lateral-pipe',
-            title: 'สร้างท่อย่อยอัตโนมัติ',
-            description:
-                'คลิกปุ่มนี้เพื่อสร้างท่อย่อยอัตโนมัติ ระบบจะสร้างท่อย่อยให้ครอบคลุมพืชทั้งหมดในโซนที่เลือก',
-            position: 'right',
-            highlight: true,
-        },
-        {
             id: 'sprinkler_config',
             target: 'sprinkler-config',
             title: 'ตั้งค่าหัวฉีด',

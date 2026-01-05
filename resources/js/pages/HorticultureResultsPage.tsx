@@ -247,6 +247,34 @@ const GoogleMapsResultsOverlays: React.FC<{
         if (!map || !projectData) return;
         clearOverlays();
 
+        // Helper function to get pipe color based on zone
+        const getPipeColor = (pipe: { coordinates: { lat: number; lng: number }[] }): string => {
+            const zoneId = findPipeZoneImproved(
+                pipe,
+                projectData.zones || [],
+                irrigationZones
+            );
+
+            if (zoneId === 'main-area' || zoneId === 'unknown') {
+                // Default color for pipes outside zones
+                return '#22C55E'; // Green for main area
+            }
+
+            // ใช้ index เพื่อหาสีใหม่แทนการใช้สีเก่าที่เก็บไว้
+            const zoneIndex = irrigationZones.findIndex((z) => z.id === zoneId);
+            if (zoneIndex >= 0) {
+                return getZoneColor(zoneIndex);
+            }
+
+            const zoneIndex2 = projectData.zones?.findIndex((z) => z.id === zoneId) ?? -1;
+            if (zoneIndex2 >= 0) {
+                return getZoneColor(zoneIndex2);
+            }
+
+            // Final fallback
+            return '#22C55E';
+        };
+
         if (projectData.mainArea && projectData.mainArea.length > 0) {
             const mainAreaPolygon = new google.maps.Polygon({
                 paths: projectData.mainArea.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
@@ -289,7 +317,7 @@ const GoogleMapsResultsOverlays: React.FC<{
             const zonePolygon = new google.maps.Polygon({
                 paths: zone.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                 fillColor: zoneColor,
-                fillOpacity: 0.3,
+                fillOpacity: 0.08,
                 strokeColor: zoneColor,
                 strokeWeight: 2,
                 clickable: true,
@@ -325,9 +353,10 @@ const GoogleMapsResultsOverlays: React.FC<{
         }
 
         projectData.mainPipes?.forEach((pipe) => {
+            const pipeColor = getPipeColor(pipe);
             const mainPipePolyline = new google.maps.Polyline({
                 path: pipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                strokeColor: '#FF0000',
+                strokeColor: pipeColor,
                 strokeWeight: 5 * pipeSize,
                 strokeOpacity: 0.9,
             });
@@ -336,22 +365,24 @@ const GoogleMapsResultsOverlays: React.FC<{
         });
 
         projectData.subMainPipes?.forEach((subMainPipe) => {
+            const subMainColor = getPipeColor(subMainPipe);
             const subMainPolyline = new google.maps.Polyline({
                 path: subMainPipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                strokeColor: '#8B5CF6',
-                strokeWeight: 4 * pipeSize,
+                strokeColor: subMainColor,
+                strokeWeight: 3 * pipeSize,
                 strokeOpacity: 0.9,
             });
             subMainPolyline.setMap(map);
             overlaysRef.current.polylines.set(subMainPipe.id, subMainPolyline);
 
             subMainPipe.branchPipes?.forEach((branchPipe) => {
+                const branchColor = getPipeColor(branchPipe);
                 const branchPolyline = new google.maps.Polyline({
                     path: branchPipe.coordinates.map((coord) => ({
                         lat: coord.lat,
                         lng: coord.lng,
                     })),
-                    strokeColor: '#FFD700',
+                    strokeColor: branchColor,
                     strokeWeight: 2 * pipeSize,
                     strokeOpacity: 0.8,
                 });
@@ -360,12 +391,14 @@ const GoogleMapsResultsOverlays: React.FC<{
             });
         });
 
-        irrigationZones?.forEach((zone) => {
+        irrigationZones?.forEach((zone, index) => {
+            // ใช้สีใหม่ตาม index แทนสีเดิม
+            const zoneColor = getZoneColor(index);
             const irrigationZonePolygon = new google.maps.Polygon({
                 paths: zone.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                fillColor: zone.color,
-                fillOpacity: 0.3,
-                strokeColor: zone.color,
+                fillColor: zoneColor,
+                fillOpacity: 0.08,
+                strokeColor: zoneColor,
                 strokeWeight: 2,
                 clickable: true,
                 zIndex: 50,
@@ -386,9 +419,10 @@ const GoogleMapsResultsOverlays: React.FC<{
         });
 
         lateralPipes?.forEach((lateralPipe) => {
+            const lateralColor = getPipeColor(lateralPipe);
             const lateralPolyline = new google.maps.Polyline({
                 path: lateralPipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
-                strokeColor: '#FFD700',
+                strokeColor: lateralColor,
                 strokeWeight: 2 * pipeSize,
                 strokeOpacity: 0.9,
             });
@@ -470,7 +504,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                             lat: coord.lat,
                             lng: coord.lng,
                         })),
-                        strokeColor: '#FFB347',
+                        strokeColor: lateralColor,
                         strokeWeight: 2 * pipeSize,
                         strokeOpacity: 0.8,
                     });
@@ -486,7 +520,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                             icon: {
                                 path: google.maps.SymbolPath.CIRCLE,
                                 scale: 2 * connectionPointSize,
-                                fillColor: '#FFB347',
+                                fillColor: lateralColor,
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
                                 strokeWeight: 1,
@@ -2086,6 +2120,8 @@ function EnhancedHorticultureResultsPageContent() {
                     });
                 }
 
+                // ตั้งค่า flag เพื่อบอกว่ามาจากหน้า results
+                sessionStorage.setItem('fromHorticultureResults', 'true');
                 window.location.href = '/product';
             } else {
                 throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');

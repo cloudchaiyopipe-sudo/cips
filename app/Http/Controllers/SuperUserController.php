@@ -53,11 +53,24 @@ class SuperUserController extends Controller
     {
         $this->checkSuperUser();
 
-        $users = User::all();
+        $users = User::withCount(['fields', 'folders'])->get();
 
         return response()->json([
             'success' => true,
-            'users' => $users
+            'users' => $users->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'additional_details' => $user->additional_details,
+                    'is_super_user' => $user->is_super_user,
+                    'role' => $user->role,
+                    'created_at' => $user->created_at,
+                    'fields_count' => $user->fields_count ?? 0,
+                    'folders_count' => $user->folders_count ?? 0,
+                ];
+            })
         ]);
     }
 

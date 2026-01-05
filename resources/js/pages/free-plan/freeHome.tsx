@@ -309,11 +309,24 @@ function FreeHome() {
     return (
         // Changed to a richer gradient background
         <div className="relative min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200 selection:bg-green-500/30">
-            <Head title="Welcome to Free Plan" />
+            
+                <Head title="Welcome to Free Plan" />
 
             {/* Custom Navbar */}
             <div className="sticky top-0 z-40 backdrop-blur-md bg-slate-900/50 border-b border-white/5">
                  <FreeNav />
+            </div>
+            <div className="flex items-center gap-3 mt-4 mb-2 px-4">
+                <button
+                    onClick={() => router.visit('/')}
+                    className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/20 transition shadow-sm focus:outline-none"
+                    aria-label="กลับไปหน้าแรก"
+                >
+                    <svg className="h-5 w-5 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    <span>ย้อนกลับหน้าหลัก</span>
+                </button>
             </div>
 
             {/* Toast Container */}

@@ -76,7 +76,7 @@ export default function NewHome() {
                     bgColor: 'bg-slate-900/30',
                     borderColor: 'border-slate-600',
                     icon: '🆓',
-                    description: 'Basic features with limited tokens',
+                    description: 'ฟีเจอร์พื้นฐานพร้อมโทเค็นจำกัด',
                     price: 'Free',
                     monthlyTokens: 100,
                     dailyTokens: 50,
@@ -88,7 +88,7 @@ export default function NewHome() {
                     bgColor: 'bg-blue-900/30',
                     borderColor: 'border-blue-500',
                     icon: '⭐',
-                    description: 'Advanced features with more tokens',
+                    description: 'ฟีเจอร์ขั้นสูงพร้อมโทเค็นเพิ่มเติม',
                     price: 'XXX tokens/month',
                     monthlyTokens: 500,
                     dailyTokens: 100,
@@ -100,7 +100,7 @@ export default function NewHome() {
                     bgColor: 'bg-purple-900/30',
                     borderColor: 'border-purple-500',
                     icon: '💎',
-                    description: 'Premium features with maximum tokens',
+                    description: 'ฟีเจอร์พรีเมียมพร้อมโทเค็นสูงสุด',
                     price: 'XXX tokens/month',
                     monthlyTokens: 1000,
                     dailyTokens: 200,
@@ -112,7 +112,7 @@ export default function NewHome() {
                     bgColor: 'bg-slate-900/30',
                     borderColor: 'border-slate-600',
                     icon: '🆓',
-                    description: 'Basic features with limited tokens',
+                    description: 'ฟีเจอร์พื้นฐานพร้อมโทเค็นจำกัด',
                     price: 'Free',
                     monthlyTokens: 100,
                     dailyTokens: 50,
@@ -127,13 +127,13 @@ export default function NewHome() {
             console.log(`Upgrading to ${tier} for ${months} months`);
             // TODO: Implement actual payment processing
             showToast(
-                `Upgrade to ${tier} plan for ${months} months - Payment processing would be implemented here`,
+                `อัปเกรดเป็นแผน ${tier} เป็นเวลา ${months} เดือน - การประมวลผลการชำระเงินจะถูกนำไปใช้ที่นี่`,
                 'info'
             );
             setShowUpgradeModal(false);
         } catch (error) {
             console.error('Error upgrading tier:', error);
-            showToast('Error processing upgrade. Please try again.', 'error');
+            showToast('เกิดข้อผิดพลาดในการอัปเกรด กรุณาลองอีกครั้ง', 'error');
         }
     };
 
@@ -142,7 +142,7 @@ export default function NewHome() {
             const response = await axios.post('/api/payments/purchase-plan', purchaseData);
             if (response.data.success) {
                 showToast(
-                    `Successfully upgraded to ${purchaseData.plan_type} plan! You consumed ${response.data.tokens_consumed} tokens.`,
+                    `อัปเกรดเป็นแผน ${purchaseData.plan_type} สำเร็จ! คุณใช้โทเค็น ${response.data.tokens_consumed} โทเค็น`,
                     'success'
                 );
                 setShowTokenPurchaseModal(false);
@@ -152,13 +152,13 @@ export default function NewHome() {
                     window.location.reload();
                 }, 1500);
             } else {
-                showToast(response.data.message || 'Error purchasing plan. Please try again.', 'error');
+                showToast(response.data.message || 'เกิดข้อผิดพลาดในการซื้อแผน กรุณาลองอีกครั้ง', 'error');
             }
         } catch (error: unknown) {
             console.error('Error purchasing plan:', error);
-            const errorMessage =
+                const errorMessage =
                 (error as { response?: { data?: { message?: string } } })?.response?.data
-                    ?.message || 'Error purchasing plan. Please try again.';
+                    ?.message || 'เกิดข้อผิดพลาดในการซื้อแผน กรุณาลองอีกครั้ง';
             showToast(errorMessage, 'error');
         }
     };
@@ -173,13 +173,13 @@ export default function NewHome() {
             const response = await axios.post('/api/payments/create', paymentData);
             if (response.data.success) {
                 showToast(
-                    'Payment request submitted successfully! You will receive tokens once approved by admin.',
+                    'ส่งคำขอชำระเงินสำเร็จ! คุณจะได้รับโทเค็นเมื่อได้รับการอนุมัติจากผู้ดูแลระบบ',
                     'success'
                 );
                 setShowTokenPurchaseModal(false);
                 setSelectedPlan(null);
             } else {
-                showToast('Error submitting payment request. Please try again.', 'error');
+                showToast('เกิดข้อผิดพลาดในการส่งคำขอชำระเงิน กรุณาลองอีกครั้ง', 'error');
             }
         } catch (error) {
             console.error('Error submitting payment request:', error);
@@ -230,7 +230,7 @@ export default function NewHome() {
     if (user?.tier === 'pro' || user?.tier === 'advanced') {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-                <Head title="Welcome - Water Management System" />
+                <Head title="ยินดีต้อนรับ - ระบบจัดการน้ำ" />
                 <Navbar />
 
                 {/* Toast Notifications */}
@@ -286,7 +286,7 @@ export default function NewHome() {
                                 transition={{ duration: 0.6, delay: 0.3 }}
                                 className="mb-6 text-4xl font-bold text-white lg:text-5xl"
                             >
-                                Welcome back, {user.name}!
+                                ยินดีต้อนรับกลับ, {user.name}!
                             </motion.h1>
                             <motion.p
                                 initial={{ opacity: 0, y: 20 }}
@@ -294,9 +294,9 @@ export default function NewHome() {
                                 transition={{ duration: 0.6, delay: 0.4 }}
                                 className="mx-auto mb-8 max-w-2xl text-lg text-slate-300"
                             >
-                                You're using our {currentTierInfo.name} plan with{' '}
-                                {currentTierInfo.monthlyTokens} tokens per month. Ready to continue
-                                optimizing your irrigation systems?
+                                คุณกำลังใช้แผน {currentTierInfo.name} ของเราพร้อม{' '}
+                                {currentTierInfo.monthlyTokens} โทเค็นต่อเดือน พร้อมที่จะดำเนินการต่อ
+                                เพื่อเพิ่มประสิทธิภาพระบบชลประทานของคุณหรือไม่?
                             </motion.p>
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -308,19 +308,19 @@ export default function NewHome() {
                                     onClick={handleContinueToApp}
                                     className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold text-white shadow-lg shadow-blue-500/50 transition-all duration-300 hover:scale-105 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/60"
                                 >
-                                    Continue to App
+                                    ไปยังแอปพลิเคชัน
                                 </button>
                                 <button
                                     onClick={handleGoToAccount}
                                     className="rounded-lg border-2 border-green-400 px-8 py-3 text-lg font-semibold text-green-400 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-green-400/10 hover:shadow-lg hover:shadow-green-500/30"
                                 >
-                                    My Account
+                                    บัญชีของฉัน
                                 </button>
                                 <button
                                     onClick={() => setShowUpgradeModal(true)}
                                     className="rounded-lg border-2 border-blue-400 px-8 py-3 text-lg font-semibold text-blue-400 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-blue-400/10 hover:shadow-lg hover:shadow-blue-500/30"
                                 >
-                                    Manage Subscription
+                                    จัดการการสมัครสมาชิก
                                 </button>
                             </motion.div>
                         </motion.div>
@@ -340,7 +340,7 @@ export default function NewHome() {
                                 <div className="mb-2 text-3xl font-bold text-blue-400">
                                     {user.tokens || 0}
                                 </div>
-                                <div className="text-slate-300">Current Tokens</div>
+                                <div className="text-slate-300">โทเค็นปัจจุบัน</div>
                             </motion.div>
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -351,7 +351,7 @@ export default function NewHome() {
                                 <div className="mb-2 text-3xl font-bold text-green-400">
                                     {currentTierInfo.monthlyTokens}
                                 </div>
-                                <div className="text-slate-300">Monthly Allowance</div>
+                                <div className="text-slate-300">โทเค็นรายเดือน</div>
                             </motion.div>
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -362,7 +362,7 @@ export default function NewHome() {
                                 <div className="mb-2 text-3xl font-bold text-purple-400">
                                     {currentTierInfo.dailyTokens}
                                 </div>
-                                <div className="text-slate-300">Daily Tokens</div>
+                                <div className="text-slate-300">โทเค็นรายวัน</div>
                             </motion.div>
                         </div>
                     </div>
@@ -378,11 +378,11 @@ export default function NewHome() {
                             className="mb-12 text-center"
                         >
                             <h2 className="mb-4 text-3xl font-bold text-white lg:text-4xl">
-                                Your Irrigation Management Hub
+                                ศูนย์จัดการการชลประทานของคุณ
                             </h2>
                             <p className="mx-auto max-w-3xl text-lg text-slate-300">
-                                Access all your irrigation planning tools and manage your projects
-                                efficiently.
+                                เข้าถึงเครื่องมือการวางแผนการชลประทานทั้งหมดของคุณและจัดการโครงการของคุณ
+                                อย่างมีประสิทธิภาพ
                             </p>
                         </motion.div>
 
@@ -396,7 +396,7 @@ export default function NewHome() {
                                 <div className="aspect-video overflow-hidden rounded-lg">
                                     <img
                                         src="/images/app-screenshot.png"
-                                        alt="Smart Irrigation Management System Interface"
+                                        alt="อินเทอร์เฟซระบบจัดการการชลประทานอัจฉริยะ"
                                         className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                                         onError={(e) => {
                                             const target = e.target as HTMLImageElement;
@@ -413,10 +413,10 @@ export default function NewHome() {
                                         <div className="text-center">
                                             <div className="mb-4 text-6xl">🌱</div>
                                             <p className="font-medium text-slate-300">
-                                                App Screenshot Placeholder
+                                                ภาพหน้าจอแอปพลิเคชัน
                                             </p>
                                             <p className="text-sm text-slate-400">
-                                                Your irrigation planning interface
+                                                อินเทอร์เฟซการวางแผนการชลประทานของคุณ
                                             </p>
                                         </div>
                                     </div>
@@ -496,9 +496,8 @@ export default function NewHome() {
                                 transition={{ duration: 0.6, delay: 0.3 }}
                                 className="mb-8 text-lg text-slate-300"
                             >
-                                Transform your agricultural operations with our advanced irrigation
-                                planning and management platform. Optimize water usage, increase
-                                crop yields, and reduce costs with precision technology.
+                                ปรับปรุงการดำเนินงานทางการเกษตรของคุณด้วยแพลตฟอร์มการวางแผนและจัดการการชลประทานขั้นสูงของเรา
+                                เพิ่มประสิทธิภาพการใช้น้ำ เพิ่มผลผลิตพืชผล และลดต้นทุนด้วยเทคโนโลยีที่แม่นยำ
                             </motion.p>
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
@@ -510,19 +509,19 @@ export default function NewHome() {
                                     onClick={handleTryFreePlan}
                                     className="rounded-lg bg-orange-600 px-8 py-3 text-lg font-semibold text-white shadow-lg shadow-orange-500/50 transition-all duration-300 hover:scale-105 hover:bg-orange-700 hover:shadow-xl hover:shadow-orange-500/60"
                                 >
-                                    Mobile Mode
+                                    โหมดมือถือ
                                 </button>
                                 <button
                                     onClick={handleGoToAccount}
                                     className="rounded-lg border-2 border-green-400 px-8 py-3 text-lg font-semibold text-green-400 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-green-400/10 hover:shadow-lg hover:shadow-green-500/30"
                                 >
-                                    My Account
+                                    บัญชีของฉัน
                                 </button>
                                 <button
                                     onClick={() => setShowUpgradeModal(true)}
                                     className="rounded-lg border-2 border-blue-400 px-8 py-3 text-lg font-semibold text-blue-400 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-blue-400/10 hover:shadow-lg hover:shadow-blue-500/30"
                                 >
-                                    View Plans
+                                    ดูแผน
                                 </button>
                             </motion.div>
                         </motion.div>
@@ -538,7 +537,7 @@ export default function NewHome() {
                                 <div className="aspect-video overflow-hidden rounded-lg">
                                     <img
                                         src="/images/app-screenshot.png"
-                                        alt="Smart Irrigation Management System Interface"
+                                        alt="อินเทอร์เฟซระบบจัดการการชลประทานอัจฉริยะ"
                                         className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                                         onError={(e) => {
                                             // Fallback to placeholder if image fails to load
@@ -556,10 +555,10 @@ export default function NewHome() {
                                         <div className="text-center">
                                             <div className="mb-4 text-6xl">🌱</div>
                                             <p className="font-medium text-slate-300">
-                                                App Screenshot Placeholder
+                                                ภาพหน้าจอแอปพลิเคชัน
                                             </p>
                                             <p className="text-sm text-slate-400">
-                                                Your irrigation planning interface
+                                                อินเทอร์เฟซการวางแผนการชลประทานของคุณ
                                             </p>
                                         </div>
                                     </div>
@@ -588,89 +587,6 @@ export default function NewHome() {
                     </div>
                 </div>
             </section>
-
-            {/* Features Section */}
-            <section className="bg-slate-800/40 backdrop-blur-sm py-20">
-                <div className="mx-auto max-w-7xl px-6">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="mb-16 text-center"
-                    >
-                        <h2 className="mb-4 text-3xl font-bold text-white lg:text-4xl">
-                            Why Choose Our Platform?
-                        </h2>
-                        <p className="mx-auto max-w-3xl text-lg text-slate-300">
-                            Our comprehensive irrigation management system provides everything you
-                            need to optimize your agricultural operations.
-                        </p>
-                    </motion.div>
-
-                    <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                        {/* Feature 1 */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.1 }}
-                            whileHover={{ scale: 1.02, y: -5 }}
-                            className="p-6 text-center rounded-lg bg-slate-800/40 backdrop-blur-lg border border-slate-400/20 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20"
-                        >
-                            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-900/30">
-                                <span className="text-3xl">🎯</span>
-                            </div>
-                            <h3 className="mb-3 text-xl font-semibold text-white">
-                                Precision Planning
-                            </h3>
-                            <p className="text-slate-300">
-                                Create detailed irrigation plans with precise water distribution and
-                                timing optimization.
-                            </p>
-                        </motion.div>
-
-                        {/* Feature 2 */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.2 }}
-                            whileHover={{ scale: 1.02, y: -5 }}
-                            className="p-6 text-center rounded-lg bg-slate-800/40 backdrop-blur-lg border border-slate-400/20 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20"
-                        >
-                            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-900/30">
-                                <span className="text-3xl">📈</span>
-                            </div>
-                            <h3 className="mb-3 text-xl font-semibold text-white">
-                                Smart Analytics
-                            </h3>
-                            <p className="text-slate-300">
-                                Monitor water usage, crop health, and efficiency with advanced
-                                analytics and reporting.
-                            </p>
-                        </motion.div>
-
-                        {/* Feature 3 */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.3 }}
-                            whileHover={{ scale: 1.02, y: -5 }}
-                            className="p-6 text-center rounded-lg bg-slate-800/40 backdrop-blur-lg border border-slate-400/20 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
-                        >
-                            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-purple-900/30">
-                                <span className="text-3xl">🌍</span>
-                            </div>
-                            <h3 className="mb-3 text-xl font-semibold text-white">
-                                Sustainable Farming
-                            </h3>
-                            <p className="text-slate-300">
-                                Reduce water waste and environmental impact while maximizing crop
-                                yields and quality.
-                            </p>
-                        </motion.div>
-                    </div>
-                </div>
-            </section>
-
             {/* Pricing Section */}
             <section className="bg-slate-900 py-20">
                 <div className="mx-auto max-w-7xl px-6">
@@ -681,10 +597,10 @@ export default function NewHome() {
                         className="mb-16 text-center"
                     >
                         <h2 className="mb-4 text-3xl font-bold text-white lg:text-4xl">
-                            Choose Your Plan
+                            เลือกแผนของคุณ
                         </h2>
                         <p className="text-lg text-slate-300">
-                            Try our Free plan now! Pro and Advanced plans coming in 2026.
+                            ลองใช้แผนฟรีของเราตอนนี้! แผน Pro และ Advanced กำลังจะมาในปี 2026
                         </p>
                     </motion.div>
 
@@ -699,7 +615,7 @@ export default function NewHome() {
                         >
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
                                 <span className="whitespace-nowrap rounded-full bg-green-500 px-3 py-1 text-xs font-medium text-white">
-                                    Available Now
+                                    ใช้ได้เลย
                                 </span>
                             </div>
 
@@ -707,13 +623,13 @@ export default function NewHome() {
                                 <div className="mb-2 text-4xl">🆓</div>
                                 <div className="text-2xl font-bold text-white">Free</div>
                                 <div className="text-sm text-slate-400">
-                                    Perfect for getting started
+                                    เหมาะสำหรับการเริ่มต้น
                                 </div>
                             </div>
 
                             <div className="mb-6">
                                 <div className="text-3xl font-bold text-white">Free</div>
-                                <div className="text-sm text-slate-400">Forever</div>
+                                <div className="text-sm text-slate-400">ตลอดไป</div>
                             </div>
 
                             <div className="mb-8 flex-grow space-y-3 text-left">
@@ -731,7 +647,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    100 tokens per month
+                                    100 โทเค็นต่อเดือน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -747,7 +663,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    50 tokens daily
+                                    50 โทเค็นต่อวัน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -763,7 +679,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Basic irrigation planning
+                                    การวางแผนการชลประทานพื้นฐาน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -779,7 +695,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Standard support
+                                    การสนับสนุนมาตรฐาน
                                 </div>
                             </div>
 
@@ -787,7 +703,7 @@ export default function NewHome() {
                                 onClick={handleTryFreePlan}
                                 className="mt-auto w-full rounded-lg bg-orange-600 px-6 py-3 font-semibold text-white shadow-lg shadow-orange-500/50 transition-all duration-300 hover:scale-105 hover:bg-orange-700 hover:shadow-xl hover:shadow-orange-500/60"
                             >
-                                Mobile Mode
+                                โหมดมือถือ
                             </button>
                         </motion.div>
 
@@ -801,19 +717,19 @@ export default function NewHome() {
                         >
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
                                 <span className="whitespace-nowrap rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white">
-                                    Coming Q2 2026
+                                    Coming 2026
                                 </span>
                             </div>
 
                             <div className="mb-6">
                                 <div className="mb-2 text-4xl">⭐</div>
                                 <div className="text-2xl font-bold text-white">Pro</div>
-                                <div className="text-sm text-slate-400">For serious users</div>
+                                <div className="text-sm text-slate-400">สำหรับผู้ใช้จริงจัง</div>
                             </div>
 
                             <div className="mb-6">
                                 <div className="text-3xl font-bold text-white">XXX</div>
-                                <div className="text-sm text-slate-400">tokens per month</div>
+                                <div className="text-sm text-slate-400">โทเค็นต่อเดือน</div>
                             </div>
 
                             <div className="mb-8 flex-grow space-y-3 text-left">
@@ -831,7 +747,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    XXX tokens per month
+                                    XXX โทเค็นต่อเดือน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -847,7 +763,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    100 tokens daily
+                                    100 โทเค็นต่อวัน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -863,7 +779,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Advanced irrigation planning
+                                    การวางแผนการชลประทานขั้นสูง
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -879,7 +795,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Priority support
+                                    การสนับสนุนแบบพิเศษ
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -895,7 +811,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Export capabilities
+                                    ความสามารถในการส่งออก
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -911,7 +827,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Advanced analytics
+                                    การวิเคราะห์ขั้นสูง
                                 </div>
                             </div>
 
@@ -919,7 +835,7 @@ export default function NewHome() {
                                 disabled
                                 className="mt-auto w-full cursor-not-allowed rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white opacity-50"
                             >
-                                Coming Q2 2026
+                                Coming 2026
                             </button>
                         </motion.div>
 
@@ -934,12 +850,12 @@ export default function NewHome() {
                             <div className="mb-6">
                                 <div className="mb-2 text-4xl">💎</div>
                                 <div className="text-2xl font-bold text-white">Advanced</div>
-                                <div className="text-sm text-slate-400">For professionals</div>
+                                <div className="text-sm text-slate-400">สำหรับผู้เชี่ยวชาญ</div>
                             </div>
 
                             <div className="mb-6">
                                 <div className="text-3xl font-bold text-white">XXX</div>
-                                <div className="text-sm text-slate-400">tokens per month</div>
+                                <div className="text-sm text-slate-400">โทเค็นต่อเดือน</div>
                             </div>
 
                             <div className="mb-8 flex-grow space-y-3 text-left">
@@ -957,7 +873,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    1000 tokens per month
+                                    1000 โทเค็นต่อเดือน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -973,7 +889,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    200 tokens daily
+                                    200 โทเค็นต่อวัน
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -989,7 +905,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Premium irrigation planning
+                                    การวางแผนการชลประทานระดับพรีเมียม
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -1005,7 +921,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    24/7 priority support
+                                    การสนับสนุนแบบพิเศษ 24/7
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -1021,7 +937,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Unlimited exports
+                                    การส่งออกไม่จำกัด
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -1037,7 +953,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Advanced analytics
+                                    การวิเคราะห์ขั้นสูง
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -1053,7 +969,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    Custom integrations
+                                    การเชื่อมต่อแบบกำหนดเอง
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <svg
@@ -1069,7 +985,7 @@ export default function NewHome() {
                                             d="M5 13l4 4L19 7"
                                         />
                                     </svg>
-                                    API access
+                                    การเข้าถึง API
                                 </div>
                             </div>
 
@@ -1077,7 +993,7 @@ export default function NewHome() {
                                 onClick={handleContinueToApp}
                                 className="mt-auto w-full rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white shadow-lg shadow-purple-500/50 transition-all duration-300 hover:scale-105 hover:bg-purple-700 hover:shadow-xl hover:shadow-purple-500/60"
                             >
-                                Try Advanced For Free
+                                ทดลองใช้ Advanced ฟรี
                             </button>
                         </motion.div>
                     </div>
@@ -1088,34 +1004,22 @@ export default function NewHome() {
             <section className="bg-slate-800/40 backdrop-blur-sm py-20">
                 <div className="mx-auto max-w-7xl px-6">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="mb-16 text-center"
-                    >
-                        <h2 className="mb-4 text-3xl font-bold text-white lg:text-4xl">
-                            See Our Platform in Action
-                        </h2>
-                        <p className="mx-auto max-w-3xl text-lg text-slate-300">
-                            Watch how our smart irrigation management system transforms agricultural
-                            operations and maximizes efficiency.
-                        </p>
-                    </motion.div>
-
-                    <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className="relative"
                     >
                         <div className="aspect-video overflow-hidden rounded-2xl shadow-2xl border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg transition-all duration-300 hover:shadow-3xl hover:shadow-slate-900/50">
-                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
-                                <div className="text-center">
-                                    <div className="mb-4 text-6xl">🎥</div>
-                                    <p className="font-medium text-slate-300">Platform Demo Video</p>
-                                    <p className="text-sm text-slate-400">Video coming soon</p>
-                                </div>
-                            </div>
+                            <iframe
+                                className="w-full h-full"
+                                width="100%"
+                                height="100%"
+                                src="https://www.youtube.com/embed/U_Iu9F4Nq4E?si=CEEOlOEUkssXjTC4"
+                                title="YouTube video player"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                            ></iframe>
                         </div>
                     </motion.div>
 
@@ -1131,10 +1035,10 @@ export default function NewHome() {
                             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-900/30">
                                 <span className="text-xl">⚡</span>
                             </div>
-                            <h3 className="mb-2 text-lg font-semibold text-white">Quick Setup</h3>
+                            <h3 className="mb-2 text-lg font-semibold text-white">การตั้งค่าอย่างรวดเร็ว</h3>
                             <p className="text-sm text-slate-300">
-                                Get started in minutes with our intuitive interface and guided setup
-                                process.
+                                เริ่มต้นใช้งานได้ในไม่กี่นาทีด้วยอินเทอร์เฟซที่ใช้งานง่ายและกระบวนการตั้งค่า
+                                ที่มีคำแนะนำ
                             </p>
                         </motion.div>
 
@@ -1149,11 +1053,10 @@ export default function NewHome() {
                                 <span className="text-xl">🎯</span>
                             </div>
                             <h3 className="mb-2 text-lg font-semibold text-white">
-                                Precision Control
+                                การควบคุมที่แม่นยำ
                             </h3>
                             <p className="text-sm text-slate-300">
-                                Fine-tune every aspect of your irrigation system with millimeter
-                                precision.
+                                ปรับแต่งทุกด้านของระบบชลประทานของคุณด้วยความแม่นยำระดับมิลลิเมตร
                             </p>
                         </motion.div>
 
@@ -1168,11 +1071,11 @@ export default function NewHome() {
                                 <span className="text-xl">📊</span>
                             </div>
                             <h3 className="mb-2 text-lg font-semibold text-white">
-                                Real-time Analytics
+                                การวิเคราะห์แบบเรียลไทม์
                             </h3>
                             <p className="text-sm text-slate-300">
-                                Monitor performance and optimize efficiency with live data and
-                                insights.
+                                ตรวจสอบประสิทธิภาพและเพิ่มประสิทธิภาพด้วยข้อมูลสดและ
+                                ข้อมูลเชิงลึก
                             </p>
                         </motion.div>
                     </div>

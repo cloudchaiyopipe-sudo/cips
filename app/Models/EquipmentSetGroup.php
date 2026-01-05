@@ -10,7 +10,9 @@ class EquipmentSetGroup extends Model
 {
     protected $fillable = [
         'equipment_set_id',
-        'sort_order'
+        'name',
+        'sort_order',
+        'image'
     ];
 
     protected $casts = [
@@ -67,7 +69,9 @@ class EquipmentSetGroup extends Model
         return [
             'id' => $this->id,
             'equipment_set_id' => $this->equipment_set_id,
+            'name' => $this->name,
             'sort_order' => $this->sort_order,
+            'image' => $this->image,
             'total_price' => $this->getTotalPrice(),
             'items_count' => $this->getItemsCount(),
             'created_at' => $this->created_at,

@@ -7,6 +7,7 @@ use App\Models\EquipmentSet;
 use App\Models\EquipmentSetGroup;
 use App\Models\EquipmentSetItem;
 use App\Models\Equipment;
+use App\Models\PumpAccessory;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,8 @@ class EquipmentSetController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'groups' => 'required|array|min:1',
+                'groups.*.name' => 'nullable|string|max:255',
+                'groups.*.image' => 'nullable|string|max:500',
                 'groups.*.items' => 'required|array|min:1',
                 'groups.*.items.*.category_id' => 'required|integer|exists:equipment_categories,id',
                 'groups.*.items.*.equipment_id' => 'required|integer|exists:equipments,id',
@@ -83,7 +86,9 @@ class EquipmentSetController extends Controller
                 foreach ($validated['groups'] as $groupIndex => $groupData) {
                     $group = EquipmentSetGroup::create([
                         'equipment_set_id' => $equipmentSet->id,
-                        'sort_order' => $groupIndex
+                        'name' => $groupData['name'] ?? null,
+                        'sort_order' => $groupIndex,
+                        'image' => $groupData['image'] ?? null
                     ]);
 
                     // Create items for this group
@@ -147,10 +152,13 @@ class EquipmentSetController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'groups' => 'required|array|min:1',
+                'groups.*.id' => 'nullable|integer|exists:equipment_set_groups,id', // เพิ่ม validation สำหรับ id
+                'groups.*.name' => 'nullable|string|max:255',
                 'groups.*.items' => 'required|array|min:1',
                 'groups.*.items.*.category_id' => 'required|integer|exists:equipment_categories,id',
                 'groups.*.items.*.equipment_id' => 'required|integer|exists:equipments,id',
-                'groups.*.items.*.quantity' => 'required|integer|min:1'
+                'groups.*.items.*.quantity' => 'required|integer|min:1',
+                'groups.*.image' => 'nullable|string|max:500'
             ]);
 
             return DB::transaction(function () use ($validated, $equipmentSet) {
@@ -159,15 +167,38 @@ class EquipmentSetController extends Controller
                     'name' => $validated['name']
                 ]);
 
-                // Delete existing groups and items (cascade will handle items)
-                $equipmentSet->groups()->delete();
-
-                // Create new groups and items
+                // เก็บ mapping ระหว่าง group_id เก่าและใหม่
+                // เพื่ออัพเดต pumpAccessories ที่ใช้ group_id เก่า
+                $groupMapping = [];
+                $existingGroups = $equipmentSet->groups()->get()->keyBy('id');
+                
+                // อัพเดตหรือสร้าง groups ใหม่
                 foreach ($validated['groups'] as $groupIndex => $groupData) {
-                    $group = EquipmentSetGroup::create([
-                        'equipment_set_id' => $equipmentSet->id,
-                        'sort_order' => $groupIndex
-                    ]);
+                    $existingGroupId = isset($groupData['id']) ? $groupData['id'] : null;
+                    $existingGroup = $existingGroupId ? $existingGroups->get($existingGroupId) : null;
+                    
+                    if ($existingGroup) {
+                        // อัพเดต group ที่มีอยู่
+                        $existingGroup->update([
+                            'name' => $groupData['name'] ?? null,
+                            'sort_order' => $groupIndex,
+                            'image' => $groupData['image'] ?? null
+                        ]);
+                        
+                        $group = $existingGroup;
+                        $groupMapping[$existingGroupId] = $group->id;
+                        
+                        // ลบ items เก่าของ group นี้
+                        $group->items()->delete();
+                    } else {
+                        // สร้าง group ใหม่
+                        $group = EquipmentSetGroup::create([
+                            'equipment_set_id' => $equipmentSet->id,
+                            'name' => $groupData['name'] ?? null,
+                            'sort_order' => $groupIndex,
+                            'image' => $groupData['image'] ?? null
+                        ]);
+                    }
 
                     // Create items for this group
                     foreach ($groupData['items'] as $itemIndex => $itemData) {
@@ -180,6 +211,36 @@ class EquipmentSetController extends Controller
                             'unit_price' => $equipment->price,
                             'sort_order' => $itemIndex
                         ]);
+                    }
+                }
+                
+                // ลบ groups ที่ไม่ได้ถูกอัพเดตหรือสร้างใหม่
+                $newGroupIds = collect($validated['groups'])
+                    ->map(function($groupData) use ($groupMapping) {
+                        $existingGroupId = isset($groupData['id']) ? $groupData['id'] : null;
+                        return $existingGroupId ? ($groupMapping[$existingGroupId] ?? $existingGroupId) : null;
+                    })
+                    ->filter()
+                    ->toArray();
+                
+                $groupsToDelete = $equipmentSet->groups()
+                    ->whereNotIn('id', $newGroupIds)
+                    ->get();
+                
+                // ตรวจสอบว่า groups ที่จะลบมี pumpAccessories ใช้งานอยู่หรือไม่
+                foreach ($groupsToDelete as $groupToDelete) {
+                    $pumpAccessoriesUsingGroup = PumpAccessory::where('group_id', $groupToDelete->id)->count();
+                    
+                    if ($pumpAccessoriesUsingGroup > 0) {
+                        // ถ้ามี pumpAccessories ใช้งานอยู่ ไม่ลบ group แต่ลบ items เท่านั้น
+                        $groupToDelete->items()->delete();
+                        // อัพเดต group ให้เป็น empty group
+                        $groupToDelete->update([
+                            'name' => ($groupToDelete->name ?? '') . ' (ลบแล้ว)',
+                        ]);
+                    } else {
+                        // ถ้าไม่มี pumpAccessories ใช้งานอยู่ ลบ group ได้
+                        $groupToDelete->delete();
                     }
                 }
 
@@ -253,7 +314,9 @@ class EquipmentSetController extends Controller
                 foreach ($equipmentSet->groups as $group) {
                     $newGroup = EquipmentSetGroup::create([
                         'equipment_set_id' => $newEquipmentSet->id,
-                        'sort_order' => $group->sort_order
+                        'name' => $group->name,
+                        'sort_order' => $group->sort_order,
+                        'image' => $group->image
                     ]);
 
                     foreach ($group->items as $item) {

@@ -131,6 +131,16 @@ export interface PumpAccessory {
     accessory_type?: string;
     specifications?: any;
     description?: string;
+    group_id?: number | null;
+    equipment_set_id?: number | null;
+    group?: {
+        id: number;
+        name: string;
+        image?: string;
+        total_price?: number;
+        items?: any[];
+    };
+    group_items?: any[];
 }
 
 export interface HeadLossValidation {
@@ -376,10 +386,12 @@ export interface SprinklerSetItem {
 export interface SprinklerSetGroup {
     id: number | string;
     equipment_set_id: number;
+    name?: string;
     items: SprinklerSetItem[];
     total_price?: number;
     items_count?: number;
     sort_order: number;
+    image?: string;
 }
 
 export interface SprinklerEquipmentSet {

@@ -20,6 +20,12 @@ import {
     FaCreditCard,
     FaCheck,
     FaTimes,
+    FaEnvelope,
+    FaPhone,
+    FaCalendarAlt,
+    FaUserShield,
+    FaUserTie,
+    FaUser,
 } from 'react-icons/fa';
 
 // Types
@@ -95,7 +101,7 @@ export default function SuperUserDashboard() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'users' | 'fields' | 'folders' | 'payments'>(
-        'payments'
+        'users'
     );
     const [activePaymentTab, setActivePaymentTab] = useState<'management' | 'history'>(
         'management'
@@ -138,9 +144,24 @@ export default function SuperUserDashboard() {
             if (statsResponse.data.success) {
                 setStats(statsResponse.data.stats);
             }
-            if (usersResponse.data.success) {
-                setUsers(usersResponse.data.users);
+            
+            // Handle users response with better error handling
+            if (usersResponse.data) {
+                if (usersResponse.data.success) {
+                    const usersData = usersResponse.data.users || [];
+                    console.log('Loaded users:', usersData.length, usersData);
+                    setUsers(usersData);
+                } else {
+                    console.error('Users API returned success: false', usersResponse.data);
+                }
+            } else {
+                console.error('Users API response structure unexpected:', usersResponse.data);
+                // Try to set users anyway if data exists
+                if (usersResponse.data?.users) {
+                    setUsers(usersResponse.data.users);
+                }
             }
+            
             if (fieldsResponse.data.success) {
                 setFields(fieldsResponse.data.fields);
             }
@@ -150,8 +171,23 @@ export default function SuperUserDashboard() {
             if (paymentsResponse.data.success) {
                 setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error loading dashboard data:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+            });
+            
+            // Try to load users separately if main request fails
+            try {
+                const usersResponse = await axios.get('/super/users');
+                if (usersResponse.data?.success && usersResponse.data?.users) {
+                    setUsers(usersResponse.data.users);
+                }
+            } catch (usersError) {
+                console.error('Failed to load users separately:', usersError);
+            }
         } finally {
             setLoading(false);
         }
@@ -431,8 +467,8 @@ export default function SuperUserDashboard() {
                         <div className="mb-6">
                             <nav className="flex space-x-8">
                                 {[
-                                    { id: 'payments', label: 'Payments', icon: FaCreditCard },
                                     { id: 'users', label: t('users'), icon: FaUsers },
+                                    { id: 'payments', label: 'Payments', icon: FaCreditCard },
                                     { id: 'fields', label: t('fields'), icon: FaMap },
                                     { id: 'folders', label: t('folders'), icon: FaFolder },
                                 ].map((tab) => (
@@ -1014,337 +1050,380 @@ export default function SuperUserDashboard() {
                                 </div>
                                 {/* User Display */}
                                 {userViewMode === 'grid' ? (
-                                    <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                                        {paginatedUsers.map((user) => (
-                                            <div
-                                                key={user.id}
-                                                className={`relative flex min-h-[420px] flex-col overflow-hidden rounded-3xl border shadow-2xl transition-transform duration-300 hover:-translate-y-2 hover:scale-105 ${
-                                                    user.role === 'super_user'
-                                                        ? 'border-yellow-700 bg-gradient-to-br from-yellow-900 via-gray-900 to-yellow-800 hover:shadow-yellow-500/30'
-                                                        : user.role === 'sales'
-                                                          ? 'border-purple-700 bg-gradient-to-br from-purple-900 via-gray-900 to-purple-800 hover:shadow-purple-500/30'
-                                                          : 'border-blue-700 bg-gradient-to-br from-blue-900 via-gray-900 to-blue-800 hover:shadow-blue-500/30'
-                                                }`}
-                                            >
-                                                {/* User Banner */}
-                                                <div
-                                                    className={`h-24 w-full ${
-                                                        user.role === 'super_user'
-                                                            ? 'bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-400'
-                                                            : user.role === 'sales'
-                                                              ? 'bg-gradient-to-r from-purple-800 via-purple-600 to-purple-400'
-                                                              : 'bg-gradient-to-r from-blue-800 via-blue-600 to-blue-400'
-                                                    }`}
-                                                ></div>
-                                                {/* Avatar */}
-                                                <div className="absolute left-1/2 top-12 z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-                                                    <div
-                                                        className={`flex h-24 w-24 items-center justify-center rounded-full border-4 border-white shadow-lg ring-4 ${
-                                                            user.role === 'super_user'
-                                                                ? 'bg-gradient-to-br from-yellow-700 via-yellow-500 to-yellow-400 ring-yellow-300/30'
-                                                                : user.role === 'sales'
-                                                                  ? 'bg-gradient-to-br from-purple-700 via-purple-500 to-purple-400 ring-purple-300/30'
-                                                                  : 'bg-gradient-to-br from-blue-700 via-blue-500 to-blue-400 ring-blue-300/30'
-                                                        }`}
+                                    <>
+                                        {paginatedUsers.length === 0 ? (
+                                            <div className="py-12 text-center">
+                                                <FaUsers className="mx-auto h-12 w-12 text-gray-400" />
+                                                <p className="mt-2 text-gray-400">
+                                                    {userSearchTerm
+                                                        ? t('no_users_found') ||
+                                                          'No users found matching your search'
+                                                        : t('no_users') || 'No users found'}
+                                                </p>
+                                                {userSearchTerm && (
+                                                    <button
+                                                        onClick={() => setUserSearchTerm('')}
+                                                        className="mt-2 text-sm text-blue-400 hover:text-blue-300"
                                                     >
-                                                        <FaUsers className="h-12 w-12 text-white drop-shadow" />
-                                                    </div>
-                                                    {/* Role Badge */}
-                                                    <span
-                                                        className={`mt-2 rounded-full border px-4 py-1 text-xs font-bold text-white shadow-lg ${
-                                                            user.role === 'super_user'
-                                                                ? 'border-yellow-300 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600'
-                                                                : user.role === 'sales'
-                                                                  ? 'border-purple-300 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600'
-                                                                  : 'border-blue-300 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-600'
-                                                        }`}
-                                                    >
-                                                        {user.role === 'super_user'
-                                                            ? t('Admin') || 'Admin'
-                                                            : user.role === 'sales'
-                                                              ? t('Sales') || 'Sales'
-                                                              : t('User') || 'User'}
-                                                    </span>
-                                                </div>
-                                                {/* User Info */}
-                                                <div className="flex flex-1 flex-col items-center px-8 pb-4 pt-20">
-                                                    <h3 className="mb-1 text-center text-xl font-extrabold tracking-wide text-white drop-shadow">
-                                                        {user.name}
-                                                    </h3>
-                                                    <p className="mb-1 break-all text-center font-mono text-sm text-blue-200">
-                                                        {user.email}
+                                                        {t('clear_search') || 'Clear search'}
+                                                    </button>
+                                                )}
+                                                {users.length === 0 && !loading && (
+                                                    <p className="mt-2 text-sm text-yellow-400">
+                                                        Debug: Users array is empty. Check console for API response.
                                                     </p>
-                                                    <div className="flex w-full flex-col items-center gap-1">
-                                                        <span className="flex items-center gap-1 text-xs text-gray-300">
-                                                            <span className="inline-block rounded bg-blue-900 px-2 py-0.5 text-xs font-semibold text-blue-200 shadow">
-                                                                <span className="font-bold text-blue-400">
-                                                                    Tel:
-                                                                </span>{' '}
-                                                                {user.is_super_user
-                                                                    ? user.phone
-                                                                    : '-'}
-                                                            </span>
-                                                        </span>
-                                                        {user.additional_details && (
-                                                            <div className="mt-2 w-full">
-                                                                <div className="group relative">
-                                                                    <div className="max-h-12 overflow-hidden rounded-lg border border-blue-800 bg-blue-950 px-3 py-2 text-xs text-gray-300 shadow-inner transition-all duration-200 group-hover:max-h-40 group-hover:overflow-y-auto">
-                                                                        {user.additional_details}
-                                                                    </div>
-                                                                    {user.additional_details
-                                                                        .length > 60 && (
-                                                                        <div className="absolute bottom-1 right-2 text-[10px] text-blue-300 opacity-70 group-hover:hidden">
-                                                                            ...
-                                                                        </div>
-                                                                    )}
-                                                                    {user.additional_details
-                                                                        .length > 60 && (
-                                                                        <div className="absolute left-0 top-full z-20 hidden w-full group-hover:block">
-                                                                            {/* Optionally, you can add a tooltip or modal for full text */}
-                                                                        </div>
-                                                                    )}
-                                                                    {user.additional_details
-                                                                        .length > 60 && (
-                                                                        <div className="mt-1 text-right text-[10px] text-blue-400 group-hover:hidden">
-                                                                            {t('hover_to_expand') ||
-                                                                                'Hover to expand'}
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                                {paginatedUsers.map((user) => {
+                                                    const RoleIcon =
+                                                        user.role === 'super_user'
+                                                            ? FaUserShield
+                                                            : user.role === 'sales'
+                                                              ? FaUserTie
+                                                              : FaUser;
+                                                    const roleColors = {
+                                                        super_user: {
+                                                            bg: 'from-amber-500/20 via-amber-600/10 to-amber-500/20',
+                                                            border: 'border-amber-500/30',
+                                                            accent: 'text-amber-400',
+                                                            badge: 'bg-amber-500/20 text-amber-300 border-amber-500/50',
+                                                            button: 'bg-amber-600 hover:bg-amber-700',
+                                                        },
+                                                        sales: {
+                                                            bg: 'from-purple-500/20 via-purple-600/10 to-purple-500/20',
+                                                            border: 'border-purple-500/30',
+                                                            accent: 'text-purple-400',
+                                                            badge: 'bg-purple-500/20 text-purple-300 border-purple-500/50',
+                                                            button: 'bg-purple-600 hover:bg-purple-700',
+                                                        },
+                                                        user: {
+                                                            bg: 'from-blue-500/20 via-blue-600/10 to-blue-500/20',
+                                                            border: 'border-blue-500/30',
+                                                            accent: 'text-blue-400',
+                                                            badge: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
+                                                            button: 'bg-blue-600 hover:bg-blue-700',
+                                                        },
+                                                    };
+                                                    const colors = roleColors[user.role] || roleColors.user;
+
+                                                    return (
+                                                        <div
+                                                            key={user.id}
+                                                            className={`group relative overflow-hidden rounded-2xl border ${colors.border} bg-gradient-to-br ${colors.bg} backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-gray-900/50`}
+                                                        >
+                                                            {/* Header with gradient */}
+                                                            <div className={`relative h-20 bg-gradient-to-r ${
+                                                                user.role === 'super_user'
+                                                                    ? 'from-amber-600 via-amber-500 to-amber-600'
+                                                                    : user.role === 'sales'
+                                                                      ? 'from-purple-600 via-purple-500 to-purple-600'
+                                                                      : 'from-blue-600 via-blue-500 to-blue-600'
+                                                            }`}>
+                                                                <div className="absolute inset-0 bg-black/10"></div>
+                                                                {/* Role Badge */}
+                                                                <div className="absolute right-3 top-3">
+                                                                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${colors.badge} backdrop-blur-sm`}>
+                                                                        <RoleIcon className="h-3 w-3" />
+                                                                        {user.role === 'super_user'
+                                                                            ? t('Admin') || 'Admin'
+                                                                            : user.role === 'sales'
+                                                                              ? t('Sales') || 'Sales'
+                                                                              : t('User') || 'User'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Avatar */}
+                                                            <div className="relative -mt-10 flex justify-center">
+                                                                <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-gray-800 bg-gradient-to-br ${
+                                                                    user.role === 'super_user'
+                                                                        ? 'from-amber-400 to-amber-600'
+                                                                        : user.role === 'sales'
+                                                                          ? 'from-purple-400 to-purple-600'
+                                                                          : 'from-blue-400 to-blue-600'
+                                                                } shadow-xl ring-4 ring-gray-900/50`}>
+                                                                    <RoleIcon className="h-8 w-8 text-white" />
+                                                                    {user.is_super_user && (
+                                                                        <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 border-2 border-gray-800">
+                                                                            <FaCheck className="h-3 w-3 text-white" />
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                {/* User Stats */}
-                                                <div
-                                                    className={`flex justify-around border-t py-4 text-xs ${
-                                                        user.role === 'super_user'
-                                                            ? 'border-yellow-800 bg-gradient-to-r from-yellow-950 via-yellow-900 to-yellow-950 text-yellow-200'
-                                                            : user.role === 'sales'
-                                                              ? 'border-purple-800 bg-gradient-to-r from-purple-950 via-purple-900 to-purple-950 text-purple-200'
-                                                              : 'border-blue-800 bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 text-blue-200'
-                                                    }`}
-                                                >
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-lg font-bold text-white drop-shadow">
-                                                            {user.fields_count ?? '-'}
-                                                        </span>
-                                                        <span className="tracking-wide">
-                                                            {t('fields')}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-lg font-bold text-white drop-shadow">
-                                                            {user.folders_count ?? '-'}
-                                                        </span>
-                                                        <span className="tracking-wide">
-                                                            {t('folders')}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-lg font-bold text-white drop-shadow">
-                                                            {new Date(
-                                                                user.created_at
-                                                            ).toLocaleDateString()}
-                                                        </span>
-                                                        <span className="tracking-wide">
-                                                            {t('joined')}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                {/* Action Buttons - stick to bottom */}
-                                                <div className="mt-auto flex w-full gap-2 px-6 pb-6 pt-3">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedUser(user);
-                                                            setShowEditUserModal(true);
-                                                        }}
-                                                        className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-md transition-all ${
-                                                            user.role === 'super_user'
-                                                                ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 ring-1 ring-yellow-400/30 hover:from-yellow-700 hover:to-yellow-600'
-                                                                : user.role === 'sales'
-                                                                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 ring-1 ring-purple-400/30 hover:from-purple-700 hover:to-purple-600'
-                                                                  : 'bg-gradient-to-r from-blue-600 to-blue-500 ring-1 ring-blue-400/30 hover:from-blue-700 hover:to-blue-600'
-                                                        }`}
-                                                    >
-                                                        <FaEdit className="h-4 w-4" />
-                                                        {t('edit')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteUser(user.id)}
-                                                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-red-600 to-red-500 px-3 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-red-400/30 transition-all hover:from-red-700 hover:to-red-600"
-                                                    >
-                                                        <FaTrash className="h-4 w-4" />
-                                                        {t('delete')}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    /* Table View */
-                                    <div className="overflow-hidden rounded-lg border border-gray-700 bg-gray-800">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full">
-                                                <thead className="bg-gray-700">
-                                                    <tr>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('user') || 'User'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('email') || 'Email'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('phone') || 'Phone'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('fields') || 'Fields'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('folders') || 'Folders'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('joined') || 'Joined'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('status') || 'Status'}
-                                                        </th>
-                                                        <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-300">
-                                                            {t('actions') || 'Actions'}
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-700">
-                                                    {paginatedUsers.map((user) => (
-                                                        <tr
-                                                            key={user.id}
-                                                            className="transition-colors hover:bg-gray-700/50"
-                                                        >
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <div className="flex items-center">
-                                                                    <div className="h-10 w-10 flex-shrink-0">
-                                                                        <div
-                                                                            className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                                                                                user.role ===
-                                                                                'super_user'
-                                                                                    ? 'bg-gradient-to-br from-yellow-500 to-yellow-600'
-                                                                                    : user.role ===
-                                                                                        'sales'
-                                                                                      ? 'bg-gradient-to-br from-purple-500 to-purple-600'
-                                                                                      : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                                                                            }`}
-                                                                        >
-                                                                            <FaUsers className="h-5 w-5 text-white" />
+
+                                                            {/* User Info */}
+                                                            <div className="px-5 pb-5 pt-3">
+                                                                <h3 className="mb-1 text-center text-lg font-bold text-white">
+                                                                    {user.name}
+                                                                </h3>
+                                                                
+                                                                {/* Email */}
+                                                                <div className="mb-3 flex items-center justify-center gap-2 text-sm text-gray-400">
+                                                                    <FaEnvelope className="h-3.5 w-3.5" />
+                                                                    <span className="truncate font-mono text-xs">
+                                                                        {user.email}
+                                                                    </span>
+                                                                </div>
+
+                                                                {/* Phone */}
+                                                                {user.phone && (
+                                                                    <div className="mb-3 flex items-center justify-center gap-2 text-sm text-gray-400">
+                                                                        <FaPhone className="h-3.5 w-3.5" />
+                                                                        <span className="text-xs">{user.phone}</span>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Additional Details */}
+                                                                {user.additional_details && (
+                                                                    <div className="mb-3 rounded-lg border border-gray-700/50 bg-gray-800/50 p-2">
+                                                                        <p className="line-clamp-2 text-xs text-gray-400">
+                                                                            {user.additional_details}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Stats Grid */}
+                                                                <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg border border-gray-700/50 bg-gray-800/30 p-3">
+                                                                    <div className="flex flex-col items-center">
+                                                                        <div className={`mb-1 text-xl font-bold ${colors.accent}`}>
+                                                                            {user.fields_count ?? 0}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                                                                            <FaMap className="h-3 w-3" />
+                                                                            <span>{t('fields')}</span>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="ml-4">
-                                                                        <div className="text-sm font-medium text-white">
-                                                                            {user.name}
+                                                                    <div className="flex flex-col items-center">
+                                                                        <div className={`mb-1 text-xl font-bold ${colors.accent}`}>
+                                                                            {user.folders_count ?? 0}
                                                                         </div>
-                                                                        <div
-                                                                            className={`text-xs font-semibold ${
-                                                                                user.role ===
-                                                                                'super_user'
-                                                                                    ? 'text-yellow-400'
-                                                                                    : user.role ===
-                                                                                        'sales'
-                                                                                      ? 'text-purple-400'
-                                                                                      : 'text-blue-400'
-                                                                            }`}
-                                                                        >
-                                                                            {user.role ===
-                                                                            'super_user'
-                                                                                ? t('super_user') ||
-                                                                                  'Super User'
-                                                                                : user.role ===
-                                                                                    'sales'
-                                                                                  ? t(
-                                                                                        'sales_user'
-                                                                                    ) ||
-                                                                                    'Sales User'
-                                                                                  : t(
-                                                                                        'regular_user'
-                                                                                    ) ||
-                                                                                    'Regular User'}
+                                                                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                                                                            <FaFolder className="h-3 w-3" />
+                                                                            <span>{t('folders')}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-center">
+                                                                        <div className="mb-1 flex items-center gap-1 text-xs text-gray-400">
+                                                                            <FaCalendarAlt className="h-3 w-3" />
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-500">
+                                                                            {new Date(user.created_at).toLocaleDateString('en-US', {
+                                                                                month: 'short',
+                                                                                day: 'numeric',
+                                                                                year: 'numeric',
+                                                                            })}
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <div className="font-mono text-sm text-gray-300">
-                                                                    {user.email}
-                                                                </div>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <div className="text-sm text-gray-300">
-                                                                    {user.phone || '-'}
-                                                                </div>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <div className="text-sm font-semibold text-white">
-                                                                    {user.fields_count ?? '-'}
-                                                                </div>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <div className="text-sm font-semibold text-white">
-                                                                    {user.folders_count ?? '-'}
-                                                                </div>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <div className="text-sm text-gray-300">
-                                                                    {new Date(
-                                                                        user.created_at
-                                                                    ).toLocaleDateString()}
-                                                                </div>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4">
-                                                                <span
-                                                                    className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                                                        user.role === 'super_user'
-                                                                            ? 'bg-yellow-100 text-yellow-800'
-                                                                            : user.role === 'sales'
-                                                                              ? 'bg-purple-100 text-purple-800'
-                                                                              : 'bg-green-100 text-green-800'
-                                                                    }`}
-                                                                >
-                                                                    {user.role === 'super_user'
-                                                                        ? t('Admin') || 'Admin'
-                                                                        : user.role === 'sales'
-                                                                          ? t('Sales') || 'Sales'
-                                                                          : t('User') || 'User'}
-                                                                </span>
-                                                            </td>
-                                                            <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                                                <div className="flex items-center justify-end gap-2">
+
+                                                                {/* Action Buttons */}
+                                                                <div className="flex gap-2">
                                                                     <button
                                                                         onClick={() => {
                                                                             setSelectedUser(user);
-                                                                            setShowEditUserModal(
-                                                                                true
-                                                                            );
+                                                                            setShowEditUserModal(true);
                                                                         }}
-                                                                        className="text-blue-400 transition-colors hover:text-blue-300"
-                                                                        title={t('edit') || 'Edit'}
+                                                                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg ${colors.button} px-3 py-2.5 text-sm font-medium text-white transition-all hover:shadow-lg`}
                                                                     >
                                                                         <FaEdit className="h-4 w-4" />
+                                                                        <span>{t('edit')}</span>
                                                                     </button>
                                                                     <button
-                                                                        onClick={() =>
-                                                                            handleDeleteUser(
-                                                                                user.id
-                                                                            )
-                                                                        }
-                                                                        className="text-red-400 transition-colors hover:text-red-300"
-                                                                        title={
-                                                                            t('delete') || 'Delete'
-                                                                        }
+                                                                        onClick={() => handleDeleteUser(user.id)}
+                                                                        className="flex items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-all hover:bg-red-700 hover:shadow-lg"
                                                                     >
                                                                         <FaTrash className="h-4 w-4" />
                                                                     </button>
                                                                 </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    /* Table View */
+                                    <div className="overflow-hidden rounded-xl border border-gray-700/50 bg-gray-800/50 backdrop-blur-sm">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead className="bg-gradient-to-r from-gray-800 to-gray-700/50">
+                                                    <tr>
+                                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            {t('user') || 'User'}
+                                                        </th>
+                                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            <div className="flex items-center gap-2">
+                                                                <FaEnvelope className="h-3.5 w-3.5" />
+                                                                {t('email') || 'Email'}
+                                                            </div>
+                                                        </th>
+                                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            <div className="flex items-center gap-2">
+                                                                <FaPhone className="h-3.5 w-3.5" />
+                                                                {t('phone') || 'Phone'}
+                                                            </div>
+                                                        </th>
+                                                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <FaMap className="h-3.5 w-3.5" />
+                                                                {t('fields') || 'Fields'}
+                                                            </div>
+                                                        </th>
+                                                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <FaFolder className="h-3.5 w-3.5" />
+                                                                {t('folders') || 'Folders'}
+                                                            </div>
+                                                        </th>
+                                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            <div className="flex items-center gap-2">
+                                                                <FaCalendarAlt className="h-3.5 w-3.5" />
+                                                                {t('joined') || 'Joined'}
+                                                            </div>
+                                                        </th>
+                                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            {t('status') || 'Status'}
+                                                        </th>
+                                                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-300">
+                                                            {t('actions') || 'Actions'}
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-700/50">
+                                                    {paginatedUsers.map((user) => {
+                                                        const RoleIcon =
+                                                            user.role === 'super_user'
+                                                                ? FaUserShield
+                                                                : user.role === 'sales'
+                                                                  ? FaUserTie
+                                                                  : FaUser;
+                                                        const roleStyles = {
+                                                            super_user: {
+                                                                iconBg: 'from-amber-500 to-amber-600',
+                                                                text: 'text-amber-400',
+                                                                badge: 'bg-amber-500/20 text-amber-300 border-amber-500/50',
+                                                            },
+                                                            sales: {
+                                                                iconBg: 'from-purple-500 to-purple-600',
+                                                                text: 'text-purple-400',
+                                                                badge: 'bg-purple-500/20 text-purple-300 border-purple-500/50',
+                                                            },
+                                                            user: {
+                                                                iconBg: 'from-blue-500 to-blue-600',
+                                                                text: 'text-blue-400',
+                                                                badge: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
+                                                            },
+                                                        };
+                                                        const styles = roleStyles[user.role] || roleStyles.user;
+
+                                                        return (
+                                                            <tr
+                                                                key={user.id}
+                                                                className="transition-all hover:bg-gray-700/30"
+                                                            >
+                                                                <td className="whitespace-nowrap px-6 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${styles.iconBg} shadow-lg ring-2 ring-gray-700/50`}>
+                                                                            <RoleIcon className="h-5 w-5 text-white" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="text-sm font-semibold text-white">
+                                                                                {user.name}
+                                                                            </div>
+                                                                            {user.is_super_user && (
+                                                                                <div className="mt-0.5 flex items-center gap-1">
+                                                                                    <FaCheck className="h-2.5 w-2.5 text-yellow-400" />
+                                                                                    <span className="text-xs text-yellow-400">Super User</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <FaEnvelope className="h-3.5 w-3.5 text-gray-500" />
+                                                                        <span className="font-mono text-sm text-gray-300">
+                                                                            {user.email}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4">
+                                                                    {user.phone ? (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <FaPhone className="h-3.5 w-3.5 text-gray-500" />
+                                                                            <span className="text-sm text-gray-300">
+                                                                                {user.phone}
+                                                                            </span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-sm text-gray-500">-</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4 text-center">
+                                                                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5">
+                                                                        <FaMap className="h-3.5 w-3.5 text-blue-400" />
+                                                                        <span className="text-sm font-semibold text-white">
+                                                                            {user.fields_count ?? 0}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4 text-center">
+                                                                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-purple-500/10 px-3 py-1.5">
+                                                                        <FaFolder className="h-3.5 w-3.5 text-purple-400" />
+                                                                        <span className="text-sm font-semibold text-white">
+                                                                            {user.folders_count ?? 0}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <FaCalendarAlt className="h-3.5 w-3.5 text-gray-500" />
+                                                                        <span className="text-sm text-gray-300">
+                                                                            {new Date(user.created_at).toLocaleDateString('en-US', {
+                                                                                month: 'short',
+                                                                                day: 'numeric',
+                                                                                year: 'numeric',
+                                                                            })}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4">
+                                                                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${styles.badge}`}>
+                                                                        <RoleIcon className="h-3 w-3" />
+                                                                        {user.role === 'super_user'
+                                                                            ? t('Admin') || 'Admin'
+                                                                            : user.role === 'sales'
+                                                                              ? t('Sales') || 'Sales'
+                                                                              : t('User') || 'User'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-6 py-4 text-right">
+                                                                    <div className="flex items-center justify-end gap-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setSelectedUser(user);
+                                                                                setShowEditUserModal(true);
+                                                                            }}
+                                                                            className="rounded-lg bg-blue-600/20 p-2 text-blue-400 transition-all hover:bg-blue-600/30 hover:text-blue-300"
+                                                                            title={t('edit') || 'Edit'}
+                                                                        >
+                                                                            <FaEdit className="h-4 w-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteUser(user.id)}
+                                                                            className="rounded-lg bg-red-600/20 p-2 text-red-400 transition-all hover:bg-red-600/30 hover:text-red-300"
+                                                                            title={t('delete') || 'Delete'}
+                                                                        >
+                                                                            <FaTrash className="h-4 w-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -2048,7 +2127,6 @@ const CreateUserModal = ({
     const [userName, setUserName] = useState('');
     const [userEmail, setUserEmail] = useState('');
     const [userPassword, setUserPassword] = useState('');
-    const [isSuperUser, setIsSuperUser] = useState(false);
     const [userRole, setUserRole] = useState<'user' | 'sales' | 'super_user'>('user');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -2059,7 +2137,7 @@ const CreateUserModal = ({
             name: userName.trim(),
             email: userEmail.trim(),
             password: userPassword,
-            is_super_user: isSuperUser || userRole === 'super_user',
+            is_super_user: userRole === 'super_user',
             role: userRole,
             phone: '',
             additional_details: '',
@@ -2068,7 +2146,6 @@ const CreateUserModal = ({
         setUserName('');
         setUserEmail('');
         setUserPassword('');
-        setIsSuperUser(false);
         setUserRole('user');
         onClose();
     };
@@ -2154,17 +2231,11 @@ const CreateUserModal = ({
                             <option value="sales">{t('sales_user') || 'Sales User'}</option>
                             <option value="super_user">{t('super_user') || 'Super User'}</option>
                         </select>
-                    </div>
-                    <div className="mb-6">
-                        <label className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={isSuperUser}
-                                onChange={(e) => setIsSuperUser(e.target.checked)}
-                                className="mr-2 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-300">{t('make_super_user')}</span>
-                        </label>
+                        {userRole === 'super_user' && (
+                            <p className="mt-2 text-xs text-amber-400">
+                                {t('super_user_note') || 'Super User will have full administrative access'}
+                            </p>
+                        )}
                     </div>
                     <div className="flex justify-end space-x-3">
                         <button
@@ -2205,7 +2276,6 @@ const EditUserModal = ({
     const [userName, setUserName] = useState(user.name);
     const [userEmail, setUserEmail] = useState(user.email);
     const [userPassword, setUserPassword] = useState('');
-    const [isSuperUser, setIsSuperUser] = useState(user.is_super_user);
     const [userRole, setUserRole] = useState<'user' | 'sales' | 'super_user'>(user.role || 'user');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -2215,7 +2285,7 @@ const EditUserModal = ({
         const updateData: Partial<User> = {
             name: userName.trim(),
             email: userEmail.trim(),
-            is_super_user: isSuperUser || userRole === 'super_user',
+            is_super_user: userRole === 'super_user',
             role: userRole,
         };
 
@@ -2310,17 +2380,11 @@ const EditUserModal = ({
                             <option value="sales">{t('sales_user') || 'Sales User'}</option>
                             <option value="super_user">{t('super_user') || 'Super User'}</option>
                         </select>
-                    </div>
-                    <div className="mb-6">
-                        <label className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={isSuperUser}
-                                onChange={(e) => setIsSuperUser(e.target.checked)}
-                                className="mr-2 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-300">{t('make_super_user')}</span>
-                        </label>
+                        {userRole === 'super_user' && (
+                            <p className="mt-2 text-xs text-amber-400">
+                                {t('super_user_note') || 'Super User will have full administrative access'}
+                            </p>
+                        )}
                     </div>
                     <div className="flex justify-end space-x-3">
                         <button

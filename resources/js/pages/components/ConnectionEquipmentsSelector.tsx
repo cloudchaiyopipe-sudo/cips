@@ -313,7 +313,7 @@ const ConnectionEquipmentsSelector: React.FC<ConnectionEquipmentsSelectorProps> 
                 <div className="mb-2 flex flex-row items-center justify-between gap-4">
                     <div>
                         <h3 className="m-0 p-0 text-2xl font-bold text-green-800">
-                            🔗 {t('อุปกรณ์เชื่อมต่อท่อ')}
+                            🔗 {t('อุปกรณ์ข้อต่อท่อ')}
                         </h3>
                     </div>
                 </div>

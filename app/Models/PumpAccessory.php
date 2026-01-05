@@ -21,6 +21,8 @@ class PumpAccessory extends Model
         'is_included',
         'sort_order',
         'equipment_id',
+        'group_id',
+        'equipment_set_id',
         'description',
     ];
 

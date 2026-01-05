@@ -89,6 +89,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
     const [selectedEquipment, setSelectedEquipment] = useState<number | null>(null);
     const [loadingEquipments, setLoadingEquipments] = useState(false);
+    const [applyEquipmentToAllZones, setApplyEquipmentToAllZones] = useState(false);
 
     const inputRef = useRef(input);
     const onInputChangeRef = useRef(onInputChange);
@@ -97,6 +98,16 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         inputRef.current = input;
         onInputChangeRef.current = onInputChange;
     }, [input, onInputChange]);
+
+    // Load sprinkler equipment set from input when zone changes
+    useEffect(() => {
+        if (input?.sprinklerEquipmentSet?.selectedItems) {
+            setSelectedSprinklerItems(input.sprinklerEquipmentSet.selectedItems);
+        } else {
+            setSelectedSprinklerItems([]);
+        }
+    }, [input?.sprinklerEquipmentSet, activeZone?.id]);
+
 
     const analyzedSprinklers = useMemo(
         () => results.analyzedSprinklers || [],
@@ -151,6 +162,52 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
         return null;
     }, [fieldCropData]);
+
+    // ฟังก์ชันหาจำนวนหัวฉีดของโซนนี้
+    const getZoneSprinklerCount = useCallback(() => {
+        if (activeZone && input) {
+            // ใช้ input.totalTrees สำหรับโซนนี้
+            let zoneSprinklerCount = input.totalTrees || 0;
+            
+            if (projectMode === 'horticulture' && zoneSprinklerCount > 0) {
+                const config = loadSprinklerConfig();
+                const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
+            }
+            return zoneSprinklerCount;
+        } else if (projectMode === 'garden' && gardenStats && activeZone) {
+            const zone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+            if (zone) {
+                return zone.sprinklerCount || 0;
+            }
+        } else if (projectMode === 'field-crop' && fieldCropData && activeZone) {
+            const zone = fieldCropData.zones?.info?.find((z: any) => z.id === activeZone.id);
+            if (zone) {
+                const zoneSummary = fieldCropData.zoneSummaries?.[activeZone.id];
+                if (zoneSummary?.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                    return zoneSummary.totalIrrigationPoints;
+                } else if (zoneSummary?.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                    return zoneSummary.sprinklerCount;
+                } else {
+                    return zone.sprinklerCount || 0;
+                }
+            }
+        } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
+            const plot = greenhouseData.summary?.plotStats?.find((p: any) => p.plotId === activeZone.id);
+            if (plot) {
+                return plot.equipmentCount?.sprinklers || plot.production?.totalPlants || 0;
+            }
+        }
+        
+        // Fallback: ใช้ results.totalSprinklers
+        let totalSprinklers = results.totalSprinklers || 0;
+        if (projectMode === 'horticulture' && totalSprinklers > 0) {
+            const config = loadSprinklerConfig();
+            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+            totalSprinklers = totalSprinklers * sprinklersPerTree;
+        }
+        return totalSprinklers;
+    }, [activeZone, input, projectMode, gardenStats, fieldCropData, greenhouseData, results.totalSprinklers]);
 
     const getAverageValue = (value: any): number => {
         if (Array.isArray(value)) {
@@ -552,6 +609,61 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         }
     };
 
+    // Function to apply equipment set to all zones
+    const applyEquipmentSetToAllZones = useCallback((groupId: number | string | null, items: SprinklerSetItem[]) => {
+        try {
+            // Get all zones from project data
+            let zoneIds: string[] = [];
+
+            if (projectMode === 'horticulture') {
+                const horticultureData = localStorage.getItem('horticultureSystemData');
+                if (horticultureData) {
+                    const data = JSON.parse(horticultureData);
+                    zoneIds = data.zones?.map((z: any) => z.id) || [];
+                }
+            } else if (projectMode === 'garden' && gardenStats) {
+                zoneIds = gardenStats.zones.map((z: any) => z.zoneId);
+            } else if (projectMode === 'field-crop' && fieldCropData) {
+                zoneIds = fieldCropData.zones?.info?.map((z: any) => z.id) || [];
+            } else if (projectMode === 'greenhouse' && greenhouseData) {
+                zoneIds = greenhouseData.summary?.plotStats?.map((p: any) => p.plotId) || [];
+            }
+
+            // Update sprinklerEquipmentSets in localStorage
+            const equipmentSetsKey = `${projectMode}_sprinklerEquipmentSets`;
+            let sprinklerEquipmentSets: { [zoneId: string]: any } = {};
+            
+            try {
+                const storedSets = localStorage.getItem(equipmentSetsKey);
+                if (storedSets) {
+                    sprinklerEquipmentSets = JSON.parse(storedSets);
+                }
+            } catch (e) {
+                console.error('Error parsing sprinklerEquipmentSets:', e);
+            }
+
+            // Apply equipment set to all zones
+            zoneIds.forEach((zoneId) => {
+                sprinklerEquipmentSets[zoneId] = {
+                    selectedGroupId: groupId,
+                    selectedItems: items,
+                };
+            });
+
+            // Save back to localStorage
+            localStorage.setItem(equipmentSetsKey, JSON.stringify(sprinklerEquipmentSets));
+
+            // Dispatch custom event to notify other components
+            window.dispatchEvent(new CustomEvent('sprinklerEquipmentSetsUpdated', {
+                detail: { sprinklerEquipmentSets }
+            }));
+
+            console.log(`Applied equipment set to ${zoneIds.length} zones`);
+        } catch (error) {
+            console.error('Error applying equipment set to all zones:', error);
+        }
+    }, [projectMode, gardenStats, fieldCropData, greenhouseData]);
+
     const handleSprinklerGroupChange = useCallback(
         (groupId: string) => {
             if (!inputRef.current || !onInputChangeRef.current) return;
@@ -574,6 +686,11 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             selectedItems: selectedGroup.items,
                         },
                     });
+
+                    // Apply to all zones if checkbox is checked
+                    if (applyEquipmentToAllZones) {
+                        applyEquipmentSetToAllZones(selectedGroupId, selectedGroup.items);
+                    }
                 }
             } else {
                 setSelectedSprinklerItems([]);
@@ -584,9 +701,35 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         selectedItems: [],
                     },
                 });
+
+                // Clear all zones if checkbox is checked
+                if (applyEquipmentToAllZones) {
+                    applyEquipmentSetToAllZones(null, []);
+                } else {
+                    // ลบข้อมูลของโซนปัจจุบันออกจาก localStorage
+                    try {
+                        const equipmentSetsKey = `${projectMode}_sprinklerEquipmentSets`;
+                        const storedSets = localStorage.getItem(equipmentSetsKey);
+                        if (storedSets) {
+                            const sets = JSON.parse(storedSets);
+                            // ลบโซนปัจจุบันออก
+                            if (activeZone?.id) {
+                                delete sets[activeZone.id];
+                            }
+                            // บันทึกกลับ
+                            localStorage.setItem(equipmentSetsKey, JSON.stringify(sets));
+                            // Dispatch event เพื่อ update components อื่น
+                            window.dispatchEvent(new CustomEvent('sprinklerEquipmentSetsUpdated', {
+                                detail: { sprinklerEquipmentSets: sets }
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Error clearing sprinkler equipment set:', error);
+                    }
+                }
             }
         },
-        [sprinklerGroups]
+        [sprinklerGroups, applyEquipmentToAllZones, applyEquipmentSetToAllZones, activeZone?.id, projectMode]
     );
 
     const isPipeEquipment = (item: SprinklerSetItem): boolean => {
@@ -978,15 +1121,51 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                         <span className="text-sm text-gray-300">{t('จำนวนที่ต้องใช้:')}</span>
                                         <span className="text-base font-semibold text-white">
                                             {(() => {
-                                                if (projectMode === 'horticulture') {
-                                                    const config = loadSprinklerConfig();
-                                                    const sprinklersPerTree =
-                                                        config?.sprinklersPerTree || 1;
-                                                    return (
-                                                        results.totalSprinklers * sprinklersPerTree
-                                                    ).toLocaleString();
+                                                // หาจำนวนหัวฉีดของโซนนี้
+                                                let zoneSprinklerCount = 0;
+                                                
+                                                if (activeZone && input) {
+                                                    // ใช้ input.totalTrees สำหรับโซนนี้
+                                                    zoneSprinklerCount = input.totalTrees || 0;
+                                                    
+                                                    if (projectMode === 'horticulture' && zoneSprinklerCount > 0) {
+                                                        const config = loadSprinklerConfig();
+                                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                        zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
+                                                    }
+                                                } else if (projectMode === 'garden' && gardenStats && activeZone) {
+                                                    const zone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                                    if (zone) {
+                                                        zoneSprinklerCount = zone.sprinklerCount || 0;
+                                                    }
+                                                } else if (projectMode === 'field-crop' && fieldCropData && activeZone) {
+                                                    const zone = fieldCropData.zones?.info?.find((z: any) => z.id === activeZone.id);
+                                                    if (zone) {
+                                                        const zoneSummary = fieldCropData.zoneSummaries?.[activeZone.id];
+                                                        if (zoneSummary?.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                                                            zoneSprinklerCount = zoneSummary.totalIrrigationPoints;
+                                                        } else if (zoneSummary?.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                                                            zoneSprinklerCount = zoneSummary.sprinklerCount;
+                                                        } else {
+                                                            zoneSprinklerCount = zone.sprinklerCount || 0;
+                                                        }
+                                                    }
+                                                } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
+                                                    const plot = greenhouseData.summary?.plotStats?.find((p: any) => p.plotId === activeZone.id);
+                                                    if (plot) {
+                                                        zoneSprinklerCount = plot.equipmentCount?.sprinklers || plot.production?.totalPlants || 0;
+                                                    }
+                                                } else {
+                                                    // Fallback: ใช้ results.totalSprinklers
+                                                    zoneSprinklerCount = results.totalSprinklers || 0;
+                                                    if (projectMode === 'horticulture' && zoneSprinklerCount > 0) {
+                                                        const config = loadSprinklerConfig();
+                                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                        zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
+                                                    }
                                                 }
-                                                return results.totalSprinklers.toLocaleString();
+                                                
+                                                return zoneSprinklerCount.toLocaleString();
                                             })()}{' '}
                                             {t('หัว')}
                                             {activeZone && (
@@ -1003,19 +1182,52 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                         <span className="text-xl font-bold text-green-300">
                                             ฿
                                             {(() => {
-                                                if (projectMode === 'horticulture') {
-                                                    const config = loadSprinklerConfig();
-                                                    const sprinklersPerTree =
-                                                        config?.sprinklersPerTree || 1;
-                                                    return (
-                                                        selectedSprinkler.price *
-                                                        results.totalSprinklers *
-                                                        sprinklersPerTree
-                                                    ).toLocaleString();
+                                                // หาจำนวนหัวฉีดของโซนนี้
+                                                let zoneSprinklerCount = 0;
+                                                
+                                                if (activeZone && input) {
+                                                    // ใช้ input.totalTrees สำหรับโซนนี้
+                                                    zoneSprinklerCount = input.totalTrees || 0;
+                                                    
+                                                    if (projectMode === 'horticulture' && zoneSprinklerCount > 0) {
+                                                        const config = loadSprinklerConfig();
+                                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                        zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
+                                                    }
+                                                } else if (projectMode === 'garden' && gardenStats && activeZone) {
+                                                    const zone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                                    if (zone) {
+                                                        zoneSprinklerCount = zone.sprinklerCount || 0;
+                                                    }
+                                                } else if (projectMode === 'field-crop' && fieldCropData && activeZone) {
+                                                    const zone = fieldCropData.zones?.info?.find((z: any) => z.id === activeZone.id);
+                                                    if (zone) {
+                                                        const zoneSummary = fieldCropData.zoneSummaries?.[activeZone.id];
+                                                        if (zoneSummary?.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                                                            zoneSprinklerCount = zoneSummary.totalIrrigationPoints;
+                                                        } else if (zoneSummary?.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                                                            zoneSprinklerCount = zoneSummary.sprinklerCount;
+                                                        } else {
+                                                            zoneSprinklerCount = zone.sprinklerCount || 0;
+                                                        }
+                                                    }
+                                                } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
+                                                    const plot = greenhouseData.summary?.plotStats?.find((p: any) => p.plotId === activeZone.id);
+                                                    if (plot) {
+                                                        zoneSprinklerCount = plot.equipmentCount?.sprinklers || plot.production?.totalPlants || 0;
+                                                    }
+                                                } else {
+                                                    // Fallback: ใช้ results.totalSprinklers
+                                                    zoneSprinklerCount = results.totalSprinklers || 0;
+                                                    if (projectMode === 'horticulture' && zoneSprinklerCount > 0) {
+                                                        const config = loadSprinklerConfig();
+                                                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                                                        zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
+                                                    }
                                                 }
+                                                
                                                 return (
-                                                    selectedSprinkler.price *
-                                                    results.totalSprinklers
+                                                    selectedSprinkler.price * zoneSprinklerCount
                                                 ).toLocaleString();
                                             })()}
                                         </span>
@@ -1099,145 +1311,268 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             {/* ท่อเสริมต่อหัวสปริงเกอร์ */}
             {input && onInputChange && (
                 <div className="mt-6 rounded-lg bg-blue-600 p-3">
-                    <h4 className="mb-3 text-lg font-semibold text-white">
-                        🔧 {t('ท่อเสริมต่อหัวสปริงเกอร์')}
-                    </h4>
+                    <div className="mb-3 flex items-center justify-between">
+                        <h4 className="text-lg font-semibold text-white">
+                            🔧 {t('ท่อเสริมต่อหัวสปริงเกอร์')}
+                        </h4>
+                        {/* Checkbox to apply to all zones */}
+                        <label className="flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 rounded px-3 py-1.5 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={applyEquipmentToAllZones}
+                                onChange={(e) => {
+                                    const isChecked = e.target.checked;
+                                    setApplyEquipmentToAllZones(isChecked);
+                                    
+                                    // If checkbox is checked and there's already selected equipment, apply to all zones immediately
+                                    if (isChecked && input?.sprinklerEquipmentSet?.selectedGroupId) {
+                                        applyEquipmentSetToAllZones(
+                                            input.sprinklerEquipmentSet.selectedGroupId,
+                                            input.sprinklerEquipmentSet.selectedItems || []
+                                        );
+                                    }
+                                }}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-white font-medium whitespace-nowrap">
+                                {t('ใช้กับทุกโซน')}
+                            </span>
+                        </label>
+                    </div>
                     <div className="space-y-3">
                         <div>
                             <label className="mb-2 block text-sm font-medium text-white">
-                                {t('เลือกกลุ่มอุปกรณ์')}
+                                {t('เลือกชุดอุปกรณ์')}
                             </label>
-                            <select
-                                value={input.sprinklerEquipmentSet?.selectedGroupId || ''}
-                                onChange={(e) => handleSprinklerGroupChange(e.target.value)}
-                                className="w-full rounded border border-gray-500 bg-white p-2 text-black focus:border-blue-400"
-                                disabled={loadingSprinklerGroups}
-                            >
-                                <option value="">
-                                    {loadingSprinklerGroups
-                                        ? t('กำลังโหลด...')
-                                        : `-- ${t('เลือกกลุ่มอุปกรณ์')} --`}
-                                </option>
-                                {sprinklerGroups.map((group, index) => (
-                                    <option key={group.id} value={group.id}>
-                                        {t('กลุ่มที่')} {index + 1} -{' '}
-                                        {group.total_price?.toLocaleString()} {t('บาท')}
-                                    </option>
-                                ))}
-                            </select>
+                            {loadingSprinklerGroups ? (
+                                <div className="flex w-full items-center justify-center rounded border border-gray-500 bg-white p-2 text-gray-500">
+                                    {t('กำลังโหลด...')}
+                                </div>
+                            ) : (
+                                <SearchableDropdown
+                                    value={input.sprinklerEquipmentSet?.selectedGroupId || ''}
+                                    onChange={(value) => {
+                                        handleSprinklerGroupChange(String(value));
+                                    }}
+                                    options={[
+                                        {
+                                            value: '',
+                                            label: `-- ${t('เลือกชุดอุปกรณ์')} --`,
+                                        },
+                                        ...sprinklerGroups.map((group, index) => {
+                                            const groupName = group.name || `${t('กลุ่มที่')} ${index + 1}`;
+                                            return {
+                                                value: group.id,
+                                                label: `${groupName} - ${group.total_price?.toLocaleString()} ${t('บาท')}`,
+                                                searchableText: `${groupName} ${t('กลุ่มที่')} ${index + 1} ${group.total_price || 0}`,
+                                                image: group.image,
+                                                name: groupName,
+                                                price: group.total_price,
+                                                unit: t('บาท'),
+                                            };
+                                        }),
+                                    ]}
+                                    placeholder={`-- ${t('เลือกชุดอุปกรณ์')} --`}
+                                    searchPlaceholder={t('พิมพ์เพื่อค้นหาชื่อชุดอุปกรณ์...')}
+                                    className="w-full"
+                                />
+                            )}
                         </div>
 
                         {selectedSprinklerItems.length > 0 && (
                             <div className="mt-4">
                                 <div className="mb-3 flex items-center justify-between">
-                                    <h5 className="text-sm font-medium text-green-300">
-                                        {t('รายการอุปกรณ์ในกลุ่ม')} (
-                                        {selectedSprinklerItems.length} {t('รายการ')})
-                                    </h5>
+                                    <div className="flex items-center gap-2">
+                                        <h5 className="text-sm font-medium text-green-100">
+                                            {t('รายการอุปกรณ์ในชุด')} (
+                                            {selectedSprinklerItems.length} {t('รายการ')})
+                                        </h5>
+                                        {(() => {
+                                            const zoneSprinklerCount = getZoneSprinklerCount();
+                                            
+                                            const totalGroupPrice = selectedSprinklerItems.reduce((sum, item) => {
+                                                const quantityPerHead = item.quantity || 0;
+                                                const totalQuantity = quantityPerHead * zoneSprinklerCount;
+                                                const itemTotalPrice = totalQuantity * (item.unit_price || 0);
+                                                return sum + itemTotalPrice;
+                                            }, 0);
+                                            
+                                            return (
+                                                <span className="text-sm font-bold text-yellow-300">
+                                                    | {t('ราคารวม')}: ฿{totalGroupPrice.toLocaleString()} {t('บาท')}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={addSprinklerItem}
-                                        className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                                        className="rounded bg-green-600 px-3 py-1 text-xs text-white hover:bg-green-700"
                                     >
                                         + {t('เพิ่มรายการ')}
                                     </button>
                                 </div>
-                                <div className="max-h-48 space-y-2 overflow-y-auto">
-                                    {selectedSprinklerItems.map((item, index) => (
-                                        <div
-                                            key={`${item.id}-${index}`}
-                                            className="rounded border border-gray-600 bg-gray-600 p-3"
-                                        >
-                                            <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
-                                                <div className="col-span-2 flex items-center justify-center">
-                                                    {item.equipment.image ? (
-                                                        <img
-                                                            src={item.equipment.image}
-                                                            alt={
-                                                                item.equipment.name ||
-                                                                item.equipment.product_code
-                                                            }
-                                                            className="h-16 w-16 rounded-md border border-gray-500 object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="flex h-16 w-16 items-center justify-center rounded-md border border-gray-500 bg-gray-500">
-                                                            <span className="text-center text-xs text-gray-300">
-                                                                {t('ไม่มีรูป')}
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-12 p-2 rounded-lg bg-gray-700">
+                                    {/* Column 1: Group Image (5/12) */}
+                                    <div className="md:col-span-4 flex items-center justify-center">
+                                        {(() => {
+                                            const selectedGroup = sprinklerGroups.find(
+                                                (g) => g.id == input.sprinklerEquipmentSet?.selectedGroupId
+                                            );
+                                            return selectedGroup?.image ? (
+                                                <div className="flex justify-center w-full">
+                                                    {(() => {
+                                                        const groupIndex = sprinklerGroups.findIndex((g) => g.id == selectedGroup.id);
+                                                        const groupName = selectedGroup.name || `${t('กลุ่มที่')} ${groupIndex + 1}`;
+                                                        return (
+                                                            <img
+                                                                src={selectedGroup.image}
+                                                                alt={groupName}
+                                                                className="h-auto w-full max-w-xs cursor-pointer rounded-lg border border-gray-500 object-contain transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                onClick={() =>
+                                                                    openImageModal(
+                                                                        selectedGroup.image!,
+                                                                        groupName
+                                                                    )
+                                                                }
+                                                                title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        );
+                                                    })()}
+                                                </div>
+                                            ) : (
+                                                <div className="flex h-64 w-full max-w-xs items-center justify-center rounded-lg border border-gray-500 bg-gray-500">
+                                                    <span className="text-center text-sm text-gray-300">
+                                                        {t('ไม่มีรูปกลุ่ม')}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* Column 2: Equipment List (7/12) */}
+                                    <div className="md:col-span-8 max-h-80 overflow-y-auto">
+                                        <div className="space-y-2">
+                                            {selectedSprinklerItems.map((item, index) => (
+                                                <div
+                                                    key={`${item.id}-${index}`}
+                                                    className="rounded border border-gray-600 bg-gray-600 px-2 py-1 flex items-center gap-2"
+                                                    style={{ minHeight: 56 }} // shrink row height
+                                                >
+                                                    {/* Equipment Image */}
+                                                    <div className="flex-shrink-0 flex items-center justify-center">
+                                                        {item.equipment.image ? (
+                                                            <img
+                                                                src={item.equipment.image}
+                                                                alt={
+                                                                    item.equipment.name ||
+                                                                    item.equipment.product_code
+                                                                }
+                                                                className="h-10 w-10 cursor-pointer rounded border border-gray-500 object-cover transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                onClick={() =>
+                                                                    openImageModal(
+                                                                        item.equipment.image!,
+                                                                        item.equipment.name ||
+                                                                            item.equipment.product_code ||
+                                                                            'อุปกรณ์'
+                                                                    )
+                                                                }
+                                                                title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <div className="flex h-10 w-10 items-center justify-center rounded border border-gray-500 bg-gray-500">
+                                                                <span className="text-center text-[10px] text-gray-300">
+                                                                    {t('ไม่มีรูป')}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Equipment Details on 1 line, shrink font, plus quantity & price & remove button */}
+                                                    <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0 justify-between">
+                                                        {/* Main Info */}
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-medium text-xs text-white truncate">
+                                                                {item.equipment.name || item.equipment.product_code}
                                                             </span>
+                                                            {item.equipment.brand && (
+                                                                <span className="text-[10px] text-gray-400 truncate max-w-[7rem]">
+                                                                    {t('ยี่ห้อ')}: {item.equipment.brand}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    )}
+                                                        {/* Right aligned controls: Quantity, Price, Remove */}
+                                                        <div className="flex items-center gap-2 ml-auto">
+                                                            {/* Quantity Input */}
+                                                            <label className="text-[12px] text-gray-300 ml-2 whitespace-nowrap">
+                                                                {isPipeEquipment(item)
+                                                                    ? t('ความยาว (เมตร)')
+                                                                    : t('จำนวน')}
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                min={isPipeEquipment(item) ? '0.1' : '1'}
+                                                                step={isPipeEquipment(item) ? '0.1' : '1'}
+                                                                value={(() => {
+                                                                    const quantityPerHead = item.quantity || 0;
+                                                                    const zoneSprinklerCount = getZoneSprinklerCount();
+                                                                    const totalQuantity = quantityPerHead * zoneSprinklerCount;
+                                                                    return isPipeEquipment(item) 
+                                                                        ? totalQuantity.toFixed(1)
+                                                                        : Math.round(totalQuantity);
+                                                                })()}
+                                                                onChange={(e) => {
+                                                                    const inputValue = isPipeEquipment(item)
+                                                                        ? parseFloat(e.target.value) || 0.1
+                                                                        : parseInt(e.target.value) || 1;
+                                                                    
+                                                                    const zoneSprinklerCount = getZoneSprinklerCount();
+                                                                    
+                                                                    // Divide by zone sprinkler count to get quantity per head
+                                                                    const quantityPerHead = inputValue / zoneSprinklerCount;
+                                                                    
+                                                                    updateSprinklerItem(
+                                                                        index,
+                                                                        'quantity',
+                                                                        quantityPerHead
+                                                                    );
+                                                                }}
+                                                                className="w-20 h-7 rounded border border-gray-500 bg-gray-700 px-1 py-0 text-xs text-white focus:border-blue-400 text-right"
+                                                            />
+
+                                                            {/* Price */}
+                                                            <span className="text-xs font-semibold text-green-400 whitespace-nowrap">
+                                                                ฿
+                                                                {(() => {
+                                                                    const quantityPerHead = item.quantity || 0;
+                                                                    const zoneSprinklerCount = getZoneSprinklerCount();
+                                                                    const totalQuantity = quantityPerHead * zoneSprinklerCount;
+                                                                    const totalPrice = totalQuantity * (item.unit_price || 0);
+                                                                    
+                                                                    return totalPrice.toLocaleString();
+                                                                })()}
+                                                            </span>
+
+                                                            {/* Remove button */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeSprinklerItem(index)}
+                                                                className="ml-2 rounded bg-red-600 px-2 py-0.5 text-[10px] text-white hover:bg-red-700"
+                                                                style={{ lineHeight: "1.1" }}
+                                                            >
+                                                                {t('ลบ')}
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="col-span-5">
-                                                    <label className="mb-1 block text-xs text-gray-300">
-                                                        {t('ชื่อสินค้า')}
-                                                    </label>
-                                                    <p className="text-sm text-white">
-                                                        {item.equipment.name ||
-                                                            item.equipment.product_code}
-                                                    </p>
-                                                    {item.equipment.brand && (
-                                                        <p className="text-xs text-gray-400">
-                                                            {item.equipment.brand}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="mb-1 block text-xs text-gray-300">
-                                                        {isPipeEquipment(item)
-                                                            ? t('ความยาว (เมตร)')
-                                                            : t('จำนวน')}
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        min={
-                                                            isPipeEquipment(item) ? '0.1' : '1'
-                                                        }
-                                                        step={
-                                                            isPipeEquipment(item) ? '0.1' : '1'
-                                                        }
-                                                        value={item.quantity}
-                                                        onChange={(e) =>
-                                                            updateSprinklerItem(
-                                                                index,
-                                                                'quantity',
-                                                                isPipeEquipment(item)
-                                                                    ? parseFloat(
-                                                                          e.target.value
-                                                                      ) || 0.1
-                                                                    : parseInt(
-                                                                          e.target.value
-                                                                      ) || 1
-                                                            )
-                                                        }
-                                                        className="w-full rounded border border-gray-500 bg-gray-700 p-1 text-sm text-white focus:border-blue-400"
-                                                    />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="mb-1 block text-xs text-gray-300">
-                                                        {t('ราคารวม')}
-                                                    </label>
-                                                    <p className="text-sm text-green-400">
-                                                        ฿
-                                                        {(
-                                                            (item.quantity || 0) *
-                                                            (item.unit_price || 0)
-                                                        ).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                                <div className="col-span-1 flex items-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            removeSprinklerItem(index)
-                                                        }
-                                                        className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
-                                                    >
-                                                        {t('ลบ')}
-                                                    </button>
-                                                </div>
-                                            </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1425,12 +1760,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     onClick={closeImageModal}
                 >
                     <div
-                        className="relative max-h-[90vh] max-w-[90vw] p-4"
+                        className="relative flex h-full w-full items-center justify-center p-4"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
                             onClick={closeImageModal}
-                            className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
+                            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
                             title={t('ปิด')}
                         >
                             ✕
@@ -1438,10 +1773,16 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         <img
                             src={modalImage.src}
                             alt={modalImage.alt}
-                            className="max-h-full max-w-full rounded-lg shadow-2xl"
+                            className="max-h-full max-w-full rounded-lg shadow-2xl object-contain"
+                            style={{
+                                maxHeight: '90vh',
+                                maxWidth: '90vw',
+                                width: 'auto',
+                                height: 'auto',
+                            }}
                         />
-                        <div className="mt-2 text-center">
-                            <p className="inline-block rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+                            <p className="inline-block rounded bg-black bg-opacity-50 px-3 py-2 text-sm text-white">
                                 {modalImage.alt}
                             </p>
                         </div>

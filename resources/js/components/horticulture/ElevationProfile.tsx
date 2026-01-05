@@ -43,6 +43,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
     const endPointRef = useRef<google.maps.LatLng | null>(null);
 
     const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+    const domClickListenerRef = useRef<((event: MouseEvent) => void) | null>(null);
     const mouseMoveListenerRef = useRef<google.maps.MapsEventListener | null>(null);
     const polylineRef = useRef<google.maps.Polyline | null>(null);
     const markersRef = useRef<google.maps.Marker[]>([]);
@@ -60,6 +61,13 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
         if (clickListenerRef.current) {
             google.maps.event.removeListener(clickListenerRef.current);
             clickListenerRef.current = null;
+        }
+        if (domClickListenerRef.current && map) {
+            const mapDiv = map.getDiv();
+            if (mapDiv) {
+                mapDiv.removeEventListener('click', domClickListenerRef.current, true);
+            }
+            domClickListenerRef.current = null;
         }
         if (mouseMoveListenerRef.current) {
             google.maps.event.removeListener(mouseMoveListenerRef.current);
@@ -445,23 +453,24 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
     const setupDrawingMode = useCallback(() => {
         if (!map) return;
 
-        const handleMapClick = (event: google.maps.MapMouseEvent) => {
-            if (!event.latLng) return;
+        // Helper function to handle click with LatLng
+        const handleClickWithLatLng = (latLng: google.maps.LatLng) => {
+            if (!latLng) return;
 
             if (!startPointRef.current) {
                 // First click - set start point
-                startPointRef.current = event.latLng;
-                setStartPoint(event.latLng);
-                createMarker(event.latLng, 'start');
+                startPointRef.current = latLng;
+                setStartPoint(latLng);
+                createMarker(latLng, 'start');
             } else if (!endPointRef.current) {
                 // Second click - set end point and create profile
-                endPointRef.current = event.latLng;
-                setEndPoint(event.latLng);
-                createMarker(event.latLng, 'end');
+                endPointRef.current = latLng;
+                setEndPoint(latLng);
+                createMarker(latLng, 'end');
 
                 // Store the points for later use
                 const startPointForProfile = startPointRef.current;
-                const endPointForProfile = event.latLng;
+                const endPointForProfile = latLng;
 
                 // Create line between start and end points
                 createLineBetweenPoints(startPointForProfile, endPointForProfile);
@@ -480,11 +489,23 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                     google.maps.event.removeListener(clickListenerRef.current);
                     clickListenerRef.current = null;
                 }
+                if (domClickListenerRef.current) {
+                    const mapDiv = map.getDiv();
+                    if (mapDiv) {
+                        mapDiv.removeEventListener('click', domClickListenerRef.current, true);
+                    }
+                    domClickListenerRef.current = null;
+                }
                 if (mouseMoveListenerRef.current) {
                     google.maps.event.removeListener(mouseMoveListenerRef.current);
                     mouseMoveListenerRef.current = null;
                 }
             }
+        };
+
+        const handleMapClick = (event: google.maps.MapMouseEvent) => {
+            if (!event.latLng) return;
+            handleClickWithLatLng(event.latLng);
         };
 
         const handleMouseMove = (event: google.maps.MapMouseEvent) => {
@@ -499,11 +520,82 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
         if (clickListenerRef.current) {
             google.maps.event.removeListener(clickListenerRef.current);
         }
+        if (domClickListenerRef.current) {
+            const mapDiv = map.getDiv();
+            if (mapDiv) {
+                mapDiv.removeEventListener('click', domClickListenerRef.current, true);
+            }
+        }
         if (mouseMoveListenerRef.current) {
             google.maps.event.removeListener(mouseMoveListenerRef.current);
         }
 
+        // Add Google Maps click listener
         clickListenerRef.current = map.addListener('click', handleMapClick);
+
+        // Add DOM click listener to capture clicks on polygons and other overlays
+        const mapDiv = map.getDiv();
+        const handleDomClick = (event: MouseEvent) => {
+            // Only process if it's a left click
+            if (event.button !== 0) return;
+
+            // Check if click is within map bounds
+            const mapBounds = mapDiv.getBoundingClientRect();
+            if (
+                event.clientX < mapBounds.left ||
+                event.clientX > mapBounds.right ||
+                event.clientY < mapBounds.top ||
+                event.clientY > mapBounds.bottom
+            ) {
+                return;
+            }
+
+            // Check if click is on a UI element (buttons, panels, etc.)
+            const target = event.target as HTMLElement;
+            // Check if the click target or any parent is a UI element
+            let element: HTMLElement | null = target;
+            while (element && element !== mapDiv) {
+                const tagName = element.tagName.toLowerCase();
+                const className = element.className || '';
+                const style = window.getComputedStyle(element);
+                
+                // Check for UI elements
+                if (
+                    tagName === 'button' ||
+                    tagName === 'input' ||
+                    tagName === 'select' ||
+                    tagName === 'textarea' ||
+                    className.includes('fixed') ||
+                    parseInt(style.zIndex || '0') > 100 ||
+                    element.getAttribute('role') === 'button' ||
+                    element.getAttribute('role') === 'dialog'
+                ) {
+                    return;
+                }
+                element = element.parentElement;
+            }
+
+            const bounds = map.getBounds();
+            if (!bounds) return;
+
+            const relativeX = (event.clientX - mapBounds.left) / mapBounds.width;
+            const relativeY = (event.clientY - mapBounds.top) / mapBounds.height;
+
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            const lng = sw.lng() + (ne.lng() - sw.lng()) * relativeX;
+            const lat = ne.lat() + (sw.lat() - ne.lat()) * relativeY;
+
+            // Create LatLng from calculated coordinates
+            const latLng = new google.maps.LatLng(lat, lng);
+            handleClickWithLatLng(latLng);
+        };
+
+        if (mapDiv) {
+            mapDiv.addEventListener('click', handleDomClick, true); // Use capture phase to catch before event.stop()
+            domClickListenerRef.current = handleDomClick;
+        }
+
         mouseMoveListenerRef.current = map.addListener('mousemove', handleMouseMove);
     }, [map, createMarker, createLineBetweenPoints, createElevationProfile]);
 
@@ -528,6 +620,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
         }
 
         return () => cleanup(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [map, isActive, isDrawing, setupDrawingMode, profileData]);
 
     // Redraw chart when yAxisStepSize changes
