@@ -211,7 +211,7 @@ class Equipment extends Model
 
     if ($this->category && $this->category->name === 'pump') {
         $result['pumpAccessories'] = $this->pumpAccessories->map(function($accessory) {
-            return [
+            $accessoryData = [
                 'id' => $accessory->id,
                 'product_code' => $accessory->product_code,
                 'name' => $accessory->name,
@@ -222,9 +222,55 @@ class Equipment extends Model
                 'quantity' => $accessory->quantity,
                 'is_included' => $accessory->is_included,
                 'sort_order' => $accessory->sort_order,
-                'description' => $accessory->description, // ⭐ เพิ่มบรรทัดนี้
+                'description' => $accessory->description,
                 'equipment_id' => $accessory->equipment_id,
+                'group_id' => $accessory->group_id, // ส่ง group_id กลับมา
+                'equipment_set_id' => $accessory->equipment_set_id, // ส่ง equipment_set_id กลับมา
             ];
+            
+            // ถ้ามี group_id ให้โหลดข้อมูลกลุ่ม
+            if ($accessory->group_id && $accessory->equipment_set_id) {
+                try {
+                    // ใช้ fresh() เพื่อโหลดข้อมูลใหม่จาก database
+                    $equipmentSet = \App\Models\EquipmentSet::with(['groups.items.equipment.category'])
+                        ->find($accessory->equipment_set_id);
+                    
+                    if ($equipmentSet && $equipmentSet->groups) {
+                        $group = $equipmentSet->groups->firstWhere('id', $accessory->group_id);
+                        
+                        if ($group && $group->items) {
+                            $accessoryData['group'] = [
+                                'id' => $group->id,
+                                'name' => $group->name,
+                                'image' => $group->image,
+                                'items' => $group->items->map(function($item) {
+                                    return [
+                                        'id' => $item->id,
+                                        'equipment_id' => $item->equipment_id,
+                                        'quantity' => $item->quantity,
+                                        'unit_price' => (float)$item->unit_price,
+                                        'total_price' => (float)$item->total_price,
+                                        'equipment' => $item->equipment ? [
+                                            'id' => $item->equipment->id,
+                                            'name' => $item->equipment->name,
+                                            'product_code' => $item->equipment->product_code,
+                                            'price' => (float)$item->equipment->price,
+                                            'image' => $item->equipment->image_url,
+                                            'category_id' => $item->equipment->category_id,
+                                        ] : null,
+                                    ];
+                                })->toArray(),
+                            ];
+                            $accessoryData['group_items'] = $accessoryData['group']['items'];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error loading group data for accessory ID ' . $accessory->id . ': ' . $e->getMessage());
+                    \Log::error('Group ID: ' . $accessory->group_id . ', Equipment Set ID: ' . $accessory->equipment_set_id);
+                }
+            }
+            
+            return $accessoryData;
         })->toArray();
 
         $result['pumpAccessory'] = $result['pumpAccessories'];
@@ -272,7 +318,7 @@ class Equipment extends Model
                 'attributes_raw' => $this->getAttributesArray(),
                 'pumpAccessories' => $this->category && $this->category->name === 'pump' 
                     ? $this->pumpAccessories->map(function($accessory) {
-                        return [
+                        $accessoryData = [
                             'id' => $accessory->id,
                             'product_code' => $accessory->product_code,
                             'name' => $accessory->name,
@@ -285,7 +331,53 @@ class Equipment extends Model
                             'sort_order' => $accessory->sort_order,
                             'description' => $accessory->description,
                             'equipment_id' => $accessory->equipment_id,
+                            'group_id' => $accessory->group_id,
+                            'equipment_set_id' => $accessory->equipment_set_id,
                         ];
+                        
+                        // ถ้ามี group_id ให้โหลดข้อมูลกลุ่ม
+                        if ($accessory->group_id && $accessory->equipment_set_id) {
+                            try {
+                                // ใช้ fresh() เพื่อโหลดข้อมูลใหม่จาก database
+                                $equipmentSet = \App\Models\EquipmentSet::with(['groups.items.equipment.category'])
+                                    ->find($accessory->equipment_set_id);
+                                
+                                if ($equipmentSet && $equipmentSet->groups) {
+                                    $group = $equipmentSet->groups->firstWhere('id', $accessory->group_id);
+                                    
+                                    if ($group && $group->items) {
+                                        $accessoryData['group'] = [
+                                            'id' => $group->id,
+                                            'name' => $group->name,
+                                            'image' => $group->image,
+                                            'items' => $group->items->map(function($item) {
+                                                return [
+                                                    'id' => $item->id,
+                                                    'equipment_id' => $item->equipment_id,
+                                                    'quantity' => $item->quantity,
+                                                    'unit_price' => (float)$item->unit_price,
+                                                    'total_price' => (float)$item->total_price,
+                                                    'equipment' => $item->equipment ? [
+                                                        'id' => $item->equipment->id,
+                                                        'name' => $item->equipment->name,
+                                                        'product_code' => $item->equipment->product_code,
+                                                        'price' => (float)$item->equipment->price,
+                                                        'image' => $item->equipment->image_url,
+                                                        'category_id' => $item->equipment->category_id,
+                                                    ] : null,
+                                                ];
+                                            })->toArray(),
+                                        ];
+                                        $accessoryData['group_items'] = $accessoryData['group']['items'];
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                \Log::error('Error loading group data for accessory ID ' . $accessory->id . ': ' . $e->getMessage());
+                                \Log::error('Group ID: ' . $accessory->group_id . ', Equipment Set ID: ' . $accessory->equipment_set_id);
+                            }
+                        }
+                        
+                        return $accessoryData;
                     })->sortBy('sort_order')->values()->toArray()
                     : [],
                 'created_at' => $this->created_at,

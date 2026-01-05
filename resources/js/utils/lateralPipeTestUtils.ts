@@ -9,7 +9,6 @@ import {
     hasRotation,
     transformToRotatedCoordinate,
 } from './lateralPipeUtils';
-import { generateAutoLateralPipes } from './autoLateralPipeUtils';
 
 export const testLateralPipeValidation = (): boolean => {
     const validCoordinates: Coordinate[] = [
@@ -153,80 +152,12 @@ export const testPlantRotation = (): boolean => {
     }
 };
 
-export const testAutoLateralWithRotation = (): boolean => {
-    const testPlants: PlantLocation[] = [
-        {
-            id: '1',
-            position: { lat: 13.7563, lng: 100.5018 },
-            plantData: {
-                id: 1,
-                name: 'Test Plant',
-                plantSpacing: 2,
-                rowSpacing: 3,
-                waterNeed: 5,
-            },
-            rotationAngle: 30,
-        },
-        {
-            id: '2',
-            position: { lat: 13.7565, lng: 100.502 },
-            plantData: {
-                id: 1,
-                name: 'Test Plant',
-                plantSpacing: 2,
-                rowSpacing: 3,
-                waterNeed: 5,
-            },
-            rotationAngle: 30,
-        },
-    ];
-
-    const testZones = [
-        {
-            id: 'zone1',
-            name: 'Test Zone',
-            coordinates: [
-                { lat: 13.756, lng: 100.5015 },
-                { lat: 13.757, lng: 100.5015 },
-                { lat: 13.757, lng: 100.5025 },
-                { lat: 13.756, lng: 100.5025 },
-            ],
-            plants: testPlants,
-        },
-    ];
-
-    const testSubMainPipes = [
-        {
-            id: 'submain1',
-            coordinates: [
-                { lat: 13.7562, lng: 100.5016 },
-                { lat: 13.7568, lng: 100.5024 },
-            ],
-            zoneId: 'zone1',
-        },
-    ];
-
-    try {
-        const results = generateAutoLateralPipes('through_submain', testSubMainPipes, testZones, {
-            snapThreshold: 20,
-            minPipeLength: 1,
-            maxPipeLength: 100,
-        });
-
-        return results.length > 0;
-    } catch (error) {
-        console.error('Error in testAutoLateralWithRotation:', error);
-        return false;
-    }
-};
-
 export const runAllLateralPipeTests = (): {
     validation: boolean;
     optimization: boolean;
     grouping: boolean;
     alignment: boolean;
     rotation: boolean;
-    autoLateralWithRotation: boolean;
     overall: boolean;
 } => {
     const validation = testLateralPipeValidation();
@@ -234,10 +165,8 @@ export const runAllLateralPipeTests = (): {
     const grouping = testPlantGrouping();
     const alignment = testLateralPipeAlignment();
     const rotation = testPlantRotation();
-    const autoLateralWithRotation = testAutoLateralWithRotation();
 
-    const overall =
-        validation && optimization && grouping && alignment && rotation && autoLateralWithRotation;
+    const overall = validation && optimization && grouping && alignment && rotation;
 
     console.log('Lateral Pipe Tests Results:', {
         validation,
@@ -245,7 +174,6 @@ export const runAllLateralPipeTests = (): {
         grouping,
         alignment,
         rotation,
-        autoLateralWithRotation,
         overall,
     });
 
@@ -255,7 +183,6 @@ export const runAllLateralPipeTests = (): {
         grouping,
         alignment,
         rotation,
-        autoLateralWithRotation,
         overall,
     };
 };

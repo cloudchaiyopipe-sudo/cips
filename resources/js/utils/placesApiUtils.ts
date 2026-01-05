@@ -505,14 +505,18 @@ export const detectCoordinatePattern = (query: string): boolean => {
     // รูปแบบที่มีวงเล็บ: (lat, lng)
     const parenthesesPattern = /^\(-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\)$/;
 
-    // รูปแบบ degrees, minutes, seconds
-    const dmsPattern = /^\d+°\d+'[\d.]+["N|S]\s*,\s*\d+°\d+'[\d.]+["E|W]$/i;
+    // รูปแบบ degrees, minutes, seconds (มี comma)
+    const dmsPatternWithComma = /^\d+°\d+'[\d.]+["N|S]\s*,\s*\d+°\d+'[\d.]+["E|W]$/i;
+    
+    // รูปแบบ degrees, minutes, seconds (ไม่มี comma, มีช่องว่าง เช่น 14°06'57.7"N 99°28'23.0"E)
+    const dmsPatternNoComma = /^\d+°\d+'[\d.]+["]\s*(N|S)\s+\d+°\d+'[\d.]+["]\s*(E|W)$/i;
 
     return (
         basicPattern.test(trimmedQuery) ||
         namedPattern.test(trimmedQuery) ||
         parenthesesPattern.test(trimmedQuery) ||
-        dmsPattern.test(trimmedQuery)
+        dmsPatternWithComma.test(trimmedQuery) ||
+        dmsPatternNoComma.test(trimmedQuery)
     );
 };
 
@@ -554,19 +558,46 @@ export const parseCoordinatesFromText = (query: string): { lat: number; lng: num
         }
 
         // รูปแบบ DMS (Degrees, Minutes, Seconds) - แปลงเป็น decimal degrees
-        const dmsMatch = trimmedQuery.match(
+        // รูปแบบที่มี comma: 13°45'22.68"N, 100°30'6.48"E
+        const dmsMatchWithComma = trimmedQuery.match(
             /^(\d+)°(\d+)'([\d.]+)["](N|S)\s*,\s*(\d+)°(\d+)'([\d.]+)["](E|W)$/i
         );
-        if (dmsMatch) {
-            const latDeg = parseInt(dmsMatch[1]);
-            const latMin = parseInt(dmsMatch[2]);
-            const latSec = parseFloat(dmsMatch[3]);
-            const latDir = dmsMatch[4].toUpperCase();
+        if (dmsMatchWithComma) {
+            const latDeg = parseInt(dmsMatchWithComma[1]);
+            const latMin = parseInt(dmsMatchWithComma[2]);
+            const latSec = parseFloat(dmsMatchWithComma[3]);
+            const latDir = dmsMatchWithComma[4].toUpperCase();
 
-            const lngDeg = parseInt(dmsMatch[5]);
-            const lngMin = parseInt(dmsMatch[6]);
-            const lngSec = parseFloat(dmsMatch[7]);
-            const lngDir = dmsMatch[8].toUpperCase();
+            const lngDeg = parseInt(dmsMatchWithComma[5]);
+            const lngMin = parseInt(dmsMatchWithComma[6]);
+            const lngSec = parseFloat(dmsMatchWithComma[7]);
+            const lngDir = dmsMatchWithComma[8].toUpperCase();
+
+            let lat = latDeg + latMin / 60 + latSec / 3600;
+            let lng = lngDeg + lngMin / 60 + lngSec / 3600;
+
+            if (latDir === 'S') lat = -lat;
+            if (lngDir === 'W') lng = -lng;
+
+            if (isValidCoordinate(lat, lng)) {
+                return { lat, lng };
+            }
+        }
+
+        // รูปแบบ DMS ที่ไม่มี comma: 14°06'57.7"N 99°28'23.0"E
+        const dmsMatchNoComma = trimmedQuery.match(
+            /^(\d+)°(\d+)'([\d.]+)["]\s*(N|S)\s+(\d+)°(\d+)'([\d.]+)["]\s*(E|W)$/i
+        );
+        if (dmsMatchNoComma) {
+            const latDeg = parseInt(dmsMatchNoComma[1]);
+            const latMin = parseInt(dmsMatchNoComma[2]);
+            const latSec = parseFloat(dmsMatchNoComma[3]);
+            const latDir = dmsMatchNoComma[4].toUpperCase();
+
+            const lngDeg = parseInt(dmsMatchNoComma[5]);
+            const lngMin = parseInt(dmsMatchNoComma[6]);
+            const lngSec = parseFloat(dmsMatchNoComma[7]);
+            const lngDir = dmsMatchNoComma[8].toUpperCase();
 
             let lat = latDeg + latMin / 60 + latSec / 3600;
             let lng = lngDeg + lngMin / 60 + lngSec / 3600;
@@ -739,6 +770,7 @@ export const universalSearch = async (
                         'หรือ: lat:13.7563, lng:100.5018',
                         'หรือ: (13.7563, 100.5018)',
                         'หรือ: 13°45\'22.68"N, 100°30\'6.48"E',
+                        'หรือ: 14°06\'57.7"N 99°28\'23.0"E',
                     ],
                 },
             };

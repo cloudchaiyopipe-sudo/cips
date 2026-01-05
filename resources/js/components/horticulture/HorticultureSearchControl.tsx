@@ -771,25 +771,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             </div>
                         )}
 
-                        {/* Coordinate Search Info */}
-                        {isCoordinateSearch && searchQuery && (
-                            <div className="border-b border-gray-200 bg-blue-50 p-3">
-                                <div className="flex items-center gap-2">
-                                    <FaCrosshairs className="text-blue-500" />
-                                    <div className="flex-1">
-                                        <div className="font-medium text-blue-900">
-                                            ค้นหาด้วยพิกัด
-                                        </div>
-                                        <div className="text-sm text-blue-700">{searchQuery}</div>
-                                        <div className="mt-1 text-xs text-blue-600">
-                                            รูปแบบที่รองรับ: 13.7563,100.5018 •
-                                            lat:13.7563,lng:100.5018 • (13.7563,100.5018)
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {/* Search Results */}
                         {searchResults.length > 0 && (
                             <div>
@@ -961,6 +942,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                                     <div>• lat:13.7563, lng:100.5018</div>
                                                     <div>• (13.7563, 100.5018)</div>
                                                     <div>• 13°45'22.68"N, 100°30'6.48"E</div>
+                                                    <div>• 14°06'57.7"N 99°28'23.0"E</div>
                                                 </div>
                                             </div>
                                         </div>

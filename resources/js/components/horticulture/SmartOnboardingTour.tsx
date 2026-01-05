@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaTimes, FaChevronRight, FaChevronLeft, FaLightbulb } from 'react-icons/fa';
 
@@ -21,6 +22,7 @@ interface SmartOnboardingTourProps {
     isVisible: boolean;
     onComplete: () => void;
     onSkip: () => void;
+    onDontShowAgain?: () => void;
     steps: TourStep[];
     t: (key: string) => string;
     storageKey?: string;
@@ -30,6 +32,7 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
     isVisible,
     onComplete,
     onSkip,
+    onDontShowAgain,
     steps,
     t,
     storageKey = 'horticulture_tour_completed',
@@ -40,8 +43,10 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
     const [isHighlighted, setIsHighlighted] = useState(false);
     const overlayRef = useRef<HTMLDivElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
+    const finalPositionMap = useRef<Map<number, 'top' | 'bottom' | 'left' | 'right'>>(new Map());
     const [isAnimating, setIsAnimating] = useState(false);
     const [skippedSteps, setSkippedSteps] = useState<Set<number>>(new Set());
+    const [dontShowAgain, setDontShowAgain] = useState(false);
 
     const currentStepData = steps[currentStep];
 
@@ -98,8 +103,12 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
 
     const handleComplete = useCallback(() => {
         localStorage.setItem(storageKey, 'true');
-        onComplete();
-    }, [storageKey, onComplete]);
+        if (dontShowAgain && onDontShowAgain) {
+            onDontShowAgain();
+        } else {
+            onComplete();
+        }
+    }, [storageKey, onComplete, dontShowAgain, onDontShowAgain]);
 
     // Find and highlight target element
     useEffect(() => {
@@ -171,26 +180,141 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
             const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
             const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
 
+            // Get actual tooltip dimensions if available, otherwise use estimates
+            let tooltipWidth = 320;
+            let tooltipHeight = 200;
+            if (tooltipRef.current) {
+                const tooltipRect = tooltipRef.current.getBoundingClientRect();
+                tooltipWidth = tooltipRect.width || 320;
+                tooltipHeight = tooltipRect.height || 200;
+            }
+            
+            const spacing = 8; // Reduced spacing for closer positioning
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const padding = 10; // Minimum padding from viewport edges
+
             // Calculate tooltip position based on step position preference
             let top = 0;
             let left = 0;
+            let finalPosition = currentStepData.position;
 
-            switch (currentStepData.position) {
+            // Helper function to check if position would overflow
+            const checkOverflow = (pos: 'top' | 'bottom' | 'left' | 'right'): boolean => {
+                let testTop = 0;
+                let testLeft = 0;
+
+                switch (pos) {
+                    case 'top':
+                        testTop = rect.top + scrollTop - spacing;
+                        testLeft = rect.left + scrollLeft + rect.width / 2;
+                        return testTop - tooltipHeight - spacing < scrollTop + padding || 
+                               testLeft - tooltipWidth / 2 < scrollLeft + padding ||
+                               testLeft + tooltipWidth / 2 > scrollLeft + viewportWidth - padding;
+                    case 'bottom':
+                        testTop = rect.bottom + scrollTop + spacing;
+                        testLeft = rect.left + scrollLeft + rect.width / 2;
+                        return testTop + tooltipHeight + spacing > scrollTop + viewportHeight - padding ||
+                               testLeft - tooltipWidth / 2 < scrollLeft + padding ||
+                               testLeft + tooltipWidth / 2 > scrollLeft + viewportWidth - padding;
+                    case 'left':
+                        testTop = rect.top + scrollTop + rect.height / 2;
+                        testLeft = rect.left + scrollLeft - spacing;
+                        return testLeft - tooltipWidth - spacing < scrollLeft + padding ||
+                               testTop - tooltipHeight / 2 < scrollTop + padding ||
+                               testTop + tooltipHeight / 2 > scrollTop + viewportHeight - padding;
+                    case 'right':
+                        testTop = rect.top + scrollTop + rect.height / 2;
+                        testLeft = rect.right + scrollLeft + spacing;
+                        return testLeft + tooltipWidth + spacing > scrollLeft + viewportWidth - padding ||
+                               testTop - tooltipHeight / 2 < scrollTop + padding ||
+                               testTop + tooltipHeight / 2 > scrollTop + viewportHeight - padding;
+                }
+                return false;
+            };
+
+            // Try preferred position first, then find best alternative
+            const preferredPosition = currentStepData.position || 'bottom';
+            const allPositions: Array<'top' | 'bottom' | 'left' | 'right'> = ['top', 'bottom', 'left', 'right'];
+            
+            // Filter out 'center' from preferred position if it exists
+            const validPreferredPosition: 'top' | 'bottom' | 'left' | 'right' = 
+                (preferredPosition !== 'center' && allPositions.includes(preferredPosition as 'top' | 'bottom' | 'left' | 'right'))
+                    ? preferredPosition as 'top' | 'bottom' | 'left' | 'right'
+                    : 'bottom';
+            
+            // Reorder positions to try preferred first, then others
+            const positionsToTry = [
+                validPreferredPosition,
+                ...allPositions.filter(p => p !== validPreferredPosition)
+            ];
+
+            // Find first position that doesn't overflow
+            for (const pos of positionsToTry) {
+                if (!checkOverflow(pos)) {
+                    finalPosition = pos;
+                    break;
+                }
+            }
+
+            // Calculate final position with proper boundary checks
+            switch (finalPosition) {
                 case 'top':
-                    top = rect.top + scrollTop - 20;
+                    top = rect.top + scrollTop - spacing;
                     left = rect.left + scrollLeft + rect.width / 2;
+                    // Ensure tooltip doesn't go off left/right edges
+                    left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                        Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                    // Ensure tooltip doesn't go off top edge
+                    if (top - tooltipHeight - spacing < scrollTop + padding) {
+                        // If would overflow top, switch to bottom
+                        top = rect.bottom + scrollTop + spacing;
+                    }
                     break;
                 case 'bottom':
-                    top = rect.bottom + scrollTop + 20;
+                    top = rect.bottom + scrollTop + spacing;
                     left = rect.left + scrollLeft + rect.width / 2;
+                    // Ensure tooltip doesn't go off left/right edges
+                    left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                        Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                    // Ensure tooltip doesn't go off bottom edge
+                    if (top + tooltipHeight + spacing > scrollTop + viewportHeight - padding) {
+                        // If would overflow bottom, switch to top
+                        top = rect.top + scrollTop - spacing;
+                    }
                     break;
                 case 'left':
                     top = rect.top + scrollTop + rect.height / 2;
-                    left = rect.left + scrollLeft - 20;
+                    left = rect.left + scrollLeft - spacing;
+                    // Ensure tooltip doesn't go off left edge - if it would, switch to right
+                    if (left - tooltipWidth - spacing < scrollLeft + padding) {
+                        left = rect.right + scrollLeft + spacing;
+                        finalPosition = 'right';
+                    }
+                    // Ensure tooltip doesn't go off top/bottom edges
+                    top = Math.max(scrollTop + tooltipHeight / 2 + padding, 
+                        Math.min(top, scrollTop + viewportHeight - tooltipHeight / 2 - padding));
                     break;
                 case 'right':
                     top = rect.top + scrollTop + rect.height / 2;
-                    left = rect.right + scrollLeft + 20;
+                    left = rect.right + scrollLeft + spacing;
+                    // Ensure tooltip doesn't go off right edge - if it would, switch to left
+                    if (left + tooltipWidth + spacing > scrollLeft + viewportWidth - padding) {
+                        left = rect.left + scrollLeft - spacing;
+                        finalPosition = 'left';
+                        // But if left would also overflow, use top or bottom instead
+                        if (left - tooltipWidth - spacing < scrollLeft + padding) {
+                            // Use top position instead
+                            top = rect.top + scrollTop - spacing;
+                            left = rect.left + scrollLeft + rect.width / 2;
+                            finalPosition = 'top';
+                            left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                                Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                        }
+                    }
+                    // Ensure tooltip doesn't go off top/bottom edges
+                    top = Math.max(scrollTop + tooltipHeight / 2 + padding, 
+                        Math.min(top, scrollTop + viewportHeight - tooltipHeight / 2 - padding));
                     break;
                 case 'center':
                 default:
@@ -201,6 +325,16 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
 
             setTooltipPosition({ top, left });
             setIsHighlighted(currentStepData.highlight !== false);
+            
+            // Store final position for tooltip transform
+            // Using a type-safe approach by storing in a separate map
+            if (!finalPositionMap.current) {
+                finalPositionMap.current = new Map();
+            }
+            // Only store if finalPosition is not 'center'
+            if (finalPosition !== 'center') {
+                finalPositionMap.current.set(currentStep, finalPosition);
+            }
 
             // Scroll element into view if needed
             if (currentStepData.action?.type === 'scroll') {
@@ -285,6 +419,88 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
         handleComplete,
     ]);
 
+    // Recalculate position after tooltip is rendered to use actual dimensions
+    useEffect(() => {
+        if (!isVisible || !targetElement || !tooltipRef.current || !currentStepData) return;
+
+        const element = targetElement;
+        const rect = element.getBoundingClientRect();
+        const tooltipRect = tooltipRef.current.getBoundingClientRect();
+        const tooltipWidth = tooltipRect.width || 320;
+        const tooltipHeight = tooltipRect.height || 200;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        const spacing = 8;
+        const padding = 10;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        const finalPosition = finalPositionMap.current.get(currentStep) || 
+            (currentStepData?.position && currentStepData.position !== 'center' ? currentStepData.position : 'bottom') || 'bottom';
+
+        let top = tooltipPosition.top;
+        let left = tooltipPosition.left;
+
+        // Fine-tune position with actual tooltip dimensions
+        switch (finalPosition) {
+            case 'left':
+                left = rect.left + scrollLeft - spacing;
+                if (left - tooltipWidth - spacing < scrollLeft + padding) {
+                    // Switch to right if left would overflow
+                    left = rect.right + scrollLeft + spacing;
+                    if (left + tooltipWidth + spacing > scrollLeft + viewportWidth - padding) {
+                        // Switch to top if both left and right would overflow
+                        top = rect.top + scrollTop - spacing;
+                        left = rect.left + scrollLeft + rect.width / 2;
+                        left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                            Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                    }
+                }
+                top = Math.max(scrollTop + tooltipHeight / 2 + padding, 
+                    Math.min(top, scrollTop + viewportHeight - tooltipHeight / 2 - padding));
+                break;
+            case 'right':
+                left = rect.right + scrollLeft + spacing;
+                if (left + tooltipWidth + spacing > scrollLeft + viewportWidth - padding) {
+                    // Switch to left if right would overflow
+                    left = rect.left + scrollLeft - spacing;
+                    if (left - tooltipWidth - spacing < scrollLeft + padding) {
+                        // Switch to top if both would overflow
+                        top = rect.top + scrollTop - spacing;
+                        left = rect.left + scrollLeft + rect.width / 2;
+                        left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                            Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                    }
+                }
+                top = Math.max(scrollTop + tooltipHeight / 2 + padding, 
+                    Math.min(top, scrollTop + viewportHeight - tooltipHeight / 2 - padding));
+                break;
+            case 'top':
+                top = rect.top + scrollTop - spacing;
+                left = rect.left + scrollLeft + rect.width / 2;
+                left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                    Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                if (top - tooltipHeight - spacing < scrollTop + padding) {
+                    top = rect.bottom + scrollTop + spacing;
+                }
+                break;
+            case 'bottom':
+                top = rect.bottom + scrollTop + spacing;
+                left = rect.left + scrollLeft + rect.width / 2;
+                left = Math.max(scrollLeft + tooltipWidth / 2 + padding, 
+                    Math.min(left, scrollLeft + viewportWidth - tooltipWidth / 2 - padding));
+                if (top + tooltipHeight + spacing > scrollTop + viewportHeight - padding) {
+                    top = rect.top + scrollTop - spacing;
+                }
+                break;
+        }
+
+        // Only update if position changed significantly
+        if (Math.abs(top - tooltipPosition.top) > 1 || Math.abs(left - tooltipPosition.left) > 1) {
+            setTooltipPosition({ top, left });
+        }
+    }, [isVisible, targetElement, currentStep, currentStepData, tooltipPosition]);
+
     const handleNext = useCallback(() => {
         // Find next available step (skip steps with invisible elements)
         let nextStep = currentStep + 1;
@@ -331,8 +547,12 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
 
     const handleSkip = useCallback(() => {
         localStorage.setItem(storageKey, 'skipped');
-        onSkip();
-    }, [storageKey, onSkip]);
+        if (dontShowAgain && onDontShowAgain) {
+            onDontShowAgain();
+        } else {
+            onSkip();
+        }
+    }, [storageKey, onSkip, dontShowAgain, onDontShowAgain]);
 
     if (!isVisible || !currentStepData) return null;
 
@@ -361,18 +581,28 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
         zIndex: 9999,
         transform: 'translate(-50%, -50%)',
         transition: 'all 0.3s ease',
-        maxWidth: '400px',
+        maxWidth: '450px',
     };
 
-    // Adjust transform based on position
-    if (currentStepData.position === 'top') {
-        tooltipStyle.transform = 'translate(-50%, calc(-100% - 20px))';
-    } else if (currentStepData.position === 'bottom') {
-        tooltipStyle.transform = 'translate(-50%, 20px)';
-    } else if (currentStepData.position === 'left') {
-        tooltipStyle.transform = 'translate(calc(-100% - 20px), -50%)';
-    } else if (currentStepData.position === 'right') {
-        tooltipStyle.transform = 'translate(20px, -50%)';
+    // Adjust transform based on final calculated position
+    // Use finalPositionMap if available (from updatePosition), otherwise fall back to position
+    const finalPosition = finalPositionMap.current.get(currentStep) || 
+        (currentStepData?.position && currentStepData.position !== 'center' ? currentStepData.position : 'bottom') || 'bottom';
+    const spacing = 8; // Reduced spacing for closer positioning (matches updatePosition)
+    
+    if (finalPosition === 'top') {
+        tooltipStyle.transform = `translate(-50%, calc(-100% - ${spacing}px))`;
+    } else if (finalPosition === 'bottom') {
+        tooltipStyle.transform = `translate(-50%, ${spacing}px)`;
+    } else if (finalPosition === 'left') {
+        tooltipStyle.transform = `translate(calc(-100% - ${spacing}px), -50%)`;
+    } else if (finalPosition === 'right') {
+        tooltipStyle.transform = `translate(${spacing}px, -50%)`;
+    }
+
+    // Early return if no step data
+    if (!currentStepData || !isVisible || steps.length === 0) {
+        return null;
     }
 
     return (
@@ -435,45 +665,64 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="flex gap-2">
-                            {currentStep > 0 && (
-                                <>
-                                    <button
-                                        onClick={handleGoToFirst}
-                                        className="flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100"
-                                        title={t('กลับไปขั้นตอนแรก') || 'กลับไปขั้นตอนแรก'}
-                                    >
-                                        <span>⏮️</span>
-                                        <span className="hidden sm:inline">
-                                            {t('อันแรก') || 'อันแรก'}
-                                        </span>
-                                    </button>
-                                    <button
-                                        onClick={handlePrevious}
-                                        className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-                                    >
-                                        <FaChevronLeft size={12} />
-                                        {t('ย้อนกลับ') || 'ย้อนกลับ'}
-                                    </button>
-                                </>
-                            )}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex gap-2">
+                                {currentStep > 0 && (
+                                    <>
+                                        <button
+                                            onClick={handleGoToFirst}
+                                            className="flex items-center gap-2 rounded-lg border border-purple-300 bg-purple-50 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100"
+                                            title={t('กลับไปขั้นตอนแรก') || 'กลับไปขั้นตอนแรก'}
+                                        >
+                                            <span>⏮️</span>
+                                            <span className="hidden sm:inline">
+                                                {t('อันแรก') || 'อันแรก'}
+                                            </span>
+                                        </button>
+                                        <button
+                                            onClick={handlePrevious}
+                                            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                        >
+                                            <FaChevronLeft size={12} />
+                                            {t('ย้อนกลับ') || 'ย้อนกลับ'}
+                                        </button>
+                                    </>
+                                )}
+                                <button
+                                    onClick={handleSkip}
+                                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                >
+                                    {currentStepData.skipButtonText || t('ข้าม') || 'ข้าม'}
+                                </button>
+                            </div>
                             <button
-                                onClick={handleSkip}
-                                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                onClick={handleNext}
+                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                             >
-                                {currentStepData.skipButtonText || t('ข้าม') || 'ข้าม'}
+                                {currentStep === steps.length - 1
+                                    ? t('เสร็จสิ้น') || 'เสร็จสิ้น'
+                                    : currentStepData.nextButtonText || t('ต่อไป') || 'ต่อไป'}
+                                {currentStep < steps.length - 1 && <FaChevronRight size={12} />}
                             </button>
                         </div>
-                        <button
-                            onClick={handleNext}
-                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-                        >
-                            {currentStep === steps.length - 1
-                                ? t('เสร็จสิ้น') || 'เสร็จสิ้น'
-                                : currentStepData.nextButtonText || t('ต่อไป') || 'ต่อไป'}
-                            {currentStep < steps.length - 1 && <FaChevronRight size={12} />}
-                        </button>
+                        {onDontShowAgain && (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="dont-show-again"
+                                    checked={dontShowAgain}
+                                    onChange={(e) => setDontShowAgain(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <label
+                                    htmlFor="dont-show-again"
+                                    className="text-sm text-gray-700 cursor-pointer"
+                                >
+                                    {t('อย่าแสดงอีก') || 'อย่าแสดงอีก'}
+                                </label>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

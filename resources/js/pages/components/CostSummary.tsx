@@ -346,154 +346,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 return false;
             }
 
-            if (
-                zoneInput.sprinklerEquipmentSet &&
-                zoneInput.sprinklerEquipmentSet.selectedItems &&
-                zoneInput.sprinklerEquipmentSet.selectedItems.length > 0
-            ) {
-                let hasProcessedPipe = false;
-
-                zoneInput.sprinklerEquipmentSet.selectedItems.forEach((item) => {
-                    const categoryName = item.equipment.category?.name?.toLowerCase();
-                    const isPipe = categoryName === 'pipe' || categoryName?.includes('pipe');
-
-                    if (isPipe && item.quantity > 0) {
-                        const extraPipeId = item.equipment.id;
-                        const extraLength = item.quantity;
-
-                        const zonePipes = selectedPipes[zoneId] || {};
-                        const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
-                        const secondaryPipe =
-                            zonePipes.secondary || results.autoSelectedSecondaryPipe;
-                        const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
-                        const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
-
-                        if (branchPipe && branchPipe.id === extraPipeId) {
-                            const key = `${branchPipe.id}`;
-                            if (!pipeSummary.branch[key]) {
-                                pipeSummary.branch[key] = {
-                                    pipe: branchPipe,
-                                    totalLength: 0,
-                                    quantity: 0,
-                                    zones: [],
-                                    totalCost: 0,
-                                    includesExtra: true,
-                                    extraLength: 0,
-                                };
-                            }
-                            pipeSummary.branch[key].extraLength =
-                                (pipeSummary.branch[key].extraLength || 0) + extraLength;
-                            pipeSummary.branch[key].includesExtra = true;
-                            const zoneName = getZoneName(zoneId);
-                            if (!pipeSummary.branch[key].zones.includes(zoneName)) {
-                                pipeSummary.branch[key].zones.push(zoneName);
-                            }
-                            hasProcessedPipe = true;
-                            return;
-                        }
-
-                        if (secondaryPipe && secondaryPipe.id === extraPipeId) {
-                            const key = `${secondaryPipe.id}`;
-                            if (!pipeSummary.secondary[key]) {
-                                pipeSummary.secondary[key] = {
-                                    pipe: secondaryPipe,
-                                    totalLength: 0,
-                                    quantity: 0,
-                                    zones: [],
-                                    totalCost: 0,
-                                    includesExtra: true,
-                                    extraLength: 0,
-                                };
-                            }
-                            pipeSummary.secondary[key].extraLength =
-                                (pipeSummary.secondary[key].extraLength || 0) + extraLength;
-                            pipeSummary.secondary[key].includesExtra = true;
-                            const zoneName = getZoneName(zoneId);
-                            if (!pipeSummary.secondary[key].zones.includes(zoneName)) {
-                                pipeSummary.secondary[key].zones.push(zoneName);
-                            }
-                            hasProcessedPipe = true;
-                            return;
-                        }
-
-                        if (mainPipe && mainPipe.id === extraPipeId) {
-                            const key = `${mainPipe.id}`;
-                            if (!pipeSummary.main[key]) {
-                                pipeSummary.main[key] = {
-                                    pipe: mainPipe,
-                                    totalLength: 0,
-                                    quantity: 0,
-                                    zones: [],
-                                    totalCost: 0,
-                                    includesExtra: true,
-                                    extraLength: 0,
-                                };
-                            }
-                            pipeSummary.main[key].extraLength =
-                                (pipeSummary.main[key].extraLength || 0) + extraLength;
-                            pipeSummary.main[key].includesExtra = true;
-                            const zoneName = getZoneName(zoneId);
-                            if (!pipeSummary.main[key].zones.includes(zoneName)) {
-                                pipeSummary.main[key].zones.push(zoneName);
-                            }
-                            hasProcessedPipe = true;
-                            return;
-                        }
-
-                        if (emitterPipe && emitterPipe.id === extraPipeId) {
-                            const key = `${emitterPipe.id}`;
-                            if (!pipeSummary.emitter[key]) {
-                                pipeSummary.emitter[key] = {
-                                    pipe: emitterPipe,
-                                    totalLength: 0,
-                                    quantity: 0,
-                                    zones: [],
-                                    totalCost: 0,
-                                    includesExtra: true,
-                                    extraLength: 0,
-                                };
-                            }
-                            pipeSummary.emitter[key].extraLength =
-                                (pipeSummary.emitter[key].extraLength || 0) + extraLength;
-                            pipeSummary.emitter[key].includesExtra = true;
-                            const zoneName = getZoneName(zoneId);
-                            if (!pipeSummary.emitter[key].zones.includes(zoneName)) {
-                                pipeSummary.emitter[key].zones.push(zoneName);
-                            }
-                            hasProcessedPipe = true;
-                            return;
-                        }
-
-                        const pipeData = {
-                            id: item.equipment.id,
-                            name: item.equipment.name,
-                            productCode: item.equipment.product_code,
-                            price: item.equipment.price || 0,
-                            sizeMM: 20,
-                            lengthM: 100,
-                            image: item.equipment.image,
-                        };
-
-                        if (!extraPipeSummary) {
-                            extraPipeSummary = {
-                                pipe: pipeData,
-                                totalLength: extraLength,
-                                zones: [getZoneName(zoneId)],
-                            };
-                        } else if (extraPipeSummary.pipe.id === pipeData.id) {
-                            extraPipeSummary.totalLength += extraLength;
-                            const zoneName = getZoneName(zoneId);
-                            if (!extraPipeSummary.zones.includes(zoneName)) {
-                                extraPipeSummary.zones.push(zoneName);
-                            }
-                        }
-
-                        hasProcessedPipe = true;
-                    }
-                });
-
-                return hasProcessedPipe;
-            }
+            // ไม่ต้อง process ท่อจาก zoneInput.sprinklerEquipmentSet อีกแล้ว
+            // เพราะจะคำนวณจาก sprinklerEquipmentSets prop ที่ส่งมาแทน (ใช้ข้อมูลจาก localStorage)
+            // เพื่อให้ตรงกับ QuotationDocument.tsx
 
             return false;
         };
@@ -1141,33 +996,179 @@ const CostSummary: React.FC<CostSummaryProps> = ({
         let pumpAccessoriesCost = 0;
         if (showPump) {
             const effectivePump = selectedPump || results.autoSelectedPump;
+            
             if (effectivePump) {
                 pumpCost = effectivePump.price || 0;
 
                 if (effectivePump.pumpAccessories && effectivePump.pumpAccessories.length > 0) {
+                    // ดึง selectedGroupId จาก localStorage (เหมือนกับ QuotationDocument.tsx)
+                    const getStoredSelectedGroupId = (pumpId: number | undefined): number | string | null => {
+                        if (!pumpId) return null;
+                        try {
+                            const stored = localStorage.getItem(`pump_${pumpId}_selectedGroupId`);
+                            return stored ? (isNaN(Number(stored)) ? stored : Number(stored)) : null;
+                        } catch {
+                            return null;
+                        }
+                    };
+                    
+                    // ดึง selectedGroupId จาก localStorage
+                    const selectedGroupId = getStoredSelectedGroupId(effectivePump.id);
+                    
+                    // ไม่กรอง is_included ที่นี่ เพราะต้องดูที่ group_items ข้างใน (เหมือน QuotationDocument)
                     pumpAccessoriesCost = effectivePump.pumpAccessories
-                        .filter((accessory: any) => !accessory.is_included)
                         .reduce((sum: number, accessory: any) => {
-                            return sum + (Number(accessory.price) || 0);
+                            // ถ้าเป็นกลุ่ม (มี group_id และ group_items) ให้คำนวณจากรายการอุปกรณ์ในกลุ่ม
+                            if (accessory.group_id && accessory.group_items && accessory.group_items.length > 0) {
+                                // กรองเฉพาะกลุ่มที่เลือก (ถ้ามี selectedGroupId) หรือรวมทุกกลุ่ม (ถ้าไม่มี selectedGroupId)
+                                if (selectedGroupId && accessory.group_id !== selectedGroupId) {
+                                    return sum; // ข้ามกลุ่มที่ไม่ใช่กลุ่มที่เลือก
+                                }
+                                
+                                // สำหรับกลุ่ม ให้คำนวณจาก group_items โดยดูที่แต่ละ item (เหมือน QuotationDocument)
+                                const groupItemsCost = accessory.group_items.reduce((itemSum: number, item: any) => {
+                                    const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                    const itemQuantity = Number(item.quantity || 1);
+                                    
+                                    // แสดงเฉพาะรายการที่มีราคา > 0 หรือไม่ใช่ is_included (เหมือน QuotationDocument)
+                                    if (itemPrice > 0 || !accessory.is_included) {
+                                        return itemSum + (itemPrice * itemQuantity);
+                                    }
+                                    return itemSum;
+                                }, 0);
+                                
+                                return sum + groupItemsCost;
+                            } else {
+                                // ถ้าเป็นอุปกรณ์เดี่ยว ให้เช็ค is_included ที่นี่
+                                if (!accessory.is_included || (accessory.price && accessory.price > 0)) {
+                                    const price = Number(accessory.price) || 0;
+                                    const quantity = Number(accessory.quantity) || 1;
+                                    return sum + (price * quantity);
+                                }
+                                return sum;
+                            }
                         }, 0);
                 }
             }
         }
         let sprinklerEquipmentSetsCost = 0;
+        
         if (sprinklerEquipmentSets && Object.keys(sprinklerEquipmentSets).length > 0) {
-            Object.values(sprinklerEquipmentSets).forEach((equipmentSet: any) => {
+            Object.entries(sprinklerEquipmentSets).forEach(([zoneId, equipmentSet]: [string, any]) => {
+                // ตรวจสอบว่า equipmentSet มี selectedItems หรือ groups จริงๆ หรือไม่ (เหมือน QuotationDocument.tsx)
+                if (!equipmentSet) {
+                    return; // ข้ามถ้าไม่มีข้อมูล
+                }
+                
+                // ตรวจสอบว่ามี selectedGroupId (ต้องไม่เป็น null หรือไม่มี)
+                if (!equipmentSet.selectedGroupId || equipmentSet.selectedGroupId === null || equipmentSet.selectedGroupId === '') {
+                    return; // ข้ามถ้าไม่ได้เลือกกลุ่ม
+                }
+                
+                // ตรวจสอบว่ามี selectedItems และมีความยาว > 0 (เหมือน QuotationDocument.tsx)
+                const hasValidSelectedItems = equipmentSet.selectedItems && Array.isArray(equipmentSet.selectedItems) && equipmentSet.selectedItems.length > 0;
+                
+                // ตรวจสอบว่ามี groups และมีความยาว > 0
+                const hasValidGroups = equipmentSet.groups && Array.isArray(equipmentSet.groups) && equipmentSet.groups.length > 0;
+                
+                // ถ้าไม่มีทั้ง selectedItems และ groups ที่ valid ให้ข้าม
+                if (!hasValidSelectedItems && !hasValidGroups) {
+                    return;
+                }
+                
+                // หาจำนวนสปริงเกอร์ของโซนนี้
+                let totalSprinklers = 0;
+                
+                if (projectMode === 'garden' && gardenStats) {
+                    const zone = gardenStats.zones.find((z: any) => z.zoneId === zoneId);
+                    if (zone) {
+                        const effectiveZoneId = gardenStats.zones.length === 1 ? 'main-area' : zoneId;
+                        const zoneInput = zoneInputs[effectiveZoneId];
+                        totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
+                    }
+                } else if (projectMode === 'field-crop' && fieldCropData) {
+                    const zone = fieldCropData.zones?.info?.find((z: any) => z.id === zoneId);
+                    if (zone) {
+                        const zoneSummary = fieldCropData.zoneSummaries?.[zoneId];
+                        if (zoneSummary?.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                            totalSprinklers = zoneSummary.totalIrrigationPoints;
+                        } else if (zoneSummary?.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                            totalSprinklers = zoneSummary.sprinklerCount;
+                        } else {
+                            const zoneInput = zoneInputs[zoneId];
+                            totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
+                        }
+                    }
+                } else if (projectMode === 'greenhouse' && greenhouseData) {
+                    const plot = greenhouseData.summary?.plotStats?.find((p: any) => p.plotId === zoneId);
+                    if (plot) {
+                        totalSprinklers = plot.equipmentCount?.sprinklers || plot.production?.totalPlants || 0;
+                    }
+                } else {
+                    // horticulture mode
+                    const zoneInput = zoneInputs[zoneId];
+                    if (zoneInput) {
+                        totalSprinklers = zoneInput.totalTrees || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            totalSprinklers = totalSprinklers * sprinklersPerTree;
+                        }
+                    } else {
+                        // Fallback: ใช้ results.totalSprinklers
+                        totalSprinklers = results.totalSprinklers || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            totalSprinklers = totalSprinklers * sprinklersPerTree;
+                        }
+                    }
+                }
+
                 if (equipmentSet.selectedItems) {
                     equipmentSet.selectedItems.forEach((item: any) => {
-                        const itemCost =
-                            (item.unit_price || item.equipment?.price || 0) * (item.quantity || 0);
-                        sprinklerEquipmentSetsCost += itemCost;
+                        // ตรวจสอบว่า item.equipment มีจริงๆ หรือไม่ (เหมือน QuotationDocument.tsx)
+                        if (item.equipment) {
+                            // กรอง pipe ออก เพราะ pipe ถูกนับใน pipeSummary หรือ extraPipeSummary แล้ว
+                            const categoryName = item.equipment.category?.name?.toLowerCase();
+                            const isPipe = categoryName === 'pipe' || categoryName?.includes('pipe');
+                            
+                            if (!isPipe) {
+                                // item.quantity เป็น quantity per head ต้องคูณกับจำนวนสปริงเกอร์
+                                const quantityPerHead = item.quantity || 0;
+                                const totalQuantity = quantityPerHead * totalSprinklers;
+                                
+                                // ตรวจสอบว่า totalQuantity > 0 (เหมือน QuotationDocument.tsx)
+                                if (totalQuantity > 0) {
+                                    const itemCost =
+                                        (item.unit_price || item.equipment?.price || 0) * totalQuantity;
+                                    sprinklerEquipmentSetsCost += itemCost;
+                                }
+                            }
+                        }
                     });
                 } else if (equipmentSet.groups) {
                     equipmentSet.groups.forEach((group: any) => {
                         if (group.items) {
                             group.items.forEach((item: any) => {
-                                sprinklerEquipmentSetsCost +=
-                                    (item.unit_price || 0) * (item.quantity || 0);
+                                // ตรวจสอบว่า item.equipment มีจริงๆ หรือไม่ (เหมือน QuotationDocument.tsx)
+                                if (item.equipment) {
+                                    // กรอง pipe ออก เพราะ pipe ถูกนับใน pipeSummary หรือ extraPipeSummary แล้ว
+                                    const categoryName = item.equipment.category?.name?.toLowerCase();
+                                    const isPipe = categoryName === 'pipe' || categoryName?.includes('pipe');
+                                    
+                                    if (!isPipe) {
+                                        // item.quantity เป็น quantity per head ต้องคูณกับจำนวนสปริงเกอร์
+                                        const quantityPerHead = item.quantity || 0;
+                                        const totalQuantity = quantityPerHead * totalSprinklers;
+                                        
+                                        // ตรวจสอบว่า totalQuantity > 0 (เหมือน QuotationDocument.tsx)
+                                        if (totalQuantity > 0) {
+                                            sprinklerEquipmentSetsCost +=
+                                                (item.unit_price || item.equipment?.price || 0) * totalQuantity;
+                                        }
+                                    }
+                                }
                             });
                         }
                     });
@@ -1178,10 +1179,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
         let connectionEquipmentsCost = 0;
         if (connectionEquipments && Object.keys(connectionEquipments).length > 0) {
             Object.values(connectionEquipments).forEach((equipments: any[]) => {
-                equipments.forEach((equipment: any) => {
-                    connectionEquipmentsCost +=
-                        (equipment.equipment?.price || 0) * (equipment.count || 0);
-                });
+                if (equipments && equipments.length > 0) {
+                    equipments.forEach((equipment: any) => {
+                        // ตรวจสอบว่า equipment.equipment และ equipment.count > 0 (เหมือน QuotationDocument.tsx)
+                        if (equipment.equipment && equipment.count > 0) {
+                            connectionEquipmentsCost +=
+                                (equipment.equipment?.price || 0) * (equipment.count || 0);
+                        }
+                    });
+                }
             });
         }
 
@@ -1873,23 +1879,63 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         {costs.pumpAccessoriesCost > 0 && (
                             <div className="mt-2 text-sm">
                                 <p className="text-purple-300">
-                                    🔧 {t('อุปกรณ์ประกอบ')}: +
+                                    {t('อุปกรณ์ประกอบ')}: +
                                     {Number(
                                         (costs.pumpAccessoriesCost || 0).toFixed(2)
                                     ).toLocaleString('th-TH')}{' '}
                                     {t('บาท')}
                                 </p>
-                                <p className="text-lg font-bold text-white">
-                                    {t('รวม')}:{' '}
-                                    {Number(
-                                        (
-                                            (costs.pumpCost || 0) + (costs.pumpAccessoriesCost || 0)
-                                        ).toFixed(2)
-                                    ).toLocaleString('th-TH')}{' '}
-                                    {t('บาท')}
-                                </p>
                             </div>
                         )}
+                        {(() => {
+                            // ดึง selectedGroupId จาก localStorage (เหมือนกับ PumpSelector.tsx)
+                            const getStoredSelectedGroupId = (pumpId: number | undefined): number | string | null => {
+                                if (!pumpId) return null;
+                                try {
+                                    const stored = localStorage.getItem(`pump_${pumpId}_selectedGroupId`);
+                                    return stored ? (isNaN(Number(stored)) ? stored : Number(stored)) : null;
+                                } catch {
+                                    return null;
+                                }
+                            };
+                            
+                            // หาราคาของกลุ่มที่เลือก (ไม่ใช่กลุ่มแรก)
+                            let selectedGroupCost = 0;
+                            let selectedGroupName = '';
+                            
+                            if (effectivePump?.pumpAccessories && effectivePump.pumpAccessories.length > 0) {
+                                // ดึง selectedGroupId จาก localStorage
+                                const selectedGroupId = getStoredSelectedGroupId(effectivePump.id);
+                                
+                                // หากลุ่มที่เลือก (ถ้ามี) หรือกลุ่มแรก (fallback)
+                                const selectedGroup = selectedGroupId
+                                    ? effectivePump.pumpAccessories.find((acc: any) => 
+                                        acc.group_id && acc.group_id > 0 && acc.group_id === selectedGroupId
+                                    )
+                                    : effectivePump.pumpAccessories.find((acc: any) => 
+                                        acc.group_id && acc.group_id > 0
+                                    );
+                                
+                                if (selectedGroup && selectedGroup.group_items && selectedGroup.group_items.length > 0) {
+                                    selectedGroupName = selectedGroup.group?.name || selectedGroup.name || t('อุปกรณ์โรงปั๊ม');
+                                    selectedGroupCost = selectedGroup.group_items.reduce((sum: number, item: any) => {
+                                        const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                        const itemQuantity = Number(item.quantity || 1);
+                                        return sum + (itemPrice * itemQuantity);
+                                    }, 0);
+                                }
+                            }
+                            
+                            return selectedGroupCost > 0 ? (
+                                <div className="mt-2 border-t border-gray-500 pt-2">
+                                    <p className="text-sm font-semibold text-yellow-300">
+                                        {selectedGroupName || t('อุปกรณ์โรงปั๊ม')}:{' '}
+                                        {Number(selectedGroupCost.toFixed(2)).toLocaleString('th-TH')}{' '}
+                                        {t('บาท')}
+                                    </p>
+                                </div>
+                            ) : null;
+                        })()}
                     </div>
                 )}
 
@@ -1996,7 +2042,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 </div>
 
                 {/* Sprinkler Equipment Sets */}
-                {sprinklerEquipmentSets && Object.keys(sprinklerEquipmentSets).length > 0 && (
+                {costs.sprinklerEquipmentSetsCost > 0 && (
                     <div className="rounded bg-gray-600 p-4">
                         <h4 className="font-medium text-yellow-300">
                             🎯 {t('อุปกรณ์เสริมสปริงเกอร์')}
@@ -2050,7 +2096,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 {/* Connection Equipment */}
                 {costs.connectionEquipmentsCost > 0 ? (
                     <div className="rounded bg-gray-600 p-4">
-                        <h4 className="font-medium text-orange-300">🔗 {t('อุปกรณ์เชื่อมต่อ')}</h4>
+                        <h4 className="font-medium text-orange-300">🔗 {t('อุปกรณ์ข้อต่อท่อ')}</h4>
                         <p className="text-xl font-bold">
                             ราคา{' '}
                             {Number(

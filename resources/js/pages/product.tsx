@@ -83,6 +83,16 @@ import ConnectionEquipmentsSelector from './components/ConnectionEquipmentsSelec
 import CostSummary from './components/CostSummary';
 import QuotationModal from './components/QuotationModal';
 import QuotationDocument from './components/QuotationDocument';
+import SmartOnboardingTour from '../components/horticulture/SmartOnboardingTour';
+import {
+    getProductTourSteps,
+    shouldShowProductTour,
+    markProductTourCompleted,
+    markProductTourSkipped,
+    markProductTourDontShowAgain,
+    PRODUCT_TOUR_STORAGE_KEY,
+} from '../utils/productTourUtils';
+import type { TourStep } from '../utils/onboardingTourUtils';
 
 import { router } from '@inertiajs/react';
 
@@ -236,6 +246,10 @@ export default function Product() {
     const [imageLoadError, setImageLoadError] = useState<string | null>(null);
     const [showImageModal, setShowImageModal] = useState(false);
 
+    // Onboarding Tour state
+    const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+    const [tourSteps, setTourSteps] = useState<TourStep[]>([]);
+
     // เมื่อ showPumpOption เปลี่ยนเป็น false และ activeTab เป็น 4 ให้เปลี่ยนไป Tab 5
     useEffect(() => {
         if (!showPumpOption && activeTab === 4) {
@@ -243,6 +257,73 @@ export default function Product() {
             setVisitedTabs((prev) => new Set([...prev, 5]));
         }
     }, [showPumpOption, activeTab]);
+
+    // Clear connection equipment selections on initial mount
+    useEffect(() => {
+        // Reset connection equipment selections when entering product page
+        localStorage.removeItem('connectionPointEquipmentSelections');
+        console.log('🔄 Reset connection equipment selections');
+    }, []); // Run only once on mount
+
+    // Load sprinklerEquipmentSets from localStorage on mount and listen for updates
+    useEffect(() => {
+        const loadSprinklerEquipmentSets = () => {
+            try {
+                const equipmentSetsKey = `${projectMode}_sprinklerEquipmentSets`;
+                const storedSets = localStorage.getItem(equipmentSetsKey);
+                if (storedSets) {
+                    const sets = JSON.parse(storedSets);
+                    setSprinklerEquipmentSets(sets);
+                    
+                    // Also update zoneInputs to include sprinklerEquipmentSet
+                    setZoneInputs((prev) => {
+                        const updated = { ...prev };
+                        Object.keys(sets).forEach((zoneId) => {
+                            if (updated[zoneId]) {
+                                updated[zoneId] = {
+                                    ...updated[zoneId],
+                                    sprinklerEquipmentSet: sets[zoneId],
+                                };
+                            }
+                        });
+                        return updated;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sprinkler equipment sets:', error);
+            }
+        };
+
+        // Load on mount
+        loadSprinklerEquipmentSets();
+
+        // Listen for custom event
+        const handleUpdate = (event: any) => {
+            if (event.detail?.sprinklerEquipmentSets) {
+                setSprinklerEquipmentSets(event.detail.sprinklerEquipmentSets);
+                
+                // Also update zoneInputs
+                setZoneInputs((prev) => {
+                    const updated = { ...prev };
+                    Object.keys(event.detail.sprinklerEquipmentSets).forEach((zoneId) => {
+                        if (updated[zoneId]) {
+                            updated[zoneId] = {
+                                ...updated[zoneId],
+                                sprinklerEquipmentSet: event.detail.sprinklerEquipmentSets[zoneId],
+                            };
+                        }
+                    });
+                    return updated;
+                });
+            }
+        };
+
+        window.addEventListener('sprinklerEquipmentSetsUpdated', handleUpdate);
+
+        return () => {
+            window.removeEventListener('sprinklerEquipmentSetsUpdated', handleUpdate);
+        };
+    }, [projectMode]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -382,6 +463,46 @@ export default function Product() {
             }
         }
     }, [projectMode]);
+
+    // Initialize tour on mount
+    useEffect(() => {
+        setTourSteps(getProductTourSteps(t));
+        
+        // เช็คว่ามาจากหน้า HorticultureResultsPage หรือไม่
+        const fromResults = sessionStorage.getItem('fromHorticultureResults') === 'true';
+        
+        // ถ้ามาจากหน้า results ให้แสดง tour ทุกครั้ง
+        // ถ้าไม่ใช่ ให้เช็คว่าเคยเลือก "อย่าแสดงอีก" หรือไม่
+        if (fromResults) {
+            // ลบ flag หลังจากใช้แล้ว
+            sessionStorage.removeItem('fromHorticultureResults');
+            // Use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(() => {
+                setShowOnboardingTour(true);
+            });
+        } else if (shouldShowProductTour()) {
+            // Auto-start tour immediately when page loads if not marked as "don't show again"
+            // Use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(() => {
+                setShowOnboardingTour(true);
+            });
+        }
+    }, [t]);
+
+    const handleTourComplete = () => {
+        markProductTourCompleted();
+        setShowOnboardingTour(false);
+    };
+
+    const handleTourSkip = () => {
+        markProductTourSkipped();
+        setShowOnboardingTour(false);
+    };
+
+    const handleTourDontShowAgain = () => {
+        markProductTourDontShowAgain();
+        setShowOnboardingTour(false);
+    };
 
     const getZoneName = (zoneId: string): string => {
         if (projectMode === 'garden' && gardenStats) {
@@ -2550,6 +2671,7 @@ export default function Product() {
                                     <div
                                         className="group relative flex items-center justify-center"
                                         style={{ minHeight: 0 }}
+                                        data-tour="project-image"
                                     >
                                         <img
                                             src={projectImage}
@@ -2590,7 +2712,7 @@ export default function Product() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="rounded-lg border-2 border-dashed border-gray-600">
+                                    <div className="rounded-lg border-2 border-dashed border-gray-600" data-tour="project-image">
                                         <label className="flex h-[280px] cursor-pointer flex-col items-center justify-center hover:border-blue-500">
                                             <div className="text-4xl text-gray-500">📷</div>
                                             <p className="mt-2 text-sm text-gray-400">
@@ -2627,7 +2749,7 @@ export default function Product() {
                                 )}
                             </div>
                             {zones.length > 1 && (
-                                <div className="mb-4 mt-4 flex flex-wrap gap-2">
+                                <div className="mb-4 mt-4 flex flex-wrap gap-2" data-tour="zone-selection">
                                     {zones.map((zone) => {
                                         const isActive = activeZoneId === zone.id;
                                         const hasSprinkler = !!zoneSprinklers[zone.id];
@@ -2682,7 +2804,7 @@ export default function Product() {
                                     })}
                                 </div>
                             )}
-                            <div className="mb-4 rounded-lg bg-gray-800 p-4">
+                            <div className="mb-4 rounded-lg bg-gray-800 p-4" data-tour="pump-option">
                                 <div>
                                     <h3 className="mb-3 text-lg font-semibold text-purple-400">
                                         ⚡ {t('ตัวเลือกปั๊มน้ำ')}
@@ -2880,6 +3002,7 @@ export default function Product() {
                                 <div className="flex flex-wrap gap-1.5 justify-center">
                                     {/* ปุ่มบันทึกโครงการ */}
                                     <button
+                                        data-tour="save-project"
                                         onClick={handleSaveProject}
                                         className="flex items-center justify-center gap-1.5 rounded bg-green-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                                     >
@@ -2901,6 +3024,7 @@ export default function Product() {
 
                                     {/* ปุ่มแก้ไขโครงการ */}
                                     <button
+                                        data-tour="edit-project"
                                         onClick={handleEditProject}
                                         className="flex items-center justify-center gap-1.5 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                                     >
@@ -2922,6 +3046,7 @@ export default function Product() {
 
                                     {/* ปุ่มสร้างโครงการใหม่ */}
                                     <button
+                                        data-tour="new-project"
                                         onClick={handleNewProject}
                                         className="flex items-center justify-center gap-1.5 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                                     >
@@ -2950,6 +3075,7 @@ export default function Product() {
                             <div className="flex flex-row flex-wrap items-center gap-0">
                                 {/* Tab 1: InputForm */}
                                 <button
+                                    data-tour="tab-input"
                                     onClick={() => {
                                         setActiveTab(1);
                                         setVisitedTabs((prev) => new Set([...prev, 1]));
@@ -2975,6 +3101,7 @@ export default function Product() {
                                 
                                 {/* Tab 2: SprinklerSelector */}
                                 <button
+                                    data-tour="tab-sprinkler"
                                     onClick={() => {
                                         setActiveTab(2);
                                         setVisitedTabs((prev) => new Set([...prev, 2]));
@@ -2999,6 +3126,7 @@ export default function Product() {
 
                                 {/* Tab 3: PipeSelector + PipeSystemSummary */}
                                 <button
+                                    data-tour="tab-pipe"
                                     onClick={() => {
                                         setActiveTab(3);
                                         setVisitedTabs((prev) => new Set([...prev, 3]));
@@ -3025,6 +3153,7 @@ export default function Product() {
                                 {showPumpOption && (
                                     <>
                                         <button
+                                            data-tour="tab-pump"
                                             onClick={() => {
                                                 setActiveTab(4);
                                                 setVisitedTabs((prev) => new Set([...prev, 4]));
@@ -3051,6 +3180,7 @@ export default function Product() {
 
                                 {/* Tab 5: CostSummary */}
                                 <button
+                                    data-tour="tab-cost"
                                     onClick={() => {
                                         setActiveTab(5);
                                         setVisitedTabs((prev) => new Set([...prev, 5]));
@@ -3526,6 +3656,18 @@ export default function Product() {
                     showPump={showPumpOption}
                 />
             )}
+
+            {/* Smart Onboarding Tour */}
+            <SmartOnboardingTour
+                isVisible={showOnboardingTour}
+                onComplete={handleTourComplete}
+                onSkip={handleTourSkip}
+                onDontShowAgain={handleTourDontShowAgain}
+                steps={tourSteps}
+                t={t}
+                storageKey={PRODUCT_TOUR_STORAGE_KEY}
+            />
+
             <Footer />
         </div>
     );

@@ -1,172 +1,308 @@
-import React, { useState } from 'react';
-import { FaWater, FaTimes, FaRoute } from 'react-icons/fa';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect } from 'react';
+import { FaTimes, FaCheck, FaMagic } from 'react-icons/fa';
+
+interface Zone {
+    id: string;
+    name: string;
+    color: string;
+    coordinates: { lat: number; lng: number }[];
+}
+
+interface IrrigationZone {
+    id: string;
+    name: string;
+    color: string;
+    plants: any[];
+    coordinates: { lat: number; lng: number }[];
+}
 
 interface AutoLateralPipeModalProps {
-    isVisible: boolean;
-    onModeSelect: (mode: 'through_submain' | 'from_submain', selectedZoneId?: string) => void;
-    onCancel: () => void;
-    zones?: Array<{
-        id: string;
-        name: string;
-        plants: unknown[];
-    }>;
+    isOpen: boolean;
+    onClose: () => void;
+    zones: Zone[];
+    irrigationZones: IrrigationZone[];
+    onGenerate: (selectedZoneIds: string[], connectionMode: 'connect' | 'intersect') => void;
     t: (key: string) => string;
 }
 
 const AutoLateralPipeModal: React.FC<AutoLateralPipeModalProps> = ({
-    isVisible,
-    onModeSelect,
-    onCancel,
-    zones = [],
+    isOpen,
+    onClose,
+    zones,
+    irrigationZones,
+    onGenerate,
     t,
 }) => {
-    const [selectedZone, setSelectedZone] = useState<string>('all');
+    const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>([]);
+    const [connectionMode, setConnectionMode] = useState<'connect' | 'intersect'>('connect');
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    if (!isVisible) return null;
+    // Combine zones and irrigation zones (deduplicate by id)
+    const allZonesArray = [
+        ...zones.map((z) => ({ id: z.id, name: z.name || `โซน ${zones.indexOf(z) + 1}`, color: z.color })),
+        ...irrigationZones.map((z) => ({ id: z.id, name: z.name, color: z.color })),
+    ];
+    
+    // Deduplicate zones by id
+    const allZones = Array.from(
+        new Map(allZonesArray.map((zone) => [zone.id, zone])).values()
+    );
+
+    useEffect(() => {
+        if (isOpen) {
+            // Default: select all zones (deduplicated)
+            const uniqueZoneIds = Array.from(new Set(allZones.map((z) => z.id)));
+            setSelectedZoneIds(uniqueZoneIds);
+            setConnectionMode('connect');
+            setIsGenerating(false);
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleToggleZone = (zoneId: string) => {
+        setSelectedZoneIds((prev) =>
+            prev.includes(zoneId) ? prev.filter((id) => id !== zoneId) : [...prev, zoneId]
+        );
+    };
+
+    const handleSelectAll = () => {
+        const uniqueZoneIds = Array.from(new Set(allZones.map((z) => z.id)));
+        setSelectedZoneIds(uniqueZoneIds);
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedZoneIds([]);
+    };
+
+    const handleGenerate = async () => {
+        if (selectedZoneIds.length === 0) {
+            alert(t('กรุณาเลือกโซนอย่างน้อย 1 โซน'));
+            return;
+        }
+
+        setIsGenerating(true);
+        try {
+            // Deduplicate selectedZoneIds before passing to onGenerate
+            const uniqueZoneIds = Array.from(new Set(selectedZoneIds));
+            await onGenerate(uniqueZoneIds, connectionMode);
+            onClose();
+        } catch (error) {
+            console.error('Error generating auto lateral pipes:', error);
+            alert(t('เกิดข้อผิดพลาดในการสร้างท่อย่อยอัตโนมัติ'));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     return (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
-            <div className="mx-4 w-full max-w-2xl rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-2xl">
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-[9998] bg-black bg-opacity-50"
+                onClick={onClose}
+            />
+
+            {/* Modal */}
+            <div className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-300 bg-white shadow-2xl">
                 {/* Header */}
-                <div className="mb-6 flex items-center justify-between">
-                    <h3 className="flex items-center gap-2 text-xl font-bold text-white">
-                        <FaWater className="text-blue-600" />
-                        {t('เลือกโหมดลากท่อย่อยอัตโนมัติ') || 'เลือกโหมดลากท่อย่อยอัตโนมัติ'}
-                    </h3>
+                <div className="flex items-center justify-between rounded-t-lg bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-3 text-white">
+                    <div className="flex items-center gap-2">
+                        <FaMagic className="text-yellow-200" size={20} />
+                        <span className="text-lg font-semibold">
+                            {t('สร้างท่อย่อยอัตโนมัติ')}
+                        </span>
+                    </div>
                     <button
-                        onClick={onCancel}
-                        className="text-white transition-colors hover:text-gray-400"
-                        title={t('ปิด') || 'ปิด'}
+                        onClick={onClose}
+                        className="text-yellow-200 transition-colors hover:text-white"
+                        title={t('ปิด')}
+                        disabled={isGenerating}
                     >
-                        <FaTimes size={20} />
+                        <FaTimes size={18} />
                     </button>
                 </div>
 
-                {/* Zone Selection */}
-                <div className="mb-6">
-                    <h4 className="mb-3 text-lg font-semibold text-white">
-                        🎯 {t('เลือกโซนที่ต้องการสร้างท่อย่อย') || 'เลือกโซนที่ต้องการสร้างท่อย่อย'}
-                    </h4>
-                    <div className="space-y-2">
-                        {/* All Zones Option */}
-                        <label className="flex cursor-pointer items-center rounded-lg border border-gray-600 p-3 hover:bg-gray-700">
-                            <input
-                                type="radio"
-                                name="zone"
-                                value="all"
-                                checked={selectedZone === 'all'}
-                                onChange={(e) => setSelectedZone(e.target.value)}
-                                className="mr-3 h-4 w-4 text-blue-600"
-                            />
-                            <div>
-                                <div className="font-medium text-white">
-                                    🌍 {t('ทุกโซน') || 'ทุกโซน'}
-                                </div>
-                                <div className="text-sm text-gray-400">
-                                    {t('สร้างท่อย่อยในทุกโซนพร้อมกัน') ||
-                                        'สร้างท่อย่อยในทุกโซนพร้อมกัน'}
-                                </div>
-                            </div>
-                        </label>
-
-                        {/* Individual Zone Options */}
-                        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                            {zones.map((zone) => (
-                                <label
-                                    key={zone.id}
-                                    className="flex cursor-pointer items-center rounded-lg border border-gray-600 p-3 hover:bg-gray-700"
+                {/* Content */}
+                <div className="max-h-[70vh] overflow-y-auto p-6">
+                    {/* Zone Selection */}
+                    <div className="mb-6">
+                        <div className="mb-3 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                                {t('เลือกโซนที่ต้องการสร้างท่อย่อย')}
+                            </h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleSelectAll}
+                                    className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200"
+                                    disabled={isGenerating}
                                 >
-                                    <input
-                                        type="radio"
-                                        name="zone"
-                                        value={zone.id}
-                                        checked={selectedZone === zone.id}
-                                        onChange={(e) => setSelectedZone(e.target.value)}
-                                        className="mr-3 h-4 w-4 text-blue-600"
-                                    />
-                                    <div>
-                                        <div className="font-medium text-white">🏷️ {zone.name}</div>
-                                        <div className="text-sm text-gray-400">
-                                            {zone.plants.length} {t('ต้นไม้') || 'ต้นไม้'}
+                                    {t('เลือกทั้งหมด')}
+                                </button>
+                                <button
+                                    onClick={handleDeselectAll}
+                                    className="rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
+                                    disabled={isGenerating}
+                                >
+                                    {t('ยกเลิกทั้งหมด')}
+                                </button>
+                            </div>
+                        </div>
+
+                        {allZones.length === 0 ? (
+                            <div className="rounded-lg bg-yellow-50 p-4 text-center text-yellow-700">
+                                {t('ไม่พบโซนในโครงการ กรุณาสร้างโซนก่อน')}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                                {allZones.map((zone) => (
+                                    <label
+                                        key={zone.id}
+                                        className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 p-3 transition-all ${
+                                            selectedZoneIds.includes(zone.id)
+                                                ? 'border-blue-500 bg-blue-50'
+                                                : 'border-gray-200 bg-white hover:border-gray-300'
+                                        } ${isGenerating ? 'cursor-not-allowed opacity-50' : ''}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedZoneIds.includes(zone.id)}
+                                            onChange={() => handleToggleZone(zone.id)}
+                                            disabled={isGenerating}
+                                            className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <div className="flex flex-1 items-center gap-2">
+                                            <div
+                                                className="h-4 w-4 rounded"
+                                                style={{ backgroundColor: zone.color }}
+                                            />
+                                            <span className="font-medium text-gray-800">
+                                                {zone.name}
+                                            </span>
                                         </div>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Connection Mode Selection */}
+                    <div className="mb-6">
+                        <h3 className="mb-3 text-lg font-semibold text-gray-800">
+                            {t('เลือกรูปแบบการเชื่อมต่อ')}
+                        </h3>
+
+                        <div className="space-y-3">
+                            {/* Connect Mode */}
+                            <label
+                                className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-all ${
+                                    connectionMode === 'connect'
+                                        ? 'border-green-500 bg-green-50'
+                                        : 'border-gray-200 bg-white hover:border-gray-300'
+                                } ${isGenerating ? 'cursor-not-allowed opacity-50' : ''}`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="connectionMode"
+                                    value="connect"
+                                    checked={connectionMode === 'connect'}
+                                    onChange={() => setConnectionMode('connect')}
+                                    disabled={isGenerating}
+                                    className="mt-1 h-5 w-5 border-gray-300 text-green-600 focus:ring-green-500"
+                                />
+                                <div className="flex-1">
+                                    <div className="mb-1 font-semibold text-gray-800">
+                                        🔗 {t('เชื่อมกับท่อเมนรอง')}
                                     </div>
-                                </label>
-                            ))}
+                                    <div className="text-sm text-gray-600">
+                                        {t(
+                                            'ท่อย่อยจะเริ่มจากท่อเมนรองและวิ่งไปตามแถวต้นไม้ (เหมาะสำหรับระบบน้ำหยด)'
+                                        )}
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* Intersect Mode */}
+                            <label
+                                className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-all ${
+                                    connectionMode === 'intersect'
+                                        ? 'border-purple-500 bg-purple-50'
+                                        : 'border-gray-200 bg-white hover:border-gray-300'
+                                } ${isGenerating ? 'cursor-not-allowed opacity-50' : ''}`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="connectionMode"
+                                    value="intersect"
+                                    checked={connectionMode === 'intersect'}
+                                    onChange={() => setConnectionMode('intersect')}
+                                    disabled={isGenerating}
+                                    className="mt-1 h-5 w-5 border-gray-300 text-purple-600 focus:ring-purple-500"
+                                />
+                                <div className="flex-1">
+                                    <div className="mb-1 font-semibold text-gray-800">
+                                        ⚡ {t('ตัดกับท่อเมนรอง')}
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                        {t(
+                                            'ท่อย่อยจะวิ่งผ่านท่อเมนรองตามแถวต้นไม้ (เหมาะสำหรับระบบสปริงเกอร์)'
+                                        )}
+                                    </div>
+                                </div>
+                            </label>
                         </div>
                     </div>
-                </div>
 
-                {/* Mode Options */}
-                <div className="mb-6">
-                    <div className="flex flex-col gap-4 md:flex-row">
-                        {/* Mode 1: Through SubMain */}
-                        <button
-                            onClick={() =>
-                                onModeSelect(
-                                    'through_submain',
-                                    selectedZone === 'all' ? undefined : selectedZone
-                                )
-                            }
-                            className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-blue-300 hover:bg-blue-600 md:w-1/2"
-                        >
-                            <h3 className="mb-4 text-center text-xl font-semibold text-white">
-                                {t('ลากผ่านท่อ Sub Main') || 'ลากผ่านท่อ Sub Main'}
-                            </h3>
-                            <div className="flex items-center gap-6">
-                                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 transition-colors group-hover:bg-blue-200">
-                                    <FaRoute className="text-green-600" size={32} />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm text-gray-300">
-                                        {t('ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน') ||
-                                            'ท่อย่อยจะลากตัดผ่านท่อ Sub Main ตามแนวต้นไม้ในโซน'}
-                                    </p>
-                                </div>
-                            </div>
-                        </button>
-
-                        {/* Mode 2: From SubMain */}
-                        <button
-                            onClick={() =>
-                                onModeSelect(
-                                    'from_submain',
-                                    selectedZone === 'all' ? undefined : selectedZone
-                                )
-                            }
-                            className="group w-full rounded-lg border-2 border-gray-200 p-6 text-left transition-all hover:border-green-300 hover:bg-green-600 md:w-1/2"
-                        >
-                            <h3 className="mb-4 text-center text-xl font-semibold text-white">
-                                {t('เริ่มจากท่อ Sub Main') || 'เริ่มจากท่อ Sub Main'}
-                            </h3>
-                            <div className="flex items-center gap-6">
-                                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 transition-colors group-hover:bg-green-200">
-                                    <FaRoute className="text-yellow-600" size={32} />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm text-gray-300">
-                                        {t(
-                                            'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'
-                                        ) ||
-                                            'ท่อย่อยจะเริ่มต้นจากท่อ Sub Main และลากออกไปตามแนวต้นไม้'}
-                                    </p>
-                                </div>
-                            </div>
-                        </button>
+                    {/* Info Box */}
+                    <div className="rounded-lg bg-blue-50 p-4">
+                        <div className="mb-2 font-semibold text-blue-800">
+                            ℹ️ {t('หมายเหตุ')}:
+                        </div>
+                        <ul className="list-inside list-disc space-y-1 text-sm text-blue-700">
+                            <li>{t('ระบบจะคำนวณแถวต้นไม้จากมุมเอียงและระยะห่างปัจจุบัน')}</li>
+                            <li>{t('จะสร้างท่อย่อยในแถวที่ตัดฉากกับท่อเมนรองมากที่สุด')}</li>
+                            <li>{t('ท่อย่อยจะหยุดที่ต้นไม้ต้นสุดท้ายของแต่ละแถว')}</li>
+                            <li>
+                                {t(
+                                    'หากมีท่อเมนรองหลายเส้นในโซน จะเลือกเส้นที่ใกล้ที่สุดสำหรับแต่ละแถว'
+                                )}
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
-                {/* Cancel Button */}
-                <div className="mt-6">
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-3 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4">
                     <button
-                        onClick={onCancel}
-                        className="w-full rounded-md bg-gray-600 px-4 py-2 font-medium text-white transition-colors hover:bg-gray-700"
+                        onClick={onClose}
+                        disabled={isGenerating}
+                        className="rounded-md bg-gray-200 px-5 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {t('ยกเลิก') || 'ยกเลิก'}
+                        {t('ยกเลิก')}
+                    </button>
+                    <button
+                        onClick={handleGenerate}
+                        disabled={isGenerating || selectedZoneIds.length === 0}
+                        className="flex items-center gap-2 rounded-md bg-gradient-to-r from-yellow-500 to-orange-500 px-5 py-2 font-medium text-white transition-all hover:from-yellow-600 hover:to-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                <span>{t('กำลังสร้าง')}...</span>
+                            </>
+                        ) : (
+                            <>
+                                <FaCheck size={16} />
+                                <span>{t('สร้างท่อย่อย')}</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 
 export default AutoLateralPipeModal;
+

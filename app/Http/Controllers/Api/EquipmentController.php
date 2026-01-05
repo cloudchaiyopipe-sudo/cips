@@ -136,6 +136,8 @@ class EquipmentController extends Controller
 
         if ($category->name === 'pump') {
             $rules['pump_accessories.*.equipment_id'] = 'nullable|exists:equipments,id';
+            $rules['pump_accessories.*.group_id'] = 'nullable|integer|sometimes|exists:equipment_set_groups,id';
+            $rules['pump_accessories.*.equipment_set_id'] = 'nullable|integer|sometimes|exists:equipment_sets,id';
             $rules['pump_accessories.*.product_code'] = 'nullable|string|max:100';
             $rules['pump_accessories.*.name'] = 'nullable|string|max:255';
             $rules['pump_accessories.*.image'] = 'nullable|string';
@@ -251,7 +253,14 @@ class EquipmentController extends Controller
 
             if ($category->name === 'pump' && isset($validated['pump_accessories'])) {
                 foreach ($validated['pump_accessories'] as $index => $accessoryData) {
-                    $isEmpty = empty($accessoryData['equipment_id']) && 
+                    // ตรวจสอบว่ามี group_id หรือไม่
+                    $hasGroupId = isset($accessoryData['group_id']) 
+                        && $accessoryData['group_id'] !== null 
+                        && $accessoryData['group_id'] !== '' 
+                        && (int)$accessoryData['group_id'] > 0;
+                    
+                    $isEmpty = !$hasGroupId && 
+                               empty($accessoryData['equipment_id']) && 
                                empty($accessoryData['name']) && 
                                empty($accessoryData['product_code']) &&
                                (!isset($accessoryData['price']) || $accessoryData['price'] == 0);
@@ -263,17 +272,21 @@ class EquipmentController extends Controller
                     $equipmentId = null;
                     $selectedEquipment = null;
                     
+                    if (!$hasGroupId) {
                     if (isset($accessoryData['equipment_id']) && $accessoryData['equipment_id']) {
                         $equipmentId = $accessoryData['equipment_id'];
                         $selectedEquipment = Equipment::find($equipmentId);
                     } elseif (isset($accessoryData['product_code']) && $accessoryData['product_code']) {
                         $selectedEquipment = Equipment::where('product_code', $accessoryData['product_code'])->first();
                         $equipmentId = $selectedEquipment ? $selectedEquipment->id : null;
+                        }
                     }
                     
                     $accessoryToCreate = [
                         'pump_id' => $equipment->id,
-                        'equipment_id' => $equipmentId,
+                        'equipment_id' => $hasGroupId ? null : $equipmentId,
+                        'group_id' => $hasGroupId ? (int)$accessoryData['group_id'] : null,
+                        'equipment_set_id' => $hasGroupId && isset($accessoryData['equipment_set_id']) && $accessoryData['equipment_set_id'] ? (int)$accessoryData['equipment_set_id'] : null,
                         'product_code' => $accessoryData['product_code'] ?? ($selectedEquipment ? $selectedEquipment->product_code : null),
                         'name' => $accessoryData['name'] ?? ($selectedEquipment ? $selectedEquipment->name : ''),
                         'image' => $accessoryData['image'] ?? ($selectedEquipment ? $selectedEquipment->image_url : null),
@@ -376,6 +389,8 @@ class EquipmentController extends Controller
         if ($category->name === 'pump') {
             $rules['pump_accessories'] = 'nullable|array';
             $rules['pump_accessories.*.equipment_id'] = 'nullable|exists:equipments,id';
+            $rules['pump_accessories.*.group_id'] = 'nullable|integer|exists:equipment_set_groups,id';
+            $rules['pump_accessories.*.equipment_set_id'] = 'nullable|integer|exists:equipment_sets,id';
             $rules['pump_accessories.*.product_code'] = 'nullable|string|max:100';
             $rules['pump_accessories.*.name'] = 'required|string|max:255';
             $rules['pump_accessories.*.image'] = 'nullable|string';
@@ -390,6 +405,32 @@ class EquipmentController extends Controller
 
         try {
             $validated = $request->validate($rules);
+            
+            // Custom validation สำหรับ group_id และ equipment_set_id
+            // ตรวจสอบเฉพาะเมื่อมีค่าและไม่ใช่ null/0
+            if (isset($validated['pump_accessories']) && is_array($validated['pump_accessories'])) {
+                foreach ($validated['pump_accessories'] as $index => $accessory) {
+                    if (isset($accessory['group_id']) && $accessory['group_id'] !== null && $accessory['group_id'] !== '' && (int)$accessory['group_id'] > 0) {
+                        $groupExists = \App\Models\EquipmentSetGroup::where('id', (int)$accessory['group_id'])->exists();
+                        if (!$groupExists) {
+                            return response()->json([
+                                'error' => 'Validation failed',
+                                'errors' => ["pump_accessories.{$index}.group_id" => ["The selected group does not exist."]]
+                            ], 422);
+                        }
+                    }
+                    
+                    if (isset($accessory['equipment_set_id']) && $accessory['equipment_set_id'] !== null && $accessory['equipment_set_id'] !== '' && (int)$accessory['equipment_set_id'] > 0) {
+                        $setExists = \App\Models\EquipmentSet::where('id', (int)$accessory['equipment_set_id'])->exists();
+                        if (!$setExists) {
+                            return response()->json([
+                                'error' => 'Validation failed',
+                                'errors' => ["pump_accessories.{$index}.equipment_set_id" => ["The selected equipment set does not exist."]]
+                            ], 422);
+                        }
+                    }
+                }
+            }
             
             $productCode = $validated['product_code'] ?? '';
             if (empty($productCode)) {
@@ -466,9 +507,14 @@ class EquipmentController extends Controller
                             $equipmentId = $selectedEquipment ? $selectedEquipment->id : null;
                         }
                         
-                        PumpAccessory::create([
+                        // ตรวจสอบว่ามี group_id หรือไม่
+                        $hasGroupId = isset($accessoryData['group_id']) && $accessoryData['group_id'] && $accessoryData['group_id'] > 0;
+                        
+                        $createdAccessory = PumpAccessory::create([
                             'pump_id' => $equipment->id,
-                            'equipment_id' => $equipmentId,
+                            'equipment_id' => $hasGroupId ? null : $equipmentId, // ถ้ามี group_id ให้ equipment_id เป็น null
+                            'group_id' => $hasGroupId ? (int)$accessoryData['group_id'] : null,
+                            'equipment_set_id' => $hasGroupId && isset($accessoryData['equipment_set_id']) ? (int)$accessoryData['equipment_set_id'] : null,
                             'product_code' => $accessoryData['product_code'] ?? ($selectedEquipment ? $selectedEquipment->product_code : null),
                             'name' => $accessoryData['name'],
                             'image' => $accessoryData['image'] ?? ($selectedEquipment ? $selectedEquipment->image_url : null),
@@ -486,7 +532,10 @@ class EquipmentController extends Controller
 
             DB::commit();
 
+            // Reload equipment with relationships
+            $equipment->refresh();
             $equipment->load(['category', 'attributeValues.attribute', 'pumpAccessories']);
+            
             return response()->json($equipment->toCalculationFormat());
 
         } catch (\Exception $e) {

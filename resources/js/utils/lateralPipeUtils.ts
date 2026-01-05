@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface Coordinate {
@@ -138,23 +139,42 @@ export const findLateralToSubMainIntersections = (
         segmentIndex: number;
     }[] = [];
 
-    const findPipeZone = (pipe: any): string | null => {
+    const findPipeZone = (pipe: any, pipeType: 'lateral' | 'submain'): string | null => {
         if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
 
-        const pointsToCheck: Coordinate[] = [];
+        // Use explicit zoneId if available
+        if (pipe.zoneId) {
+            return pipe.zoneId;
+        }
+
         const coords = pipe.coordinates;
+        let pointsToCheck: Coordinate[] = [];
 
-        pointsToCheck.push(coords[0]);
-
-        if (coords.length > 2) {
-            const midIndex = Math.floor(coords.length / 2);
-            pointsToCheck.push(coords[midIndex]);
+        // IMPORTANT: For sub-main pipes, only check the ENDPOINT (where the pipe ends)
+        // For lateral pipes, check PLANTS or multiple points to find the correct zone
+        if (pipeType === 'submain') {
+            // Sub-main pipe belongs to the zone where it ENDS
+            pointsToCheck = [coords[coords.length - 1]];
+        } else {
+            // Lateral pipe: Check plants first, then check multiple points along the pipe
+            // This handles cases where the connection point is outside/on the edge of the zone
+            if (pipe.plants && pipe.plants.length > 0) {
+                // Use plant positions (most reliable for lateral pipes)
+                pointsToCheck = pipe.plants.map((p: any) => p.position);
+            } else {
+                // Fallback: check multiple points along the lateral pipe
+                pointsToCheck = [coords[0]];
+                if (coords.length > 2) {
+                    const midIndex = Math.floor(coords.length / 2);
+                    pointsToCheck.push(coords[midIndex]);
+                }
+                if (coords.length > 1) {
+                    pointsToCheck.push(coords[coords.length - 1]);
+                }
+            }
         }
 
-        if (coords.length > 1) {
-            pointsToCheck.push(coords[coords.length - 1]);
-        }
-
+        // Check irrigationZones first
         if (irrigationZones) {
             for (const zone of irrigationZones) {
                 for (const point of pointsToCheck) {
@@ -165,6 +185,7 @@ export const findLateralToSubMainIntersections = (
             }
         }
 
+        // Then check regular zones
         if (zones) {
             for (const zone of zones) {
                 for (const point of pointsToCheck) {
@@ -183,15 +204,17 @@ export const findLateralToSubMainIntersections = (
             continue;
         }
 
-        const lateralZone = findPipeZone(lateralPipe);
+        const lateralZone = findPipeZone(lateralPipe, 'lateral');
 
         for (const subMainPipe of subMainPipes) {
             if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
                 continue;
             }
 
-            const subMainZone = findPipeZone(subMainPipe);
+            const subMainZone = findPipeZone(subMainPipe, 'submain');
 
+            // CRITICAL: Only create intersection point if pipes are in the SAME zone
+            // If sub-main pipe just passes through another zone, don't create connection
             if (lateralZone && subMainZone && lateralZone !== subMainZone) {
                 continue;
             }
@@ -1714,11 +1737,13 @@ export interface PlantLocation {
         waterNeed: number;
     };
     rotationAngle?: number;
+    zoneId?: string;
 }
 
 export interface SubMainPipe {
     id: string;
     coordinates: Coordinate[];
+    zoneId?: string;
 }
 
 export const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coordinate): number => {
@@ -1886,7 +1911,34 @@ export const groupPlantsByRows = (plants: PlantLocation[]): PlantLocation[][] =>
 
     try {
         const groups: PlantLocation[][] = [];
-        const tolerance = 0.000005;
+        
+        // Calculate adaptive tolerance based on plant spacing
+        // Default: 0.000005 degrees ≈ 0.55 meters, but scale based on actual plant spacing
+        let tolerance = 0.000005;
+        
+        if (plants.length >= 2) {
+            // Sample some plant pairs to estimate row spacing
+            const sampleSize = Math.min(10, plants.length);
+            const latDiffs: number[] = [];
+            
+            // Sort by lat to find consecutive plants
+            const sortedByLat = [...plants].sort((a, b) => a.position.lat - b.position.lat);
+            
+            for (let i = 1; i < sampleSize && i < sortedByLat.length; i++) {
+                const diff = Math.abs(sortedByLat[i].position.lat - sortedByLat[i - 1].position.lat);
+                if (diff > 0.0000001) { // Ignore nearly identical points
+                    latDiffs.push(diff);
+                }
+            }
+            
+            if (latDiffs.length > 0) {
+                // Use the minimum difference as row spacing indicator
+                const minDiff = Math.min(...latDiffs);
+                // Tolerance should be about 15-20% of the minimum row spacing
+                // but at least the default value and at most 0.00005 (5.5 meters)
+                tolerance = Math.min(0.00005, Math.max(0.000005, minDiff * 0.2));
+            }
+        }
 
         const rotationInfo = hasRotation(plants);
 
@@ -1993,7 +2045,34 @@ export const groupPlantsByColumns = (plants: PlantLocation[]): PlantLocation[][]
     }
 
     const groups: PlantLocation[][] = [];
-    const tolerance = 0.000005;
+    
+    // Calculate adaptive tolerance based on plant spacing
+    // Default: 0.000005 degrees ≈ 0.55 meters, but scale based on actual plant spacing
+    let tolerance = 0.000005;
+    
+    if (plants.length >= 2) {
+        // Sample some plant pairs to estimate column spacing
+        const sampleSize = Math.min(10, plants.length);
+        const lngDiffs: number[] = [];
+        
+        // Sort by lng to find consecutive plants
+        const sortedByLng = [...plants].sort((a, b) => a.position.lng - b.position.lng);
+        
+        for (let i = 1; i < sampleSize && i < sortedByLng.length; i++) {
+            const diff = Math.abs(sortedByLng[i].position.lng - sortedByLng[i - 1].position.lng);
+            if (diff > 0.0000001) { // Ignore nearly identical points
+                lngDiffs.push(diff);
+            }
+        }
+        
+        if (lngDiffs.length > 0) {
+            // Use the minimum difference as column spacing indicator
+            const minDiff = Math.min(...lngDiffs);
+            // Tolerance should be about 15-20% of the minimum column spacing
+            // but at least the default value and at most 0.00005 (5.5 meters)
+            tolerance = Math.min(0.00005, Math.max(0.000005, minDiff * 0.2));
+        }
+    }
 
     const rotationInfo = hasRotation(plants);
 
@@ -2388,7 +2467,8 @@ export const computeAlignedLateral = (
     rawEndPoint: Coordinate,
     plants: PlantLocation[],
     placementMode: 'over_plants' | 'between_plants',
-    snapThreshold: number = 20
+    snapThreshold: number = 20,
+    existingLateralPipes: any[] = []
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
     if (!startPoint || !rawEndPoint) {
         return {
@@ -2426,7 +2506,8 @@ export const computeAlignedLateral = (
                 rawEndPoint,
                 plants,
                 adaptiveThreshold,
-                direction
+                direction,
+                existingLateralPipes
             );
         }
     } catch (error) {
@@ -2440,7 +2521,8 @@ export const computeAlignedLateralFromMainPipe = (
     rawEndPoint: Coordinate,
     plants: PlantLocation[],
     placementMode: 'over_plants' | 'between_plants',
-    snapThreshold: number = 20
+    snapThreshold: number = 20,
+    existingLateralPipes: any[] = []
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
     if (!snappedStartPoint || !rawEndPoint) {
         return {
@@ -2473,7 +2555,8 @@ export const computeAlignedLateralFromMainPipe = (
             rawEndPoint,
             plants,
             adaptiveThreshold,
-            direction
+            direction,
+            existingLateralPipes
         );
     }
 };
@@ -2705,7 +2788,8 @@ export const computeBetweenPlantsMode = (
     rawEndPoint: Coordinate,
     plants: PlantLocation[],
     snapThreshold: number,
-    direction: 'rows' | 'columns'
+    direction: 'rows' | 'columns',
+    existingLateralPipes: any[] = []
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
     const rows = groupPlantsByRows(plants);
     const cols = groupPlantsByColumns(plants);
@@ -2790,38 +2874,56 @@ export const computeBetweenPlantsMode = (
         const rotationInfo = hasRotation(plants);
 
         if (rotationInfo.hasRotation) {
-            const allPlantsInPair = [...group1, ...group2];
-            const centerPoint = {
-                lat:
-                    allPlantsInPair.reduce((sum, p) => sum + p.position.lat, 0) /
-                    allPlantsInPair.length,
-                lng:
-                    allPlantsInPair.reduce((sum, p) => sum + p.position.lng, 0) /
-                    allPlantsInPair.length,
-            };
-
-            let lineDirection: { lat: number; lng: number };
+            // For rotated plants, use transformed coordinates to find the extremes
+            // Sort by transformed coordinates to find true start/end of each row
+            const transformPos = (pos: Coordinate): Coordinate => 
+                transformToRotatedCoordinate(pos, rotationInfo.center, rotationInfo.rotationAngle);
+            
             if (groupType === 'between_rows') {
-                lineDirection = directionFromPlantsLine(allPlantsInPair);
-            } else {
-                lineDirection = directionFromPlantsColumn(allPlantsInPair);
-            }
+                // Sort by transformed lng to find left-most and right-most plants
+                const sorted1 = [...group1].sort((a, b) => 
+                    transformPos(a.position).lng - transformPos(b.position).lng
+                );
+                const sorted2 = [...group2].sort((a, b) => 
+                    transformPos(a.position).lng - transformPos(b.position).lng
+                );
 
-            const lineLength = 100;
-            centerLineStart = {
-                lat: centerPoint.lat - (lineDirection.lat * lineLength) / 111320,
-                lng:
-                    centerPoint.lng -
-                    (lineDirection.lng * lineLength) /
-                        (111320 * Math.cos((centerPoint.lat * Math.PI) / 180)),
-            };
-            centerLineEnd = {
-                lat: centerPoint.lat + (lineDirection.lat * lineLength) / 111320,
-                lng:
-                    centerPoint.lng +
-                    (lineDirection.lng * lineLength) /
-                        (111320 * Math.cos((centerPoint.lat * Math.PI) / 180)),
-            };
+                const start1 = sorted1[0].position;
+                const end1 = sorted1[sorted1.length - 1].position;
+                const start2 = sorted2[0].position;
+                const end2 = sorted2[sorted2.length - 1].position;
+
+                centerLineStart = {
+                    lat: (start1.lat + start2.lat) / 2,
+                    lng: (start1.lng + start2.lng) / 2,
+                };
+                centerLineEnd = {
+                    lat: (end1.lat + end2.lat) / 2,
+                    lng: (end1.lng + end2.lng) / 2,
+                };
+            } else {
+                // Sort by transformed lat to find top-most and bottom-most plants
+                const sorted1 = [...group1].sort((a, b) => 
+                    transformPos(a.position).lat - transformPos(b.position).lat
+                );
+                const sorted2 = [...group2].sort((a, b) => 
+                    transformPos(a.position).lat - transformPos(b.position).lat
+                );
+
+                const start1 = sorted1[0].position;
+                const end1 = sorted1[sorted1.length - 1].position;
+                const start2 = sorted2[0].position;
+                const end2 = sorted2[sorted2.length - 1].position;
+
+                centerLineStart = {
+                    lat: (start1.lat + start2.lat) / 2,
+                    lng: (start1.lng + start2.lng) / 2,
+                };
+                centerLineEnd = {
+                    lat: (end1.lat + end2.lat) / 2,
+                    lng: (end1.lng + end2.lng) / 2,
+                };
+            }
         } else {
             centerLineStart = {
                 lat: (group1[0].position.lat + group2[0].position.lat) / 2,
@@ -2861,49 +2963,44 @@ export const computeBetweenPlantsMode = (
         const isGoodPair = isSuitablePair && isBetterChoice && isCloseToCenterLine;
 
         if (isGoodPair) {
-            let fullCenterLine: { start: Coordinate; end: Coordinate };
+            let fullCenterLine: { start: Coordinate; end: Coordinate } | null = null;
 
+            // Use the same approach as computeOverPlantsMode for better bidirectional support
+            // Calculate center point between the two rows/columns
+            const allPlantsInPair = [...group1, ...group2];
+            const centerPoint = {
+                lat: allPlantsInPair.reduce((sum, p) => sum + p.position.lat, 0) / allPlantsInPair.length,
+                lng: allPlantsInPair.reduce((sum, p) => sum + p.position.lng, 0) / allPlantsInPair.length,
+            };
+
+            // Get direction from plants (same as computeOverPlantsMode)
+            // This ensures proper handling of rotated plants
+            let lineDirection: { lat: number; lng: number };
             if (direction === 'rows') {
-                const sorted1ByLng = [...group1].sort((a, b) => a.position.lng - b.position.lng);
-                const sorted2ByLng = [...group2].sort((a, b) => a.position.lng - b.position.lng);
-
-                const start1 = sorted1ByLng[0].position;
-                const end1 = sorted1ByLng[sorted1ByLng.length - 1].position;
-                const start2 = sorted2ByLng[0].position;
-                const end2 = sorted2ByLng[sorted2ByLng.length - 1].position;
-
-                const centerStart = {
-                    lat: (start1.lat + start2.lat) / 2,
-                    lng: (start1.lng + start2.lng) / 2,
-                };
-                const centerEnd = {
-                    lat: (end1.lat + end2.lat) / 2,
-                    lng: (end1.lng + end2.lng) / 2,
-                };
-
-                fullCenterLine = { start: centerStart, end: centerEnd };
+                lineDirection = directionFromPlantsLine(allPlantsInPair);
             } else {
-                const sorted1ByLat = [...group1].sort((a, b) => a.position.lat - b.position.lat);
-                const sorted2ByLat = [...group2].sort((a, b) => a.position.lat - b.position.lat);
-
-                const avgLng1 = group1.reduce((sum, p) => sum + p.position.lng, 0) / group1.length;
-                const avgLng2 = group2.reduce((sum, p) => sum + p.position.lng, 0) / group2.length;
-                const avgLng = (avgLng1 + avgLng2) / 2;
-
-                const centerStart = {
-                    lat: (sorted1ByLat[0].position.lat + sorted2ByLat[0].position.lat) / 2,
-                    lng: avgLng,
-                };
-                const centerEnd = {
-                    lat:
-                        (sorted1ByLat[sorted1ByLat.length - 1].position.lat +
-                            sorted2ByLat[sorted2ByLat.length - 1].position.lat) /
-                        2,
-                    lng: avgLng,
-                };
-
-                fullCenterLine = { start: centerStart, end: centerEnd };
+                lineDirection = directionFromPlantsColumn(allPlantsInPair);
             }
+
+            // Create a long centerLine from center point (same approach as computeOverPlantsMode)
+            // Use 100 meters in both directions to support bidirectional drawing
+            const lineLength = 100;
+            fullCenterLine = {
+                start: {
+                    lat: centerPoint.lat - (lineDirection.lat * lineLength) / 111320,
+                    lng:
+                        centerPoint.lng -
+                        (lineDirection.lng * lineLength) /
+                            (111320 * Math.cos((centerPoint.lat * Math.PI) / 180)),
+                },
+                end: {
+                    lat: centerPoint.lat + (lineDirection.lat * lineLength) / 111320,
+                    lng:
+                        centerPoint.lng +
+                        (lineDirection.lng * lineLength) /
+                            (111320 * Math.cos((centerPoint.lat * Math.PI) / 180)),
+                },
+            };
 
             bestAlignment = {
                 type: groupType,
@@ -2952,20 +3049,54 @@ export const computeBetweenPlantsMode = (
         };
     }
 
-    const projectedStart = findClosestPointOnLineSegment(
-        initialStartPoint,
-        bestAlignment.centerLine.start,
-        bestAlignment.centerLine.end
+    // Create a very long centerLine that supports drawing in ALL directions
+    // Calculate the direction vector from the original centerLine
+    const centerLineVec = {
+        lat: bestAlignment.centerLine.end.lat - bestAlignment.centerLine.start.lat,
+        lng: bestAlignment.centerLine.end.lng - bestAlignment.centerLine.start.lng,
+    };
+    const centerLineLength = Math.sqrt(
+        centerLineVec.lat * centerLineVec.lat + centerLineVec.lng * centerLineVec.lng
     );
-    const distanceToProjection = calculateDistanceBetweenPoints(initialStartPoint, projectedStart);
+    
+    // Calculate center point of the original centerLine (middle of the two rows)
+    const centerPoint = {
+        lat: (bestAlignment.centerLine.start.lat + bestAlignment.centerLine.end.lat) / 2,
+        lng: (bestAlignment.centerLine.start.lng + bestAlignment.centerLine.end.lng) / 2,
+    };
+    
+    // Normalize the direction vector
+    let normalizedVec = { lat: 0, lng: 0 };
+    if (centerLineLength > 0.0000001) { // Avoid division by zero
+        normalizedVec = {
+            lat: centerLineVec.lat / centerLineLength,
+            lng: centerLineVec.lng / centerLineLength,
+        };
+    } else {
+        // Fallback: use a default direction if centerLine is too short
+        normalizedVec = { lat: 1, lng: 0 };
+    }
+    
+    // Create a VERY long centerLine (10 kilometers in both directions)
+    // This ensures the guide line works in ALL directions, not just forward/backward
+    const extensionLength = 10000 / 111320; // 10 kilometers in degrees
+    
+    // Create extended centerLine centered on the center point, extending in both directions
+    const extendedCenterLineStart = {
+        lat: centerPoint.lat - normalizedVec.lat * extensionLength,
+        lng: centerPoint.lng - normalizedVec.lng * extensionLength,
+    };
+    const extendedCenterLineEnd = {
+        lat: centerPoint.lat + normalizedVec.lat * extensionLength,
+        lng: centerPoint.lng + normalizedVec.lng * extensionLength,
+    };
 
-    const snappedStart = distanceToProjection <= snapThreshold ? projectedStart : initialStartPoint;
-
-    const alignedEnd = findClosestPointOnLineSegment(
-        rawEndPoint,
-        bestAlignment.centerLine.start,
-        bestAlignment.centerLine.end
-    );
+    // For "between plants" mode: Allow COMPLETE FREE drawing - 100% mouse position
+    // NO snapping, NO alignment, NO interference - use raw mouse position directly
+    // User has full control - pipe follows mouse exactly as they draw
+    
+    const snappedStart = initialStartPoint;
+    const alignedEnd = rawEndPoint; // Use rawEndPoint 100% - no modifications
 
     const allPlantsInPair = [...bestAlignment.row1, ...bestAlignment.row2];
 
@@ -2990,87 +3121,181 @@ export const computeBetweenPlantsMode = (
 
     const rotationInfo = hasRotation(plants);
 
+    // Helper function to project point onto infinite line (for plant selection only)
+    const projectPointOntoInfiniteLine = (
+        point: Coordinate,
+        linePoint: Coordinate,
+        lineDirection: { lat: number; lng: number }
+    ): Coordinate => {
+        const dx = point.lat - linePoint.lat;
+        const dy = point.lng - linePoint.lng;
+        const dot = dx * lineDirection.lat + dy * lineDirection.lng;
+        return {
+            lat: linePoint.lat + lineDirection.lat * dot,
+            lng: linePoint.lng + lineDirection.lng * dot,
+        };
+    };
+
     const selectedPlants = allPlantsInPair.filter((plant) => {
-        const plantProjected = findClosestPointOnLineSegment(
+        // Use infinite line projection for plant selection
+        // This helps find plants near the drawn line (even if line is not aligned)
+        const plantProjected = projectPointOntoInfiniteLine(
             plant.position,
-            bestAlignment.centerLine.start,
-            bestAlignment.centerLine.end
+            centerPoint,
+            normalizedVec
         );
 
         const distanceToStart = calculateDistanceBetweenPoints(plantProjected, snappedStart);
         const distanceToEnd = calculateDistanceBetweenPoints(plantProjected, alignedEnd);
         const lateralLength = calculateDistanceBetweenPoints(snappedStart, alignedEnd);
 
-        const pipeLengthTolerance = Math.max(3.0, avgPlantSpacing * 0.6);
+        // Increase pipe length tolerance significantly to capture more plants
+        // Especially important for long pipes where plants might be slightly off
+        const pipeLengthTolerance = Math.max(10.0, avgPlantSpacing * 1.2); // Increased from 5.0, 0.8
 
         const isWithinPipeLength =
             distanceToStart + distanceToEnd <= lateralLength + pipeLengthTolerance;
 
+        // Check if plant is within the pipe length range
+        // Use more lenient tolerance, especially for rotated plants
         let isInRange = false;
 
         if (rotationInfo.hasRotation) {
-            const tolerance = Math.max(3.0, lateralLength * 0.08);
+            // For rotated plants, use distance-based check with more generous tolerance
+            // Increase tolerance significantly for long pipes
+            const tolerance = Math.max(10.0, lateralLength * 0.15); // Increased from 5.0, 0.1
             isInRange = distanceToStart + distanceToEnd <= lateralLength + tolerance;
         } else {
+            // For non-rotated plants, use coordinate-based check with tolerance
             if (bestAlignment.type === 'between_rows') {
                 const minLng = Math.min(snappedStart.lng, alignedEnd.lng);
                 const maxLng = Math.max(snappedStart.lng, alignedEnd.lng);
-                const lngTolerance = Math.max(0.000003, avgPlantSpacing * 0.000005);
+                // Increase tolerance to capture more plants
+                const lngTolerance = Math.max(0.000005, avgPlantSpacing * 0.00001); // Increased
                 isInRange =
                     plantProjected.lng >= minLng - lngTolerance &&
                     plantProjected.lng <= maxLng + lngTolerance;
             } else {
                 const minLat = Math.min(snappedStart.lat, alignedEnd.lat);
                 const maxLat = Math.max(snappedStart.lat, alignedEnd.lat);
-                const latTolerance = Math.max(0.000003, avgPlantSpacing * 0.000005); // ลด tolerance
+                // Increase tolerance to capture more plants
+                const latTolerance = Math.max(0.000005, avgPlantSpacing * 0.00001); // Increased
                 isInRange =
                     plantProjected.lat >= minLat - latTolerance &&
                     plantProjected.lat <= maxLat + latTolerance;
             }
         }
 
+        // Check if plant is between the two rows/columns
+        // Use rotation-aware calculation when plants are rotated
         let isBetweenPlantPairs = false;
-        if (bestAlignment.type === 'between_rows') {
-            const row1LatAvg =
-                bestAlignment.row1.reduce((sum, p) => sum + p.position.lat, 0) /
-                bestAlignment.row1.length;
-            const row2LatAvg =
-                bestAlignment.row2.reduce((sum, p) => sum + p.position.lat, 0) /
-                bestAlignment.row2.length;
-            const minRowLat = Math.min(row1LatAvg, row2LatAvg);
-            const maxRowLat = Math.max(row1LatAvg, row2LatAvg);
-            isBetweenPlantPairs =
-                plant.position.lat >= minRowLat && plant.position.lat <= maxRowLat;
+        if (rotationInfo.hasRotation) {
+            // For rotated plants, use transformed coordinates
+            const transformPos = (pos: Coordinate): Coordinate =>
+                transformToRotatedCoordinate(pos, rotationInfo.center, rotationInfo.rotationAngle);
+            
+            if (bestAlignment.type === 'between_rows') {
+                // Check in transformed coordinate system (lat direction after rotation)
+                const row1Transformed = bestAlignment.row1.map(p => transformPos(p.position));
+                const row2Transformed = bestAlignment.row2.map(p => transformPos(p.position));
+                
+                const row1LatAvg = row1Transformed.reduce((sum, p) => sum + p.lat, 0) / row1Transformed.length;
+                const row2LatAvg = row2Transformed.reduce((sum, p) => sum + p.lat, 0) / row2Transformed.length;
+                const minRowLat = Math.min(row1LatAvg, row2LatAvg);
+                const maxRowLat = Math.max(row1LatAvg, row2LatAvg);
+                
+                const plantTransformed = transformPos(plant.position);
+                // Use more generous tolerance (50% of row spacing) to capture more plants
+                const rowSpacing = Math.abs(row2LatAvg - row1LatAvg);
+                const tolerance = Math.max(0.00002, rowSpacing * 0.5); // Increased from 0.2
+                isBetweenPlantPairs =
+                    plantTransformed.lat >= minRowLat - tolerance &&
+                    plantTransformed.lat <= maxRowLat + tolerance;
+            } else {
+                // Check in transformed coordinate system (lng direction after rotation)
+                const row1Transformed = bestAlignment.row1.map(p => transformPos(p.position));
+                const row2Transformed = bestAlignment.row2.map(p => transformPos(p.position));
+                
+                const col1LngAvg = row1Transformed.reduce((sum, p) => sum + p.lng, 0) / row1Transformed.length;
+                const col2LngAvg = row2Transformed.reduce((sum, p) => sum + p.lng, 0) / row2Transformed.length;
+                const minColLng = Math.min(col1LngAvg, col2LngAvg);
+                const maxColLng = Math.max(col1LngAvg, col2LngAvg);
+                
+                const plantTransformed = transformPos(plant.position);
+                // Use more generous tolerance (50% of column spacing) to capture more plants
+                const colSpacing = Math.abs(col2LngAvg - col1LngAvg);
+                const tolerance = Math.max(0.00002, colSpacing * 0.5); // Increased from 0.2
+                isBetweenPlantPairs =
+                    plantTransformed.lng >= minColLng - tolerance &&
+                    plantTransformed.lng <= maxColLng + tolerance;
+            }
         } else {
-            const col1LngAvg =
-                bestAlignment.row1.reduce((sum, p) => sum + p.position.lng, 0) /
-                bestAlignment.row1.length;
-            const col2LngAvg =
-                bestAlignment.row2.reduce((sum, p) => sum + p.position.lng, 0) /
-                bestAlignment.row2.length;
-            const minColLng = Math.min(col1LngAvg, col2LngAvg);
-            const maxColLng = Math.max(col1LngAvg, col2LngAvg);
-            isBetweenPlantPairs =
-                plant.position.lng >= minColLng && plant.position.lng <= maxColLng;
+            // Non-rotated case: use original logic
+            if (bestAlignment.type === 'between_rows') {
+                const row1LatAvg =
+                    bestAlignment.row1.reduce((sum, p) => sum + p.position.lat, 0) /
+                    bestAlignment.row1.length;
+                const row2LatAvg =
+                    bestAlignment.row2.reduce((sum, p) => sum + p.position.lat, 0) /
+                    bestAlignment.row2.length;
+                const minRowLat = Math.min(row1LatAvg, row2LatAvg);
+                const maxRowLat = Math.max(row1LatAvg, row2LatAvg);
+                // Add tolerance for non-rotated case too (increased for better coverage)
+                const rowSpacing = Math.abs(row2LatAvg - row1LatAvg);
+                const tolerance = Math.max(0.00002, rowSpacing * 0.4); // Increased from 0.15
+                isBetweenPlantPairs =
+                    plant.position.lat >= minRowLat - tolerance &&
+                    plant.position.lat <= maxRowLat + tolerance;
+            } else {
+                const col1LngAvg =
+                    bestAlignment.row1.reduce((sum, p) => sum + p.position.lng, 0) /
+                    bestAlignment.row1.length;
+                const col2LngAvg =
+                    bestAlignment.row2.reduce((sum, p) => sum + p.position.lng, 0) /
+                    bestAlignment.row2.length;
+                const minColLng = Math.min(col1LngAvg, col2LngAvg);
+                const maxColLng = Math.max(col1LngAvg, col2LngAvg);
+                // Add tolerance for non-rotated case too (increased for better coverage)
+                const colSpacing = Math.abs(col2LngAvg - col1LngAvg);
+                const tolerance = Math.max(0.00002, colSpacing * 0.4); // Increased from 0.15
+                isBetweenPlantPairs =
+                    plant.position.lng >= minColLng - tolerance &&
+                    plant.position.lng <= maxColLng + tolerance;
+            }
         }
 
         const distanceToLine = calculateDistanceBetweenPoints(plant.position, plantProjected);
 
+        // Increase distance tolerance significantly to capture more plants
+        // This is especially important for rotated plants where alignment may not be perfect
         let distanceTolerance;
         if (avgPlantSpacing < 3.0) {
-            distanceTolerance = Math.max(1.2, avgPlantSpacing * 0.3);
+            distanceTolerance = Math.max(4.0, avgPlantSpacing * 0.8); // Increased from 2.0, 0.5
         } else if (avgPlantSpacing < 8.0) {
-            distanceTolerance = Math.max(1.8, avgPlantSpacing * 0.35);
+            distanceTolerance = Math.max(5.0, avgPlantSpacing * 0.7); // Increased from 3.0, 0.45
         } else {
-            distanceTolerance = Math.max(2.0, Math.min(4.0, avgPlantSpacing * 0.4));
+            distanceTolerance = Math.max(6.0, Math.min(10.0, avgPlantSpacing * 0.7)); // Increased from 4.0-6.0, 0.5
         }
-        const result =
+        
+        // Primary check: all conditions must be met
+        const primaryResult =
             isInRange &&
             isWithinPipeLength &&
             distanceToLine <= distanceTolerance &&
             isBetweenPlantPairs;
 
-        return result;
+        // Fallback check: if plant is close to centerLine and within pipe length, include it
+        // This ensures we don't miss plants that are slightly off due to rotation or spacing variations
+        // Use more lenient criteria for fallback to capture more plants
+        const fallbackDistanceTolerance = distanceTolerance * 2.0; // Much more lenient
+        const fallbackResult =
+            isInRange &&
+            isWithinPipeLength &&
+            distanceToLine <= fallbackDistanceTolerance; // Don't require isBetweenPlantPairs for fallback
+
+        // Include plant if it meets primary criteria OR fallback criteria
+        // This ensures we capture all plants that are reasonably close to the pipe
+        return primaryResult || fallbackResult;
     });
 
     if (selectedPlants.length === 0 && allPlantsInPair.length > 0) {
@@ -3484,13 +3709,708 @@ const computeBetweenPlantsModeFromMainPipe = (
     rawEndPoint: Coordinate,
     plants: PlantLocation[],
     snapThreshold: number,
-    direction: 'rows' | 'columns'
+    direction: 'rows' | 'columns',
+    existingLateralPipes: any[] = []
 ): { alignedEnd: Coordinate; selectedPlants: PlantLocation[]; snappedStart: Coordinate } => {
     return computeBetweenPlantsMode(
         snappedStartPoint,
         rawEndPoint,
         plants,
         snapThreshold,
-        direction
+        direction,
+        existingLateralPipes
     );
+};
+
+/**
+ * Calculate plant rows for a zone, considering rotation angle
+ * Returns rows that are perpendicular to the sub main pipe direction
+ */
+export const calculatePlantRowsForZone = (
+    plants: PlantLocation[],
+    subMainPipes: SubMainPipe[]
+): PlantLocation[][] => {
+    if (plants.length === 0 || subMainPipes.length === 0) {
+        return [];
+    }
+
+    // Get rotation info
+    const rotationInfo = hasRotation(plants);
+
+    // Group plants by rows and columns
+    const rowGroups = groupPlantsByRows(plants);
+    const columnGroups = groupPlantsByColumns(plants);
+
+    // Calculate average direction of sub main pipes
+    let totalDx = 0;
+    let totalDy = 0;
+    let pipeCount = 0;
+
+    for (const pipe of subMainPipes) {
+        if (pipe.coordinates && pipe.coordinates.length >= 2) {
+            const start = pipe.coordinates[0];
+            const end = pipe.coordinates[pipe.coordinates.length - 1];
+            
+            let dx, dy;
+            if (rotationInfo.hasRotation) {
+                const transformedStart = transformToRotatedCoordinate(
+                    start,
+                    rotationInfo.center,
+                    rotationInfo.rotationAngle
+                );
+                const transformedEnd = transformToRotatedCoordinate(
+                    end,
+                    rotationInfo.center,
+                    rotationInfo.rotationAngle
+                );
+                dx = transformedEnd.lng - transformedStart.lng;
+                dy = transformedEnd.lat - transformedStart.lat;
+            } else {
+                dx = end.lng - start.lng;
+                dy = end.lat - start.lat;
+            }
+
+            totalDx += dx;
+            totalDy += dy;
+            pipeCount++;
+        }
+    }
+
+    if (pipeCount === 0) {
+        return rowGroups.length > 0 ? rowGroups : columnGroups;
+    }
+
+    // Average direction vector
+    const avgDx = totalDx / pipeCount;
+    const avgDy = totalDy / pipeCount;
+
+    // Normalize
+    const magnitude = Math.sqrt(avgDx * avgDx + avgDy * avgDy);
+    if (magnitude === 0) {
+        return rowGroups.length > 0 ? rowGroups : columnGroups;
+    }
+
+    const normDx = avgDx / magnitude;
+    const normDy = avgDy / magnitude;
+
+    // Calculate angle with horizontal (lng axis)
+    const pipeAngle = Math.atan2(normDy, normDx);
+    const pipeAngleDeg = (pipeAngle * 180) / Math.PI;
+
+    // Determine if pipe is more horizontal or vertical
+    // Rows are horizontal (along lng), columns are vertical (along lat)
+    // We want plant rows perpendicular to pipe direction
+    
+    // If pipe is mostly horizontal (-45° to 45° or 135° to -135°), 
+    // use column groups (vertical plant rows)
+    // Otherwise use row groups (horizontal plant rows)
+    const absPipeAngle = Math.abs(pipeAngleDeg);
+    const useColumnGroups = absPipeAngle < 45 || absPipeAngle > 135;
+
+    return useColumnGroups ? columnGroups : rowGroups;
+};
+
+/**
+ * Find closest sub main pipe for a plant row
+ */
+const findClosestSubMainPipeForRow = (
+    plantRow: PlantLocation[],
+    subMainPipes: SubMainPipe[]
+): SubMainPipe | null => {
+    if (plantRow.length === 0 || subMainPipes.length === 0) {
+        return null;
+    }
+
+    // Use first plant in row as reference point
+    const referencePoint = plantRow[0].position;
+
+    let closestPipe: SubMainPipe | null = null;
+    let minDistance = Infinity;
+
+    for (const pipe of subMainPipes) {
+        if (!pipe.coordinates || pipe.coordinates.length < 2) {
+            continue;
+        }
+
+        // Calculate minimum distance from reference point to pipe
+        for (let i = 0; i < pipe.coordinates.length - 1; i++) {
+            const segmentStart = pipe.coordinates[i];
+            const segmentEnd = pipe.coordinates[i + 1];
+
+            const pointOnSegment = findClosestPointOnLineSegment(
+                referencePoint,
+                segmentStart,
+                segmentEnd
+            );
+
+            const distance = calculateDistanceBetweenPoints(referencePoint, pointOnSegment);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPipe = pipe;
+            }
+        }
+    }
+
+    return closestPipe;
+};
+
+/**
+ * Split plant row if it crosses sub-main pipe (for Connect Mode)
+ * Returns array of sub-rows, one for each side of the sub-main pipe
+ */
+const splitRowBySubMainPipe = (
+    plantRow: PlantLocation[],
+    subMainPipe: SubMainPipe
+): PlantLocation[][] => {
+    if (plantRow.length < 2 || !subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
+        return [plantRow];
+    }
+
+    // Check if the row crosses the sub-main pipe
+    const firstPlant = plantRow[0].position;
+    const lastPlant = plantRow[plantRow.length - 1].position;
+
+    // Find if there's an intersection
+    let hasIntersection = false;
+    for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+        const segmentStart = subMainPipe.coordinates[i];
+        const segmentEnd = subMainPipe.coordinates[i + 1];
+
+        const intersection = findLineIntersection(
+            firstPlant,
+            lastPlant,
+            segmentStart,
+            segmentEnd
+        );
+
+        if (intersection) {
+            hasIntersection = true;
+            break;
+        }
+    }
+
+    // If no intersection, return the whole row
+    if (!hasIntersection) {
+        return [plantRow];
+    }
+
+    // Split plants into two groups based on which side of sub-main pipe they're on
+    const side1: PlantLocation[] = [];
+    const side2: PlantLocation[] = [];
+
+    // Calculate sub-main pipe direction vector
+    const pipeStart = subMainPipe.coordinates[0];
+    const pipeEnd = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
+    const pipeDx = pipeEnd.lng - pipeStart.lng;
+    const pipeDy = pipeEnd.lat - pipeStart.lat;
+
+    for (const plant of plantRow) {
+        // Use cross product to determine which side of the line the plant is on
+        const dx = plant.position.lng - pipeStart.lng;
+        const dy = plant.position.lat - pipeStart.lat;
+        const crossProduct = dx * pipeDy - dy * pipeDx;
+
+        if (crossProduct >= 0) {
+            side1.push(plant);
+        } else {
+            side2.push(plant);
+        }
+    }
+
+    // Return non-empty sides
+    const result: PlantLocation[][] = [];
+    if (side1.length >= 2) result.push(side1);
+    if (side2.length >= 2) result.push(side2);
+
+    return result.length > 0 ? result : [plantRow];
+};
+
+/**
+ * Create lateral pipe from plant row - Connect mode (starts from sub main)
+ */
+const createConnectModeLateralPipe = (
+    plantRow: PlantLocation[],
+    subMainPipe: SubMainPipe,
+    zoneId?: string
+): {
+    coordinates: Coordinate[];
+    plants: PlantLocation[];
+    connectionPoint: Coordinate;
+} | null => {
+    if (plantRow.length === 0 || !subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
+        return null;
+    }
+
+    // Find closest point on sub main pipe to first plant
+    const firstPlant = plantRow[0];
+    const lastPlant = plantRow[plantRow.length - 1];
+
+    // Determine which end of the row is closer to the sub main pipe
+    let closestToSubMain: Coordinate | null = null;
+    let minDistToSubMain = Infinity;
+    let connectionPoint: Coordinate | null = null;
+
+    for (const plant of [firstPlant, lastPlant]) {
+        for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+            const segmentStart = subMainPipe.coordinates[i];
+            const segmentEnd = subMainPipe.coordinates[i + 1];
+
+            const pointOnPipe = findClosestPointOnLineSegment(
+                plant.position,
+                segmentStart,
+                segmentEnd
+            );
+
+            const dist = calculateDistanceBetweenPoints(plant.position, pointOnPipe);
+
+            if (dist < minDistToSubMain) {
+                minDistToSubMain = dist;
+                closestToSubMain = plant.position;
+                connectionPoint = pointOnPipe;
+            }
+        }
+    }
+
+    if (!connectionPoint || !closestToSubMain) {
+        return null;
+    }
+
+    // Sort plants from connection point to far end
+    const sortedPlants = [...plantRow].sort((a, b) => {
+        const distA = calculateDistanceBetweenPoints(a.position, connectionPoint!);
+        const distB = calculateDistanceBetweenPoints(b.position, connectionPoint!);
+        return distA - distB;
+    });
+
+    // Create coordinates: straight line from connection point through the plant row
+    // Start from connection point -> first plant -> last plant (straight line)
+    const coordinates: Coordinate[] = [
+        connectionPoint,
+        sortedPlants[0].position,
+        sortedPlants[sortedPlants.length - 1].position
+    ];
+
+    return {
+        coordinates,
+        plants: sortedPlants,
+        connectionPoint,
+    };
+};
+
+/**
+ * Create lateral pipe from plant row - Intersect mode (crosses sub main)
+ */
+const createIntersectModeLateralPipe = (
+    plantRow: PlantLocation[],
+    subMainPipe: SubMainPipe,
+    zoneId?: string
+): {
+    coordinates: Coordinate[];
+    plants: PlantLocation[];
+    intersectionPoint: Coordinate | null;
+} | null => {
+    if (plantRow.length < 2 || !subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
+        return null;
+    }
+
+    // Sort plants to determine the row direction
+    const sortedPlants = [...plantRow].sort((a, b) => {
+        // Sort by distance to form a line
+        const dx = a.position.lng - b.position.lng;
+        const dy = a.position.lat - b.position.lat;
+        return dx !== 0 ? dx : dy;
+    });
+
+    // Create a line through the plant row (first to last plant)
+    const firstPlant = sortedPlants[0].position;
+    const lastPlant = sortedPlants[sortedPlants.length - 1].position;
+
+    // Find intersection with sub main pipe
+    let intersectionPoint: Coordinate | null = null;
+
+    for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+        const segmentStart = subMainPipe.coordinates[i];
+        const segmentEnd = subMainPipe.coordinates[i + 1];
+
+        const intersection = findLineIntersection(
+            firstPlant,
+            lastPlant,
+            segmentStart,
+            segmentEnd
+        );
+
+        if (intersection) {
+            intersectionPoint = intersection;
+            break;
+        }
+    }
+
+    // Create coordinates: straight line from first plant to last plant
+    const coordinates: Coordinate[] = [firstPlant, lastPlant];
+
+    return {
+        coordinates,
+        plants: sortedPlants,
+        intersectionPoint,
+    };
+};
+
+/**
+ * Generate automatic lateral pipes for selected zones
+ */
+export const generateAutoLateralPipes = (
+    zones: any[],
+    irrigationZones: any[],
+    selectedZoneIds: string[],
+    connectionMode: 'connect' | 'intersect',
+    allPlants: PlantLocation[],
+    allSubMainPipes: SubMainPipe[]
+): {
+    lateralPipes: any[];
+    stats: {
+        totalPipes: number;
+        totalLength: number;
+        totalPlants: number;
+        zoneStats: { [zoneId: string]: { pipes: number; length: number; plants: number } };
+    };
+} => {
+    // IMPORTANT: Deduplicate selectedZoneIds to prevent processing the same zone multiple times
+    const uniqueZoneIds = Array.from(new Set(selectedZoneIds));
+    
+    const lateralPipes: any[] = [];
+    const zoneStats: { [zoneId: string]: { pipes: number; length: number; plants: number } } = {};
+
+    // Process each selected zone
+    for (const zoneId of uniqueZoneIds) {
+        // Find zone (could be in zones or irrigationZones)
+        const zone = [...zones, ...irrigationZones].find((z) => z.id === zoneId);
+        if (!zone) continue;
+
+        // Get plants in this zone
+        const zonePlants = allPlants.filter((p) => p.zoneId === zoneId);
+        if (zonePlants.length === 0) continue;
+
+        // Get sub main pipes in this zone
+        // IMPORTANT: A sub-main pipe belongs to the zone where its ENDPOINT is located
+        // Even if the pipe passes through other zones, it only belongs to the zone where it ends
+        const zoneSubMainPipes = allSubMainPipes.filter((pipe) => {
+            if (!pipe.coordinates || pipe.coordinates.length === 0) return false;
+
+            // Use zoneId if available (explicit assignment)
+            if (pipe.zoneId) {
+                return pipe.zoneId === zoneId;
+            }
+
+            // Otherwise check if the LAST POINT (endpoint) is inside this zone
+            const endpoint = pipe.coordinates[pipe.coordinates.length - 1];
+            return isPointInPolygon(endpoint, zone.coordinates);
+        });
+
+        if (zoneSubMainPipes.length === 0) continue;
+
+        // Calculate plant rows for this zone
+        const plantRows = calculatePlantRowsForZone(zonePlants, zoneSubMainPipes);
+
+        // IMPORTANT: Deduplicate plant rows
+        // Sometimes the grouping algorithm can create duplicate rows (same plants in different row objects)
+        // We need to filter these out to prevent creating duplicate pipes
+        const uniquePlantRows: PlantLocation[][] = [];
+        const processedPlantSets = new Set<string>();
+
+        for (const plantRow of plantRows) {
+            // Create a unique identifier for this row based on sorted plant IDs
+            const plantIds = plantRow.map((p) => p.id).sort().join(',');
+            
+            if (!processedPlantSets.has(plantIds)) {
+                uniquePlantRows.push(plantRow);
+                processedPlantSets.add(plantIds);
+            }
+        }
+
+        let zonePipeCount = 0;
+        let zoneTotalLength = 0;
+        let zoneTotalPlants = 0;
+
+        // Track used connection points to prevent overlapping pipes (connect mode)
+        const usedConnectionPoints: Coordinate[] = [];
+        const MIN_CONNECTION_DISTANCE = 3; // meters - minimum distance between connection points
+
+        // Temporary storage for pipes before merging (intersect mode)
+        const tempLateralPipes: any[] = [];
+
+        // Create lateral pipe for each plant row
+        for (const plantRow of uniquePlantRows) {
+            if (plantRow.length < 2) continue; // Skip rows with less than 2 plants
+
+            // Find closest sub main pipe for this row
+            const closestSubMainPipe = findClosestSubMainPipeForRow(plantRow, zoneSubMainPipes);
+            if (!closestSubMainPipe) continue;
+
+            // For CONNECT mode: Split row if it crosses the sub-main pipe
+            // This ensures we create pipes on BOTH sides of the sub-main
+            const rowsToProcess = connectionMode === 'connect' 
+                ? splitRowBySubMainPipe(plantRow, closestSubMainPipe)
+                : [plantRow];
+
+            for (const processRow of rowsToProcess) {
+                if (processRow.length < 2) continue;
+
+                // Create lateral pipe based on connection mode
+                let lateralPipeData;
+
+                if (connectionMode === 'connect') {
+                    lateralPipeData = createConnectModeLateralPipe(processRow, closestSubMainPipe, zoneId);
+                    
+                    // For connect mode, we don't skip rows based on connection point distance
+                    // Instead, let all rows connect - the visual overlap is acceptable
+                    // because they represent different plant rows
+                } else {
+                    lateralPipeData = createIntersectModeLateralPipe(
+                        processRow,
+                        closestSubMainPipe,
+                        zoneId
+                    );
+                }
+
+                if (!lateralPipeData) continue;
+
+                // Calculate pipe length
+                const pipeLength = calculatePipeLength(lateralPipeData.coordinates);
+
+                // Create lateral pipe object
+                const lateralPipe = {
+                    id: `auto-lateral-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    subMainPipeId: closestSubMainPipe.id,
+                    coordinates: lateralPipeData.coordinates,
+                    length: pipeLength,
+                    plants: lateralPipeData.plants,
+                    placementMode: 'over_plants' as const,
+                    emitterLines: [],
+                    connectionPoint:
+                        connectionMode === 'connect'
+                            ? lateralPipeData.connectionPoint
+                            : lateralPipeData.coordinates[0],
+                    totalWaterNeed: calculateTotalWaterNeed(lateralPipeData.plants),
+                    plantCount: lateralPipeData.plants.length,
+                    zoneId: zoneId,
+                    isEditable: true,
+                    isAutoGenerated: true,
+                };
+
+                // Add intersection data for intersect mode
+                if (connectionMode === 'intersect' && (lateralPipeData as any).intersectionPoint) {
+                    const intersectionData = findLateralSubMainIntersection(
+                        lateralPipeData.coordinates[0],
+                        lateralPipeData.coordinates[lateralPipeData.coordinates.length - 1],
+                        [closestSubMainPipe]
+                    );
+
+                    if (intersectionData) {
+                        const segmentStats = calculateLateralPipeSegmentStats(
+                            lateralPipeData.coordinates[0],
+                            lateralPipeData.coordinates[lateralPipeData.coordinates.length - 1],
+                            intersectionData.intersectionPoint,
+                            lateralPipeData.plants
+                        );
+
+                        (lateralPipe as any).intersectionData = {
+                            point: intersectionData.intersectionPoint,
+                            subMainPipeId: intersectionData.subMainPipeId,
+                            segmentIndex: intersectionData.segmentIndex,
+                            segmentStats: segmentStats,
+                        };
+
+                        // Store for merging
+                        tempLateralPipes.push(lateralPipe);
+                    } else {
+                        // No intersection found, add directly
+                        tempLateralPipes.push(lateralPipe);
+                    }
+                } else {
+                    // Connect mode or no intersection - add directly
+                    lateralPipes.push(lateralPipe);
+
+                    zonePipeCount++;
+                    zoneTotalLength += pipeLength;
+                    zoneTotalPlants += lateralPipeData.plants.length;
+                }
+            }
+        }
+
+        // For intersect mode: merge pipes with close intersection points
+        if (connectionMode === 'intersect' && tempLateralPipes.length > 0) {
+            const mergedPipes = mergeLateralPipesByIntersectionPoint(tempLateralPipes);
+
+            for (const pipe of mergedPipes) {
+                lateralPipes.push(pipe);
+                zonePipeCount++;
+                zoneTotalLength += pipe.length;
+                zoneTotalPlants += pipe.plantCount;
+            }
+        }
+
+        zoneStats[zoneId] = {
+            pipes: zonePipeCount,
+            length: zoneTotalLength,
+            plants: zoneTotalPlants,
+        };
+    }
+
+    // Calculate overall stats
+    const totalPipes = lateralPipes.length;
+    const totalLength = lateralPipes.reduce((sum, pipe) => sum + pipe.length, 0);
+    const totalPlants = lateralPipes.reduce((sum, pipe) => sum + pipe.plantCount, 0);
+
+    return {
+        lateralPipes,
+        stats: {
+            totalPipes,
+            totalLength,
+            totalPlants,
+            zoneStats,
+        },
+    };
+};
+
+/**
+ * Merge lateral pipes that have close intersection points (for intersect mode)
+ * This ensures one pipe = one intersection point
+ */
+const mergeLateralPipesByIntersectionPoint = (pipes: any[]): any[] => {
+    if (pipes.length === 0) return [];
+
+    const MERGE_THRESHOLD = 2; // meters - merge pipes if intersection points are within this distance
+    const mergedPipes: any[] = [];
+    const processed = new Set<number>();
+
+    for (let i = 0; i < pipes.length; i++) {
+        if (processed.has(i)) continue;
+
+        const pipe1 = pipes[i];
+        if (!pipe1.intersectionData?.point) {
+            mergedPipes.push(pipe1);
+            processed.add(i);
+            continue;
+        }
+
+        // Find all pipes with close intersection points
+        const pipesToMerge: any[] = [pipe1];
+        processed.add(i);
+
+        for (let j = i + 1; j < pipes.length; j++) {
+            if (processed.has(j)) continue;
+
+            const pipe2 = pipes[j];
+            if (!pipe2.intersectionData?.point) continue;
+
+            // Check if intersection points are close
+            const distance = calculateDistanceBetweenPoints(
+                pipe1.intersectionData.point,
+                pipe2.intersectionData.point
+            );
+
+            if (distance < MERGE_THRESHOLD) {
+                pipesToMerge.push(pipe2);
+                processed.add(j);
+            }
+        }
+
+        // If only one pipe, add it directly
+        if (pipesToMerge.length === 1) {
+            mergedPipes.push(pipe1);
+            continue;
+        }
+
+        // Merge multiple pipes into one
+        const mergedPipe = mergePipesIntoOne(pipesToMerge);
+        mergedPipes.push(mergedPipe);
+    }
+
+    return mergedPipes;
+};
+
+/**
+ * Merge multiple lateral pipes into a single pipe
+ */
+const mergePipesIntoOne = (pipes: any[]): any => {
+    if (pipes.length === 1) return pipes[0];
+
+    // Combine all plants
+    const allPlants: PlantLocation[] = [];
+    pipes.forEach((pipe) => {
+        allPlants.push(...pipe.plants);
+    });
+
+    // Sort plants by distance from intersection point (use first pipe's intersection)
+    const intersectionPoint = pipes[0].intersectionData?.point || pipes[0].coordinates[0];
+
+    // Sort plants to create a continuous line
+    const sortedPlants = [...allPlants].sort((a, b) => {
+        const distA = calculateDistanceBetweenPoints(a.position, intersectionPoint);
+        const distB = calculateDistanceBetweenPoints(b.position, intersectionPoint);
+        return distB - distA; // Sort from far to near (so the line goes from end to end)
+    });
+
+    // Create new coordinates from all plants
+    const newCoordinates = sortedPlants.map((p) => p.position);
+
+    // Calculate new length
+    const newLength = calculatePipeLength(newCoordinates);
+
+    // Use first pipe as base
+    const basePipe = pipes[0];
+
+    // Create merged pipe
+    const mergedPipe = {
+        ...basePipe,
+        id: `auto-lateral-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        coordinates: newCoordinates,
+        length: newLength,
+        plants: sortedPlants,
+        plantCount: sortedPlants.length,
+        totalWaterNeed: calculateTotalWaterNeed(sortedPlants),
+        connectionPoint: newCoordinates[0],
+    };
+
+    // Update intersection data if exists
+    if (basePipe.intersectionData) {
+        const newIntersectionData = findLateralSubMainIntersection(
+            newCoordinates[0],
+            newCoordinates[newCoordinates.length - 1],
+            [{ id: basePipe.subMainPipeId, coordinates: [] }] // Simplified, actual data not needed for point
+        );
+
+        if (newIntersectionData) {
+            const segmentStats = calculateLateralPipeSegmentStats(
+                newCoordinates[0],
+                newCoordinates[newCoordinates.length - 1],
+                intersectionPoint,
+                sortedPlants
+            );
+
+            mergedPipe.intersectionData = {
+                point: intersectionPoint,
+                subMainPipeId: basePipe.subMainPipeId,
+                segmentIndex: basePipe.intersectionData.segmentIndex,
+                segmentStats: segmentStats,
+            };
+        }
+    }
+
+    return mergedPipe;
+};
+
+/**
+ * Calculate total pipe length from coordinates array
+ */
+const calculatePipeLength = (coordinates: Coordinate[]): number => {
+    if (!coordinates || coordinates.length < 2) return 0;
+
+    let totalLength = 0;
+    for (let i = 1; i < coordinates.length; i++) {
+        totalLength += calculateDistanceBetweenPoints(coordinates[i - 1], coordinates[i]);
+    }
+
+    return totalLength;
 };

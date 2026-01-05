@@ -1070,6 +1070,20 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             const accessories: PumpAccessory[] = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
 
             if (accessories && accessories.length > 0) {
+                // ดึง selectedGroupId จาก localStorage (เหมือนกับ PumpSelector.tsx)
+                const getStoredSelectedGroupId = (pumpId: number | undefined): number | string | null => {
+                    if (!pumpId) return null;
+                    try {
+                        const stored = localStorage.getItem(`pump_${pumpId}_selectedGroupId`);
+                        return stored ? (isNaN(Number(stored)) ? stored : Number(stored)) : null;
+                    } catch {
+                        return null;
+                    }
+                };
+                
+                // ดึง selectedGroupId จาก localStorage
+                const selectedGroupId = getStoredSelectedGroupId(selectedPump.id);
+                
                 accessories
                     .sort(
                         (a: PumpAccessory, b: PumpAccessory) =>
@@ -1077,35 +1091,66 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     )
                     .forEach(
                         (accessory: PumpAccessory) => {
-                            if (
-                                !accessory.is_included ||
-                                (accessory.price && accessory.price > 0)
-                            ) {
-                                const accessoryTypeMap: { [key: string]: string } = {
-                                    foot_valve: 'Foot Valve',
-                                    check_valve: 'Check Valve',
-                                    ball_valve: 'Ball Valve',
-                                    pressure_gauge: 'เกจวัดแรงดัน',
-                                    other: 'อุปกรณ์เสริม',
-                                };
-
-                                const typeName =
-                                    (accessory.accessory_type && accessoryTypeMap[accessory.accessory_type]) ||
-                                    accessory.accessory_type ||
-                                    '';
-
-                                initialItems.push({
-                                    id: `pump_accessory_${accessory.id || seq}`,
-                                    seq: seq++,
-                                    image: accessory.image_url || accessory.image || '',
-                                    date: '',
-                                    description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''}`,
-                                    quantity: accessory.quantity || 1,
-                                    unitPrice: accessory.is_included ? 0 : accessory.price || 0,
-                                    discount: accessory.is_included ? 0 : 0.0,
-                                    taxes: 'Output\nVAT\n7%',
-                                    originalData: accessory,
+                            // ถ้าเป็นกลุ่ม (มี group_id และ group_items) ให้แสดงรายการอุปกรณ์ในกลุ่ม
+                            if (accessory.group_id && accessory.group_items && accessory.group_items.length > 0) {
+                                // แสดงเฉพาะกลุ่มที่เลือก (ถ้ามี selectedGroupId) หรือแสดงทุกกลุ่ม (ถ้าไม่มี selectedGroupId)
+                                if (selectedGroupId && accessory.group_id !== selectedGroupId) {
+                                    return; // ข้ามกลุ่มที่ไม่ใช่กลุ่มที่เลือก
+                                }
+                                
+                                accessory.group_items.forEach((item: any) => {
+                                    const equipment = item.equipment || item;
+                                    const itemPrice = Number(item.unit_price || item.total_price || equipment?.price || 0);
+                                    const itemQuantity = Number(item.quantity || 1);
+                                    
+                                    // แสดงเฉพาะรายการที่มีราคา > 0 หรือไม่ใช่ is_included
+                                    if (itemPrice > 0 || !accessory.is_included) {
+                                        initialItems.push({
+                                            id: `pump_accessory_group_${accessory.group_id}_item_${item.id || item.equipment_id || seq}`,
+                                            seq: seq++,
+                                            image: equipment?.image || equipment?.image_url || equipment?.imageUrl || '',
+                                            date: '',
+                                            description: `${equipment?.product_code || equipment?.productCode || ''} - ${equipment?.name || item.name || 'อุปกรณ์'}`,
+                                            quantity: itemQuantity,
+                                            unitPrice: itemPrice,
+                                            discount: 0.0,
+                                            taxes: 'Output\nVAT\n7%',
+                                            originalData: equipment || item,
+                                        });
+                                    }
                                 });
+                            } else {
+                                // ถ้าเป็นอุปกรณ์เดี่ยว ให้แสดงตามเดิม
+                                if (
+                                    !accessory.is_included ||
+                                    (accessory.price && accessory.price > 0)
+                                ) {
+                                    const accessoryTypeMap: { [key: string]: string } = {
+                                        foot_valve: 'Foot Valve',
+                                        check_valve: 'Check Valve',
+                                        ball_valve: 'Ball Valve',
+                                        pressure_gauge: 'เกจวัดแรงดัน',
+                                        other: 'อุปกรณ์เสริม',
+                                    };
+
+                                    const typeName =
+                                        (accessory.accessory_type && accessoryTypeMap[accessory.accessory_type]) ||
+                                        accessory.accessory_type ||
+                                        '';
+
+                                    initialItems.push({
+                                        id: `pump_accessory_${accessory.id || seq}`,
+                                        seq: seq++,
+                                        image: accessory.image_url || accessory.image || '',
+                                        date: '',
+                                        description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''}`,
+                                        quantity: accessory.quantity || 1,
+                                        unitPrice: accessory.is_included ? 0 : accessory.price || 0,
+                                        discount: accessory.is_included ? 0 : 0.0,
+                                        taxes: 'Output\nVAT\n7%',
+                                        originalData: accessory,
+                                    });
+                                }
                             }
                         }
                     );
@@ -1128,27 +1173,91 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 originalData: selectedExtraPipe.pipe,
             });
         }
-
+        
         Object.entries(sprinklerEquipmentSets).forEach(([zoneId, equipmentSet]) => {
             if (
                 equipmentSet &&
                 equipmentSet.selectedItems &&
                 equipmentSet.selectedItems.length > 0
             ) {
+                
+                // หาจำนวนสปริงเกอร์ของโซนนี้
+                let totalSprinklers = 0;
+                
+                if (projectMode === 'garden' && gardenStats) {
+                    const zone = gardenStats.zones.find((z: any) => z.zoneId === zoneId);
+                    if (zone) {
+                        const effectiveZoneId = gardenStats.zones.length === 1 ? 'main-area' : zoneId;
+                        const zoneInput = zoneInputs[effectiveZoneId];
+                        totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
+                    }
+                } else if (projectMode === 'field-crop' && fieldCropData) {
+                    const zone = fieldCropData.zones?.info?.find((z: any) => z.id === zoneId);
+                    if (zone) {
+                        const zoneSummary = fieldCropData.zoneSummaries?.[zoneId];
+                        if (zoneSummary?.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                            totalSprinklers = zoneSummary.totalIrrigationPoints;
+                        } else if (zoneSummary?.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                            totalSprinklers = zoneSummary.sprinklerCount;
+                        } else {
+                            const zoneInput = zoneInputs[zoneId];
+                            totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
+                        }
+                    }
+                } else if (projectMode === 'greenhouse' && greenhouseData) {
+                    const plot = greenhouseData.summary?.plotStats?.find((p: any) => p.plotId === zoneId);
+                    if (plot) {
+                        totalSprinklers = plot.equipmentCount?.sprinklers || plot.production?.totalPlants || 0;
+                    }
+                } else {
+                    // horticulture mode
+                    const zoneInput = zoneInputs[zoneId];
+                    if (zoneInput) {
+                        totalSprinklers = zoneInput.totalTrees || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            totalSprinklers = totalSprinklers * sprinklersPerTree;
+                        }
+                    } else {
+                        // Fallback: ใช้ results.totalSprinklers
+                        totalSprinklers = results.totalSprinklers || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            totalSprinklers = totalSprinklers * sprinklersPerTree;
+                        }
+                    }
+                }
+                
                 equipmentSet.selectedItems.forEach((item: any) => {
-                    if (item.equipment && item.quantity > 0) {
-                        initialItems.push({
-                            id: `sprinkler_equipment_${zoneId}_${item.equipment.id}`,
-                            seq: seq++,
-                            image: item.equipment.image || '',
-                            date: '',
-                            description: `${item.equipment.product_code || ''} - ${item.equipment.name || ''} (${item.equipment.brand || ''})`,
-                            quantity: item.quantity,
-                            unitPrice: item.unit_price || item.equipment.price || 0,
-                            discount: 0.0,
-                            taxes: 'Output\nVAT\n7%',
-                            originalData: item.equipment,
-                        });
+                    if (item.equipment) {
+                        // กรอง pipe ออก เพราะ pipe ถูกแสดงในส่วนท่อแล้ว (branch/secondary/main/emitter)
+                        const categoryName = item.equipment.category?.name?.toLowerCase();
+                        const isPipe = categoryName === 'pipe' || categoryName?.includes('pipe');
+                        
+                        if (!isPipe) {
+                            // item.quantity เป็น quantity per head ต้องคูณกับจำนวนสปริงเกอร์
+                            const quantityPerHead = item.quantity || 0;
+                            const totalQuantity = quantityPerHead * totalSprinklers;
+                            
+                            if (totalQuantity > 0) {
+                                const unitPrice = item.unit_price || item.equipment.price || 0;
+                                
+                                initialItems.push({
+                                    id: `sprinkler_equipment_${zoneId}_${item.equipment.id}`,
+                                    seq: seq++,
+                                    image: item.equipment.image || '',
+                                    date: '',
+                                    description: `${item.equipment.product_code || ''} - ${item.equipment.name || ''} (${item.equipment.brand || ''})`,
+                                    quantity: totalQuantity,
+                                    unitPrice: unitPrice,
+                                    discount: 0.0,
+                                    taxes: 'Output\nVAT\n7%',
+                                    originalData: item.equipment,
+                                });
+                            }
+                        }
                     }
                 });
             }
@@ -1216,7 +1325,39 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     };
 
     const calculateTotal = () => {
-        return items.reduce((total, item) => total + calculateItemAmount(item), 0);
+        // Calculate breakdown by category
+        let sprinklerCost = 0;
+        let pumpCost = 0;
+        let pumpAccessoriesCost = 0;
+        let pipeCost = 0;
+        let connectionCost = 0;
+        let sprinklerEquipmentCost = 0;
+        let otherCost = 0;
+        
+        items.forEach((item) => {
+            const amount = calculateItemAmount(item);
+            const id = item.id.toString();
+            
+            if (id.includes('sprinkler_') && !id.includes('sprinkler_equipment_')) {
+                sprinklerCost += amount;
+            } else if (id.includes('pump_') && !id.includes('pump_accessory')) {
+                pumpCost += amount;
+            } else if (id.includes('pump_accessory')) {
+                pumpAccessoriesCost += amount;
+            } else if (id.includes('pipe_')) {
+                pipeCost += amount;
+            } else if (id.includes('connection_equipment_')) {
+                connectionCost += amount;
+            } else if (id.includes('sprinkler_equipment_')) {
+                sprinklerEquipmentCost += amount;
+            } else {
+                otherCost += amount;
+            }
+        });
+        
+        const total = items.reduce((sum, item) => sum + calculateItemAmount(item), 0);
+        
+        return total;
     };
 
     const updateItem = (id: string, field: keyof QuotationItem, value: any) => {

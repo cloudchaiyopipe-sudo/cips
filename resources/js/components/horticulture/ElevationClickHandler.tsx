@@ -25,6 +25,7 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+    const domClickListenerRef = useRef<((event: MouseEvent) => void) | null>(null);
     const elevationServiceRef = useRef<google.maps.ElevationService | null>(null);
 
     // Initialize elevation service
@@ -34,12 +35,51 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
         }
     }, [map]);
 
-    // Setup click listener
+    // Helper function to get elevation for a point
+    const getElevationForPoint = (lat: number, lng: number) => {
+        if (!elevationServiceRef.current) return;
+
+        setIsLoading(true);
+        setError(null);
+
+        const latLng = new google.maps.LatLng(lat, lng);
+
+        // Request elevation for clicked point
+        elevationServiceRef.current.getElevationForLocations(
+            {
+                locations: [latLng],
+            },
+            (results, status) => {
+                if (status === google.maps.ElevationStatus.OK && results && results[0]) {
+                    setElevationInfo({
+                        lat,
+                        lng,
+                        elevation: results[0].elevation || 0,
+                        timestamp: Date.now(),
+                    });
+                } else {
+                    setError(
+                        t('ไม่สามารถดึงข้อมูลความสูงได้') || 'ไม่สามารถดึงข้อมูลความสูงได้'
+                    );
+                }
+                setIsLoading(false);
+            }
+        );
+    };
+
+    // Setup click listeners (both map and DOM to capture polygon clicks)
     useEffect(() => {
         if (!map || !isActive) {
             if (clickListenerRef.current) {
                 google.maps.event.removeListener(clickListenerRef.current);
                 clickListenerRef.current = null;
+            }
+            if (domClickListenerRef.current && map) {
+                const mapDiv = map.getDiv();
+                if (mapDiv) {
+                    mapDiv.removeEventListener('click', domClickListenerRef.current);
+                }
+                domClickListenerRef.current = null;
             }
             return;
         }
@@ -49,39 +89,82 @@ const ElevationClickHandler: React.FC<ElevationClickHandlerProps> = ({
 
             const lat = event.latLng.lat();
             const lng = event.latLng.lng();
-
-            setIsLoading(true);
-            setError(null);
-
-            // Request elevation for clicked point
-            elevationServiceRef.current.getElevationForLocations(
-                {
-                    locations: [event.latLng],
-                },
-                (results, status) => {
-                    if (status === google.maps.ElevationStatus.OK && results && results[0]) {
-                        setElevationInfo({
-                            lat,
-                            lng,
-                            elevation: results[0].elevation || 0,
-                            timestamp: Date.now(),
-                        });
-                    } else {
-                        setError(
-                            t('ไม่สามารถดึงข้อมูลความสูงได้') || 'ไม่สามารถดึงข้อมูลความสูงได้'
-                        );
-                    }
-                    setIsLoading(false);
-                }
-            );
+            getElevationForPoint(lat, lng);
         };
 
+        // Add Google Maps click listener
         clickListenerRef.current = map.addListener('click', handleMapClick);
+
+        // Add DOM click listener to capture clicks on polygons and other overlays
+        const mapDiv = map.getDiv();
+        const handleDomClick = (event: MouseEvent) => {
+            // Only process if it's a left click
+            if (event.button !== 0) return;
+
+            // Check if click is within map bounds
+            const mapBounds = mapDiv.getBoundingClientRect();
+            if (
+                event.clientX < mapBounds.left ||
+                event.clientX > mapBounds.right ||
+                event.clientY < mapBounds.top ||
+                event.clientY > mapBounds.bottom
+            ) {
+                return;
+            }
+
+            // Check if click is on a UI element (buttons, panels, etc.)
+            const target = event.target as HTMLElement;
+            // Check if the click target or any parent is a UI element
+            let element: HTMLElement | null = target;
+            while (element && element !== mapDiv) {
+                const tagName = element.tagName.toLowerCase();
+                const className = element.className || '';
+                const style = window.getComputedStyle(element);
+                
+                // Check for UI elements
+                if (
+                    tagName === 'button' ||
+                    tagName === 'input' ||
+                    tagName === 'select' ||
+                    tagName === 'textarea' ||
+                    className.includes('fixed') ||
+                    parseInt(style.zIndex || '0') > 100 ||
+                    element.getAttribute('role') === 'button' ||
+                    element.getAttribute('role') === 'dialog'
+                ) {
+                    return;
+                }
+                element = element.parentElement;
+            }
+
+            const bounds = map.getBounds();
+            if (!bounds) return;
+
+            const relativeX = (event.clientX - mapBounds.left) / mapBounds.width;
+            const relativeY = (event.clientY - mapBounds.top) / mapBounds.height;
+
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            const lng = sw.lng() + (ne.lng() - sw.lng()) * relativeX;
+            const lat = ne.lat() + (sw.lat() - ne.lat()) * relativeY;
+
+            // Get elevation for the clicked point
+            getElevationForPoint(lat, lng);
+        };
+
+        if (mapDiv) {
+            mapDiv.addEventListener('click', handleDomClick, true); // Use capture phase to catch before event.stop()
+            domClickListenerRef.current = handleDomClick;
+        }
 
         return () => {
             if (clickListenerRef.current) {
                 google.maps.event.removeListener(clickListenerRef.current);
                 clickListenerRef.current = null;
+            }
+            if (domClickListenerRef.current && mapDiv) {
+                mapDiv.removeEventListener('click', domClickListenerRef.current, true);
+                domClickListenerRef.current = null;
             }
         };
     }, [map, isActive, t]);
