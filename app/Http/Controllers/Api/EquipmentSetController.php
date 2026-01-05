@@ -152,12 +152,15 @@ class EquipmentSetController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'groups' => 'required|array|min:1',
-                'groups.*.id' => 'nullable|integer|exists:equipment_set_groups,id', // เพิ่ม validation สำหรับ id
+                'groups.*.id' => 'nullable|integer', // id เป็น nullable สำหรับ group ใหม่
                 'groups.*.name' => 'nullable|string|max:255',
+                'groups.*.sort_order' => 'nullable|integer',
+                'groups.*.total_price' => 'nullable|numeric',
                 'groups.*.items' => 'required|array|min:1',
                 'groups.*.items.*.category_id' => 'required|integer|exists:equipment_categories,id',
                 'groups.*.items.*.equipment_id' => 'required|integer|exists:equipments,id',
                 'groups.*.items.*.quantity' => 'required|integer|min:1',
+                'groups.*.items.*.sort_order' => 'nullable|integer',
                 'groups.*.image' => 'nullable|string|max:500'
             ]);
 
@@ -171,6 +174,7 @@ class EquipmentSetController extends Controller
                 // เพื่ออัพเดต pumpAccessories ที่ใช้ group_id เก่า
                 $groupMapping = [];
                 $existingGroups = $equipmentSet->groups()->get()->keyBy('id');
+                $processedGroupIds = []; // เก็บ id ของ groups ที่ถูกประมวลผล (ทั้งเก่าและใหม่)
                 
                 // อัพเดตหรือสร้าง groups ใหม่
                 foreach ($validated['groups'] as $groupIndex => $groupData) {
@@ -181,7 +185,7 @@ class EquipmentSetController extends Controller
                         // อัพเดต group ที่มีอยู่
                         $existingGroup->update([
                             'name' => $groupData['name'] ?? null,
-                            'sort_order' => $groupIndex,
+                            'sort_order' => $groupData['sort_order'] ?? $groupIndex,
                             'image' => $groupData['image'] ?? null
                         ]);
                         
@@ -195,10 +199,13 @@ class EquipmentSetController extends Controller
                         $group = EquipmentSetGroup::create([
                             'equipment_set_id' => $equipmentSet->id,
                             'name' => $groupData['name'] ?? null,
-                            'sort_order' => $groupIndex,
+                            'sort_order' => $groupData['sort_order'] ?? $groupIndex,
                             'image' => $groupData['image'] ?? null
                         ]);
                     }
+
+                    // เก็บ id ของ group ที่ประมวลผลแล้ว
+                    $processedGroupIds[] = $group->id;
 
                     // Create items for this group
                     foreach ($groupData['items'] as $itemIndex => $itemData) {
@@ -207,24 +214,18 @@ class EquipmentSetController extends Controller
                         EquipmentSetItem::create([
                             'group_id' => $group->id,
                             'equipment_id' => $itemData['equipment_id'],
+                            'category_id' => $itemData['category_id'],
                             'quantity' => $itemData['quantity'],
                             'unit_price' => $equipment->price,
-                            'sort_order' => $itemIndex
+                            'total_price' => $equipment->price * $itemData['quantity'],
+                            'sort_order' => $itemData['sort_order'] ?? $itemIndex
                         ]);
                     }
                 }
                 
-                // ลบ groups ที่ไม่ได้ถูกอัพเดตหรือสร้างใหม่
-                $newGroupIds = collect($validated['groups'])
-                    ->map(function($groupData) use ($groupMapping) {
-                        $existingGroupId = isset($groupData['id']) ? $groupData['id'] : null;
-                        return $existingGroupId ? ($groupMapping[$existingGroupId] ?? $existingGroupId) : null;
-                    })
-                    ->filter()
-                    ->toArray();
-                
+                // ลบ groups ที่ไม่ได้ถูกอัพเดตหรือสร้างใหม่ (groups ที่ไม่อยู่ใน $processedGroupIds)
                 $groupsToDelete = $equipmentSet->groups()
-                    ->whereNotIn('id', $newGroupIds)
+                    ->whereNotIn('id', $processedGroupIds)
                     ->get();
                 
                 // ตรวจสอบว่า groups ที่จะลบมี pumpAccessories ใช้งานอยู่หรือไม่

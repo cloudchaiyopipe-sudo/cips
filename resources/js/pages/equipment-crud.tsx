@@ -1058,7 +1058,13 @@ const EquipmentSetForm: React.FC<{
 
         setFormData((prev) => ({
             ...prev,
-            groups: [...prev.groups, newGroup],
+            groups: [newGroup, ...prev.groups], // เพิ่มกลุ่มใหม่ด้านบน
+        }));
+
+        // ขยายกลุ่มใหม่ที่เพิ่มเข้ามา
+        setCollapsedGroups((prev) => ({
+            ...prev,
+            [newGroup.id]: false,
         }));
     };
 
@@ -1115,7 +1121,7 @@ const EquipmentSetForm: React.FC<{
             const updatedGroups = [...prev.groups];
             updatedGroups[groupIndex] = {
                 ...updatedGroups[groupIndex],
-                items: [...updatedGroups[groupIndex].items, newItem],
+                items: [newItem, ...updatedGroups[groupIndex].items], // เพิ่มรายการใหม่ด้านบน
             };
             return {
                 ...prev,
@@ -1207,10 +1213,16 @@ const EquipmentSetForm: React.FC<{
     };
 
     const handleSubmit = () => {
-        if (!validateForm()) return;
+        if (!validateForm()) {
+            showAlert.error(
+                t('ข้อมูลไม่ครบถ้วน'), 
+                t('กรุณาตรวจสอบข้อมูลที่กรอก แต่ละกลุ่มต้องมีอุปกรณ์อย่างน้อย 1 รายการ')
+            );
+            return;
+        }
 
         // Clean up groups data before sending
-        const cleanedGroups = formData.groups.map((group) => {
+        const cleanedGroups = formData.groups.map((group, groupIndex) => {
             // Clean up items - only send necessary fields
             const cleanedItems = group.items
                 .filter((item) => {
@@ -1218,22 +1230,42 @@ const EquipmentSetForm: React.FC<{
                     const equipmentId = item.equipment_id || item.equipment?.id;
                     return equipmentId && equipmentId > 0;
                 })
-                .map((item) => ({
+                .map((item, itemIndex) => ({
                     category_id: item.category_id || item.equipment?.category_id || 0,
                     equipment_id: item.equipment_id || item.equipment?.id || 0,
                     quantity: item.quantity || 1,
+                    sort_order: itemIndex,
                 }));
+
+            // Calculate total price for this group
+            const groupTotalPrice = cleanedItems.reduce((total, item) => {
+                const equipment = formData.groups[groupIndex].items.find(
+                    (i) => (i.equipment_id || i.equipment?.id) === item.equipment_id
+                )?.equipment;
+                const price = equipment?.price || 0;
+                return total + price * item.quantity;
+            }, 0);
 
             // Return only necessary group fields
             // รวม id ด้วยเมื่อแก้ไข (เพื่อให้ backend รู้ว่าเป็น group เดิม)
             const groupData: any = {
-                name: group.name || null,
-                image: group.image || null,
+                sort_order: group.sort_order !== undefined ? group.sort_order : groupIndex,
+                total_price: groupTotalPrice,
                 items: cleanedItems,
             };
 
-            // ถ้าเป็น group ที่มีอยู่แล้ว (มี id) ให้ส่ง id ไปด้วย
-            if (group.id) {
+            // Add optional fields only if they have values
+            if (group.name) {
+                groupData.name = group.name;
+            }
+            
+            if (group.image) {
+                groupData.image = group.image;
+            }
+
+            // ถ้าเป็น group ที่มีอยู่แล้ว (มี id เป็น number) ให้ส่ง id ไปด้วย
+            // ไม่ส่ง id ถ้าเป็น string (group ใหม่ที่สร้างใน frontend)
+            if (group.id && typeof group.id === 'number') {
                 groupData.id = group.id;
             }
 
@@ -1340,7 +1372,7 @@ const EquipmentSetForm: React.FC<{
                                             className="rounded-lg border border-gray-600 bg-gray-700 p-4"
                                         >
                                             <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex flex-1 items-start gap-3">
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -1354,14 +1386,21 @@ const EquipmentSetForm: React.FC<{
                                                             <ChevronDown className="h-5 w-5" />
                                                         )}
                                                     </button>
-                                                    <h4 className="text-lg font-medium">
-                                                        # {t('กลุ่มที่')} {groupIndex + 1}
-                                                        {group.name && (
-                                                            <span className="ml-2 text-base font-normal text-gray-300">
-                                                                - {group.name}
-                                                            </span>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-lg font-medium">
+                                                            # {t('กลุ่มที่')} {groupIndex + 1}
+                                                            {group.name && (
+                                                                <span className="ml-2 text-base font-normal text-gray-300">
+                                                                    - {group.name}
+                                                                </span>
+                                                            )}
+                                                        </h4>
+                                                        {errors[`group_${groupIndex}_items`] && (
+                                                            <p className="mt-1 text-sm text-red-500">
+                                                                ⚠️ {errors[`group_${groupIndex}_items`]}
+                                                            </p>
                                                         )}
-                                                    </h4>
+                                                    </div>
                                                     {isCollapsed && (
                                                         <div className="flex items-center gap-4 text-sm text-gray-400">
                                                             {group.image && (
@@ -1393,18 +1432,16 @@ const EquipmentSetForm: React.FC<{
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {!isCollapsed && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                addItemToGroup(groupIndex)
-                                                            }
-                                                            className="flex items-center rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
-                                                        >
-                                                            <Plus className="mr-1 h-3 w-3" />
-                                                            {t('เพิ่มรายการ')}
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            addItemToGroup(groupIndex)
+                                                        }
+                                                        className="flex items-center rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
+                                                    >
+                                                        <Plus className="mr-1 h-3 w-3" />
+                                                        {t('เพิ่มรายการ')}
+                                                    </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeGroup(groupIndex)}
@@ -5140,6 +5177,7 @@ const EquipmentCRUD: React.FC = () => {
     // Equipment Set Functions
     const handleSaveEquipmentSet = async (equipmentSetData: Partial<EquipmentSet>) => {
         setSaving(true);
+        
         try {
             let response;
 
@@ -5150,22 +5188,27 @@ const EquipmentCRUD: React.FC = () => {
                     equipmentSetData
                 );
 
-                // Update local state
-                const updatedSet = (response as any).data || response;
-                setEquipmentSets((prev) =>
-                    prev.map((set) => (set.id === editingEquipmentSet.id ? updatedSet : set))
-                );
+                // Reload equipment sets to get the latest data including new groups
+                const reloadedSets = await api.getEquipmentSets();
+                setEquipmentSets(reloadedSets);
 
                 showAlert.success(
                     t('แก้ไขเซ็ตสำเร็จ'),
                     `${equipmentSetData.name} ${t('ได้รับการแก้ไขเรียบร้อยแล้ว')}`
                 );
             } else {
+                
                 // Create new set
                 response = await api.createEquipmentSet(equipmentSetData);
 
-                // Add to local state
+                console.log('====================================');
+                console.log('📥 BACKEND RESPONSE:');
+                console.log('====================================');
+                console.log('Response:', response);
                 const newSet = (response as any).data || response;
+                console.log('Groups returned:', newSet.groups?.length);
+                console.log('====================================');
+                
                 setEquipmentSets((prev) => [...prev, newSet]);
 
                 showAlert.success(
@@ -5177,7 +5220,13 @@ const EquipmentCRUD: React.FC = () => {
             setShowEquipmentSetForm(false);
             setEditingEquipmentSet(undefined);
         } catch (error: any) {
-            console.error('Failed to save equipment set:', error);
+            console.error('====================================');
+            console.error('❌ ERROR SAVING:');
+            console.error('====================================');
+            console.error('Error:', error);
+            console.error('Error response:', error?.response?.data);
+            console.error('====================================');
+            
             const errorMessage =
                 error?.response?.data?.message || error?.message || t('ไม่สามารถบันทึกเซ็ตได้');
             showAlert.error(t('เกิดข้อผิดพลาด'), errorMessage);
