@@ -378,4 +378,3 @@ export const getAdvancedTourSteps = (t: (key: string) => string): TourStep[] => 
         },
     ];
 };
-

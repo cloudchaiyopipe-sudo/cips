@@ -213,6 +213,32 @@ export default function CreateProduct() {
                         {isEditMode ? (translations.editProduct || 'แก้ไขสินค้า') : translations.createNewProduct}
                     </h1>
 
+                    {/* Notice for recommended products (sprinklers) */}
+                    {data.category === 'recommended' && (
+                        <div className="mb-6 rounded-lg border border-yellow-500/50 bg-yellow-900/20 p-4">
+                            <div className="flex items-start gap-3">
+                                <svg className="h-5 w-5 flex-shrink-0 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-yellow-300 mb-1">
+                                        หมายเหตุ: สินค้าแนะนำ (Recommended) จะแสดงข้อมูลสปริงเกอร์จากฐานข้อมูล
+                                    </p>
+                                    <p className="text-xs text-yellow-400/80">
+                                        หากต้องการสร้างหรือแก้ไขสปริงเกอร์ กรุณาไปที่หน้า{' '}
+                                        <button
+                                            type="button"
+                                            onClick={() => router.visit('/equipments')}
+                                            className="underline hover:text-yellow-300"
+                                        >
+                                            จัดการอุปกรณ์
+                                        </button>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-slate-600/30 p-6 text-white">
                         {/* Name Field */}
                         <div>

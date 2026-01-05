@@ -2,7 +2,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from 'react';
-import { CalculationResults, QuotationData, QuotationDataCustomer, IrrigationInput } from '../types/interfaces';
+import {
+    CalculationResults,
+    QuotationData,
+    QuotationDataCustomer,
+    IrrigationInput,
+    PumpAccessory,
+} from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
 import { calculatePipeRolls } from '../utils/calculations';
@@ -50,13 +56,13 @@ interface QuotationDocumentProps {
     projectMode: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenData: any;
     projectData: any;
-    greenhouseData?: any; 
+    greenhouseData?: any;
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: {
         [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any };
     };
-    sprinklerEquipmentSets?: { [zoneId: string]: any }; 
+    sprinklerEquipmentSets?: { [zoneId: string]: any };
     connectionEquipments?: { [zoneId: string]: any[] };
     zoneInputs?: { [zoneId: string]: IrrigationInput };
     gardenStats?: any;
@@ -125,13 +131,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (totalItems <= 7) {
                 return totalItems;
             } else if (totalItems === 8) {
-                return 7; 
+                return 7;
             } else if (totalItems === 9) {
-                return 8; 
+                return 8;
             } else if (totalItems === 10) {
-                return 9; 
+                return 9;
             } else {
-                return 10; 
+                return 10;
             }
         } else if (effectivePage === totalPages - imagePageOffset) {
             const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
@@ -144,19 +150,19 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (itemsInThisPage <= 10) {
                 return itemsInThisPage;
             } else if (itemsInThisPage === 11) {
-                return 10; 
+                return 10;
             } else if (itemsInThisPage === 12) {
-                return 11; 
+                return 11;
             } else if (itemsInThisPage === 13) {
-                return 12; 
+                return 12;
             } else {
-                return 13; 
+                return 13;
             }
         }
     };
 
     const calculateTotalPages = (totalItems: number) => {
-        if (totalItems === 0) return hasProjectImagePage ? 1 : 0; 
+        if (totalItems === 0) return hasProjectImagePage ? 1 : 0;
 
         let firstPageItems;
         if (totalItems <= 7) {
@@ -183,13 +189,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 additionalPages += 1;
                 break;
             } else if (remainingItems === 11) {
-                additionalPages += 2; 
+                additionalPages += 2;
                 break;
             } else if (remainingItems === 12) {
-                additionalPages += 2; 
+                additionalPages += 2;
                 break;
             } else if (remainingItems === 13) {
-                additionalPages += 2; 
+                additionalPages += 2;
                 break;
             } else {
                 remainingItems -= 13;
@@ -450,7 +456,6 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         });
                     }
                 }
-
             });
 
             for (const [key, item] of equipmentMap.entries()) {
@@ -463,12 +468,15 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         } else if (isMultiZone) {
             // ใช้ zoneSprinklers โดยตรง (เพราะ zone IDs อาจไม่ตรงกัน)
             const equipmentMap = new Map();
-            
+
             // คำนวณ totalTrees จาก zoneInputs
-            const totalTreesInAllZones = Object.values(zoneInputs || {}).reduce(
-                (sum: number, input: any) => sum + (input.totalTrees || 0),
-                0
-            ) || (results?.totalSprinklers || 0);
+            const totalTreesInAllZones =
+                Object.values(zoneInputs || {}).reduce(
+                    (sum: number, input: any) => sum + (input.totalTrees || 0),
+                    0
+                ) ||
+                results?.totalSprinklers ||
+                0;
 
             // วนลูป zoneSprinklers โดยตรง (เหมือน CostSummary.tsx)
             Object.keys(zoneSprinklers || {}).forEach((zoneId) => {
@@ -478,19 +486,19 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                 if (zoneSprinkler) {
                     let sprinklerQuantity = 0;
-                    
+
                     // ใช้ zoneInput.totalTrees ก่อน
                     if (zoneInput) {
                         sprinklerQuantity = zoneInput.totalTrees || 0;
                     }
-                    
+
                     // สำหรับ horticulture mode ให้คูณด้วย sprinklersPerTree (เหมือน CostSummary.tsx)
                     if (projectMode === 'horticulture' && sprinklerQuantity > 0) {
                         const config = loadSprinklerConfig();
                         const sprinklersPerTree = config?.sprinklersPerTree || 1;
                         sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
                     }
-                    
+
                     // ถ้ายังไม่มี ให้ใช้ results.totalSprinklers แบ่งตามจำนวน zones
                     if (sprinklerQuantity === 0 && results) {
                         const zoneCount = Object.keys(zoneSprinklers || {}).length;
@@ -501,7 +509,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
                         }
                     }
-                    
+
                     const sprinklerKey = `sprinkler_${zoneSprinkler.id}`;
                     if (equipmentMap.has(sprinklerKey)) {
                         const existing = equipmentMap.get(sprinklerKey);
@@ -513,7 +521,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         equipmentMap.set(sprinklerKey, {
                             id: sprinklerKey,
                             seq: seq++,
-                            image: (zoneSprinkler as any).image_url || (zoneSprinkler as any).image || '',
+                            image:
+                                (zoneSprinkler as any).image_url ||
+                                (zoneSprinkler as any).image ||
+                                '',
                             date: '',
                             description: `${(zoneSprinkler as any).productCode || (zoneSprinkler as any).product_code || ''} - ${(zoneSprinkler as any).name || 'สปริงเกอร์'} (${(zoneSprinkler as any).brand || ''})`,
                             quantity: sprinklerQuantity || 1,
@@ -530,22 +541,28 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
                 if (branchPipe && zoneInput && zoneInput.totalBranchPipeM > 0) {
                     const pipeKey = `branch_${branchPipe.id}`;
-                    
+
                     // คำนวณ extraLength (เหมือน CostSummary.tsx)
                     let extraLength = 0;
-                    if (zoneInput.extraPipePerSprinkler && 
+                    if (
+                        zoneInput.extraPipePerSprinkler &&
                         zoneInput.extraPipePerSprinkler.pipeId === branchPipe.id &&
-                        zoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        zoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = zoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * zoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                zoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * zoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount * zoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    
+
                     // ใช้ totalLength + extraLength แล้วคำนวณ rolls (เหมือน CostSummary.tsx)
                     const totalLength = zoneInput.totalBranchPipeM + extraLength;
                     const rolls = calculatePipeRolls(totalLength, branchPipe.lengthM || 100);
@@ -574,24 +591,35 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 }
 
                 const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
-                if (secondaryPipe && results.hasValidSecondaryPipe && zoneInput && zoneInput.totalSecondaryPipeM > 0) {
+                if (
+                    secondaryPipe &&
+                    results.hasValidSecondaryPipe &&
+                    zoneInput &&
+                    zoneInput.totalSecondaryPipeM > 0
+                ) {
                     const pipeKey = `secondary_${secondaryPipe.id}`;
-                    
+
                     // คำนวณ extraLength (เหมือน CostSummary.tsx)
                     let extraLength = 0;
-                    if (zoneInput.extraPipePerSprinkler && 
+                    if (
+                        zoneInput.extraPipePerSprinkler &&
                         zoneInput.extraPipePerSprinkler.pipeId === secondaryPipe.id &&
-                        zoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        zoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = zoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * zoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                zoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * zoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount * zoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    
+
                     // ใช้ totalLength + extraLength แล้วคำนวณ rolls (เหมือน CostSummary.tsx)
                     const totalLength = zoneInput.totalSecondaryPipeM + extraLength;
                     const rolls = calculatePipeRolls(totalLength, secondaryPipe.lengthM || 100);
@@ -606,7 +634,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         equipmentMap.set(pipeKey, {
                             id: pipeKey,
                             seq: seq++,
-                            image: (secondaryPipe as any).image_url || (secondaryPipe as any).image || '',
+                            image:
+                                (secondaryPipe as any).image_url ||
+                                (secondaryPipe as any).image ||
+                                '',
                             date: '',
                             description: `${(secondaryPipe as any).productCode || (secondaryPipe as any).product_code || ''} - ท่อรอง ${(secondaryPipe as any).pipeType || ''} ${(secondaryPipe as any).sizeMM || ''}mm ยาว ${(secondaryPipe as any).lengthM || ''} ม./ม้วน`,
                             quantity: rolls,
@@ -620,24 +651,35 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 }
 
                 const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
-                if (mainPipe && results.hasValidMainPipe && zoneInput && zoneInput.totalMainPipeM > 0) {
+                if (
+                    mainPipe &&
+                    results.hasValidMainPipe &&
+                    zoneInput &&
+                    zoneInput.totalMainPipeM > 0
+                ) {
                     const pipeKey = `main_${mainPipe.id}`;
-                    
+
                     // คำนวณ extraLength (เหมือน CostSummary.tsx)
                     let extraLength = 0;
-                    if (zoneInput.extraPipePerSprinkler && 
+                    if (
+                        zoneInput.extraPipePerSprinkler &&
                         zoneInput.extraPipePerSprinkler.pipeId === mainPipe.id &&
-                        zoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        zoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = zoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * zoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                zoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * zoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount * zoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    
+
                     // ใช้ totalLength + extraLength แล้วคำนวณ rolls (เหมือน CostSummary.tsx)
                     const totalLength = zoneInput.totalMainPipeM + extraLength;
                     const rolls = calculatePipeRolls(totalLength, mainPipe.lengthM || 100);
@@ -671,7 +713,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 if (isNaN(item.quantity) || item.quantity <= 0) {
                     item.quantity = 1;
                 }
-                
+
                 if (item.zones && item.zones.length > 1) {
                     item.description += ``;
                 } else if (item.zones && item.zones.length === 1) {
@@ -694,12 +736,15 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         const sprinklersPerTree = config?.sprinklersPerTree || 1;
                         sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
                     }
-                    
+
                     if (sprinklerQuantity > 0) {
                         initialItems.push({
                             id: `sprinkler_${zoneSprinkler.id}`,
                             seq: seq++,
-                            image: (zoneSprinkler as any).image_url || (zoneSprinkler as any).image || '',
+                            image:
+                                (zoneSprinkler as any).image_url ||
+                                (zoneSprinkler as any).image ||
+                                '',
                             date: '',
                             description: `${(zoneSprinkler as any).productCode || (zoneSprinkler as any).product_code || ''} - ${(zoneSprinkler as any).name || 'สปริงเกอร์'} (${(zoneSprinkler as any).brand || ''})`,
                             quantity: sprinklerQuantity,
@@ -725,11 +770,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
                         }
                     }
-                    
+
                     initialItems.push({
                         id: `sprinkler_${zoneSprinkler.id}`,
                         seq: seq++,
-                        image: (zoneSprinkler as any).image_url || (zoneSprinkler as any).image || '',
+                        image:
+                            (zoneSprinkler as any).image_url || (zoneSprinkler as any).image || '',
                         date: '',
                         description: `${(zoneSprinkler as any).productCode || (zoneSprinkler as any).product_code || ''} - ${(zoneSprinkler as any).name || 'สปริงเกอร์'} (${(zoneSprinkler as any).brand || ''})`,
                         quantity: sprinklerQuantity || 1,
@@ -740,15 +786,15 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     });
                 }
             });
-            
+
             // ถ้ายังไม่มี sprinkler ให้ลองใช้ zoneSprinklers โดยไม่ต้องมี zoneInput
-            const hasSprinkler = initialItems.some(item => item.id.startsWith('sprinkler_'));
-            
+            const hasSprinkler = initialItems.some((item) => item.id.startsWith('sprinkler_'));
+
             if (!hasSprinkler) {
                 const zoneSprinklerKeys = Object.keys(zoneSprinklers || {});
                 let singleZoneSprinkler: any = null;
                 let zoneIdToUse: string | null = null;
-                
+
                 // ลองหา 'main-area' ก่อน
                 if (zoneSprinklers['main-area']) {
                     singleZoneSprinkler = zoneSprinklers['main-area'];
@@ -760,33 +806,33 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         singleZoneSprinkler = zoneSprinklers[zoneIdToUse];
                     }
                 }
-                
+
                 // ถ้ายังไม่มี ให้ใช้ selectedSprinkler
                 if (!singleZoneSprinkler) {
                     singleZoneSprinkler = selectedSprinkler;
                 }
-                
+
                 // แสดง sprinkler ถ้ามี sprinkler ถูกเลือก (ไม่ต้องรอ quantity > 0)
                 if (singleZoneSprinkler) {
                     let sprinklerQuantity = 0;
-                    
+
                     // ลองใช้ zoneInput ถ้ามี
                     if (zoneIdToUse && zoneInputs[zoneIdToUse]) {
                         sprinklerQuantity = zoneInputs[zoneIdToUse].totalTrees || 0;
                     }
-                    
+
                     // ถ้ายังไม่มี ให้ใช้ results.totalSprinklers
                     if (sprinklerQuantity === 0 && results) {
                         sprinklerQuantity = results.totalSprinklers || 0;
                     }
-                    
+
                     // สำหรับ horticulture mode ให้คูณด้วย sprinklersPerTree
                     if (projectMode === 'horticulture' && sprinklerQuantity > 0) {
                         const config = loadSprinklerConfig();
                         const sprinklersPerTree = config?.sprinklersPerTree || 1;
                         sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
                     }
-                    
+
                     // ถ้ายังเป็น 0 ให้ลองใช้จำนวนต้นไม้
                     if (sprinklerQuantity === 0 && projectData?.plants?.length) {
                         sprinklerQuantity = projectData.plants.length;
@@ -796,13 +842,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
                         }
                     }
-                    
+
                     // แสดง sprinkler แม้ว่า quantity จะเป็น 0 ก็ตาม (อย่างน้อย 1 ตัว)
                     // เพื่อให้ผู้ใช้เห็นว่ามีการเลือก sprinkler แล้ว
                     initialItems.push({
                         id: 'sprinkler',
                         seq: seq++,
-                        image: (singleZoneSprinkler as any).image_url || (singleZoneSprinkler as any).image || '',
+                        image:
+                            (singleZoneSprinkler as any).image_url ||
+                            (singleZoneSprinkler as any).image ||
+                            '',
                         date: '',
                         description: `${(singleZoneSprinkler as any).productCode || (singleZoneSprinkler as any).product_code || ''} - ${(singleZoneSprinkler as any).name || 'สปริงเกอร์'} (${(singleZoneSprinkler as any).brand || ''})`,
                         quantity: sprinklerQuantity || 1, // อย่างน้อย 1 ตัว
@@ -816,31 +865,41 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             // สำหรับ single zone - ใช้ zoneInput ถ้ามี (เหมือน CostSummary.tsx บรรทัด 962-1037)
             // หา zoneInput สำหรับ single zone
-            const singleZoneInput = Object.values(zoneInputs || {})[0] || 
-                (Object.keys(zoneInputs || {}).length > 0 ? zoneInputs[Object.keys(zoneInputs || {})[0]] : null);
+            const singleZoneInput =
+                Object.values(zoneInputs || {})[0] ||
+                (Object.keys(zoneInputs || {}).length > 0
+                    ? zoneInputs[Object.keys(zoneInputs || {})[0]]
+                    : null);
 
             if (selectedBranchPipe && results) {
                 let quantity = results.branchPipeRolls || 0;
-                
+
                 // ใช้ zoneInput.totalBranchPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
                 if (singleZoneInput && singleZoneInput.totalBranchPipeM > 0) {
                     let extraLength = 0;
-                    if (singleZoneInput.extraPipePerSprinkler && 
+                    if (
+                        singleZoneInput.extraPipePerSprinkler &&
                         singleZoneInput.extraPipePerSprinkler.pipeId === selectedBranchPipe.id &&
-                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
                     const totalLength = singleZoneInput.totalBranchPipeM + extraLength;
                     quantity = calculatePipeRolls(totalLength, selectedBranchPipe.lengthM || 100);
                 }
-                
+
                 initialItems.push({
                     id: 'branchPipe',
                     seq: seq++,
@@ -857,26 +916,36 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             if (selectedSecondaryPipe && results) {
                 let quantity = results.secondaryPipeRolls || 0;
-                
+
                 // ใช้ zoneInput.totalSecondaryPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
                 if (singleZoneInput && singleZoneInput.totalSecondaryPipeM > 0) {
                     let extraLength = 0;
-                    if (singleZoneInput.extraPipePerSprinkler && 
+                    if (
+                        singleZoneInput.extraPipePerSprinkler &&
                         singleZoneInput.extraPipePerSprinkler.pipeId === selectedSecondaryPipe.id &&
-                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
                     const totalLength = singleZoneInput.totalSecondaryPipeM + extraLength;
-                    quantity = calculatePipeRolls(totalLength, selectedSecondaryPipe.lengthM || 100);
+                    quantity = calculatePipeRolls(
+                        totalLength,
+                        selectedSecondaryPipe.lengthM || 100
+                    );
                 }
-                
+
                 initialItems.push({
                     id: 'secondaryPipe',
                     seq: seq++,
@@ -893,26 +962,33 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             if (selectedMainPipe && results) {
                 let quantity = results.mainPipeRolls || 0;
-                
+
                 // ใช้ zoneInput.totalMainPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
                 if (singleZoneInput && singleZoneInput.totalMainPipeM > 0) {
                     let extraLength = 0;
-                    if (singleZoneInput.extraPipePerSprinkler && 
+                    if (
+                        singleZoneInput.extraPipePerSprinkler &&
                         singleZoneInput.extraPipePerSprinkler.pipeId === selectedMainPipe.id &&
-                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
                     const totalLength = singleZoneInput.totalMainPipeM + extraLength;
                     quantity = calculatePipeRolls(totalLength, selectedMainPipe.lengthM || 100);
                 }
-                
+
                 initialItems.push({
                     id: 'mainPipe',
                     seq: seq++,
@@ -929,26 +1005,37 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             if (selectedEmitterPipe && results) {
                 let quantity = results.emitterPipeRolls || 0;
-                
+
                 // ใช้ zoneInput.totalEmitterPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
-                if (singleZoneInput && singleZoneInput.totalEmitterPipeM && singleZoneInput.totalEmitterPipeM > 0) {
+                if (
+                    singleZoneInput &&
+                    singleZoneInput.totalEmitterPipeM &&
+                    singleZoneInput.totalEmitterPipeM > 0
+                ) {
                     let extraLength = 0;
-                    if (singleZoneInput.extraPipePerSprinkler && 
+                    if (
+                        singleZoneInput.extraPipePerSprinkler &&
                         singleZoneInput.extraPipePerSprinkler.pipeId === selectedEmitterPipe.id &&
-                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0) {
+                        singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
+                    ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
                         if (projectMode === 'horticulture' && sprinklerCount > 0) {
                             const config = loadSprinklerConfig();
                             const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            extraLength = (sprinklerCount * sprinklersPerTree) * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                sprinklersPerTree *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         } else {
-                            extraLength = sprinklerCount * singleZoneInput.extraPipePerSprinkler.lengthPerHead;
+                            extraLength =
+                                sprinklerCount *
+                                singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
                     const totalLength = singleZoneInput.totalEmitterPipeM + extraLength;
                     quantity = calculatePipeRolls(totalLength, selectedEmitterPipe.lengthM || 100);
                 }
-                
+
                 initialItems.push({
                     id: 'emitterPipe',
                     seq: seq++,
@@ -980,25 +1067,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 originalData: selectedPump,
             });
 
-            const accessories = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
+            const accessories: PumpAccessory[] = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
 
             if (accessories && accessories.length > 0) {
                 accessories
                     .sort(
-                        (a: { sort_order: any }, b: { sort_order: any }) =>
+                        (a: PumpAccessory, b: PumpAccessory) =>
                             (a.sort_order || 0) - (b.sort_order || 0)
                     )
                     .forEach(
-                        (accessory: {
-                            id: any;
-                            name: any;
-                            size: any;
-                            is_included: any;
-                            price: any;
-                            image_url: any;
-                            image: any;
-                            accessory_type: any;
-                        }) => {
+                        (accessory: PumpAccessory) => {
                             if (
                                 !accessory.is_included ||
                                 (accessory.price && accessory.price > 0)
@@ -1012,7 +1090,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 };
 
                                 const typeName =
-                                    accessoryTypeMap[accessory.accessory_type] ||
+                                    (accessory.accessory_type && accessoryTypeMap[accessory.accessory_type]) ||
                                     accessory.accessory_type ||
                                     '';
 
@@ -1022,7 +1100,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     image: accessory.image_url || accessory.image || '',
                                     date: '',
                                     description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''}`,
-                                    quantity: 1,
+                                    quantity: accessory.quantity || 1,
                                     unitPrice: accessory.is_included ? 0 : accessory.price || 0,
                                     discount: accessory.is_included ? 0 : 0.0,
                                     taxes: 'Output\nVAT\n7%',

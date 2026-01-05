@@ -97,7 +97,7 @@ const ModeSelection: React.FC<{
     return (
         <div className="min-h-screen w-full overflow-hidden bg-gray-900">
             <Navbar />
-            <div className="flex h-[calc(100vh-64px)] w-full items-center justify-center bg-gray-900 p-6">
+            <div className="flex h-[calc(100vh-64px)] w-full items-center justify-center bg-gray-900 p-6 pt-20">
                 <div className="w-full max-w-4xl">
                     <h1 className="mb-8 text-center text-3xl font-bold text-white">
                         🏡 {t('เลือกวิธีการออกแบบระบบน้ำ')}
@@ -1405,7 +1405,7 @@ export default function HomeGardenPlanner() {
         <div className="min-h-screen w-full overflow-hidden bg-gray-900">
             <Navbar />
             {showValidationErrors && (
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50 pt-20">
                     <div className="mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
                         <h3 className="mb-4 text-xl font-bold text-red-400">
                             ❌ {t('ไม่สามารถดูสรุปผลได้')}

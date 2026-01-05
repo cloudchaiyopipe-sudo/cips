@@ -324,7 +324,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
             if (!start || !end) {
                 setError(
                     t('จุดเริ่มต้นหรือจุดสิ้นสุดไม่ถูกต้อง') ||
-                    'จุดเริ่มต้นหรือจุดสิ้นสุดไม่ถูกต้อง'
+                        'จุดเริ่มต้นหรือจุดสิ้นสุดไม่ถูกต้อง'
                 );
                 return;
             }
@@ -397,7 +397,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                         } else {
                             setError(
                                 t('ไม่สามารถสร้างกราฟแสดงความสูงได้ - สถานะ: ') + status ||
-                                'ไม่สามารถสร้างกราฟแสดงความสูงได้ - สถานะ: ' + status
+                                    'ไม่สามารถสร้างกราฟแสดงความสูงได้ - สถานะ: ' + status
                             );
                         }
                         setIsLoading(false);
@@ -406,7 +406,7 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
             } catch (err) {
                 setError(
                     t('เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ') + (err as Error).message ||
-                    'เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ' + (err as Error).message
+                        'เกิดข้อผิดพลาดในการสร้างโปรไฟล์: ' + (err as Error).message
                 );
                 setIsLoading(false);
             }
@@ -646,34 +646,34 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                 {!isDrawing && (
                     <div className="space-y-3">
                         {!profileData && (
-                    <div className="space-y-3">
-                        <div className="text-sm text-gray-600">
-                            {t('คลิก 2 จุดบนแผนที่เพื่อสร้างกราฟแสดงความสูง') ||
-                                'คลิก 2 จุดบนแผนที่เพื่อสร้างกราฟแสดงความสูง'}
-                        </div>
+                            <div className="space-y-3">
+                                <div className="text-sm text-gray-600">
+                                    {t('คลิก 2 จุดบนแผนที่เพื่อสร้างกราฟแสดงความสูง') ||
+                                        'คลิก 2 จุดบนแผนที่เพื่อสร้างกราฟแสดงความสูง'}
+                                </div>
 
-                        <button
-                            onClick={() => {
-                                // Reset state before starting
-                                setStartPoint(null);
-                                setEndPoint(null);
-                                setCurrentPoint(null);
-                                setProfileData(null);
-                                setYAxisMin(null);
-                                setYAxisMax(null);
-                                setUseCustomRange(false);
-                                startPointRef.current = null;
-                                endPointRef.current = null;
-                                removeLineAndMarkers();
-                                cleanup(true);
-                                setIsDrawing(true);
-                            }}
-                            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                        >
-                            {t('เริ่มวาดเส้นทาง') || 'เริ่มวาดเส้นทาง'}
-                        </button>
-                    </div>
-                )}
+                                <button
+                                    onClick={() => {
+                                        // Reset state before starting
+                                        setStartPoint(null);
+                                        setEndPoint(null);
+                                        setCurrentPoint(null);
+                                        setProfileData(null);
+                                        setYAxisMin(null);
+                                        setYAxisMax(null);
+                                        setUseCustomRange(false);
+                                        startPointRef.current = null;
+                                        endPointRef.current = null;
+                                        removeLineAndMarkers();
+                                        cleanup(true);
+                                        setIsDrawing(true);
+                                    }}
+                                    className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                                >
+                                    {t('เริ่มวาดเส้นทาง') || 'เริ่มวาดเส้นทาง'}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -729,10 +729,11 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                                 </label>
                                 <div className="flex items-center gap-2">
                                     <span
-                                        className={`rounded px-2 py-1 text-xs ${useCustomRange
+                                        className={`rounded px-2 py-1 text-xs ${
+                                            useCustomRange
                                                 ? 'bg-blue-500 text-white'
                                                 : 'bg-gray-200 text-gray-600'
-                                            }`}
+                                        }`}
                                     >
                                         {useCustomRange
                                             ? t('กำหนดเอง') || 'กำหนดเอง'
@@ -910,13 +911,17 @@ const ElevationProfile: React.FC<ElevationProfileProps> = ({ map, isActive, onTo
                                     {t('ความต่าง max-min') || 'ความต่าง max-min'}
                                 </div>
                                 <div className="text-gray-800">
-                                    {(profileData.maxElevation - profileData.minElevation).toFixed(1)} m
+                                    {(profileData.maxElevation - profileData.minElevation).toFixed(
+                                        1
+                                    )}{' '}
+                                    m
                                 </div>
                             </div>
 
                             <div className="rounded bg-purple-50 p-2">
                                 <div className="font-medium text-purple-600">
-                                    {t('ความต่าง จุดเริ่ม-จุดสิ้นสุด') || 'ความต่าง จุดเริ่ม-จุดสิ้นสุด'}
+                                    {t('ความต่าง จุดเริ่ม-จุดสิ้นสุด') ||
+                                        'ความต่าง จุดเริ่ม-จุดสิ้นสุด'}
                                 </div>
                                 <div className="flex items-center gap-1 text-gray-800">
                                     {profileData.elevationChange > 0 ? (

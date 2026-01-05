@@ -6652,7 +6652,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             >
                 <Navbar />
 
-                <div className="h-[calc(100vh-4rem)] overflow-hidden">
+                <div className="h-[calc(100vh-4rem)] overflow-hidden pt-20">
                     <div className="flex h-full">
                         <div
                             className="flex w-80 flex-col border-r border-white"

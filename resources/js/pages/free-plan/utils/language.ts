@@ -1,5 +1,16 @@
 // Language translations for Free Plan pages
 export interface LanguageTranslations {
+    [x: string]: string;
+    flowRateLabel: string;
+    outletsLabel: string;
+    selectedPlantInformation: string;
+    selectedPlantInformationDescription: string;
+    selectedPlantInformationDescription2: string;
+    selectedPlantInformationDescription3: string;
+    selectedPlantInformationDescription4: string;
+    selectedPlantInformationDescription5: string;
+    selectedPlantInformationDescription6: string;
+    selectedPlantInformationDescription7: string;
     // FreeHome page
     welcomeTo: string;
     freePlan: string;
@@ -546,6 +557,16 @@ export interface LanguageTranslations {
 
 export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
     EN: {
+        flowRateLabel: 'Flow Rate',
+        outletsLabel: 'Outlets',
+        selectedPlantInformation: 'Selected Plant Information',
+        selectedPlantInformationDescription: 'Selected Plant Information Description',
+        selectedPlantInformationDescription2: 'Selected Plant Information Description 2',
+        selectedPlantInformationDescription3: 'Selected Plant Information Description 3',
+        selectedPlantInformationDescription4: 'Selected Plant Information Description 4',
+        selectedPlantInformationDescription5: 'Selected Plant Information Description 5',
+        selectedPlantInformationDescription6: 'Selected Plant Information Description 6',
+        selectedPlantInformationDescription7: 'Selected Plant Information Description 7',
         // FreeHome page
         welcomeTo: 'welcome to',
         freePlan: 'Free Plan!',
@@ -717,7 +738,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         placingWaterPump: '🔧 Placing Water Pump',
         clickOnlyOnRedOrangePoints:
             'Click ONLY on the blue placement points around the water source',
-        redCirclesCornerPoints: 'Dark blue circles = corner points, Light blue circles = midpoint points',
+        redCirclesCornerPoints:
+            'Dark blue circles = corner points, Light blue circles = midpoint points',
         orangeCirclesMidpointPoints: 'Orange circles = midpoint points',
         cannotPlacePumpsAnywhereElse: '⚠️ You cannot place pumps anywhere else in the area',
         pumpWillDistributeWater:
@@ -1098,6 +1120,16 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         paymentProcessedSecurely: 'Payment is processed securely through Omise. Your Pro Plan subscription will be activated automatically once payment is confirmed. If you have any questions, please contact our support team.',
     },
     TH: {
+        flowRateLabel: 'อัตราการไหล',
+        outletsLabel: 'จุดจ่าย',
+        selectedPlantInformation: 'ข้อมูลพืชที่เลือก',
+        selectedPlantInformationDescription: 'ข้อมูลพืชที่เลือกคำอธิบาย',
+        selectedPlantInformationDescription2: 'ข้อมูลพืชที่เลือกคำอธิบาย 2',
+        selectedPlantInformationDescription3: 'ข้อมูลพืชที่เลือกคำอธิบาย 3',
+        selectedPlantInformationDescription4: 'ข้อมูลพืชที่เลือกคำอธิบาย 4',
+        selectedPlantInformationDescription5: 'ข้อมูลพืชที่เลือกคำอธิบาย 5',
+        selectedPlantInformationDescription6: 'ข้อมูลพืชที่เลือกคำอธิบาย 6',
+        selectedPlantInformationDescription7: 'ข้อมูลพืชที่เลือกคำอธิบาย 7',
         // FreeHome page
         welcomeTo: 'ยินดีต้อนรับสู่',
         freePlan: 'แผนฟรี!',

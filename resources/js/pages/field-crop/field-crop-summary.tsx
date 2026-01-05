@@ -5243,7 +5243,7 @@ export default function FieldCropSummary() {
             <div className="min-h-screen bg-gray-900 text-white">
                 <Head title={`${t('Field Crop Summary')} - ${t('No data to show')}`} />
                 <Navbar />
-                <div className="flex items-center justify-center px-4 py-12">
+                <div className="flex items-center justify-center px-4 py-12 pt-20">
                     <div className="container mx-auto">
                         <div className="rounded-lg bg-gray-800 p-8 text-center">
                             <div className="mb-4 text-6xl">📋</div>

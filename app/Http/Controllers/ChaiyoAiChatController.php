@@ -16,7 +16,15 @@ class ChaiyoAiChatController extends Controller
         try {
             $this->chaiyoAiService = new ChaiyoAiService();
         } catch (Exception $e) {
-            Log::error('Failed to initialize ChaiyoAiService: ' . $e->getMessage());
+            $apiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY');
+            Log::error('Failed to initialize ChaiyoAiService', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'api_key_exists' => !empty($apiKey),
+                'api_key_preview' => !empty($apiKey) ? substr($apiKey, 0, 10) . '...' : 'Not set',
+                'config_key_exists' => !empty(config('services.gemini.api_key')),
+                'env_key_exists' => !empty(env('GEMINI_API_KEY'))
+            ]);
             $this->chaiyoAiService = null;
         }
     }
@@ -45,14 +53,9 @@ class ChaiyoAiChatController extends Controller
                 'user_agent' => $request->header('User-Agent', 'Unknown')
             ]);
 
-            // Handle empty message
+            // Handle empty message - throw exception
             if (empty(trim($userMessage))) {
-                return $this->jsonResponse([
-                    'reply' => 'สวัสดีครับ! ฉันคือ **ChaiyoAI** 🤖 ตัวแทน AI ของ บริษัท ไชโยไปป์แอนด์ฟิตติ้ง และ บริษัท กนกส์โปรดัก\n\nมีอะไรให้ช่วยเหลือไหมครับ? 🌿',
-                    'success' => true,
-                    'message_type' => 'greeting',
-                    'ai_identity' => 'ChaiyoAI'
-                ]);
+                throw new Exception('Empty message provided');
             }
 
             // Get AI response from ChaiyoAI
@@ -73,23 +76,28 @@ class ChaiyoAiChatController extends Controller
                 'message_type' => 'ai_response',
                 'ai_identity' => 'ChaiyoAI',
                 'service_info' => [
-                    'powered_by' => 'Gemini Pro + ChaiyoAI Knowledge Base',
-                    'company_representative' => true,
-                    'specialized_in' => 'ระบบน้ำและชลประทาน'
+                    'powered_by' => 'Gemini Pro',
+                    'model' => 'gemini-1.5-pro'
                 ]
             ]);
 
         } catch (Exception $e) {
+            $errorMessage = $e->getMessage();
+            $isRateLimit = strpos($errorMessage, '429') !== false || 
+                          strpos($errorMessage, 'Rate Limit') !== false || 
+                          strpos($errorMessage, 'Quota exceeded') !== false;
+            
             Log::error('ChaiyoAI Chat Error', [
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
+                'is_rate_limit' => $isRateLimit,
                 'trace' => $e->getTraceAsString(),
                 'user_message' => $userMessage ?? 'N/A'
             ]);
             
             return $this->jsonResponse([
-                'reply' => $this->getErrorResponse($userMessage ?? ''),
+                'reply' => $this->getErrorResponse($userMessage ?? '', $isRateLimit),
                 'success' => true, // Keep success true for UX
-                'error' => 'processing_error',
+                'error' => $isRateLimit ? 'rate_limit' : 'processing_error',
                 'timestamp' => now()->toISOString(),
                 'ai_identity' => 'ChaiyoAI'
             ]);
@@ -175,27 +183,15 @@ class ChaiyoAiChatController extends Controller
     /**
      * Get error response when AI fails
      */
-    private function getErrorResponse(string $userMessage): string
+    private function getErrorResponse(string $userMessage, bool $isRateLimit = false): string
     {
-        $isCompanyQuery = $this->isCompanyQuery($userMessage);
-        
-        if ($isCompanyQuery) {
-            return "ขออภัยครับ ขณะนี้ระบบ ChaiyoAI กำลังประมวลผลข้อมูลบริษัท 🔧\n\n" .
-                   "สำหรับข้อมูลเพิ่มเติมเกี่ยวกับ:\n" .
-                   "🏢 **บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด**\n" .
-                   "🏢 **บริษัท กนกส์โปรดัก จำกัด**\n\n" .
-                   "📞 **โทรศัพท์:** 02-451-1111\n" .
-                   "🌐 **เว็บไซต์:** www.kanokgroup.com\n" .
-                   "📧 **อีเมล:** chaiyopipeonline@gmail.com\n\n" .
-                   "ลองถามใหม่อีกครั้งได้เลยครับ! 😊";
+        if ($isRateLimit) {
+            return "ขออภัยครับ ขณะนี้ Gemini API กำลังรับคำขอจำนวนมาก (Quota exceeded)\n\n" .
+                   "**กรุณารอ 1-2 นาที แล้วลองถามใหม่อีกครั้ง**\n\n" .
+                   "Rate limit ของ Gemini API free tier ต่ำมาก (ประมาณ 15 requests/min globally)";
         }
         
-        return "ขออภัยครับ ตอนนี้ระบบ ChaiyoAI กำลังประมวลผล 🤖\n\n" .
-               "ลองถามใหม่ได้เลยครับ! 😊\n\n" .
-               "🌿 **ChaiyoAI** พร้อมช่วยเหลือเรื่อง:\n" .
-               "💧 ระบบน้ำและชลประทาน\n" .
-               "🔧 ผลิตภัณฑ์ของบริษัท\n" .
-               "💡 คำแนะนำทั่วไป";
+        return "ขออภัยครับ เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง";
     }
 
     /**
@@ -223,14 +219,7 @@ class ChaiyoAiChatController extends Controller
      */
     private function getServiceUnavailableResponse(): string
     {
-        return "ขออภัยครับ ระบบ ChaiyoAI ยังไม่พร้อมใช้งาน 🔧\n\n" .
-               "🏢 **บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด**\n" .
-               "🏢 **บริษัท กนกส์โปรดัก จำกัด**\n\n" .
-               "📞 **โทรศัพท์:** 02-451-1111\n" .
-               "🌐 **เว็บไซต์:** www.kanokgroup.com\n" .
-               "📧 **อีเมล:** chaiyopipeonline@gmail.com\n\n" .
-               "กรุณาตรวจสอบการตั้งค่า API Key และลองใหม่อีกครั้ง\n\n" .
-               "ขอบคุณครับ! 🙏";
+        return "ขออภัยครับ ระบบยังไม่พร้อมใช้งาน กรุณาตรวจสอบการตั้งค่า API Key";
     }
 
     /**
@@ -322,20 +311,11 @@ class ChaiyoAiChatController extends Controller
             return response()->json([
                 'status' => 'healthy',
                 'version' => '3.0.0',
-                'name' => 'ChaiyoAI - Enhanced Company Representative',
+                'name' => 'ChaiyoAI',
                 'ai_service' => $chaiyoAiStatus['status'] ?? 'not_configured',
                 'api_key_configured' => $chaiyoAiStatus['api_key_configured'] ?? false,
-                'company_knowledge_loaded' => $chaiyoAiStatus['company_knowledge_loaded'] ?? false,
                 'model' => 'gemini-1.5-pro',
-                'supported_companies' => $chaiyoAiStatus['supported_companies'] ?? [],
                 'timestamp' => now(),
-                'features' => $chaiyoAiStatus['features'] ?? [
-                    'general_chat' => true,
-                    'company_information' => true,
-                    'product_consultation' => true,
-                    'irrigation_expertise' => true,
-                    'multilingual_support' => true
-                ],
                 'ai_identity' => 'ChaiyoAI'
             ]);
 
@@ -354,136 +334,81 @@ class ChaiyoAiChatController extends Controller
      */
     public function getCompanyInfo(Request $request)
     {
-        try {
-            if (!$this->chaiyoAiService) {
-                return response()->json([
-                    'error' => 'ChaiyoAI service not available',
-                    'message' => 'Please check API configuration'
-                ], 503);
-            }
-
-            $category = $request->input('category', 'overview');
-            $companyInfo = $this->chaiyoAiService->getCompanyInfo($category);
-
-            return response()->json([
-                'success' => true,
-                'category' => $category,
-                'data' => $companyInfo,
-                'available_categories' => [
-                    'overview' => 'ข้อมูลทั่วไปของบริษัท',
-                    'products' => 'ผลิตภัณฑ์และแบรนด์',
-                    'contact' => 'ข้อมูลติดต่อ',
-                    'certifications' => 'การรับรองคุณภาพ',
-                    'partnerships' => 'พันธมิตรและการส่งออก',
-                    'timeline' => 'ประวัติและพัฒนาการ'
-                ],
-                'ai_identity' => 'ChaiyoAI',
-                'timestamp' => now()
-            ]);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-                'ai_identity' => 'ChaiyoAI',
-                'timestamp' => now()
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'error' => 'Company information endpoint removed - use chat endpoint instead',
+            'ai_identity' => 'ChaiyoAI',
+            'timestamp' => now()
+        ], 404);
     }
 
     /**
-     * Get enhanced popular questions including company-specific ones
+     * Get popular questions - removed, no hardcoded data
      */
     public function getPopularQuestions()
     {
-        $questions = [
-            'company' => [
-                'บริษัทไชโยมีประวัติอย่างไร?',
-                'ผลิตภัณฑ์หลักของบริษัทกนกส์โปรดักคืออะไร?',
-                'ติดต่อบริษัทไชโยไปป์แอนด์ฟิตติ้งได้อย่างไร?',
-                'แบรนด์ RED HAND คืออะไร?',
-                'บริษัทมีการรับรองคุณภาพอะไรบ้าง?'
-            ],
-            'products' => [
-                'ท่อ PVC และข้อต่อมีแบบไหนบ้าง?',
-                'ระบบน้ำหยดทำงานอย่างไร?',
-                'สปริงเกอร์เหมาะกับพืชอะไร?',
-                'วาล์วสำหรับระบบน้ำมีกี่ประเภท?',
-                'ปั๊มน้ำควรเลือกแบบไหน?'
-            ],
-            'irrigation' => [
-                'วิธีคำนวณปริมาณน้ำที่พืชต้องการ',
-                'ระบบชลประทานสำหรับสวนขนาดเล็ก',
-                'กำหนดเวลาให้น้ำที่เหมาะสม',
-                'แก้ปัญหาระบบน้ำเบื้องต้น',
-                'เลือกระบบชลประทานที่ประหยัดน้ำ'
-            ],
-            'general' => [
-                'สวัสดี คุณเป็นอย่างไรบ้าง?',
-                'วันนี้เป็นอย่างไร?',
-                'ช่วยแนะนำเทคนิคการเกษตร',
-                'คำแนะนำการดูแลพืชสวน',
-                'เทคโนโลยีการเกษตรสมัยใหม่'
-            ]
-        ];
-
         return response()->json([
-            'questions' => $questions,
-            'categories' => [
-                'company' => '🏢 ข้อมูลบริษัท',
-                'products' => '🔧 ผลิตภัณฑ์',
-                'irrigation' => '💧 ระบบชลประทาน',
-                'general' => '💬 สนทนาทั่วไป'
-            ],
-            'ai_identity' => 'ChaiyoAI',
-            'company_focus' => [
-                'chaiyo_pipe_fitting' => 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
-                'kanok_product' => 'บริษัท กนกส์โปรดัก จำกัด'
-            ]
+            'questions' => [],
+            'note' => 'No hardcoded questions - use chat endpoint instead',
+            'ai_identity' => 'ChaiyoAI'
         ]);
     }
 
     /**
      * Health check endpoint
+     * Note: Does NOT make actual API calls to prevent rate limit issues
+     * Use ?test_api=true to test actual API connection
      */
     public function health()
     {
         try {
-            $chaiyoAiTest = ['success' => false, 'api_key_configured' => false];
+            // Check API key directly from config/env (no API call)
+            $apiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY');
+            $apiKeyConfigured = !empty($apiKey);
             
-            if ($this->chaiyoAiService) {
-                $chaiyoAiTest = $this->chaiyoAiService->testConnection();
+            // Check if service is initialized (no API call)
+            $serviceInitialized = $this->chaiyoAiService !== null;
+            
+            // Only test API if ?test_api=true is passed
+            $chaiyoAiTest = ['success' => false, 'api_key_configured' => $apiKeyConfigured];
+            if (request()->query('test_api') === 'true' && $this->chaiyoAiService) {
+                try {
+                    $chaiyoAiTest = $this->chaiyoAiService->testConnection();
+                } catch (\Exception $e) {
+                    $chaiyoAiTest = [
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                        'api_key_configured' => $apiKeyConfigured
+                    ];
+                }
             }
             
             $status = 'healthy';
-            if (!$chaiyoAiTest['success']) {
-                $status = $chaiyoAiTest['api_key_configured'] ? 'degraded' : 'unhealthy';
+            if (!$apiKeyConfigured) {
+                $status = 'unhealthy';
+            } elseif (request()->query('test_api') === 'true' && !$chaiyoAiTest['success']) {
+                $status = 'degraded';
             }
             
             return response()->json([
                 'status' => $status,
                 'version' => '3.0.0',
-                'name' => 'ChaiyoAI - Enhanced Company Representative',
+                'name' => 'ChaiyoAI',
                 'timestamp' => now(),
                 'services' => [
-                    'chaiyo_ai' => $chaiyoAiTest['success'] ? 'healthy' : 'unhealthy',
-                    'company_knowledge' => $chaiyoAiTest['company_knowledge_loaded'] ?? false ? 'loaded' : 'not_loaded',
+                    'chaiyo_ai' => $apiKeyConfigured ? 'configured' : 'not_configured',
+                    'api_test' => request()->query('test_api') === 'true' ? ($chaiyoAiTest['success'] ? 'healthy' : 'unhealthy') : 'not_tested',
                     'utf8_handling' => 'enabled'
                 ],
                 'configuration' => [
-                    'api_key_configured' => $chaiyoAiTest['api_key_configured'],
+                    'api_key_configured' => $apiKeyConfigured,
                     'model' => 'gemini-1.5-pro',
                     'max_tokens' => 2048,
-                    'temperature' => 'dynamic (0.3 for company info, 0.7 for general chat)',
-                    'company_knowledge_categories' => [
-                        'company_overview', 'products', 'contact_info', 
-                        'certifications', 'partnerships', 'timeline'
-                    ]
+                    'temperature' => 0.7
                 ],
-                'supported_companies' => [
-                    'chaiyo_pipe_fitting' => 'ไชโยไปป์แอนด์ฟิตติ้ง',
-                    'kanok_product' => 'กนกส์โปรดัก'
-                ],
+                'note' => request()->query('test_api') === 'true' 
+                    ? 'API connection was tested' 
+                    : 'API connection not tested (pass ?test_api=true to test)',
                 'ai_identity' => 'ChaiyoAI'
             ]);
 
@@ -499,18 +424,32 @@ class ChaiyoAiChatController extends Controller
 
     /**
      * Test endpoint for debugging and verification
+     * Supports both GET and POST requests
      */
     public function test(Request $request)
     {
-        $message = $request->input('message', 'สวัสดี บริษัทไชโยมีสินค้าอะไรบ้าง');
+        // Support both GET (query parameter) and POST (body) requests
+        $message = $request->input('message', $request->query('message', 'Hello'));
         
         try {
             if (!$this->chaiyoAiService) {
+                $apiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY');
+                $apiKeyConfigured = !empty($apiKey);
+                
                 return response()->json([
                     'success' => false,
                     'input' => $message,
                     'error' => 'ChaiyoAiService not initialized',
-                    'hint' => 'Check GEMINI_API_KEY in .env file',
+                    'api_key_configured' => $apiKeyConfigured,
+                    'hint' => $apiKeyConfigured 
+                        ? 'API Key is configured but service failed to initialize. Check logs for details.'
+                        : 'GEMINI_API_KEY not found in .env file. Please add: GEMINI_API_KEY=your_api_key_here',
+                    'setup_instructions' => [
+                        '1. Get API Key from: https://makersuite.google.com/app/apikey',
+                        '2. Add to .env file: GEMINI_API_KEY=your_api_key_here',
+                        '3. Restart web server',
+                        '4. Test again at: /api/ai/test'
+                    ],
                     'ai_identity' => 'ChaiyoAI',
                     'timestamp' => now()
                 ], 500);
@@ -534,63 +473,36 @@ class ChaiyoAiChatController extends Controller
             ]);
             
         } catch (Exception $e) {
+            $errorMessage = $e->getMessage();
+            $isRateLimit = strpos($errorMessage, '429') !== false || 
+                          strpos($errorMessage, 'Rate Limit') !== false || 
+                          strpos($errorMessage, 'Quota exceeded') !== false;
+            
             return response()->json([
                 'success' => false,
                 'input' => $message,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
+                'is_rate_limit' => $isRateLimit,
+                'message' => $isRateLimit 
+                    ? 'Gemini API quota exceeded. Please wait 1-2 minutes and try again.' 
+                    : 'An error occurred while processing your request.',
                 'ai_identity' => 'ChaiyoAI',
                 'timestamp' => now()
-            ], 500);
+            ], $isRateLimit ? 429 : 500);
         }
     }
 
     /**
-     * Get product recommendations based on customer needs
+     * Get product recommendations - removed, no hardcoded data
      */
     public function getProductRecommendations(Request $request)
     {
-        try {
-            $customerType = $request->input('customer_type', 'general'); // farmer, construction, home_garden, etc.
-            $budget = $request->input('budget', 'medium'); // low, medium, high
-            $application = $request->input('application', 'general'); // irrigation, plumbing, agriculture, etc.
-
-            if (!$this->chaiyoAiService) {
-                return response()->json([
-                    'error' => 'ChaiyoAI service not available',
-                    'message' => 'Please contact us directly for product recommendations'
-                ], 503);
-            }
-
-            $promptMessage = "แนะนำผลิตภัณฑ์ของบริษัทไชโยและกนกส์โปรดัก สำหรับ ลูกค้าประเภท: {$customerType}, งบประมาณ: {$budget}, การใช้งาน: {$application}";
-            
-            $recommendations = $this->chaiyoAiService->generateResponse($promptMessage);
-
-            return response()->json([
-                'success' => true,
-                'customer_profile' => [
-                    'type' => $customerType,
-                    'budget' => $budget,
-                    'application' => $application
-                ],
-                'recommendations' => $recommendations,
-                'ai_identity' => 'ChaiyoAI',
-                'disclaimer' => 'คำแนะนำจาก ChaiyoAI - กรุณาติดต่อบริษัทโดยตรงสำหรับข้อมูลราคาและรายละเอียดเพิ่มเติม',
-                'contact_info' => [
-                    'phone' => '02-451-1111',
-                    'website' => 'www.chaiyopipe.co.th',
-                    'email' => 'chaiyopipeonline@gmail.com'
-                ],
-                'timestamp' => now()
-            ]);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-                'ai_identity' => 'ChaiyoAI',
-                'timestamp' => now()
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'error' => 'Product recommendations endpoint removed - use chat endpoint instead',
+            'ai_identity' => 'ChaiyoAI',
+            'timestamp' => now()
+        ], 404);
     }
 
     /**
@@ -600,22 +512,11 @@ class ChaiyoAiChatController extends Controller
     {
         return response()->json([
             'status' => 'pong',
-            'service' => 'ChaiyoAI - Enhanced Company Representative',
+            'service' => 'ChaiyoAI',
             'version' => '3.0.0',
             'timestamp' => now(),
-            'gemini_configured' => !empty(env('GEMINI_API_KEY')),
-            'ai_identity' => 'ChaiyoAI',
-            'companies' => [
-                'chaiyo_pipe_fitting' => 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
-                'kanok_product' => 'บริษัท กนกส์โปรดัก จำกัด'
-            ],
-            'capabilities' => [
-                'company_information' => true,
-                'product_consultation' => true,
-                'irrigation_expertise' => true,
-                'general_conversation' => true,
-                'multilingual_support' => true
-            ]
+            'gemini_configured' => !empty(config('services.gemini.api_key') ?: env('GEMINI_API_KEY')),
+            'ai_identity' => 'ChaiyoAI'
         ]);
     }
 }

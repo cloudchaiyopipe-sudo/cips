@@ -91,9 +91,12 @@ export const refreshCsrfToken = async () => {
 
 // Function to handle CSRF token mismatch errors
 export const handleCsrfError = async (error: AxiosError) => {
-    const errorMessage = error.response?.data && typeof error.response.data === 'object' && 'message' in error.response.data
-        ? String((error.response.data as { message?: string }).message)
-        : '';
+    const errorMessage =
+        error.response?.data &&
+        typeof error.response.data === 'object' &&
+        'message' in error.response.data
+            ? String((error.response.data as { message?: string }).message)
+            : '';
     if (error.response?.status === 419 || errorMessage?.includes('CSRF')) {
         console.log('CSRF token mismatch detected, refreshing token...');
         const newToken = await refreshCsrfToken();

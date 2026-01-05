@@ -146,6 +146,45 @@ const apiRequest = async (url: string, options: RequestInit = {}) => {
     return data;
 };
 
+// Utility function to convert video link to embed format
+const convertVideoLinkToEmbed = (url: string | null | undefined): string | null => {
+    if (!url || !url.trim()) {
+        return null;
+    }
+
+    const trimmedUrl = url.trim();
+
+    // YouTube: https://youtu.be/VIDEO_ID or https://www.youtube.com/watch?v=VIDEO_ID
+    const youtubeShortRegex = /(?:youtu\.be\/)([a-zA-Z0-9_-]+)/;
+    const youtubeWatchRegex = /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]+)/;
+    
+    const youtubeShortMatch = trimmedUrl.match(youtubeShortRegex);
+    const youtubeWatchMatch = trimmedUrl.match(youtubeWatchRegex);
+    
+    if (youtubeShortMatch) {
+        return `https://www.youtube.com/embed/${youtubeShortMatch[1]}`;
+    }
+    
+    if (youtubeWatchMatch) {
+        return `https://www.youtube.com/embed/${youtubeWatchMatch[1]}`;
+    }
+
+    // Google Drive: https://drive.google.com/file/d/FILE_ID/view...
+    const driveRegex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
+    const driveMatch = trimmedUrl.match(driveRegex);
+    
+    if (driveMatch) {
+        return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    }
+
+    // If already an embed URL, return as is
+    if (trimmedUrl.includes('/embed/') || trimmedUrl.includes('/preview')) {
+        return trimmedUrl;
+    }
+
+    return null;
+};
+
 const getAllEquipments = async (params?: any): Promise<Equipment[]> => {
     try {
         const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -207,6 +246,7 @@ interface Equipment {
     name: string;
     brand?: string;
     image?: string;
+    video_link?: string;
     price: number;
     stock?: number;
     description?: string;
@@ -2236,6 +2276,7 @@ const EquipmentForm: React.FC<{
         name: equipment?.name || '',
         brand: equipment?.brand || '',
         image: equipment?.image || '',
+        video_link: equipment?.video_link || '',
         price: equipment?.price || 0,
         stock: equipment?.stock || 0,
         description: equipment?.description || '',
@@ -2277,6 +2318,7 @@ const EquipmentForm: React.FC<{
                             'name',
                             'brand',
                             'image',
+                            'video_link',
                             'price',
                             'stock',
                             'description',
@@ -2303,6 +2345,7 @@ const EquipmentForm: React.FC<{
                 name: equipment.name,
                 brand: equipment.brand,
                 image: equipment.image,
+                video_link: equipment.video_link || '',
                 price: equipment.price,
                 stock: equipment.stock,
                 description: equipment.description,
@@ -2323,6 +2366,7 @@ const EquipmentForm: React.FC<{
                 name: '',
                 brand: '',
                 image: '',
+                video_link: '',
                 price: 0,
                 stock: 0,
                 description: '',
@@ -2977,6 +3021,26 @@ const EquipmentForm: React.FC<{
                                         onImageClick={onImageClick}
                                         loading={imageUploading}
                                     />
+                                    <div className="mt-4">
+                                        <label className="mb-2 block text-sm font-medium">
+                                            {t('Link Video')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.video_link || ''}
+                                            onChange={(e) =>
+                                                setFormData((prev) => ({
+                                                    ...prev,
+                                                    video_link: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 text-white focus:ring-2 focus:ring-blue-500"
+                                            placeholder={t('เช่น https://youtu.be/... หรือ https://drive.google.com/...')}
+                                        />
+                                        <p className="mt-1 text-xs text-gray-400">
+                                            {t('รองรับ YouTube และ Google Drive')}
+                                        </p>
+                                    </div>
                                     <div className="mt-2 flex items-center">
                                         <label className="flex cursor-pointer items-center">
                                             <input
@@ -3167,6 +3231,7 @@ const EquipmentDetailModal: React.FC<{
             'name',
             'brand',
             'image',
+            'video_link',
             'price',
             'stock',
             'description',
@@ -3591,6 +3656,29 @@ const EquipmentDetailModal: React.FC<{
                                     <p className="mt-2 text-sm text-gray-500">{t('ไม่มีรูปภาพ')}</p>
                                 </div>
                             </div>
+
+                            {/* Video Section */}
+                            {equipment.video_link && convertVideoLinkToEmbed(equipment.video_link) && (
+                                <div className="mt-4">
+                                    <h4 className="mb-2 text-sm font-semibold text-white">
+                                        🎥 {t('วิดีโอสินค้า')}
+                                    </h4>
+                                    <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ height: 300 }}>
+                                        <iframe
+                                            src={convertVideoLinkToEmbed(equipment.video_link)!}
+                                            className="absolute inset-0 w-full h-full"
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                            }}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            title={equipment.name}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="mt-4">
                                 <span
                                     className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
@@ -4418,7 +4506,7 @@ const EquipmentCRUD: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-800">
             <Navbar />
-            <div className="mx-auto px-4 py-8">
+            <div className="mx-auto px-4 py-8 pt-20">
                 <div className="rounded-lg bg-gray-700 shadow-xl">
                     <div className="border-b border-gray-600 p-6">
                         <div className="mb-6 flex items-center justify-between">
@@ -5127,7 +5215,7 @@ const EquipmentCRUD: React.FC = () => {
                                                         {equipment.stock ? (
                                                             <span className="font-semibold text-blue-400">
                                                                 {equipment.stock.toLocaleString()}
-                                                            </span> 
+                                                            </span>
                                                         ) : (
                                                             '-'
                                                         )}

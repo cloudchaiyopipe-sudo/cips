@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaTimes, FaChevronRight, FaChevronLeft, FaLightbulb, FaCheckCircle } from 'react-icons/fa';
+import { FaTimes, FaChevronRight, FaChevronLeft, FaLightbulb } from 'react-icons/fa';
 
 interface TourStep {
     id: string;
@@ -48,50 +48,53 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
     // Check if element is visible (more lenient check)
     const isElementVisible = useCallback((element: HTMLElement): boolean => {
         if (!element) return false;
-        
+
         const style = window.getComputedStyle(element);
         const rect = element.getBoundingClientRect();
-        
+
         // Check if element is explicitly hidden
-        if (style.display === 'none' || 
-            style.visibility === 'hidden') {
+        if (style.display === 'none' || style.visibility === 'hidden') {
             return false;
         }
-        
+
         // More lenient check - allow elements that are partially visible or have size
         // Don't check opacity or exact viewport position too strictly
         if (rect.width === 0 && rect.height === 0) {
             return false;
         }
-        
+
         // Check if element is in DOM and has some size
         // Allow elements that are partially off-screen or scrolled
         return true;
     }, []);
 
-    const checkStepElementVisible = useCallback((step: TourStep): boolean => {
-        // Center steps are always available
-        if (step.target === 'center') {
-            return true;
-        }
-        
-        // Check if element exists and is visible
-        let element: HTMLElement | null = null;
-        try {
-            element = document.querySelector(`[data-tour="${step.target}"]`) as HTMLElement;
-            if (!element) {
-                element = document.querySelector(step.target) as HTMLElement;
+    const checkStepElementVisible = useCallback(
+        (step: TourStep): boolean => {
+            // Center steps are always available
+            if (step.target === 'center') {
+                return true;
             }
-            if (!element && step.target.startsWith('#')) {
-                element = document.getElementById(step.target.substring(1));
+
+            // Check if element exists and is visible
+            let element: HTMLElement | null = null;
+            try {
+                element = document.querySelector(`[data-tour="${step.target}"]`) as HTMLElement;
+                if (!element) {
+                    element = document.querySelector(step.target) as HTMLElement;
+                }
+                if (!element && step.target.startsWith('#')) {
+                    element = document.getElementById(step.target.substring(1));
+                }
+            } catch (error: unknown) {
+                console.warn('Invalid selector:', step.target, (error as Error).message);
+                // Invalid selector
+                return false;
             }
-        } catch (e) {
-            // Invalid selector
-            return false;
-        }
-        
-        return element ? isElementVisible(element) : false;
-    }, [isElementVisible]);
+
+            return element ? isElementVisible(element) : false;
+        },
+        [isElementVisible]
+    );
 
     const handleComplete = useCallback(() => {
         localStorage.setItem(storageKey, 'true');
@@ -109,20 +112,24 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
             }
 
             // Try data attribute first (most common case)
-            let element = document.querySelector(`[data-tour="${currentStepData.target}"]`) as HTMLElement;
-            
+            let element = document.querySelector(
+                `[data-tour="${currentStepData.target}"]`
+            ) as HTMLElement;
+
             // Try CSS selector if data-tour didn't work
             if (!element) {
                 try {
                     element = document.querySelector(currentStepData.target) as HTMLElement;
-                } catch (e) {
-                    console.warn('Invalid selector:', currentStepData.target);
+                } catch (error: unknown) {
+                    console.warn('Invalid selector:', currentStepData.target, (error as Error).message);
                 }
             }
 
             // Try by ID if target starts with #
             if (!element && currentStepData.target.startsWith('#')) {
-                element = document.getElementById(currentStepData.target.substring(1));
+                element = document.getElementById(
+                    currentStepData.target.substring(1)
+                ) as HTMLElement;
             }
 
             // Check if element is visible
@@ -147,7 +154,7 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
                     setIsHighlighted(false);
                     return;
                 }
-                
+
                 // For non-center steps, show tooltip in center but don't highlight
                 // Let retry mechanism handle finding the element
                 setTargetElement(null);
@@ -203,7 +210,9 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
             // Auto-click if needed
             if (currentStepData.action?.type === 'click' && currentStepData.action.selector) {
                 setTimeout(() => {
-                    const clickElement = document.querySelector(currentStepData.action!.selector!) as HTMLElement;
+                    const clickElement = document.querySelector(
+                        currentStepData.action!.selector!
+                    ) as HTMLElement;
                     if (clickElement) {
                         clickElement.click();
                     }
@@ -223,33 +232,33 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
 
         window.addEventListener('scroll', handleUpdate, true);
         window.addEventListener('resize', handleUpdate);
-        
+
         // Retry finding element (in case it's not loaded yet)
         // Only retry for non-center steps
         let retryCount = 0;
         const maxRetries = 20; // Retry for 10 seconds (20 * 500ms) - longer wait for elements to appear
-        
+
         const retryInterval = setInterval(() => {
             if (currentStepData.target === 'center') {
                 clearInterval(retryInterval);
                 return;
             }
-            
+
             if (skippedSteps.has(currentStep)) {
                 clearInterval(retryInterval);
                 return;
             }
-            
+
             retryCount++;
             const element = findElement();
-            
+
             if (element && isElementVisible(element)) {
                 updatePosition();
                 clearInterval(retryInterval);
             } else if (retryCount >= maxRetries) {
                 // Max retries reached, skip this step and find next visible one
                 if (!skippedSteps.has(currentStep)) {
-                    setSkippedSteps(prev => new Set(prev).add(currentStep));
+                    setSkippedSteps((prev) => new Set(prev).add(currentStep));
                     // Find next visible step
                     setTimeout(() => {
                         handleNext();
@@ -265,23 +274,32 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
             window.removeEventListener('resize', handleUpdate);
             clearInterval(retryInterval);
         };
-    }, [isVisible, currentStep, currentStepData, isAnimating, skippedSteps, steps, checkStepElementVisible, handleComplete]);
+    }, [
+        isVisible,
+        currentStep,
+        currentStepData,
+        isAnimating,
+        skippedSteps,
+        steps,
+        checkStepElementVisible,
+        handleComplete,
+    ]);
 
     const handleNext = useCallback(() => {
         // Find next available step (skip steps with invisible elements)
         let nextStep = currentStep + 1;
-        
+
         while (nextStep < steps.length) {
             const step = steps[nextStep];
-            
+
             if (checkStepElementVisible(step)) {
                 break;
             }
-            
+
             // Element not found or not visible, skip to next
             nextStep++;
         }
-        
+
         if (nextStep < steps.length) {
             setIsAnimating(true);
             setTimeout(() => {
@@ -367,16 +385,14 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
             />
 
             {/* Highlight Box */}
-            {isHighlighted && targetElement && (
-                <div style={highlightStyle} />
-            )}
+            {isHighlighted && targetElement && <div style={highlightStyle} />}
 
             {/* Tooltip */}
             <div
                 ref={tooltipRef}
                 style={tooltipStyle}
                 className={`rounded-lg border-2 border-blue-500 bg-white shadow-2xl transition-all duration-300 ${
-                    isAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                    isAnimating ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
                 }`}
             >
                 {/* Header */}
@@ -408,9 +424,7 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
                             <span>
                                 {t('ขั้นตอน') || 'ขั้นตอน'} {currentStep + 1} / {steps.length}
                             </span>
-                            <span>
-                                {Math.round(((currentStep + 1) / steps.length) * 100)}%
-                            </span>
+                            <span>{Math.round(((currentStep + 1) / steps.length) * 100)}%</span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                             <div
@@ -431,7 +445,9 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
                                         title={t('กลับไปขั้นตอนแรก') || 'กลับไปขั้นตอนแรก'}
                                     >
                                         <span>⏮️</span>
-                                        <span className="hidden sm:inline">{t('อันแรก') || 'อันแรก'}</span>
+                                        <span className="hidden sm:inline">
+                                            {t('อันแรก') || 'อันแรก'}
+                                        </span>
                                     </button>
                                     <button
                                         onClick={handlePrevious}
@@ -466,4 +482,3 @@ const SmartOnboardingTour: React.FC<SmartOnboardingTourProps> = ({
 };
 
 export default SmartOnboardingTour;
-

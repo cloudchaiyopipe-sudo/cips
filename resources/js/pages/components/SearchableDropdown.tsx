@@ -220,11 +220,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 <span className="font-medium text-white">{option.label}</span>
                             </div>
 
-                            {option.description && (
+                            {/* {option.description && (
                                 <div className="mt-1 truncate text-xs text-gray-300">
                                     {option.description}
                                 </div>
-                            )}
+                            )} */}
 
                             <div className="mt-1 flex items-center justify-between">
                                 <div className="flex items-center space-x-2 text-xs text-gray-200">

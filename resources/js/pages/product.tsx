@@ -79,6 +79,7 @@ import SprinklerSelector from './components/SprinklerSelector';
 import PumpSelector from './components/PumpSelector';
 import PipeSelector from './components/PipeSelector';
 import PipeSystemSummary from './components/PipeSystemSummary';
+import ConnectionEquipmentsSelector from './components/ConnectionEquipmentsSelector';
 import CostSummary from './components/CostSummary';
 import QuotationModal from './components/QuotationModal';
 import QuotationDocument from './components/QuotationDocument';
@@ -218,10 +219,30 @@ export default function Product() {
         {}
     );
 
+    // Tab system state
+    const [activeTab, setActiveTab] = useState<number>(1); // 1 = InputForm, 2 = SprinklerSelector, 3 = PipeSelector, 4 = PumpSelector, 5 = CostSummary
+    const [visitedTabs, setVisitedTabs] = useState<Set<number>>(new Set([1])); // Track which tabs have been visited
+
+    // เมื่อ showPumpOption เปลี่ยนเป็น false และ activeTab เป็น 4 ให้เปลี่ยนไป Tab 5
+    useEffect(() => {
+        if (!showPumpOption && activeTab === 4) {
+            setActiveTab(5);
+            setVisitedTabs((prev) => new Set([...prev, 5]));
+        }
+    }, [showPumpOption, activeTab]);
+
     const [projectImage, setProjectImage] = useState<string | null>(null);
     const [imageLoading, setImageLoading] = useState<boolean>(false);
     const [imageLoadError, setImageLoadError] = useState<string | null>(null);
     const [showImageModal, setShowImageModal] = useState(false);
+
+    // เมื่อ showPumpOption เปลี่ยนเป็น false และ activeTab เป็น 4 ให้เปลี่ยนไป Tab 5
+    useEffect(() => {
+        if (!showPumpOption && activeTab === 4) {
+            setActiveTab(5);
+            setVisitedTabs((prev) => new Set([...prev, 5]));
+        }
+    }, [showPumpOption, activeTab]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -1478,6 +1499,66 @@ export default function Product() {
         }
     }, []);
 
+    // โหลด sprinkler และอุปกรณ์สำหรับทุกโซนโดยอัตโนมัติเมื่อโหลดข้อมูลครั้งแรก
+    useEffect(() => {
+        // ตรวจสอบว่ามี zoneInputs และยังไม่มี zoneSprinklers สำหรับบางโซน
+        const allZoneIds: string[] = [];
+        
+        if (projectMode === 'garden' && gardenStats) {
+            allZoneIds.push(...gardenStats.zones.map((z) => z.zoneId));
+        } else if (projectMode === 'field-crop' && fieldCropData) {
+            allZoneIds.push(...fieldCropData.zones.info.map((z) => z.id));
+        } else if (projectMode === 'greenhouse' && greenhouseData) {
+            allZoneIds.push(...greenhouseData.summary.plotStats.map((p) => p.plotId));
+        } else if (projectMode === 'horticulture' && (projectData || horticultureSystemData)) {
+            if (horticultureSystemData?.zones) {
+                allZoneIds.push(...horticultureSystemData.zones.map((z: any) => z.id));
+            } else if (projectData?.zones) {
+                allZoneIds.push(...projectData.zones.map((z) => z.id));
+            }
+        }
+
+        // โหลด sprinkler สำหรับทุกโซนที่ยังไม่มี
+        if (allZoneIds.length > 0 && Object.keys(zoneInputs).length > 0) {
+            const zonesToLoad = allZoneIds.filter((zoneId) => 
+                zoneInputs[zoneId] && !zoneSprinklers[zoneId]
+            );
+
+            // ถ้ามีโซนที่ต้องโหลด ให้โหลดทีละโซน
+            if (zonesToLoad.length > 0) {
+                // ใช้ setTimeout เพื่อให้โหลดหลังจาก render เสร็จแล้ว
+                setTimeout(() => {
+                    zonesToLoad.forEach((zoneId) => {
+                        // ใช้ default sprinkler จาก localStorage สำหรับทุกโซน
+                        const defaultSprinklerStr = localStorage.getItem(
+                            `${projectMode}_defaultSprinkler`
+                        );
+                        
+                        if (defaultSprinklerStr) {
+                            try {
+                                const defaultSprinkler = JSON.parse(defaultSprinklerStr);
+                                setZoneSprinklers((prev) => ({
+                                    ...prev,
+                                    [zoneId]: defaultSprinkler,
+                                }));
+                            } catch (error) {
+                                console.error('Error parsing default sprinkler:', error);
+                            }
+                        }
+                    });
+                }, 500); // เพิ่ม delay เพื่อให้แน่ใจว่า components render เสร็จแล้ว
+            }
+        }
+    }, [zoneInputs, projectMode, gardenStats, fieldCropData, greenhouseData, projectData, horticultureSystemData, zoneSprinklers]);
+
+    // เมื่อ showPumpOption เปลี่ยนเป็น false และ activeTab เป็น 4 ให้เปลี่ยนไป Tab 5
+    useEffect(() => {
+        if (!showPumpOption && activeTab === 4) {
+            setActiveTab(5);
+            setVisitedTabs((prev) => new Set([...prev, 5]));
+        }
+    }, [showPumpOption, activeTab]);
+
     const currentSprinkler = zoneSprinklers[activeZoneId] || null;
 
     const handleSprinklerChange = (sprinkler: any) => {
@@ -1489,33 +1570,48 @@ export default function Product() {
         }
     };
 
-    const handlePipeChange = useCallback((pipeType: 'branch' | 'secondary' | 'main' | 'emitter', pipe: any) => {
-        if (activeZoneId) {
-            setSelectedPipes((prev) => ({
-                ...prev,
-                [activeZoneId]: {
-                    ...prev[activeZoneId],
-                    [pipeType]: pipe,
-                },
-            }));
-        }
-    }, [activeZoneId]);
+    const handlePipeChange = useCallback(
+        (pipeType: 'branch' | 'secondary' | 'main' | 'emitter', pipe: any) => {
+            if (activeZoneId) {
+                setSelectedPipes((prev) => ({
+                    ...prev,
+                    [activeZoneId]: {
+                        ...prev[activeZoneId],
+                        [pipeType]: pipe,
+                    },
+                }));
+            }
+        },
+        [activeZoneId]
+    );
 
-    const handleBranchPipeChange = useCallback((pipe: any) => {
-        handlePipeChange('branch', pipe);
-    }, [handlePipeChange]);
+    const handleBranchPipeChange = useCallback(
+        (pipe: any) => {
+            handlePipeChange('branch', pipe);
+        },
+        [handlePipeChange]
+    );
 
-    const handleSecondaryPipeChange = useCallback((pipe: any) => {
-        handlePipeChange('secondary', pipe);
-    }, [handlePipeChange]);
+    const handleSecondaryPipeChange = useCallback(
+        (pipe: any) => {
+            handlePipeChange('secondary', pipe);
+        },
+        [handlePipeChange]
+    );
 
-    const handleMainPipeChange = useCallback((pipe: any) => {
-        handlePipeChange('main', pipe);
-    }, [handlePipeChange]);
+    const handleMainPipeChange = useCallback(
+        (pipe: any) => {
+            handlePipeChange('main', pipe);
+        },
+        [handlePipeChange]
+    );
 
-    const handleEmitterPipeChange = useCallback((pipe: any) => {
-        handlePipeChange('emitter', pipe);
-    }, [handlePipeChange]);
+    const handleEmitterPipeChange = useCallback(
+        (pipe: any) => {
+            handlePipeChange('emitter', pipe);
+        },
+        [handlePipeChange]
+    );
 
     const handlePumpChange = (pump: any) => {
         setSelectedPump(pump);
@@ -1555,21 +1651,21 @@ export default function Product() {
     });
 
     const [currentZonePumpHead, setCurrentZonePumpHead] = useState<number>(0);
-    
+
     // เก็บค่า Pump Head ของทุกโซน (zoneId -> pumpHead)
     const zonePumpHeadsRef = useRef<Map<string, number>>(new Map());
-    
+
     // เก็บค่าสูงสุดของ maxPumpHeadForProjectMode (ไม่เปลี่ยนตามโซน)
     const [maxPumpHeadForAllZones, setMaxPumpHeadForAllZones] = useState<number>(0);
-    
+
     // เก็บ activeZoneId ล่าสุดเพื่อใช้ใน handlePumpHeadCalculated
     const activeZoneIdRef = useRef<string>(activeZoneId);
-    
+
     // อัพเดต activeZoneIdRef เมื่อ activeZoneId เปลี่ยน
     useEffect(() => {
         activeZoneIdRef.current = activeZoneId;
     }, [activeZoneId]);
-    
+
     // ฟังก์ชันคำนวณค่าสูงสุดจากทุกโซนที่ยังมีอยู่
     const calculateMaxPumpHeadFromAllZones = useCallback(() => {
         const zonePumpHeads = zonePumpHeadsRef.current;
@@ -1579,32 +1675,35 @@ export default function Product() {
         const maxHead = Math.max(...Array.from(zonePumpHeads.values()));
         return maxHead;
     }, []);
-    
+
     // คำนวณค่าที่ส่งไปยัง PumpSelector (ใช้ค่าสูงสุดจากทุกโซน)
     // ใช้ maxPumpHeadForAllZones เป็นหลัก (ค่าสูงสุดที่เก็บไว้แล้ว - ไม่เปลี่ยนตามโซน)
     const finalMaxPumpHeadForProjectMode = useMemo(() => {
         // ใช้ maxPumpHeadForAllZones เป็นหลัก (ค่าสูงสุดที่เก็บไว้แล้ว)
         // ถ้ายังไม่มีค่าให้ใช้ results?.maxPumpHeadForProjectMode (fallback)
-        const finalValue = maxPumpHeadForAllZones > 0 ? maxPumpHeadForAllZones : (results?.maxPumpHeadForProjectMode ?? 0);
+        const finalValue =
+            maxPumpHeadForAllZones > 0
+                ? maxPumpHeadForAllZones
+                : (results?.maxPumpHeadForProjectMode ?? 0);
         return finalValue;
     }, [
         maxPumpHeadForAllZones, // ใช้ค่าสูงสุดที่เก็บไว้ (ไม่เปลี่ยนตามโซน)
         // ใช้ results?.maxPumpHeadForProjectMode เป็น fallback (จะเปลี่ยนเฉพาะเมื่อค่าจริงๆ เปลี่ยน)
-        results?.maxPumpHeadForProjectMode ?? 0
+        results?.maxPumpHeadForProjectMode ?? 0,
     ]);
 
     const handlePumpHeadCalculated = (pumpHead: number) => {
         setCurrentZonePumpHead(pumpHead);
-        
+
         // ใช้ activeZoneIdRef.current เพื่อให้ได้ค่าล่าสุด
         const currentZoneId = activeZoneIdRef.current;
-        
+
         // เก็บค่า Pump Head ของโซนปัจจุบันไว้ใน Map
         zonePumpHeadsRef.current.set(currentZoneId, pumpHead);
-        
+
         // คำนวณค่าสูงสุดจากทุกโซนที่ยังมีอยู่
         const maxHead = calculateMaxPumpHeadFromAllZones();
-        
+
         // อัพเดตค่าสูงสุด (จะอัพเดตเสมอ ไม่ว่าจะเพิ่มขึ้นหรือลดลง)
         setMaxPumpHeadForAllZones((prevValue) => {
             if (maxHead !== prevValue) {
@@ -1619,19 +1718,19 @@ export default function Product() {
         const zonesData = getZonesData();
         const currentZoneIds = new Set(zonesData?.map((z: any) => z.id) || []);
         const storedZoneIds = Array.from(zonePumpHeadsRef.current.keys());
-        
+
         // หาโซนที่ถูกลบออก (มีใน Map แต่ไม่มีใน zones ปัจจุบัน)
-        const removedZoneIds = storedZoneIds.filter(zoneId => !currentZoneIds.has(zoneId));
-        
+        const removedZoneIds = storedZoneIds.filter((zoneId) => !currentZoneIds.has(zoneId));
+
         if (removedZoneIds.length > 0) {
             // ลบค่า Pump Head ของโซนที่ถูกลบออก
-            removedZoneIds.forEach(zoneId => {
+            removedZoneIds.forEach((zoneId) => {
                 zonePumpHeadsRef.current.delete(zoneId);
             });
-            
+
             // คำนวณค่าสูงสุดใหม่จากโซนที่เหลือ
             const maxHead = calculateMaxPumpHeadFromAllZones();
-            
+
             // อัพเดตค่าสูงสุด
             setMaxPumpHeadForAllZones((prevValue) => {
                 if (maxHead !== prevValue) {
@@ -1641,7 +1740,6 @@ export default function Product() {
             });
         }
     }, [results?.allZoneResults, calculateMaxPumpHeadFromAllZones]);
-
 
     const handleInputChange = (input: IrrigationInput) => {
         if (activeZoneId) {
@@ -2421,7 +2519,7 @@ export default function Product() {
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <Navbar />
-            <div className="max-w-8xl mx-auto p-6">
+            <div className="max-w-8xl mx-auto p-6 pt-20">
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                     <div className="lg:col-span-4">
                         <div className="sticky top-6">
@@ -2584,7 +2682,27 @@ export default function Product() {
                                     })}
                                 </div>
                             )}
-                            {zones.length > 1 && (
+                            <div className="mb-4 rounded-lg bg-gray-800 p-4">
+                                <div>
+                                    <h3 className="mb-3 text-lg font-semibold text-purple-400">
+                                        ⚡ {t('ตัวเลือกปั๊มน้ำ')}
+                                    </h3>
+                                    <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={showPumpOption}
+                                                onChange={(e) => setShowPumpOption(e.target.checked)}
+                                                className="rounded"
+                                            />
+                                            <span className="text-sm font-medium">
+                                                {t('ต้องการใช้ปั๊มน้ำในระบบ')}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* {zones.length > 1 && (
                                 <div className="mb-6 rounded-lg bg-gray-800 p-4">
                                     <div className="rounded bg-blue-900 p-3">
                                         <h4 className="mb-2 text-sm font-medium text-blue-300">
@@ -2755,45 +2873,18 @@ export default function Product() {
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            )} */}
 
-                    <div className="space-y-6 lg:col-span-8">
-                        <div className="mb-6 flex flex-row flex-wrap justify-between gap-3 rounded-lg bg-gray-800 p-4">
-                            <div>
-                                <h3 className="mb-3 text-lg font-semibold text-purple-400">
-                                    ⚡ {t('ตัวเลือกปั๊มน้ำ')}
-                                </h3>
-                                <div className="flex items-center gap-4">
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={showPumpOption}
-                                            onChange={(e) => setShowPumpOption(e.target.checked)}
-                                            className="rounded"
-                                        />
-                                        <span className="text-sm font-medium">
-                                            {t('ต้องการใช้ปั๊มน้ำในระบบ')}
-                                        </span>
-                                    </label>
-                                    {!showPumpOption && (
-                                        <p className="text-sm text-gray-400">
-                                            ({t('ใช้แรงดันจากระบบประปาบ้าน')})
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            {/* ปุ่มจัดการโครงการ */}
-                            <div className="mt-4 flex justify-end">
-                                <div className="flex flex-row flex-wrap gap-3">
+                            {/* Tab Navigation Buttons */}
+                            <div className="mb-4 mt-3 rounded-lg bg-gray-800 p-3">
+                                <div className="flex flex-wrap gap-1.5 justify-center">
                                     {/* ปุ่มบันทึกโครงการ */}
                                     <button
                                         onClick={handleSaveProject}
-                                        className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                        className="flex items-center justify-center gap-1.5 rounded bg-green-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                                     >
                                         <svg
-                                            className="h-5 w-5"
+                                            className="h-4 w-4"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -2811,10 +2902,10 @@ export default function Product() {
                                     {/* ปุ่มแก้ไขโครงการ */}
                                     <button
                                         onClick={handleEditProject}
-                                        className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                        className="flex items-center justify-center gap-1.5 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                                     >
                                         <svg
-                                            className="h-5 w-5"
+                                            className="h-4 w-4"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -2832,10 +2923,10 @@ export default function Product() {
                                     {/* ปุ่มสร้างโครงการใหม่ */}
                                     <button
                                         onClick={handleNewProject}
-                                        className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                                        className="flex items-center justify-center gap-1.5 rounded bg-purple-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
                                     >
                                         <svg
-                                            className="h-5 w-5"
+                                            className="h-4 w-4"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"
@@ -2852,68 +2943,203 @@ export default function Product() {
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <InputForm
-                            key={activeZoneId}
-                            input={currentInput}
-                            onInputChange={handleInputChange}
-                            selectedSprinkler={currentSprinkler}
-                            activeZone={activeZone}
-                            projectMode={projectMode}
-                            zoneAreaData={getZoneAreaData()}
-                            connectionStats={connectionStats}
-                            onConnectionEquipmentsChange={handleConnectionEquipmentsChange}
-                            greenhouseData={greenhouseData}
-                            fieldCropSystemData={fieldCropData}
-                            fieldCropIrrigationSettings={(() => {
-                                // Use the same irrigationSettingsData that field-crop-summary.tsx uses
-                                if (fieldCropData && (fieldCropData as any).irrigationSettings) {
-                                    return (fieldCropData as any).irrigationSettings;
-                                }
+                    <div className="space-y-6 lg:col-span-8">
+                        <div className="mb-6 flex flex-row flex-wrap justify-center gap-3 rounded-lg bg-gray-800 p-4">
+                            <div className="flex flex-row flex-wrap items-center gap-0">
+                                {/* Tab 1: InputForm */}
+                                <button
+                                    onClick={() => {
+                                        setActiveTab(1);
+                                        setVisitedTabs((prev) => new Set([...prev, 1]));
+                                    }}
+                                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                        activeTab === 1
+                                            ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                            : visitedTabs.has(1)
+                                              ? 'bg-green-600 text-white hover:bg-green-700'
+                                              : 'bg-gray-600 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <span>📝</span>
+                                    <span>{t('ดูข้อมูลพื้นที่')}</span>
+                                    {visitedTabs.has(1) && activeTab !== 1 && (
+                                        <span className="text-xs">✓</span>
+                                    )}
+                                </button>
+                                {/* เส้นตรง + ลูกศร */}
+                                <span className="flex items-center mx-1 select-none">
+                                    <span className="mx-1 text-xl text-gray-400">{'➔'}</span>
+                                </span>
+                                
+                                {/* Tab 2: SprinklerSelector */}
+                                <button
+                                    onClick={() => {
+                                        setActiveTab(2);
+                                        setVisitedTabs((prev) => new Set([...prev, 2]));
+                                    }}
+                                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                        activeTab === 2
+                                            ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                            : visitedTabs.has(2)
+                                              ? 'bg-green-600 text-white hover:bg-green-700'
+                                              : 'bg-gray-600 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <span>💧</span>
+                                    <span>{t('เลือกสปริงเกอร์')}</span>
+                                    {visitedTabs.has(2) && activeTab !== 2 && (
+                                        <span className="text-xs">✓</span>
+                                    )}
+                                </button>
+                                <span className="flex items-center mx-1 select-none">
+                                    <span className="mx-1 text-xl text-gray-400">{'➔'}</span>
+                                </span>
 
-                                // Fallback to localStorage
-                                try {
-                                    const data = localStorage.getItem('fieldCropData');
-                                    if (data) {
-                                        const parsed = JSON.parse(data) as {
-                                            irrigationSettings?: Record<
-                                                string,
-                                                {
-                                                    flow?: number;
-                                                    coverageRadius?: number;
-                                                    pressure?: number;
-                                                }
-                                            >;
-                                        };
-                                        if (parsed.irrigationSettings) {
-                                            return parsed.irrigationSettings;
-                                        }
+                                {/* Tab 3: PipeSelector + PipeSystemSummary */}
+                                <button
+                                    onClick={() => {
+                                        setActiveTab(3);
+                                        setVisitedTabs((prev) => new Set([...prev, 3]));
+                                    }}
+                                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                        activeTab === 3
+                                            ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                            : visitedTabs.has(3)
+                                              ? 'bg-green-600 text-white hover:bg-green-700'
+                                              : 'bg-gray-600 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <span>🔧</span>
+                                    <span>{t('เลือกระบบท่อ')}</span>
+                                    {visitedTabs.has(3) && activeTab !== 3 && (
+                                        <span className="text-xs">✓</span>
+                                    )}
+                                </button>
+                                <span className="flex items-center mx-1 select-none">
+                                    <span className="mx-1 text-xl text-gray-400">{'➔'}</span>
+                                </span>
+
+                                {/* Tab 4: PumpSelector - แสดงเฉพาะเมื่อ showPumpOption เป็น true */}
+                                {showPumpOption && (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab(4);
+                                                setVisitedTabs((prev) => new Set([...prev, 4]));
+                                            }}
+                                            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                                activeTab === 4
+                                                    ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                                    : visitedTabs.has(4)
+                                                      ? 'bg-green-600 text-white hover:bg-green-700'
+                                                      : 'bg-gray-600 text-gray-300 hover:bg-gray-700'
+                                            }`}
+                                        >
+                                            <span>⚡</span>
+                                            <span>{t('เลือกปั๊มน้ำ')}</span>
+                                            {visitedTabs.has(4) && activeTab !== 4 && (
+                                                <span className="text-xs">✓</span> 
+                                            )}
+                                        </button>
+                                        <span className="flex items-center mx-1 select-none">
+                                            <span className="mx-1 text-xl text-gray-400">{'➔'}</span>
+                                        </span>
+                                    </>
+                                )}
+
+                                {/* Tab 5: CostSummary */}
+                                <button
+                                    onClick={() => {
+                                        setActiveTab(5);
+                                        setVisitedTabs((prev) => new Set([...prev, 5]));
+                                    }}
+                                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                        activeTab === 5
+                                            ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                            : visitedTabs.has(5)
+                                              ? 'bg-green-600 text-white hover:bg-green-700'
+                                              : 'bg-gray-600 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <span>💰</span>
+                                    <span>{t('สรุปค่าใช้จ่าย')}</span>
+                                    {visitedTabs.has(5) && activeTab !== 5 && (
+                                        <span className="text-xs">✓</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Tab 1: InputForm */}
+                        {activeTab === 1 && (
+                            <InputForm
+                                key={activeZoneId}
+                                input={currentInput}
+                                onInputChange={handleInputChange}
+                                selectedSprinkler={currentSprinkler}
+                                activeZone={activeZone}
+                                projectMode={projectMode}
+                                zoneAreaData={getZoneAreaData()}
+                                greenhouseData={greenhouseData}
+                                fieldCropSystemData={fieldCropData}
+                                fieldCropIrrigationSettings={(() => {
+                                    // Use the same irrigationSettingsData that field-crop-summary.tsx uses
+                                    if (fieldCropData && (fieldCropData as any).irrigationSettings) {
+                                        return (fieldCropData as any).irrigationSettings;
                                     }
-                                } catch (error) {
-                                    console.error('Error parsing fieldCropData:', error);
-                                }
 
-                                // Return default flow settings if no data found (same as field-crop-summary.tsx)
-                                return {
-                                    sprinkler_system: { flow: 0, coverageRadius: 5 }, // Default 0 L/min for sprinklers
-                                    pivot: { flow: 0, coverageRadius: 10 }, // Default 0 L/min for pivots
-                                };
-                            })()}
-                        />
+                                    // Fallback to localStorage
+                                    try {
+                                        const data = localStorage.getItem('fieldCropData');
+                                        if (data) {
+                                            const parsed = JSON.parse(data) as {
+                                                irrigationSettings?: Record<
+                                                    string,
+                                                    {
+                                                        flow?: number;
+                                                        coverageRadius?: number;
+                                                        pressure?: number;
+                                                    }
+                                                >;
+                                            };
+                                            if (parsed.irrigationSettings) {
+                                                return parsed.irrigationSettings;
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('Error parsing fieldCropData:', error);
+                                    }
 
-                        <SprinklerSelector
-                            selectedSprinkler={currentSprinkler}
-                            onSprinklerChange={handleSprinklerChange}
-                            results={results}
-                            activeZone={activeZone}
-                            allZoneSprinklers={zoneSprinklers}
-                            projectMode={projectMode}
-                            gardenStats={gardenStats}
-                            greenhouseData={greenhouseData}
-                            fieldCropData={fieldCropData}
-                        />
+                                    // Return default flow settings if no data found (same as field-crop-summary.tsx)
+                                    return {
+                                        sprinkler_system: { flow: 0, coverageRadius: 5 }, // Default 0 L/min for sprinklers
+                                        pivot: { flow: 0, coverageRadius: 10 }, // Default 0 L/min for pivots
+                                    };
+                                })()}
+                            />
+                        )}
 
-                        {currentSprinkler && (
+                        {/* Tab 2: SprinklerSelector */}
+                        {activeTab === 2 && (
+                            <SprinklerSelector
+                                selectedSprinkler={currentSprinkler}
+                                onSprinklerChange={handleSprinklerChange}
+                                results={results}
+                                activeZone={activeZone}
+                                allZoneSprinklers={zoneSprinklers}
+                                projectMode={projectMode}
+                                gardenStats={gardenStats}
+                                greenhouseData={greenhouseData}
+                                fieldCropData={fieldCropData}
+                                input={currentInput}
+                                onInputChange={handleInputChange}
+                            />
+                        )}
+
+                        {/* Tab 3: PipeSelector + PipeSystemSummary */}
+                        {activeTab === 3 && currentSprinkler && (
                             <>
                                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
                                     <PipeSelector
@@ -2986,6 +3212,18 @@ export default function Product() {
                                             selectedPipeSizes={selectedPipeSizes}
                                         />
                                     ) : projectMode === 'horticulture' ? null : null}
+
+                                    {/* อุปกรณ์เชื่อมต่อท่อ */}
+                                    {connectionStats && connectionStats.length > 0 && (
+                                        <ConnectionEquipmentsSelector
+                                            connectionStats={connectionStats}
+                                            activeZone={activeZone}
+                                            activeZoneId={activeZoneId}
+                                            projectMode={projectMode}
+                                            fieldCropSystemData={fieldCropData}
+                                            onConnectionEquipmentsChange={handleConnectionEquipmentsChange}
+                                        />
+                                    )}
                                 </div>
 
                                 {/* สรุปการคำนวณระบบท่อทั้งหมด */}
@@ -3102,7 +3340,12 @@ export default function Product() {
                                     }
                                     projectMode={projectMode}
                                 />
+                            </>
+                        )}
 
+                        {/* Tab 4: PumpSelector */}
+                        {activeTab === 4 && showPumpOption && (
+                            <>
                                 <CalculationSummary
                                     results={results}
                                     input={currentInput}
@@ -3135,37 +3378,38 @@ export default function Product() {
                                     maxPumpHeadForProjectMode={finalMaxPumpHeadForProjectMode}
                                     onPumpHeadCalculated={handlePumpHeadCalculated}
                                 />
-
-                                {showPumpOption && (
-                                    <PumpSelector
-                                        results={results}
-                                        selectedPump={effectiveEquipment.pump}
-                                        selectedSprinkler={zoneSprinklers[activeZoneId]}
-                                        onPumpChange={handlePumpChange}
-                                        zoneOperationGroups={zoneOperationGroups}
-                                        zoneInputs={zoneInputs}
-                                        zoneOperationMode={zoneOperationMode}
-                                        simultaneousZonesCount={
-                                            zoneOperationMode === 'simultaneous'
-                                                ? zones.length
-                                                : zoneOperationMode === 'custom'
-                                                  ? Math.max(
-                                                        ...zoneOperationGroups.map(
-                                                            (g) => g.zones.length
-                                                        )
+                                <PumpSelector
+                                    results={results}
+                                    selectedPump={effectiveEquipment.pump}
+                                    selectedSprinkler={zoneSprinklers[activeZoneId]}
+                                    onPumpChange={handlePumpChange}
+                                    zoneOperationGroups={zoneOperationGroups}
+                                    zoneInputs={zoneInputs}
+                                    zoneOperationMode={zoneOperationMode}
+                                    simultaneousZonesCount={
+                                        zoneOperationMode === 'simultaneous'
+                                            ? zones.length
+                                            : zoneOperationMode === 'custom'
+                                              ? Math.max(
+                                                    ...zoneOperationGroups.map(
+                                                        (g) => g.zones.length
                                                     )
-                                                  : 1
-                                        }
-                                        selectedZones={zones.map((z) => z.id)}
-                                        allZoneResults={results?.allZoneResults}
-                                        projectSummary={results?.projectSummary}
-                                        projectMode={projectMode}
-                                        fieldCropData={fieldCropData}
-                                        maxPumpHeadForProjectMode={finalMaxPumpHeadForProjectMode}
-                                    />
-                                )}
+                                                )
+                                              : 1
+                                    }
+                                    selectedZones={zones.map((z) => z.id)}
+                                    allZoneResults={results?.allZoneResults}
+                                    projectSummary={results?.projectSummary}
+                                    projectMode={projectMode}
+                                    fieldCropData={fieldCropData}
+                                    maxPumpHeadForProjectMode={finalMaxPumpHeadForProjectMode}
+                                />
+                            </>
+                        )}
 
-                                <CostSummary
+                        {/* Tab 5: CostSummary */}
+                        {activeTab === 5 && (
+                            <CostSummary
                                     results={results}
                                     zoneSprinklers={zoneSprinklers}
                                     selectedPipes={selectedPipes}
@@ -3182,76 +3426,7 @@ export default function Product() {
                                     greenhouseData={greenhouseData}
                                     sprinklerEquipmentSets={sprinklerEquipmentSets}
                                     connectionEquipments={connectionEquipments}
-                                />
-
-                                {/* ปุ่มจัดการโครงการ */}
-                                <div className="mt-4 flex justify-end">
-                                    <div className="flex flex-row flex-wrap gap-3">
-                                        {/* ปุ่มบันทึกโครงการ */}
-                                        <button
-                                            onClick={handleSaveProject}
-                                            className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-                                        >
-                                            <svg
-                                                className="h-5 w-5"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                                                />
-                                            </svg>
-                                            {t('บันทึกโครงการ')}
-                                        </button>
-
-                                        {/* ปุ่มแก้ไขโครงการ */}
-                                        <button
-                                            onClick={handleEditProject}
-                                            className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-                                        >
-                                            <svg
-                                                className="h-5 w-5"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                                />
-                                            </svg>
-                                            {t('แก้ไขโครงการ')}
-                                        </button>
-
-                                        {/* ปุ่มสร้างโครงการใหม่ */}
-                                        <button
-                                            onClick={handleNewProject}
-                                            className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white transition-all duration-200 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-                                        >
-                                            <svg
-                                                className="h-5 w-5"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                                />
-                                            </svg>
-                                            {t('สร้างโครงการใหม่')}
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
+                            />
                         )}
                     </div>
                 </div>
@@ -3274,7 +3449,7 @@ export default function Product() {
                         </button>
                         <div className="relative flex h-[90vh] w-[90vw] items-center justify-center">
                             <img
-                                src={projectImage}
+                                src={projectImage || undefined}
                                 alt={`${
                                     projectMode === 'garden'
                                         ? t('สวนบ้าน')
@@ -3323,32 +3498,34 @@ export default function Product() {
                 t={t}
             />
 
-            <QuotationDocument
-                show={showQuotation}
-                results={results}
-                quotationData={quotationData}
-                quotationDataCustomer={quotationDataCustomer}
-                selectedSprinkler={currentSprinkler}
-                selectedPump={effectiveEquipment.pump}
-                selectedBranchPipe={effectiveEquipment.branchPipe}
-                selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
-                selectedMainPipe={effectiveEquipment.mainPipe}
-                selectedExtraPipe={selectedExtraPipe}
-                projectImage={projectImage}
-                projectData={projectData}
-                gardenData={gardenData}
-                greenhouseData={greenhouseData}
-                zoneSprinklers={zoneSprinklers}
-                selectedPipes={selectedPipes}
-                sprinklerEquipmentSets={sprinklerEquipmentSets}
-                connectionEquipments={connectionEquipments}
-                zoneInputs={zoneInputs}
-                gardenStats={gardenStats}
-                fieldCropData={fieldCropData}
-                onClose={() => setShowQuotation(false)}
-                projectMode={projectMode}
-                showPump={showPumpOption}
-            />
+            {results && (
+                <QuotationDocument
+                    show={showQuotation}
+                    results={results!}
+                    quotationData={quotationData}
+                    quotationDataCustomer={quotationDataCustomer}
+                    selectedSprinkler={currentSprinkler}
+                    selectedPump={effectiveEquipment.pump}
+                    selectedBranchPipe={effectiveEquipment.branchPipe}
+                    selectedSecondaryPipe={effectiveEquipment.secondaryPipe}
+                    selectedMainPipe={effectiveEquipment.mainPipe}
+                    selectedExtraPipe={selectedExtraPipe}
+                    projectImage={projectImage}
+                    projectData={projectData}
+                    gardenData={gardenData}
+                    greenhouseData={greenhouseData}
+                    zoneSprinklers={zoneSprinklers}
+                    selectedPipes={selectedPipes}
+                    sprinklerEquipmentSets={sprinklerEquipmentSets}
+                    connectionEquipments={connectionEquipments}
+                    zoneInputs={zoneInputs}
+                    gardenStats={gardenStats}
+                    fieldCropData={fieldCropData}
+                    onClose={() => setShowQuotation(false)}
+                    projectMode={projectMode}
+                    showPump={showPumpOption}
+                />
+            )}
             <Footer />
         </div>
     );

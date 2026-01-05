@@ -22,6 +22,9 @@ const Navbar: React.FC = () => {
     const [showTokenPricingModal, setShowTokenPricingModal] = useState(false);
     const [showTokenBuyModal, setShowTokenBuyModal] = useState(false);
 
+    // State for help programs modal
+    const [showHelpProgramsModal, setShowHelpProgramsModal] = useState(false);
+
     // Set token status from user data for non-admin users
     useEffect(() => {
         if (!auth?.user || auth.user.is_super_user) {
@@ -89,6 +92,52 @@ const Navbar: React.FC = () => {
             return null;
         }
     };
+
+    // Help programs data
+    const helpPrograms = [
+        {
+            name: 'CalTopo',
+            description: 'แผนที่ภูมิประเทศแบบ Topographic สำหรับการวางแผนการเดินทางและการวิเคราะห์ภูมิประเทศ',
+            url: 'https://caltopo.com/map.html#ll=35.86254,-105.6938&z=15&b=mbt',
+            icon: '🗺️',
+            owner: 'CalTopo.com',
+        },
+        {
+            name: 'แผนที่เกษตรออนไลน์',
+            description: 'แผนที่เกษตรออนไลน์ของกระทรวงเกษตรและสหกรณ์ สำหรับดูข้อมูลพื้นที่เกษตรกรรม',
+            url: 'https://agri-map-online.moac.go.th/',
+            icon: '🌾',
+            owner: 'กระทรวงเกษตรและสหกรณ์',
+        },
+        {
+            name: 'OpenStreetMap',
+            description: 'แผนที่เปิดที่สร้างโดยชุมชน สำหรับดูข้อมูลแผนที่และเส้นทาง',
+            url: 'https://www.openstreetmap.org/#map=15/17.71852/100.65524',
+            icon: '🌍',
+            owner: 'OpenStreetMap Foundation',
+        },
+        {
+            name: 'กรมพัฒนาที่ดิน',
+            description: 'เว็บไซต์กรมพัฒนาที่ดิน กระทรวงเกษตรและสหกรณ์ สำหรับข้อมูลการพัฒนาที่ดิน',
+            url: 'https://www.ldd.go.th/home/',
+            icon: '🏞️',
+            owner: 'กรมพัฒนาที่ดิน กระทรวงเกษตรและสหกรณ์',
+        },
+        {
+            name: 'Windy',
+            description: 'ข้อมูลสภาพอากาศแบบเรียลไทม์ สำหรับตรวจสอบสภาพอากาศและลม',
+            url: 'https://www.windy.com/?13.544,100.273,5',
+            icon: '💨',
+            owner: 'Windy.com',
+        },
+        {
+            name: 'กรมส่งเสริมการเกษตร',
+            description: 'เว็บไซต์กรมส่งเสริมการเกษตร กระทรวงเกษตรและสหกรณ์ สำหรับข้อมูลการส่งเสริมการเกษตร',
+            url: 'https://www.doae.go.th/home-new-2024/',
+            icon: '🌱',
+            owner: 'กรมส่งเสริมการเกษตร กระทรวงเกษตรและสหกรณ์',
+        },
+    ];
 
     // Function to handle token purchase
     const handleTokenPurchase = async (purchaseData: {
@@ -179,7 +228,7 @@ const Navbar: React.FC = () => {
 
     return (
         <>
-            <nav className="border-b border-gray-700 bg-gray-800 shadow-lg">
+            <nav className="fixed top-0 left-0 right-0 z-50 border-b border-gray-700 bg-gray-800 shadow-lg">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
                         {/* App Name and Logo */}
@@ -225,12 +274,32 @@ const Navbar: React.FC = () => {
                             )}
 
                             <div className="flex items-center gap-1 sm:gap-3">
+                                {/* Help Programs Button */}
+                                <button
+                                    onClick={() => setShowHelpProgramsModal(true)}
+                                    className="hidden items-center rounded-lg bg-purple-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-purple-700 sm:flex sm:px-3 sm:text-sm"
+                                    title={t('โปรแกรมช่วยเหลือ')}
+                                >
+                                    <span className="text-sm sm:text-lg">💡</span>
+                                    <span className="hidden sm:inline">{t('โปรแกรมช่วยเหลือ')}</span>
+                                </button>
+
+                                {/* AI Chat Button */}
+                                {/* <button
+                                    onClick={() => setShowFloatingAiChat(true)}
+                                    className="hidden items-center rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:flex sm:px-3 sm:text-sm"
+                                    title={t('เปิด ChaiyoAI Chat')}
+                                >
+                                    <span className="text-sm sm:text-lg">🤖</span>
+                                    <span className="hidden sm:inline">{t('AI Chat')}</span>
+                                </button>
+                                
                                 <FloatingAiChat
                                     isOpen={showFloatingAiChat}
                                     onClose={() => setShowFloatingAiChat(false)}
                                     onMinimize={() => setIsAiChatMinimized(!isAiChatMinimized)}
                                     isMinimized={isAiChatMinimized}
-                                />
+                                /> */}
                                 {auth?.user?.is_super_user && (
                                     <button
                                         onClick={() => (window.location.href = '/equipment-crud')}
@@ -475,6 +544,90 @@ const Navbar: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Help Programs Modal */}
+            {showHelpProgramsModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="relative z-[10000] max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-gray-900 p-8">
+                        {/* Header */}
+                        <div className="mb-8 flex items-center justify-between">
+                            <div>
+                                <h2 className="mb-2 text-3xl font-bold text-white">
+                                    {t('โปรแกรมช่วยเหลือ')}
+                                </h2>
+                                <p className="text-gray-400">
+                                    {t('รายการโปรแกรมและเครื่องมือที่ช่วยในการวางแผนระบบชลประทาน')}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowHelpProgramsModal(false)}
+                                className="text-gray-400 transition-colors hover:text-white"
+                            >
+                                <svg
+                                    className="h-8 w-8"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Programs List */}
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {helpPrograms.map((program, index) => (
+                                <div
+                                    key={index}
+                                    className="group rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all hover:border-purple-500 hover:shadow-lg"
+                                >
+                                    <div className="mb-4 flex items-center gap-3">
+                                        <span className="text-3xl">{program.icon}</span>
+                                        <div className="flex-1">
+                                            <h3 className="text-xl font-semibold text-white">
+                                                {program.name}
+                                            </h3>
+                                            <p className="mt-1 text-sm text-gray-400">
+                                                <span className="font-medium text-gray-300">
+                                                    {t('เจ้าของ')}:
+                                                </span>{' '}
+                                                {program.owner}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="mb-4 text-gray-300">{program.description}</p>
+                                    <a
+                                        href={program.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+                                    >
+                                        <span>{t('เปิดโปรแกรม')}</span>
+                                        <svg
+                                            className="h-4 w-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                            />
+                                        </svg>
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}

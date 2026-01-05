@@ -16,6 +16,7 @@ import {
     createUpdatedZone,
     deepCopyZone,
 } from '../utils/zoneEditUtils';
+import { validateEditedZone, updateEditedZone } from '../utils/autoZoneUtilsExtensions';
 
 export interface UseZoneEditorProps {
     zones: IrrigationZone[];
@@ -24,6 +25,8 @@ export interface UseZoneEditorProps {
     onZonesUpdate: (updatedZones: IrrigationZone[]) => void;
     onError?: (error: string) => void;
     onSuccess?: (message: string) => void;
+    map?: google.maps.Map | null; // 🔧 FIX: เพิ่ม map prop เพื่อใช้ Google Maps API
+    mapContainerRef?: React.RefObject<HTMLElement>; // 🔧 FIX: เพิ่ม mapContainerRef
 }
 
 export interface UseZoneEditorReturn {
@@ -54,6 +57,8 @@ export const useZoneEditor = ({
     onZonesUpdate,
     onError,
     onSuccess,
+    map, // 🔧 FIX: รับ map prop
+    mapContainerRef, // 🔧 FIX: รับ mapContainerRef
 }: UseZoneEditorProps): UseZoneEditorReturn => {
     const [editState, setEditState] = useState<ZoneEditState>(createInitialZoneEditState());
     const [originalZone, setOriginalZone] = useState<IrrigationZone | null>(null);
@@ -79,14 +84,79 @@ export const useZoneEditor = ({
         };
     }, [mainArea]);
 
-    // แปลงพิกัด pixel เป็น coordinate
+    // 🔧 FIX: แปลงพิกัด pixel เป็น coordinate โดยใช้ Google Maps API
     const pixelToCoordinate = useCallback(
         (pixelX: number, pixelY: number): Coordinate => {
+            // ใช้ Google Maps API ถ้ามี
+            if (map) {
+                try {
+                    const projection = map.getProjection();
+                    if (projection) {
+                        const bounds = map.getBounds();
+                        if (bounds) {
+                            const ne = bounds.getNorthEast();
+                            const sw = bounds.getSouthWest();
+                            const scale = Math.pow(2, map.getZoom() || 10);
+                            const worldCoordinate = projection.fromLatLngToPoint(
+                                new google.maps.LatLng(ne.lat(), ne.lng())
+                            );
+
+                            if (!worldCoordinate) {
+                                // Fall through to fallback calculation
+                                throw new Error('Failed to get world coordinate');
+                            }
+
+                            // หา map container
+                            const container = mapContainerRef?.current || 
+                                document.querySelector('.map-container') ||
+                                document.querySelector('[data-map-container]') ||
+                                document.querySelector('.google-map-container') as HTMLElement;
+
+                            const containerRect = container?.getBoundingClientRect() || {
+                                width: window.innerWidth,
+                                height: window.innerHeight,
+                                left: 0,
+                                top: 0,
+                            };
+
+                            const point = new google.maps.Point(
+                                (pixelX / containerRect.width) * (ne.lng() - sw.lng()) / scale,
+                                (pixelY / containerRect.height) * (ne.lat() - sw.lat()) / scale
+                            );
+
+                            const latLng = projection.fromPointToLatLng(
+                                new google.maps.Point(
+                                    worldCoordinate.x + point.x,
+                                    worldCoordinate.y - point.y
+                                )
+                            );
+
+                            if (latLng) {
+                                return {
+                                    lat: latLng.lat(),
+                                    lng: latLng.lng(),
+                                };
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Error using Google Maps projection, falling back to manual calculation:', error);
+                }
+            }
+
+            // Fallback: ใช้วิธีเดิม
             const bounds = mapBoundsRef.current || calculateMapBounds();
             if (!bounds) return { lat: 0, lng: 0 };
 
-            const mapWidth = window.innerWidth || 800;
-            const mapHeight = window.innerHeight || 600;
+            const container = mapContainerRef?.current || 
+                document.querySelector('.map-container') ||
+                document.querySelector('[data-map-container]') ||
+                document.querySelector('.google-map-container') as HTMLElement;
+
+            const containerRect = container?.getBoundingClientRect() || {
+                width: window.innerWidth,
+                height: window.innerHeight,
+            };
 
             const lngRange = bounds.east - bounds.west;
             const latRange = bounds.north - bounds.south;
@@ -98,15 +168,15 @@ export const useZoneEditor = ({
                 };
             }
 
-            const lat = bounds.north - (pixelY / mapHeight) * latRange;
-            const lng = bounds.west + (pixelX / mapWidth) * lngRange;
+            const lat = bounds.north - (pixelY / containerRect.height) * latRange;
+            const lng = bounds.west + (pixelX / containerRect.width) * lngRange;
 
             return {
                 lat: Math.max(bounds.south, Math.min(bounds.north, lat)),
                 lng: Math.max(bounds.west, Math.min(bounds.east, lng)),
             };
         },
-        [calculateMapBounds]
+        [calculateMapBounds, map, mapContainerRef]
     );
 
     // ออกจากโหมดแก้ไข
@@ -125,8 +195,21 @@ export const useZoneEditor = ({
                 isEditing: true,
             }));
             mapBoundsRef.current = calculateMapBounds();
+            
+            // 🔧 FIX: อัปเดต mapBounds จาก map ถ้ามี
+            if (map) {
+                const bounds = map.getBounds();
+                if (bounds) {
+                    mapBoundsRef.current = {
+                        north: bounds.getNorthEast().lat(),
+                        south: bounds.getSouthWest().lat(),
+                        east: bounds.getNorthEast().lng(),
+                        west: bounds.getSouthWest().lng(),
+                    };
+                }
+            }
         }
-    }, [editState.isEditing, exitEditMode, calculateMapBounds]);
+    }, [editState.isEditing, exitEditMode, calculateMapBounds, map]);
 
     // จัดการการคลิกโซน
     const handleZoneClick = useCallback(
@@ -174,30 +257,35 @@ export const useZoneEditor = ({
 
             let rect: DOMRect | null = null;
 
-            // ลองหาจาก target element ก่อน
-            if (event.target && (event.target as Element).getBoundingClientRect) {
-                rect = (event.target as Element).getBoundingClientRect();
-            }
-
-            // ถ้าไม่ได้ ลองหาจาก map container
-            if (!rect) {
-                const mapContainer =
-                    document.querySelector('.map-container') ||
-                    document.querySelector('[data-map-container]') ||
-                    document.querySelector('.google-map-container');
-                if (mapContainer) {
-                    rect = mapContainer.getBoundingClientRect();
+            // 🔧 FIX: ใช้ mapContainerRef หรือหา map container
+            if (mapContainerRef?.current) {
+                rect = mapContainerRef.current.getBoundingClientRect();
+            } else {
+                // ลองหาจาก target element ก่อน
+                if (event.target && (event.target as Element).getBoundingClientRect) {
+                    rect = (event.target as Element).getBoundingClientRect();
                 }
-            }
 
-            // ถ้ายังไม่ได้ ใช้ viewport
-            if (!rect) {
-                rect = {
-                    left: 0,
-                    top: 0,
-                    width: window.innerWidth,
-                    height: window.innerHeight,
-                } as DOMRect;
+                // ถ้าไม่ได้ ลองหาจาก map container
+                if (!rect) {
+                    const mapContainer =
+                        document.querySelector('.map-container') ||
+                        document.querySelector('[data-map-container]') ||
+                        document.querySelector('.google-map-container');
+                    if (mapContainer) {
+                        rect = mapContainer.getBoundingClientRect();
+                    }
+                }
+
+                // ถ้ายังไม่ได้ ใช้ viewport
+                if (!rect) {
+                    rect = {
+                        left: 0,
+                        top: 0,
+                        width: window.innerWidth,
+                        height: window.innerHeight,
+                    } as DOMRect;
+                }
             }
 
             const pixelX = event.clientX - rect.left;
@@ -246,6 +334,7 @@ export const useZoneEditor = ({
             editState.controlPoints,
             mainArea,
             pixelToCoordinate,
+            mapContainerRef,
             onError,
         ]
     );
@@ -262,7 +351,7 @@ export const useZoneEditor = ({
         if (!editState.editingZone) return;
 
         try {
-            // 🔧 แก้ไข: ตรวจสอบว่าโซนมี coordinates ที่ถูกต้องหรือไม่
+            // 🔧 FIX: ตรวจสอบว่าโซนมี coordinates ที่ถูกต้องหรือไม่
             if (
                 !editState.editingZone.coordinates ||
                 editState.editingZone.coordinates.length < 3
@@ -271,7 +360,7 @@ export const useZoneEditor = ({
                 return;
             }
 
-            // 🔧 แก้ไข: ตรวจสอบพิกัดให้ถูกต้อง
+            // 🔧 FIX: ตรวจสอบพิกัดให้ถูกต้อง
             const validCoordinates = editState.editingZone.coordinates.filter(
                 (coord) =>
                     coord &&
@@ -286,6 +375,24 @@ export const useZoneEditor = ({
                 return;
             }
 
+            // 🔧 FIX: Validate โซนทับซ้อนกันและ self-intersection
+            const validation = validateEditedZone(
+                { ...editState.editingZone, coordinates: validCoordinates },
+                zones,
+                mainArea
+            );
+
+            if (!validation.isValid) {
+                const errorMessages = validation.errors.slice(0, 3).join('\n');
+                onError?.(`ไม่สามารถบันทึกได้:\n${errorMessages}`);
+                return;
+            }
+
+            if (validation.warnings.length > 0 && validation.warnings.length <= 5) {
+                // แสดง warnings แต่ยังให้บันทึกได้
+                console.warn('⚠️ Zone edit warnings:', validation.warnings);
+            }
+            
             // หาต้นไม้ในโซนที่แก้ไขแล้ว
             const newPlants = findPlantsInEditedZone(validCoordinates, allPlants);
 
@@ -296,17 +403,15 @@ export const useZoneEditor = ({
                 newPlants
             );
 
-            // 🔧 แก้ไข: ตรวจสอบว่าโซนที่อัปเดตแล้วยังคงอยู่ในรายการหรือไม่
+            // 🔧 FIX: ตรวจสอบว่าโซนที่อัปเดตแล้วยังคงอยู่ในรายการหรือไม่
             const existingZoneIndex = zones.findIndex((zone) => zone.id === updatedZone.id);
             if (existingZoneIndex === -1) {
                 onError?.('ไม่พบโซนที่ต้องการแก้ไข');
                 return;
             }
 
-            // อัปเดตรายการโซนทั้งหมด
-            const updatedZones = zones.map((zone) =>
-                zone.id === updatedZone.id ? updatedZone : zone
-            );
+            // 🔧 FIX: ใช้ updateEditedZone เพื่อ reassign ต้นไม้ทั้งหมด
+            const updatedZones = updateEditedZone(zones, updatedZone, allPlants);
 
             onZonesUpdate(updatedZones);
             exitEditMode();
@@ -315,7 +420,7 @@ export const useZoneEditor = ({
             console.error('❌ Error applying zone changes:', error);
             onError?.('เกิดข้อผิดพลาดในการบันทึกการเปลี่ยนแปลง');
         }
-    }, [editState.editingZone, allPlants, zones, onZonesUpdate, exitEditMode, onSuccess, onError]);
+    }, [editState.editingZone, allPlants, zones, mainArea, onZonesUpdate, exitEditMode, onSuccess, onError]);
 
     // ยกเลิกการเปลี่ยนแปลง
     const cancelZoneChanges = useCallback(() => {
@@ -351,7 +456,7 @@ export const useZoneEditor = ({
             onZonesUpdate(updatedZones);
             exitEditMode();
             onSuccess?.('ลบโซนเรียบร้อย');
-        } catch (e) {
+        } catch {
             onError?.('เกิดข้อผิดพลาดในการลบโซน');
         }
     }, [editState.editingZone, zones, onZonesUpdate, exitEditMode, onError, onSuccess]);

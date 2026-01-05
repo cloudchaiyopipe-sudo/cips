@@ -91,9 +91,15 @@ export const updateZoneCoordinatesOnDrag = (
         return { lat: coord.lat, lng: coord.lng };
     });
 
+    // 🔧 FIX: ตรวจสอบว่าจุดควบคุมอยู่ใน mainArea หรือไม่
     const isWithinMainArea = isPointWithinMainArea(newPosition, mainArea);
     if (!isWithinMainArea) {
-        console.warn('⚠️ Control point moved outside main area, but allowing for flexibility');
+        // ไม่อนุญาตให้ลากออกนอก mainArea
+        return {
+            updatedCoordinates: zone.coordinates,
+            isValid: false,
+            errorMessage: 'ไม่สามารถลากจุดควบคุมออกนอกพื้นที่หลักได้',
+        };
     }
 
     if (newCoordinates.length < 3) {
@@ -104,8 +110,13 @@ export const updateZoneCoordinatesOnDrag = (
         };
     }
 
+    // 🔧 FIX: ตรวจสอบ self-intersection อย่างจริงจัง
     if (hasPolygonSelfIntersection(newCoordinates)) {
-        console.warn('⚠️ Zone has self-intersection, but allowing edit to continue');
+        return {
+            updatedCoordinates: zone.coordinates,
+            isValid: false,
+            errorMessage: 'โซนมีเส้นขอบตัดกันเอง กรุณาแก้ไขรูปทรง',
+        };
     }
 
     return {

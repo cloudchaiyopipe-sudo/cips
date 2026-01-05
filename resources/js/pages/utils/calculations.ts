@@ -775,6 +775,7 @@ export const normalizeEquipmentData = (
         product_code: flattened.product_code || flattened.productCode,
         price: Number(flattened.price || 0),
         is_active: Boolean(flattened.is_active),
+        video_link: flattened.video_link || flattened.videoLink || null,
     };
 
     switch (categoryType) {

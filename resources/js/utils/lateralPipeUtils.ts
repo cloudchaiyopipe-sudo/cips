@@ -507,7 +507,11 @@ export const findMainToSubMainConnections = (
             }
 
             const subMainStartZone = findPipeZoneForPoint(subMainStart);
-            if (!subMainStartZone || subMainStartZone !== subMainZone || subMainStartZone !== mainEndZone) {
+            if (
+                !subMainStartZone ||
+                subMainStartZone !== subMainZone ||
+                subMainStartZone !== mainEndZone
+            ) {
                 continue;
             }
 
@@ -551,15 +555,23 @@ export const findMainToSubMainConnections = (
 
         // ตรวจสอบอีกครั้งว่าจุดเชื่อมต่ออยู่ในโซนเดียวกันจริงๆ
         const finalMainEndZone = findPipeZoneForPoint(candidate.connectionPoint);
-        const subMainStart = subMainPipes.find((p) => p.id === candidate.subMainPipeId)?.coordinates[0];
+        const subMainStart = subMainPipes.find((p) => p.id === candidate.subMainPipeId)
+            ?.coordinates[0];
         if (!subMainStart) continue;
 
         const finalSubMainStartZone = findPipeZoneForPoint(subMainStart);
 
-        if (!finalMainEndZone || !finalSubMainStartZone || finalMainEndZone !== finalSubMainStartZone) {
+        if (
+            !finalMainEndZone ||
+            !finalSubMainStartZone ||
+            finalMainEndZone !== finalSubMainStartZone
+        ) {
             continue;
         }
-        if (!isPointInSameZone(candidate.connectionPoint, finalMainEndZone) || !isPointInSameZone(subMainStart, finalSubMainStartZone)) {
+        if (
+            !isPointInSameZone(candidate.connectionPoint, finalMainEndZone) ||
+            !isPointInSameZone(subMainStart, finalSubMainStartZone)
+        ) {
             continue;
         }
 
@@ -717,7 +729,7 @@ export const findEndToEndConnections = (
         }
 
         const mainEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-        
+
         // ตรวจสอบโซนของจุดปลายท่อเมนก่อน (ไม่ใช่โซนของทั้งท่อ)
         const mainEndZone = findPipeZoneForPoint(mainEnd);
         const mainZone = findPipeZone(mainPipe, mainEnd); // ตรวจสอบโซนของท่อเมนโดยใช้จุดปลายท่อ
@@ -733,7 +745,7 @@ export const findEndToEndConnections = (
             }
 
             const subMainStart = subMainPipe.coordinates[0];
-            
+
             // ตรวจสอบโซนของจุดเริ่มต้นท่อเมนรองก่อน (ไม่ใช่โซนของทั้งท่อ)
             const subMainStartZone = findPipeZoneForPoint(subMainStart);
             const subMainZone = findPipeZone(subMainPipe, subMainStart); // ตรวจสอบโซนของท่อเมนรองโดยใช้จุดเริ่มต้น
@@ -772,7 +784,10 @@ export const findEndToEndConnections = (
 
             if (distance <= 1.0) {
                 // ตรวจสอบอีกครั้งว่าจุดเชื่อมต่ออยู่ในโซนเดียวกันจริงๆ
-                if (!isPointInSameZone(mainEnd, mainEndZone) || !isPointInSameZone(subMainStart, subMainStartZone)) {
+                if (
+                    !isPointInSameZone(mainEnd, mainEndZone) ||
+                    !isPointInSameZone(subMainStart, subMainStartZone)
+                ) {
                     continue;
                 }
                 if (mainEndZone !== subMainStartZone) {
@@ -1059,10 +1074,16 @@ export const findSubMainToMainIntersections = (
 
             // ตรวจสอบว่าท่อเมนและท่อเมนรองนี้เชื่อมต่อแล้วหรือยัง
             // ถ้าเชื่อมต่อแล้ว (ที่ปลายท่อ main) ให้ข้าม intersection
-            if (mainPipeConnections.has(mainPipe.id) && mainPipeConnections.get(mainPipe.id) === subMainPipe.id) {
+            if (
+                mainPipeConnections.has(mainPipe.id) &&
+                mainPipeConnections.get(mainPipe.id) === subMainPipe.id
+            ) {
                 continue; // มี connection ที่ปลายท่อ main อยู่แล้ว ให้ข้าม intersection
             }
-            if (subMainPipeConnections.has(subMainPipe.id) && subMainPipeConnections.get(subMainPipe.id) === mainPipe.id) {
+            if (
+                subMainPipeConnections.has(subMainPipe.id) &&
+                subMainPipeConnections.get(subMainPipe.id) === mainPipe.id
+            ) {
                 continue; // มี connection อยู่แล้ว ให้ข้าม intersection
             }
 
@@ -1287,7 +1308,10 @@ export const findMidConnections = (
                 // ตรวจสอบเพิ่มเติม: ตรวจสอบว่าจุดเชื่อมต่ออยู่ในโซนเดียวกันจริงๆ
                 // เพื่อป้องกันกรณีที่ท่ออยู่ใกล้ขอบโซน
                 if (sourceZone && targetZone && sourceZone === targetZone) {
-                    if (!isPointInSameZone(endpoint.point, sourceZone) || !isPointInSameZone(targetPipeEnd, sourceZone)) {
+                    if (
+                        !isPointInSameZone(endpoint.point, sourceZone) ||
+                        !isPointInSameZone(targetPipeEnd, sourceZone)
+                    ) {
                         continue;
                     }
                 }
@@ -1309,9 +1333,9 @@ export const findMidConnections = (
                 // โดยตรวจสอบจาก zone หรือ type ของ pipe
                 // ถ้าเป็น submain-to-main connection ที่จุดกลาง ให้ข้าม
                 // ใช้ targetPipeEnd ที่ประกาศไว้แล้วที่บรรทัด 1068
-                const isTargetPipeEnd = 
+                const isTargetPipeEnd =
                     calculateDistanceBetweenPoints(endpoint.point, targetPipeEnd) <= 1.0;
-                
+
                 // ถ้าไม่ใช่การเชื่อมต่อที่ปลายท่อเมน (target pipe end) ให้ข้าม
                 // เพราะข้อกำหนดระบุว่าต้องเชื่อมต่อที่ปลายท่อเมนเท่านั้น
                 if (!isTargetPipeEnd) {
@@ -1636,8 +1660,7 @@ export const findMainToSubMainMidConnections = (
                     // ถ้ามี zone แค่ตัวเดียว ให้ตรวจสอบว่าจุดนั้นอยู่ใน zone หรือไม่
                     else if (subMainZone && !isPointInSameZone(closestPoint, subMainZone)) {
                         continue;
-                    }
-                    else if (mainEndZone && !isPointInSameZone(mainEnd, mainEndZone)) {
+                    } else if (mainEndZone && !isPointInSameZone(mainEnd, mainEndZone)) {
                         continue;
                     }
 
@@ -2143,10 +2166,10 @@ export const hasRotation = (
         return { hasRotation: false, rotationAngle: 0, center: { lat: 0, lng: 0 } };
     }
 
-    const plantWithRotation = plants.find((plant) => 
-        plant.rotationAngle !== undefined && plant.rotationAngle !== null
+    const plantWithRotation = plants.find(
+        (plant) => plant.rotationAngle !== undefined && plant.rotationAngle !== null
     );
-    const rotationAngle = plantWithRotation ? (plantWithRotation.rotationAngle || 0) : 0;
+    const rotationAngle = plantWithRotation ? plantWithRotation.rotationAngle || 0 : 0;
     const center = getPlantGroupCenter(plants);
 
     return {
@@ -3471,4 +3494,3 @@ const computeBetweenPlantsModeFromMainPipe = (
         direction
     );
 };
-
