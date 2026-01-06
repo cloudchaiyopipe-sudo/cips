@@ -124,12 +124,10 @@ function FreeNav() {
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
                                 transition={{ type: "spring", stiffness: 400, delay: 0.2 }}
-                                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-lg shadow-yellow-500/30 ring-2 ring-slate-900" 
+                                className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-600 text-xs font-medium text-white shadow-lg transition-colors hover:bg-yellow-700" 
                                 title="Admin"
                             >
-                                <svg className="h-3 w-3 text-yellow-900" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
-                                </svg>
+                                <span className="text-sm">👑</span>
                             </motion.div>
                         )}
                         

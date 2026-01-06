@@ -73,7 +73,7 @@ function ChooseCrop() {
             filtered = getGardenPlantsByCategory(selectedCategory);
         }
         if (searchValue.trim()) {
-            filtered = searchGardenPlants(searchValue);
+            filtered = searchGardenPlants(searchValue, translations);
         }
         return filtered;
     };
