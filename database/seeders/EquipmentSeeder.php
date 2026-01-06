@@ -17,7 +17,7 @@ class EquipmentSeeder extends Seeder
         $sprinklerCategory = EquipmentCategory::firstOrCreate(
             ['name' => 'sprinkler'],
             [
-                'display_name' => 'สปริงเกอร์แบบหมุน/ยิงไกล',
+                'display_name' => 'สปริงเกอร์/หัวฉีดน้ำ',
                 'description' => 'หัวสปริงเกอร์สำหรับรดน้ำ',
                 'icon' => '💧'
             ]
