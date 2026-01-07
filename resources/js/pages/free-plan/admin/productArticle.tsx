@@ -68,7 +68,6 @@ export default function CreateProduct() {
             }
         }
     }, [product]);
-
     // 1. เพิ่ม field ทั้งหมด รวมถึง 'image_url' แทน 'image'
     const { data, setData, processing, errors } = useForm({
         name: product?.name || '',
