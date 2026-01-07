@@ -2,7 +2,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import FootNav from './components/footNav';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getTranslations } from './utils/language';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,9 +20,10 @@ interface Product {
     isNew?: boolean;
     isPromotion?: boolean;
     isRecommended?: boolean;
+    equipment_id?: number;
 }
 
-interface SprinklerEquipment {
+interface Equipment {
     id: number;
     name: string;
     description?: string;
@@ -31,9 +32,37 @@ interface SprinklerEquipment {
     video_link?: string;
     product_code?: string;
     brand?: string;
-    waterVolumeLitersPerMinute?: number | [number, number];
-    radiusMeters?: number | [number, number];
-    pressureBar?: number | [number, number];
+    category_id?: number;
+    category?: {
+        id: number;
+        name: string;
+        display_name: string;
+    };
+}
+
+interface EquipmentCategory {
+    id: number;
+    name: string;
+    display_name: string;
+    description?: string;
+}
+
+interface SprinklerEquipment {
+    id: number;
+    name: string;
+    description?: string;
+    price: number;
+    originalPrice?: number | null;
+    image?: string;
+    video_link?: string;
+    product_code?: string;
+    brand?: string;
+    category_id?: number;
+    category?: {
+        id: number;
+        name: string;
+        display_name: string;
+    };
 }
 
 interface PageProps {
@@ -68,6 +97,34 @@ function ProductList() {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [sprinklers, setSprinklers] = useState<SprinklerEquipment[]>([]);
     const [loadingSprinklers, setLoadingSprinklers] = useState(false);
+    
+    // States for all users
+    const [categories, setCategories] = useState<EquipmentCategory[]>([]);
+    const [selectedRecommendedCategoryId, setSelectedRecommendedCategoryId] = useState<number | null>(null);
+    
+    // States for admin modal
+    const [showAddProductModal, setShowAddProductModal] = useState(false);
+    const [equipments, setEquipments] = useState<Equipment[]>([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<number[]>([]);
+    
+    // States for promotion discount
+    const [discountType, setDiscountType] = useState<'percent' | 'amount'>('percent');
+    const [discountValue, setDiscountValue] = useState<number>(0);
+    
+    // State for video modal
+    const [videoModal, setVideoModal] = useState<{
+        isOpen: boolean;
+        videoUrl: string | null;
+    }>({
+        isOpen: false,
+        videoUrl: null,
+    });
+    
+    // State for shop dropdown
+    const [showShopDropdown, setShowShopDropdown] = useState(false);
 
     // Toast Helper
     const showToast = (message: string, type: 'success' | 'error') => {
@@ -89,66 +146,207 @@ function ProductList() {
         };
     }, []);
 
-    // Fetch sprinklers from database
+    // Fetch categories
     useEffect(() => {
-        const fetchSprinklers = async () => {
-            setLoadingSprinklers(true);
+        const fetchCategories = async () => {
             try {
-                // Try multiple endpoints for compatibility
-                const endpoints = [
-                    '/api/equipments/by-category/sprinkler',
-                    '/api/sprinklers',
-                    '/api/equipments?category=sprinkler',
-                ];
-
-                let sprinklersData: SprinklerEquipment[] = [];
-                for (const endpoint of endpoints) {
-                    try {
-                        const response = await fetch(endpoint);
-                        if (response.ok) {
-                            sprinklersData = await response.json();
-                            if (Array.isArray(sprinklersData) && sprinklersData.length > 0) {
-                                break;
-                            }
-                        }
-                    } catch {
-                        continue;
+                const response = await fetch('/api/equipment-categories');
+                if (response.ok) {
+                    const data = await response.json();
+                    setCategories(Array.isArray(data) ? data : []);
+                    
+                    // Set default category to sprinkler for recommended tab
+                    const sprinklerCategory = data.find((cat: EquipmentCategory) => 
+                        cat.name === 'sprinkler' || cat.display_name?.toLowerCase().includes('สปริงเกอร์')
+                    );
+                    if (sprinklerCategory) {
+                        setSelectedRecommendedCategoryId(sprinklerCategory.id);
                     }
                 }
-
-                // Transform sprinkler equipment to Product format
-                const transformedSprinklers = sprinklersData.map((sprinkler) => ({
-                    id: sprinkler.id,
-                    name: sprinkler.name || '',
-                    description: sprinkler.description || '',
-                    price: sprinkler.price || 0,
-                    image_url: sprinkler.image || '',
-                    video_url: sprinkler.video_link || '',
-                    category: 'recommended' as const,
-                    isRecommended: true,
-                    product_code: sprinkler.product_code,
-                    brand: sprinkler.brand,
-                }));
-
-                setSprinklers(transformedSprinklers);
             } catch (error) {
-                console.error('Error fetching sprinklers:', error);
-                setSprinklers([]);
-            } finally {
-                setLoadingSprinklers(false);
+                console.error('Error fetching categories:', error);
             }
         };
-
-        fetchSprinklers();
+        fetchCategories();
     }, []);
+
+    // Fetch equipments for admin modal
+    useEffect(() => {
+        const fetchEquipments = async () => {
+            if (!showAddProductModal) return;
+            
+            setLoading(true);
+            try {
+                let url = '/api/equipments';
+                const params = new URLSearchParams();
+                
+                if (selectedCategoryId) {
+                    params.append('category_id', selectedCategoryId.toString());
+                }
+                
+                if (searchQuery) {
+                    params.append('search', searchQuery);
+                }
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    setEquipments(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('Error fetching equipments:', error);
+                setEquipments([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        if (showAddProductModal) {
+            fetchEquipments();
+        }
+    }, [showAddProductModal, selectedCategoryId, searchQuery]);
+
+    // Fetch recommended equipments (all users)
+    useEffect(() => {
+        if (activeTab === 'recommended') {
+            const fetchRecommendedEquipments = async () => {
+                setLoadingSprinklers(true);
+                try {
+                    let url = '/api/equipments';
+                    const params = new URLSearchParams();
+                    
+                    if (selectedRecommendedCategoryId) {
+                        params.append('category_id', selectedRecommendedCategoryId.toString());
+                    }
+                    
+                    if (params.toString()) {
+                        url += '?' + params.toString();
+                    }
+                    
+                    // Fetch equipments และ promotions พร้อมกัน
+                    const [equipmentsResponse, promotionsResponse] = await Promise.all([
+                        fetch(url),
+                        fetch('/api/promotions')
+                    ]);
+                    
+                    if (equipmentsResponse.ok) {
+                        const data = await equipmentsResponse.json();
+                        
+                        // Fetch promotions เพื่อหา original_price
+                        let promotionsData: Array<{ equipment_id: number; originalPrice: number }> = [];
+                        if (promotionsResponse.ok) {
+                            try {
+                                const promotionsJson = await promotionsResponse.json() as { promotions?: Array<{ equipment_id: number; originalPrice: number }> };
+                                promotionsData = promotionsJson.promotions || [];
+                            } catch (error) {
+                                console.error('Error parsing promotions:', error);
+                            }
+                        }
+                        
+                        const transformed = (Array.isArray(data) ? data : []).map((eq: Equipment) => {
+                            // หา promotion สำหรับ equipment นี้
+                            const promotion = promotionsData.find((p) => 
+                                p.equipment_id === eq.id
+                            );
+                            
+                            const sprinklerEquipment: SprinklerEquipment & { image_url?: string; video_url?: string; isRecommended?: boolean } = {
+                                id: eq.id,
+                                name: eq.name || '',
+                                description: eq.description || '',
+                                price: eq.price || 0, // ราคาหลังลด (จาก equipment)
+                                originalPrice: promotion?.originalPrice ?? undefined, // ราคาเดิม (จาก promotion)
+                                image: eq.image || '',
+                                video_link: eq.video_link || '',
+                                image_url: eq.image || '', // สำหรับใช้ใน rendering
+                                video_url: eq.video_link || '', // สำหรับใช้ใน rendering
+                                product_code: eq.product_code,
+                                brand: eq.brand,
+                                category_id: eq.category_id,
+                                category: eq.category,
+                                isRecommended: true,
+                            };
+                            return sprinklerEquipment;
+                        });
+                        setSprinklers(transformed);
+                    }
+                } catch (error) {
+                    console.error('Error fetching recommended equipments:', error);
+                    setSprinklers([]);
+                } finally {
+                    setLoadingSprinklers(false);
+                }
+            };
+            fetchRecommendedEquipments();
+        }
+    }, [activeTab, selectedRecommendedCategoryId]);
 
     // Filter products - use sprinklers for recommended, products for others
     const filteredProducts = activeTab === 'recommended' 
         ? sprinklers 
         : (products || []).filter((product) => product.category === activeTab);
 
+    // Filter equipments for admin modal
+    const filteredEquipments = useMemo(() => {
+        return equipments.filter((eq) => {
+            const matchesSearch = !searchQuery || 
+                eq.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                eq.product_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                eq.brand?.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            return matchesSearch;
+        });
+    }, [equipments, searchQuery]);
+
     // Navigation
     const handleBack = () => router.visit('/free-plan');
+    
+    // Handle video modal
+    const openVideoModal = (videoUrl: string | null | undefined) => {
+        if (videoUrl) {
+            setVideoModal({
+                isOpen: true,
+                videoUrl: videoUrl,
+            });
+        }
+    };
+    
+    const closeVideoModal = () => {
+        setVideoModal({
+            isOpen: false,
+            videoUrl: null,
+        });
+    };
+    
+    // Convert video URL to embed format
+    const convertVideoLinkToEmbed = (url: string | null | undefined): string | null => {
+        if (!url) return null;
+        
+        // YouTube
+        const youtubeRegex = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
+        const youtubeMatch = url.match(youtubeRegex);
+        if (youtubeMatch) {
+            return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+        }
+        
+        // Vimeo
+        const vimeoRegex = /(?:vimeo\.com\/)(?:.*\/)?(\d+)/;
+        const vimeoMatch = url.match(vimeoRegex);
+        if (vimeoMatch) {
+            return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+        }
+        
+        // If already embed format, return as is
+        if (url.includes('youtube.com/embed') || url.includes('player.vimeo.com')) {
+            return url;
+        }
+        
+        // Return original URL if can't convert
+        return url;
+    };
 
     // Format price
     const formatPrice = (price: number) => {
@@ -160,7 +358,6 @@ function ProductList() {
     };
 
     const handleProductClick = (productId: number) => {
-        // Use same route for all products, freeProductDetail will handle equipment fetching
         router.visit(`/free-plan/products/${productId}`);
     };
 
@@ -169,38 +366,143 @@ function ProductList() {
         e.stopPropagation();
         
         if (activeTab === 'recommended') {
-            // For sprinklers, delete from equipments
-            if (!confirm('ยืนยันการลบสปริงเกอร์นี้?')) return;
+            if (!confirm('ยืนยันการลบอุปกรณ์นี้?')) return;
             
             setDeletingId(productId);
             router.delete(`/api/equipments/${productId}`, {
                 onSuccess: () => {
                     setDeletingId(null);
                     setSprinklers((prev) => prev.filter((s) => s.id !== productId));
-                    showToast('ลบสปริงเกอร์เรียบร้อยแล้ว', 'success');
+                    showToast('ลบอุปกรณ์เรียบร้อยแล้ว', 'success');
                 },
                 onError: () => {
                     setDeletingId(null);
-                    showToast('เกิดข้อผิดพลาดในการลบสปริงเกอร์', 'error');
+                    showToast('เกิดข้อผิดพลาดในการลบอุปกรณ์', 'error');
                 },
             });
         } else {
-        if (!confirm(translations.confirmDeleteProduct)) return;
+            if (!confirm(translations.confirmDeleteProduct)) return;
 
-        setDeletingId(productId);
-        router.delete(`/admin/products/${productId}`, {
-            onSuccess: () => {
-                setDeletingId(null);
-                showToast('ลบสินค้าเรียบร้อยแล้ว', 'success');
-            },
-            onError: () => {
-                setDeletingId(null);
-                showToast(translations.errorDeletingProduct, 'error');
-            },
-        });
+            setDeletingId(productId);
+            router.delete(`/admin/products/${productId}`, {
+                onSuccess: () => {
+                    setDeletingId(null);
+                    showToast('ลบสินค้าเรียบร้อยแล้ว', 'success');
+                },
+                onError: () => {
+                    setDeletingId(null);
+                    showToast(translations.errorDeletingProduct, 'error');
+                },
+            });
         }
     };
 
+    // Handle select equipment for new/promotion
+    const handleSelectEquipment = (equipmentId: number) => {
+        setSelectedEquipmentIds((prev) => {
+            if (prev.includes(equipmentId)) {
+                return prev.filter((id) => id !== equipmentId);
+            } else {
+                return [...prev, equipmentId];
+            }
+        });
+    };
+
+    // Handle open add product modal
+    const handleOpenAddProductModal = () => {
+        setShowAddProductModal(true);
+        setSelectedEquipmentIds([]);
+        setSearchQuery('');
+        setSelectedCategoryId(null);
+        setDiscountType('percent');
+        setDiscountValue(0);
+    };
+
+    // Handle close add product modal
+    const handleCloseAddProductModal = () => {
+        setShowAddProductModal(false);
+        setSelectedEquipmentIds([]);
+        setSearchQuery('');
+        setSelectedCategoryId(null);
+        setDiscountType('percent');
+        setDiscountValue(0);
+    };
+
+    // Handle save selected equipments as new/promotion products
+    const handleSaveSelectedEquipments = async () => {
+        if (selectedEquipmentIds.length === 0) {
+            showToast('กรุณาเลือกรายการสินค้า', 'error');
+            return;
+        }
+
+        // activeTab ควรเป็น 'new' หรือ 'promotion' เท่านั้น (ไม่ใช่ 'recommended')
+        if (activeTab === 'recommended') {
+            showToast('ไม่สามารถบันทึกสินค้าแนะนำได้', 'error');
+            return;
+        }
+
+        try {
+            const payload: {
+                equipment_ids: number[];
+                category: 'new' | 'promotion';
+                discount_type?: 'percent' | 'amount';
+                discount?: number;
+                discount_amount?: number;
+            } = {
+                equipment_ids: selectedEquipmentIds,
+                category: activeTab as 'new' | 'promotion',
+            };
+
+            if (activeTab === 'promotion') {
+                payload.discount_type = discountType;
+                if (discountType === 'percent') {
+                    payload.discount = discountValue;
+                } else {
+                    payload.discount_amount = discountValue;
+                }
+            }
+
+            const response = await fetch('/admin/products/create-from-equipments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast(`บันทึกสินค้า ${activeTab === 'new' ? 'ใหม่' : 'โปรโมชัน'} เรียบร้อยแล้ว`, 'success');
+                handleCloseAddProductModal();
+                router.reload();
+            } else {
+                showToast(data.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving products:', error);
+            showToast('เกิดข้อผิดพลาดในการบันทึก', 'error');
+        }
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (showShopDropdown && !target.closest('.shop-dropdown-container')) {
+                setShowShopDropdown(false);
+            }
+        };
+        
+        if (showShopDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showShopDropdown]);
 
     // 5. Return TSX
     return (
@@ -234,21 +536,21 @@ function ProductList() {
             </div>
 
             {/* Main Content */}
-            <div className="mx-auto min-h-[calc(100vh-80px)] w-full max-w-6xl px-4 pb-24 pt-8 md:px-6 md:pb-8 md:pt-12">
+            <div className="mx-auto min-h-[calc(100vh-80px)] w-full max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pb-8 md:pt-12">
                 
                 {/* Header & Controls */}
-                <div className="mb-8">
+                <div className="mb-6">
                     <motion.button
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         onClick={handleBack}
-                        className="mb-6 flex items-center gap-2 text-slate-400 transition-colors hover:text-white"
+                        className="flex items-center gap-2 text-slate-400 transition-colors hover:text-white"
                     >
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                         <span className="font-medium">{translations.back}</span>
                     </motion.button>
 
-                    <div className="mb-6 flex items-center justify-between">
+                    <div className="mb-2 flex items-center justify-between">
                         <motion.h1 
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -259,54 +561,196 @@ function ProductList() {
                             </span>
                         </motion.h1>
 
-                        {/* Admin Add Button */}
-                        {isAdmin && (
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => {
-                                    if (activeTab === 'recommended') {
-                                        router.visit('/equipments/create?category=sprinkler');
-                                    } else {
-                                        router.visit('/admin/products/create');
-                                    }
-                                }}
-                                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-green-900/30 transition-all hover:brightness-110"
-                            >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                <span className="hidden sm:inline">
-                                    {activeTab === 'recommended' ? 'เพิ่มสปริงเกอร์' : translations.addProduct}
-                                </span>
-                            </motion.button>
-                        )}
+                        <div className="flex items-center gap-3">
+                            {/* Shop Dropdown Button */}
+                            <div className="relative shop-dropdown-container">
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => setShowShopDropdown(!showShopDropdown)}
+                                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-900/30 transition-all hover:brightness-110"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                                    <span className="hidden sm:inline">{translations.viewDetails}</span>
+                                    <svg className={`h-4 w-4 transition-transform ${showShopDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </motion.button>
+                                
+                                {/* Dropdown Menu */}
+                                {showShopDropdown && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className="absolute right-0 mt-2 w-64 rounded-xl bg-slate-800 border border-white/10 shadow-2xl z-50 overflow-hidden"
+                                    >
+                                        <div className="py-2">
+                                            {/* Kanok Shop */}
+                                            <a
+                                                href="https://shop.kanokproduct.com/th"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={() => setShowShopDropdown(false)}
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 transition-colors"
+                                            >
+                                                <img 
+                                                    src="/images/kanok-chaiyo.png" 
+                                                    alt="Kanok Shop" 
+                                                    className="h-8 w-8 object-contain"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                    }}
+                                                />
+                                                <div className="flex-1">
+                                                    <div className="text-sm font-semibold text-white">Kanok Shop</div>
+                                                    <div className="text-xs text-slate-400">shop.kanokproduct.com</div>
+                                                </div>
+                                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </a>
+                                            
+                                            {/* Shopee */}
+                                            <a
+                                                href="https://shopee.co.th/kanokproduct"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={() => setShowShopDropdown(false)}
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 transition-colors border-t border-white/5"
+                                            >
+                                                <img 
+                                                    src="/images/shopee.png" 
+                                                    alt="Kanok Shop" 
+                                                    className="h-8 w-8 object-contain"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                    }}
+                                                />
+                                                <div className="flex-1">
+                                                    <div className="text-sm font-semibold text-white">Shopee</div>
+                                                    <div className="text-xs text-slate-400">shopee.co.th</div>
+                                                </div>
+                                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </a>
+                                            
+                                            {/* Lazada */}
+                                            <a
+                                                href="https://www.lazada.co.th/shop/kanok-product/?path=index.htm"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={() => setShowShopDropdown(false)}
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 transition-colors border-t border-white/5"
+                                            >
+                                                <img 
+                                                    src="/images/lazada.png" 
+                                                    alt="Kanok Shop" 
+                                                    className="h-8 w-8 object-contain"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                    }}
+                                                />
+                                                <div className="flex-1">
+                                                    <div className="text-sm font-semibold text-white">Lazada</div>
+                                                    <div className="text-xs text-slate-400">lazada.co.th</div>
+                                                </div>
+                                                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+
+                            {/* Admin Button - Add Product */}
+                            {isAdmin && (activeTab === 'new' || activeTab === 'promotion') && (
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={handleOpenAddProductModal}
+                                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-green-900/30 transition-all hover:brightness-110"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    <span className="hidden sm:inline">เพิ่มสินค้า</span>
+                                </motion.button>
+                            )}
+
+                            {/* Admin Button - Go to Equipment CRUD */}
+                            {isAdmin && activeTab === 'recommended' && (
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => router.visit('/equipment-crud')}
+                                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-900/30 transition-all hover:brightness-110"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span className="hidden sm:inline">จัดการอุปกรณ์</span>
+                                </motion.button>
+                            )}
+                        </div>
                     </div>
+                        <p className="mb-2 text-xs text-red-400">**ราคาสินค้าในเว็บ เป็นราคากลาง ซึ่งราคาอาจจะเปลี่ยนแปลงไปจากแหล่งที่ซื้อ หรือช่วงโปรโมชั่น**</p>
 
                     {/* Modern Tabs */}
-                    <div className="flex gap-2 rounded-xl bg-slate-800/50 p-1 backdrop-blur-sm w-fit border border-white/5">
-                        {['new', 'promotion', 'recommended'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab as 'new' | 'promotion' | 'recommended')}
-                                className="relative rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors focus:outline-none"
-                            >
-                                {activeTab === tab && (
-                                    <motion.div
-                                        layoutId="activeTab"
-                                        className="absolute inset-0 rounded-lg bg-slate-700 shadow-sm"
-                                        transition={{ type: "spring" as const, bounce: 0.2, duration: 0.6 }}
-                                    />
-                                )}
-                                <span className={`relative z-10 ${activeTab === tab ? 'text-white' : 'text-slate-400 hover:text-slate-200'}`}>
-                                    {tab === 'new' 
-                                        ? translations.newProducts 
-                                        : tab === 'promotion' 
-                                        ? translations.promotionProducts 
-                                        : translations.recommendedProducts}
-                                </span>
-                            </button>
-                        ))}
+                    <div className="flex w-full">
+                        <div className="flex gap-2 rounded-xl bg-slate-800/50 p-1 backdrop-blur-sm w-full border border-white/5">
+                            {['new', 'promotion', 'recommended'].map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => {
+                                        setActiveTab(tab as 'new' | 'promotion' | 'recommended');
+                                        setSelectedEquipmentIds([]);
+                                        setSearchQuery('');
+                                    }}
+                                    className="relative flex-1 rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors focus:outline-none"
+                                    style={{ minWidth: 0 }}
+                                >
+                                    {activeTab === tab && (
+                                        <motion.div
+                                            layoutId="activeTab"
+                                            className="absolute inset-0 rounded-lg bg-slate-700 shadow-sm"
+                                            transition={{ type: "spring" as const, bounce: 0.2, duration: 0.6 }}
+                                        />
+                                    )}
+                                    <span className={`relative z-10 flex justify-center ${activeTab === tab ? 'text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+                                        {tab === 'new' 
+                                            ? translations.newProducts 
+                                            : tab === 'promotion' 
+                                            ? translations.promotionProducts 
+                                            : translations.recommendedProducts}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
+
+                {/* Category Filter for Recommended Tab (All Users) */}
+                {activeTab === 'recommended' && (
+                    <div className="mb-6 rounded-xl bg-slate-800/40 p-4 backdrop-blur-sm border border-white/5">
+                        <label className="mb-2 block text-sm font-medium text-slate-300">
+                            หมวดหมู่สินค้า
+                        </label>
+                        <select
+                            value={selectedRecommendedCategoryId || ''}
+                            onChange={(e) => setSelectedRecommendedCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+                            className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+                        >
+                            <option value="">ทุกหมวดหมู่</option>
+                            {categories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                    {category.display_name || category.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Products Grid */}
                 <div
@@ -316,7 +760,7 @@ function ProductList() {
                     {loadingSprinklers && activeTab === 'recommended' ? (
                         <div className="flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-slate-800/40 py-20 backdrop-blur-sm">
                             <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-slate-600 border-t-green-400"></div>
-                            <p className="text-lg font-medium text-slate-400">กำลังโหลดสปริงเกอร์...</p>
+                            <p className="text-lg font-medium text-slate-400">กำลังโหลดอุปกรณ์...</p>
                         </div>
                     ) : filteredProducts.length === 0 ? (
                         <div 
@@ -340,46 +784,6 @@ function ProductList() {
                                         onClick={() => handleProductClick(product.id)}
                                         className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/5 bg-slate-800/60 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:border-blue-500/50 hover:bg-slate-800/80 hover:shadow-2xl hover:shadow-blue-900/20"
                                     >
-                                        {/* Recommended Badge */}
-                                        {product.isRecommended && (
-                                            <div className="absolute left-2 top-2 z-20">
-                                                <span className="inline-flex items-center rounded-md bg-blue-500/90 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
-                                                    {translations.recommendedBadge}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* Admin Edit & Delete Buttons */}
-                                        {isAdmin && (
-                                            <div className="absolute right-2 top-2 z-20 flex gap-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (activeTab === 'recommended') {
-                                                            router.visit(`/equipments/${product.id}/edit`);
-                                                        } else {
-                                                        router.visit(`/admin/products/${product.id}/edit`);
-                                                        }
-                                                    }}
-                                                    className="rounded-full bg-blue-600/80 p-1.5 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-blue-600 hover:scale-110"
-                                                    title="แก้ไข"
-                                                >
-                                                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                </button>
-                                                <button
-                                                    onClick={(e) => handleDelete(e, product.id)}
-                                                    disabled={deletingId === product.id}
-                                                    className="rounded-full bg-red-600/80 p-1.5 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-red-600 hover:scale-110 disabled:opacity-50"
-                                                    title="ลบ"
-                                                >
-                                                    {deletingId === product.id ? (
-                                                        <svg className="h-3 w-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                    ) : (
-                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    )}
-                                                </button>
-                                            </div>
-                                        )}
 
                                         {/* Product Image */}
                                         <div className="relative w-full overflow-hidden bg-slate-900/50">
@@ -398,31 +802,38 @@ function ProductList() {
 
                                         {/* Product Info */}
                                         <div className="flex flex-1 flex-col p-4">
-                                            <h3 className="mb-2 line-clamp-2 text-base font-bold text-slate-100 transition-colors group-hover:text-blue-400">
+                                            <h3 className="mb-2 line-clamp-3 text-sm font-medium text-slate-100 transition-colors group-hover:text-blue-400">
                                                 {product.name}
                                             </h3>
-                                            <p className="mb-3 line-clamp-2 text-xs text-slate-400 flex-1">
-                                                {product.description}
-                                            </p>
 
                                             {/* Price & Action */}
                                             <div className="mt-auto">
-                                                <div className="mb-3 flex items-baseline gap-2">
+                                                <div className="flex items-baseline gap-2">
                                                     <span className="text-lg font-bold text-green-400">
                                                         {formatPrice(product.price)}
                                                     </span>
+                                                    {/* แสดงราคาเดิมถ้ามี promotion */}
+                                                    {product.originalPrice && product.originalPrice > product.price && (
+                                                        <span className="text-xs text-slate-500 line-through decoration-slate-500/50">
+                                                            {formatPrice(product.originalPrice)}
+                                                        </span>
+                                                    )}
                                                 </div>
 
-                                                <a
-                                                    href="https://shopee.co.th/kanokproduct"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-blue-500 hover:to-blue-600 hover:shadow-lg hover:shadow-blue-900/30 active:scale-95"
-                                                >
-                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                                                    {translations.viewDetails}
-                                                </a>
+                                                {/* ปุ่มดูวิดีโอ */}
+                                                {(product.video_url || (product as SprinklerEquipment).video_link) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const videoUrl = product.video_url || (product as SprinklerEquipment).video_link;
+                                                            openVideoModal(videoUrl);
+                                                        }}
+                                                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-purple-500 hover:to-pink-500 hover:shadow-lg hover:shadow-purple-900/30 active:scale-95"
+                                                    >
+                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        ดูวิดีโอ
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </motion.div>
@@ -430,7 +841,7 @@ function ProductList() {
                             })}
                         </div>
                     ) : (
-                        // Original Layout for New and Promotion Products
+                        // Original Layout for New and Promotion Products (All Users)
                         <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             {filteredProducts.map((product) => (
                                 <div
@@ -441,18 +852,13 @@ function ProductList() {
                                     {/* Badges Container */}
                                     <div className="absolute left-3 top-3 z-20 flex flex-col gap-2">
                                         {product.isNew && (
-                                            <span className="inline-flex items-center rounded-md bg-green-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
-                                                {translations.newBadge}
+                                            <span className="inline-flex items-center rounded-md bg-blue-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
+                                                {translations.newBadge}!!
                                             </span>
                                         )}
                                         {product.isPromotion && (
-                                            <span className="inline-flex items-center rounded-md bg-rose-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
+                                            <span className="inline-flex items-center rounded-md bg-green-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
                                                 {translations.promotionBadge}
-                                            </span>
-                                        )}
-                                        {product.isRecommended && (
-                                            <span className="inline-flex items-center rounded-md bg-blue-500/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg backdrop-blur-sm">
-                                                {translations.recommendedBadge}
                                             </span>
                                         )}
                                     </div>
@@ -460,44 +866,20 @@ function ProductList() {
                                     {/* Discount Bubble */}
                                     {product.category === 'promotion' && product.discount && product.discount > 0 && (
                                         <div className="absolute right-3 top-3 z-20">
-                                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-400/90 font-bold text-black shadow-lg backdrop-blur-sm">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-400/90 font-bold text-black shadow-lg backdrop-blur-sm">
                                                 <div className="flex flex-col items-center leading-none">
-                                                    <span className="text-xs font-bold">-{product.discount}%</span>
+                                                    <span className="text-xs font-bold">
+                                                        {-parseFloat(Number(product.discount).toFixed(2)).toString()}
+                                                        {Number.isInteger(product.discount) ? '' : ''}
+                                                        %
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Admin Edit & Delete Buttons */}
-                                    {isAdmin && (
-                                        <div className={`absolute right-3 z-20 flex gap-2 ${product.category === 'promotion' && product.discount && product.discount > 0 ? 'top-16' : 'top-3'}`}>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    router.visit(`/admin/products/${product.id}/edit`);
-                                                }}
-                                                className="rounded-full bg-blue-600/80 p-2 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-blue-600 hover:scale-110"
-                                                title="แก้ไข"
-                                            >
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDelete(e, product.id)}
-                                                disabled={deletingId === product.id}
-                                                className="rounded-full bg-red-600/80 p-2 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-red-600 hover:scale-110 disabled:opacity-50"
-                                                title="ลบ"
-                                            >
-                                                {deletingId === product.id ? (
-                                                    <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                ) : (
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                )}
-                                            </button>
-                                        </div>
-                                    )}
-
                                     {/* Product Image */}
-                                    <div className="relative w-full overflow-hidden bg-white/5 p-4">
+                                    <div className="relative w-full overflow-hidden bg-white/5 p-2">
                                         {product.image_url ? (
                                             <img
                                                 src={product.image_url}
@@ -512,13 +894,10 @@ function ProductList() {
                                     </div>
 
                                     {/* Content */}
-                                    <div className="flex flex-1 flex-col p-5">
-                                        <h3 className="mb-2 text-lg font-bold text-slate-100 transition-colors group-hover:text-green-400 line-clamp-1">
+                                    <div className="flex flex-1 flex-col p-2">
+                                        <h4 className="mb-2 text-sm font-medium text-slate-100 transition-colors group-hover:text-green-400">
                                             {product.name}
-                                        </h3>
-                                        <p className="mb-4 line-clamp-2 text-sm text-slate-400 flex-1">
-                                            {product.description}
-                                        </p>
+                                        </h4>
 
                                         {/* Footer: Price & Action */}
                                         <div className="mt-auto">
@@ -526,12 +905,57 @@ function ProductList() {
                                                 <span className="text-xl font-bold text-green-400">
                                                     {formatPrice(product.price)}
                                                 </span>
-                                                {product.category === 'promotion' && product.originalPrice && (
+                                                {/* แสดงราคาเดิมถ้ามี promotion (ไม่ว่าจะเป็น category ไหน) */}
+                                                {product.originalPrice && product.originalPrice > product.price && (
                                                     <span className="text-sm text-slate-500 line-through decoration-slate-500/50">
                                                         {formatPrice(product.originalPrice)}
                                                     </span>
                                                 )}
                                             </div>
+
+                                            {/* Admin Edit & Delete Buttons */}
+                                            {isAdmin && (
+                                                <div className="flex gap-2 mb-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            router.visit(`/admin/products/${product.id}/edit`);
+                                                        }}
+                                                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600/80 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-900/20 active:scale-95"
+                                                        title="แก้ไข"
+                                                    >
+                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                        <span className="hidden sm:inline">แก้ไข</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleDelete(e, product.id)}
+                                                        disabled={deletingId === product.id}
+                                                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-600/80 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-red-600 hover:shadow-lg hover:shadow-red-900/20 active:scale-95 disabled:opacity-50"
+                                                        title="ลบ"
+                                                    >
+                                                        {deletingId === product.id ? (
+                                                            <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                        ) : (
+                                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        )}
+                                                        <span className="hidden sm:inline">ลบ</span>
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* ปุ่มดูวิดีโอ */}
+                                            {product.video_url && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openVideoModal(product.video_url);
+                                                    }}
+                                                    className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:from-purple-500 hover:to-pink-500 hover:shadow-lg hover:shadow-purple-900/20 active:scale-95"
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    ดูวิดีโอ
+                                                </button>
+                                            )}
 
                                             <a
                                                 href="https://shopee.co.th/kanokproduct"
@@ -551,6 +975,263 @@ function ProductList() {
                     )}
                 </div>
             </div>
+
+            {/* Add Product Modal */}
+            {showAddProductModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-slate-800 border border-white/10 shadow-2xl m-4"
+                    >
+                        {/* Modal Header */}
+                        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-slate-800/95 backdrop-blur-sm px-6 py-4">
+                            <h2 className="text-2xl font-bold text-white">
+                                เพิ่มสินค้า{activeTab === 'new' ? 'ใหม่' : 'โปรโมชัน'}
+                            </h2>
+                            <button
+                                onClick={handleCloseAddProductModal}
+                                className="rounded-lg p-2 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 space-y-6">
+                            {/* Filters */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                                        หมวดหมู่สินค้า
+                                    </label>
+                                    <select
+                                        value={selectedCategoryId || ''}
+                                        onChange={(e) => setSelectedCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+                                        className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        <option value="">ทุกหมวดหมู่</option>
+                                        {categories.map((category) => (
+                                            <option key={category.id} value={category.id}>
+                                                {category.display_name || category.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                                        ค้นหาสินค้า
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="ค้นหาด้วยชื่อ, รหัสสินค้า, หรือแบรนด์..."
+                                        className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Promotion Discount Settings */}
+                            {activeTab === 'promotion' && (
+                                <div className="rounded-xl bg-slate-700/50 p-4 border border-white/5">
+                                    <label className="mb-3 block text-sm font-medium text-slate-300">
+                                        ตั้งค่าส่วนลด
+                                    </label>
+                                    <div className="space-y-4">
+                                        <div className="flex gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="discountType"
+                                                    value="percent"
+                                                    checked={discountType === 'percent'}
+                                                    onChange={() => {
+                                                        setDiscountType('percent');
+                                                        setDiscountValue(0);
+                                                    }}
+                                                    className="w-4 h-4 text-blue-600"
+                                                />
+                                                <span className="text-slate-300">ลดเป็น %</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="discountType"
+                                                    value="amount"
+                                                    checked={discountType === 'amount'}
+                                                    onChange={() => {
+                                                        setDiscountType('amount');
+                                                        setDiscountValue(0);
+                                                    }}
+                                                    className="w-4 h-4 text-blue-600"
+                                                />
+                                                <span className="text-slate-300">ลดเป็นบาท</span>
+                                            </label>
+                                        </div>
+                                        <div>
+                                            <input
+                                                type="number"
+                                                value={discountValue}
+                                                onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                                                placeholder={discountType === 'percent' ? 'กรอก % (0-100)' : 'กรอกจำนวนเงิน (บาท)'}
+                                                min={0}
+                                                max={discountType === 'percent' ? 100 : undefined}
+                                                className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Equipment List */}
+                            <div className="max-h-[400px] overflow-y-auto">
+                                {loading ? (
+                                    <div className="flex items-center justify-center py-20">
+                                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-600 border-t-green-400"></div>
+                                    </div>
+                                ) : filteredEquipments.length === 0 ? (
+                                    <div className="text-center py-20 text-slate-400">
+                                        ไม่พบสินค้า
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {filteredEquipments.map((equipment) => (
+                                            <div
+                                                key={equipment.id}
+                                                onClick={() => handleSelectEquipment(equipment.id)}
+                                                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all duration-300 ${
+                                                    selectedEquipmentIds.includes(equipment.id)
+                                                        ? 'border-blue-500 bg-blue-900/20'
+                                                        : 'border-white/5 bg-slate-800/60 hover:border-blue-500/50 hover:bg-slate-800/80'
+                                                }`}
+                                            >
+                                                {/* Selection Checkbox */}
+                                                <div className="absolute right-2 top-2 z-20">
+                                                    <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
+                                                        selectedEquipmentIds.includes(equipment.id)
+                                                            ? 'border-blue-500 bg-blue-500'
+                                                            : 'border-slate-400 bg-slate-700/50'
+                                                    }`}>
+                                                        {selectedEquipmentIds.includes(equipment.id) && (
+                                                            <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Equipment Image */}
+                                                <div className="relative w-full overflow-hidden bg-slate-900/50">
+                                                    {equipment.image ? (
+                                                        <img
+                                                            src={equipment.image}
+                                                            alt={equipment.name}
+                                                            className="w-full h-auto max-h-[150px] object-contain"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex aspect-square w-full items-center justify-center bg-slate-800/50">
+                                                            <svg className="h-12 w-12 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Equipment Info */}
+                                                <div className="flex flex-1 flex-col p-3">
+                                                    <h3 className="mb-1 line-clamp-2 text-sm font-bold text-slate-100">
+                                                        {equipment.name}
+                                                    </h3>
+                                                    {equipment.product_code && (
+                                                        <p className="mb-2 text-xs text-slate-400">
+                                                            รหัส: {equipment.product_code}
+                                                        </p>
+                                                    )}
+                                                    <div className="mt-auto">
+                                                        <span className="text-base font-bold text-green-400">
+                                                            {formatPrice(equipment.price)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="sticky bottom-0 flex items-center justify-end gap-4 border-t border-white/10 bg-slate-800/95 backdrop-blur-sm px-6 py-4">
+                            <button
+                                onClick={handleCloseAddProductModal}
+                                className="rounded-lg bg-slate-700 px-6 py-2 font-semibold text-white transition-all hover:bg-slate-600"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={handleSaveSelectedEquipments}
+                                disabled={selectedEquipmentIds.length === 0 || (activeTab === 'promotion' && discountValue <= 0)}
+                                className="rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-2 font-semibold text-white transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                บันทึก ({selectedEquipmentIds.length})
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* Video Modal */}
+            {videoModal.isOpen && videoModal.videoUrl && (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+                    onClick={closeVideoModal}
+                >
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative w-full max-w-4xl mx-4"
+                    >
+                        {/* Close Button */}
+                        <button
+                            onClick={closeVideoModal}
+                            className="absolute -top-12 right-0 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
+                        >
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        
+                        {/* Video Container */}
+                        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                            {convertVideoLinkToEmbed(videoModal.videoUrl) ? (
+                                <iframe
+                                    src={convertVideoLinkToEmbed(videoModal.videoUrl) || ''}
+                                    className="absolute inset-0 w-full h-full"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                    title="Video Player"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full">
+                                    <a
+                                        href={videoModal.videoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-white hover:text-purple-400 transition-colors"
+                                    >
+                                        เปิดวิดีโอในแท็บใหม่
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* Bottom Navigation for Mobile */}
             <FootNav />

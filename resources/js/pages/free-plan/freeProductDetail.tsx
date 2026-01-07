@@ -60,7 +60,7 @@ const getYouTubeVideoId = (url: string): string | null => {
         /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/,
         /youtube\.com\/.*[?&]v=([^&\n?#]+)/,
     ];
-    
+
     for (const pattern of patterns) {
         const match = url.match(pattern);
         if (match && match[1]) {
@@ -76,7 +76,7 @@ const getVimeoVideoId = (url: string): string | null => {
         /vimeo\.com\/(\d+)/,
         /vimeo\.com\/.*\/(\d+)/,
     ];
-    
+
     for (const pattern of patterns) {
         const match = url.match(pattern);
         if (match && match[1]) {
@@ -97,14 +97,14 @@ const convertVideoLinkToEmbed = (url: string | null | undefined): string | null 
     // YouTube: https://youtu.be/VIDEO_ID or https://www.youtube.com/watch?v=VIDEO_ID
     const youtubeShortRegex = /(?:youtu\.be\/)([a-zA-Z0-9_-]+)/;
     const youtubeWatchRegex = /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]+)/;
-    
+
     const youtubeShortMatch = trimmedUrl.match(youtubeShortRegex);
     const youtubeWatchMatch = trimmedUrl.match(youtubeWatchRegex);
-    
+
     if (youtubeShortMatch) {
         return `https://www.youtube.com/embed/${youtubeShortMatch[1]}`;
     }
-    
+
     if (youtubeWatchMatch) {
         return `https://www.youtube.com/embed/${youtubeWatchMatch[1]}`;
     }
@@ -112,7 +112,7 @@ const convertVideoLinkToEmbed = (url: string | null | undefined): string | null 
     // Google Drive: https://drive.google.com/file/d/FILE_ID/view...
     const driveRegex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
     const driveMatch = trimmedUrl.match(driveRegex);
-    
+
     if (driveMatch) {
         return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
     }
@@ -129,9 +129,7 @@ const convertVideoLinkToEmbed = (url: string | null | undefined): string | null 
 function FreeProductDetail() {
     const page = usePage<PageProps>();
     const { product: initialProduct } = page.props;
-    const isAdmin = page.props.auth?.user?.is_admin || false;
     const [translations, setTranslations] = useState(getTranslations());
-    const [deleting, setDeleting] = useState(false);
     const [product, setProduct] = useState<Product | null>(initialProduct || null);
     const [loading, setLoading] = useState(!initialProduct);
     const [isEquipment, setIsEquipment] = useState(false);
@@ -163,15 +161,15 @@ function FreeProductDetail() {
                 // Ensure description is present
                 description: initialProduct.description || '',
             };
-            
+
             // Check if it's equipment (has equipment-specific fields)
-            const hasEquipmentFields = 
+            const hasEquipmentFields =
                 normalizedProduct.product_code !== undefined ||
                 normalizedProduct.brand !== undefined ||
                 normalizedProduct.waterVolumeLitersPerMinute !== undefined ||
                 normalizedProduct.radiusMeters !== undefined ||
                 normalizedProduct.pressureBar !== undefined;
-            
+
             setProduct(normalizedProduct);
             setIsEquipment(hasEquipmentFields && normalizedProduct.category === 'recommended');
             setLoading(false);
@@ -180,19 +178,6 @@ function FreeProductDetail() {
             setLoading(false);
         }
     }, [initialProduct]);
-
-    // Format date
-    const formatDate = (dateString: string | null) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('th-TH', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
 
     // Format price
     const formatPrice = (price: number) => {
@@ -206,46 +191,6 @@ function FreeProductDetail() {
     // Handle back button
     const handleBack = () => {
         router.visit('/free-plan/products');
-    };
-
-    // Handle delete
-    const handleDelete = () => {
-        if (!product) return;
-        if (!confirm(translations.confirmDeleteProduct || 'คุณต้องการลบสินค้านี้หรือไม่?')) return;
-
-        setDeleting(true);
-        if (isEquipment) {
-            // Delete equipment via API
-            fetch(`/api/equipments/${product.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '',
-                    'Content-Type': 'application/json',
-                },
-            })
-                .then((response) => {
-                    if (response.ok) {
-                        router.visit('/free-plan/products');
-                    } else {
-                        setDeleting(false);
-                        alert('เกิดข้อผิดพลาดในการลบสปริงเกอร์');
-                    }
-                })
-                .catch(() => {
-                    setDeleting(false);
-                    alert('เกิดข้อผิดพลาดในการลบสปริงเกอร์');
-                });
-        } else {
-            router.delete(`/admin/products/${product.id}`, {
-                onSuccess: () => {
-                    router.visit('/free-plan/products');
-                },
-                onError: () => {
-                    setDeleting(false);
-                    alert(translations.errorDeletingProduct || 'เกิดข้อผิดพลาดในการลบสินค้า');
-                },
-            });
-        }
     };
 
     // Format attribute value for display
@@ -280,11 +225,11 @@ function FreeProductDetail() {
     const getThaiDisplayName = (attributeName: string): string => {
         const thaiDisplayMap: { [key: string]: string } = {
             flow_rate: 'อัตราการไหล',
-            pressure: 'ความดัน',
-            radius: 'รัศมีการพ่น',
+            pressure: 'แรงดัน',
+            radius: 'รัศมี',
             waterVolumeLitersPerMinute: 'อัตราการไหล',
-            pressureBar: 'ความดัน',
-            radiusMeters: 'รัศมีการพ่น',
+            pressureBar: 'แรงดัน',
+            radiusMeters: 'รัศมี',
             power_hp: 'กำลัง',
             powerHP: 'กำลัง',
             powerKW: 'กำลัง',
@@ -292,10 +237,10 @@ function FreeProductDetail() {
             inlet_size_inch: 'ขนาดท่อดูด',
             outlet_size_inch: 'ขนาดท่อส่ง',
             flow_rate_lpm: 'อัตราการไหล',
-            head_m: 'หัวดัน',
-            max_head_m: 'หัวดันสูงสุด',
+            head_m: 'แรงส่ง',
+            max_head_m: 'แรงส่งสูงสุด',
             max_flow_rate_lpm: 'อัตราการไหลสูงสุด',
-            suction_depth_m: 'ความลึกดูด',
+            suction_depth_m: 'แรงดูด',
             weight_kg: 'น้ำหนัก',
             size_mm: 'ขนาด',
             size_inch: 'ขนาด',
@@ -319,8 +264,8 @@ function FreeProductDetail() {
             capacity: 'ความจุ',
             efficiency: 'ประสิทธิภาพ',
             temperature_range: 'ช่วงอุณหภูมิ',
-            operating_pressure: 'ความดันใช้งาน',
-            max_pressure: 'ความดันสูงสุด',
+            operating_pressure: 'แรงดันใช้งาน',
+            max_pressure: 'แรงดันสูงสุด',
             connection_type: 'ประเภทการต่อ',
             thread_size: 'ขนาดเกลียว',
         };
@@ -345,13 +290,13 @@ function FreeProductDetail() {
             phase: 'เฟส',
             inlet_size_inch: 'นิ้ว',
             outlet_size_inch: 'นิ้ว',
-            flow_rate_lpm: 'LPM',
+            flow_rate_lpm: 'ลิตรต่อนาที',
             head_m: 'เมตร',
             max_head_m: 'เมตร',
-            max_flow_rate_lpm: 'LPM',
+            max_flow_rate_lpm: 'ลิตรต่อนาที',
             suction_depth_m: 'เมตร',
             weight_kg: 'กก.',
-            waterVolumeLitersPerMinute: 'L/min',
+            waterVolumeLitersPerMinute: 'ลิตรต่อนาที',
             radiusMeters: 'เมตร',
             pressureBar: 'บาร์',
             size_mm: 'มม.',
@@ -476,11 +421,11 @@ function FreeProductDetail() {
             <FreeNav />
 
             {/* Main Content */}
-            <div className="mx-auto min-h-[calc(100vh-80px)] w-full max-w-4xl px-4 pb-24 pt-8 md:px-6 md:pb-8 md:pt-12">
+            <div className="mx-auto min-h-[calc(100vh-80px)] w-full max-w-4xl px-4 pb-24 pt-4 md:px-6 md:pb-8 md:pt-12">
                 {/* Back Button */}
                 <button
                     onClick={handleBack}
-                    className="mb-6 flex items-center gap-2 text-slate-300 transition-colors hover:text-white"
+                    className="mb-2 flex items-center gap-2 text-slate-300 transition-colors hover:text-white"
                 >
                     <svg
                         className="h-5 w-5"
@@ -499,79 +444,47 @@ function FreeProductDetail() {
                 </button>
 
                 <article className="rounded-xl bg-slate-800/80 backdrop-blur-sm p-6 md:p-8">
-                    {/* Admin Edit & Delete Buttons */}
-                    {isAdmin && (
-                        <div className="mb-6 flex justify-end gap-3">
-                            <button
-                                onClick={() => {
-                                    if (isEquipment) {
-                                        router.visit(`/equipments/${product.id}/edit`);
-                                    } else {
-                                        router.visit(`/admin/products/${product.id}/edit`);
-                                    }
-                                }}
-                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-700"
-                            >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                แก้ไข
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-red-700 disabled:opacity-50"
-                            >
-                                {deleting ? (
-                                    <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                ) : (
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                )}
-                                ลบ
-                            </button>
-                        </div>
-                    )}
-
                     {/* Product Header */}
-                    <div className="mb-6">
+                    <div className="mb-4">
                         {/* Category Badge */}
-                        <div className="mb-4 flex flex-wrap gap-2">
-                            {product.category === 'new' && (
-                                <span className="inline-flex items-center rounded-md bg-green-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                                    {translations.newBadge}
+                        <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
+                                {product.category === 'new' && (
+                                    <span className="inline-flex items-center rounded-md bg-green-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                                        {translations.newBadge}
+                                    </span>
+                                )}
+                                {product.category === 'promotion' && (
+                                    <span className="inline-flex items-center rounded-md bg-rose-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                                        {translations.promotionBadge}
+                                    </span>
+                                )}
+                                {product.category === 'promotion' && product.discount && product.discount > 0 && (
+                                    <span className="inline-flex items-center rounded-md bg-yellow-400/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-black">
+                                        -{product.discount}%
+                                    </span>
+                                )}
+                            </div>
+                            {/* Price */}
+                            <div className="flex items-baseline gap-3">
+                                <span className="text-3xl font-bold text-green-400 md:text-4xl">
+                                    {formatPrice(product.price)}
                                 </span>
-                            )}
-                            {product.category === 'promotion' && (
-                                <span className="inline-flex items-center rounded-md bg-rose-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                                    {translations.promotionBadge}
-                                </span>
-                            )}
-                            {product.category === 'recommended' && (
-                                <span className="inline-flex items-center rounded-md bg-blue-500/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                                    {translations.recommendedBadge}
-                                </span>
-                            )}
-                            {product.category === 'promotion' && product.discount && product.discount > 0 && (
-                                <span className="inline-flex items-center rounded-md bg-yellow-400/90 px-3 py-1 text-xs font-bold uppercase tracking-wide text-black">
-                                    -{product.discount}%
-                                </span>
-                            )}
+                                {/* แสดงราคาเดิมถ้ามี promotion (ไม่ว่าจะเป็น category ไหน) */}
+                                {product.originalPrice && product.originalPrice > product.price && (
+                                    <span className="text-lg text-slate-500 line-through decoration-slate-500/50">
+                                        {formatPrice(product.originalPrice)}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         {/* Title */}
-                        <h1 className="mb-4 text-2xl font-bold text-white md:text-3xl lg:text-4xl">
+                        <h1 className="mb-2 text-2xl font-bold text-white md:text-3xl lg:text-4xl">
                             {product.name}
                         </h1>
 
-                        {/* Price */}
-                        <div className="mb-4 flex items-baseline gap-3">
-                            <span className="text-3xl font-bold text-green-400 md:text-4xl">
-                                {formatPrice(product.price)}
-                            </span>
-                            {product.category === 'promotion' && product.originalPrice && (
-                                <span className="text-lg text-slate-500 line-through decoration-slate-500/50">
-                                    {formatPrice(product.originalPrice)}
-                                </span>
-                            )}
-                        </div>
+
 
                         {/* Meta Information */}
                         <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
@@ -585,24 +498,6 @@ function FreeProductDetail() {
                                 <div className="flex items-center gap-2">
                                     <span className="font-medium">แบรนด์:</span>
                                     <span>{product.brand}</span>
-                                </div>
-                            )}
-                            {product.created_at && (
-                                <div className="flex items-center gap-2">
-                                    <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                        />
-                                    </svg>
-                                    <span>{formatDate(product.created_at)}</span>
                                 </div>
                             )}
                         </div>
@@ -672,12 +567,12 @@ function FreeProductDetail() {
                             <h2 className="mb-4 text-xl font-bold text-white md:text-2xl">
                                 🎥 {translations.productVideo || 'วิดีโอสินค้า'}
                             </h2>
-                            
+
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.3 }}
-                                className="relative aspect-video w-full overflow-hidden rounded-lg bg-slate-900/50"
+                                className="relative aspect-video w-full h-[250px] overflow-hidden rounded-lg bg-slate-900/50"
                             >
                                 {youtubeId ? (
                                     <iframe
@@ -708,66 +603,13 @@ function FreeProductDetail() {
                         </div>
                     )}
 
-                    {/* Basic Information Summary - For Sprinklers */}
-                    {isEquipment && (
-                        <div className="mb-8 rounded-lg bg-slate-700/50 p-6">
-                            <h2 className="mb-4 text-xl font-bold text-white md:text-2xl">
-                                ข้อมูลพื้นฐาน
-                            </h2>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                {product.product_code && (
-                                    <div>
-                                        <label className="text-sm text-slate-400">รหัสสินค้า</label>
-                                        <p className="font-medium text-white">{product.product_code}</p>
-                                    </div>
-                                )}
-                                <div className="md:col-span-2">
-                                    <label className="text-sm text-slate-400">ชื่อสินค้า</label>
-                                    <p className="font-medium text-white">{product.name}</p>
-                                </div>
-                                {product.brand && (
-                                    <div>
-                                        <label className="text-sm text-slate-400">แบรนด์</label>
-                                        <p className="font-medium text-white">{product.brand}</p>
-                                    </div>
-                                )}
-                                <div className="md:col-span-2">
-                                    <label className="text-sm text-slate-400">ราคา</label>
-                                    <p className="font-medium text-green-400">
-                                        {formatPrice(product.price)} บาท
-                                    </p>
-                                </div>
-                                {product.stock !== undefined && product.stock !== null && (
-                                    <div>
-                                        <label className="text-sm text-slate-400">Stock</label>
-                                        <p className="font-medium text-blue-400">
-                                            {product.stock.toLocaleString()} ชิ้น
-                                        </p>
-                                    </div>
-                                )}
-                                {product.created_at && (
-                                    <div>
-                                        <label className="text-sm text-slate-400">วันที่เพิ่ม</label>
-                                        <p className="font-medium text-white">{formatDate(product.created_at)}</p>
-                                    </div>
-                                )}
-                                {product.updated_at && (
-                                    <div>
-                                        <label className="text-sm text-slate-400">แก้ไขล่าสุด</label>
-                                        <p className="font-medium text-white">{formatDate(product.updated_at)}</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Specific Attributes - For Sprinklers */}
                     {isEquipment && (() => {
                         const attributes = getAllAttributes();
                         return attributes.length > 0 ? (
                             <div className="mb-8 rounded-lg bg-slate-700/50 p-6">
                                 <h2 className="mb-4 text-xl font-bold text-white md:text-2xl">
-                                    คุณสมบัติเฉพาะ ({attributes.length} รายการ)
+                                    คุณสมบัติ
                                 </h2>
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     {attributes.map((attr, index) => {
@@ -803,24 +645,9 @@ function FreeProductDetail() {
                         <h2 className="mb-4 text-xl font-bold text-white md:text-2xl">
                             {translations.productDescription}
                         </h2>
-                        <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-300 md:text-lg">
+                        <div className="break-words text-base leading-relaxed text-slate-300 md:text-lg" style={{ whiteSpace: 'pre-line' }}>
                             {product.description}
                         </div>
-                    </div>
-
-                    {/* Action Button */}
-                    <div className="mt-8">
-                        <a
-                            href="https://shopee.co.th/kanokproduct"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-600 to-orange-700 px-6 py-4 text-lg font-bold text-white transition-all hover:from-orange-500 hover:to-orange-600 hover:shadow-lg hover:shadow-orange-900/30 active:scale-95"
-                        >
-                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                            </svg>
-                            {translations.viewDetails}
-                        </a>
                     </div>
                 </article>
             </div>

@@ -30,6 +30,8 @@ export default function CreateProduct() {
     const [uploadingImage, setUploadingImage] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [translations, setTranslations] = useState(getTranslations());
+    const [discountType, setDiscountType] = useState<'percent' | 'amount'>('percent');
+    const [discountAmount, setDiscountAmount] = useState<number>(0);
 
     // Listen for language changes
     useEffect(() => {
@@ -53,19 +55,54 @@ export default function CreateProduct() {
         if (product?.image_url) {
             setImagePreview(product.image_url);
         }
+        
+        // Set discount type and amount if product exists and is promotion
+        if (product && product.category === 'promotion' && product.originalPrice && product.discount) {
+            // Try to determine discount type from discount value
+            // If discount is > 100, it's likely amount, otherwise percent
+            // But we'll default to percent and let user change if needed
+            setDiscountType('percent');
+            if (product.originalPrice > 0) {
+                const calculatedAmount = (product.originalPrice * product.discount) / 100;
+                setDiscountAmount(calculatedAmount);
+            }
+        }
     }, [product]);
 
     // 1. เพิ่ม field ทั้งหมด รวมถึง 'image_url' แทน 'image'
     const { data, setData, post, put, processing, errors } = useForm({
         name: product?.name || '',
         description: product?.description || '',
-        price: product?.price || 0,
-        originalPrice: product?.originalPrice || 0,
+        price: product?.price ? Number(product.price) : 0,
+        originalPrice: product?.originalPrice ? Number(product.originalPrice) : 0,
         category: product?.category || ('new' as 'new' | 'promotion' | 'recommended'),
-        discount: product?.discount || 0,
+        discount: product?.discount ? Number(product.discount) : 0,
         image_url: product?.image_url || '',
         video_url: product?.video_url || '',
+        discount_type: 'percent' as 'percent' | 'amount',
+        discount_amount: 0,
     });
+
+    // Calculate price when discount changes for promotion
+    useEffect(() => {
+        if (data.category === 'promotion' && data.originalPrice > 0) {
+            let finalPrice = data.originalPrice;
+            const discountValue = Number(data.discount) || 0;
+            
+            if (discountType === 'percent' && discountValue > 0) {
+                finalPrice = data.originalPrice * (1 - discountValue / 100);
+            } else if (discountType === 'amount' && discountAmount > 0) {
+                finalPrice = Math.max(0, data.originalPrice - discountAmount);
+            }
+            
+            setData('price', finalPrice);
+        } else if (data.category !== 'promotion') {
+            // ถ้าไม่ใช่โปรโมชัน ให้ราคาเป็นราคาปกติ (ไม่ต้องคำนวณส่วนลด)
+            if (data.originalPrice > 0 && data.price !== data.originalPrice) {
+                setData('price', data.originalPrice);
+            }
+        }
+    }, [data.category, data.originalPrice, data.discount, discountType, discountAmount]);
 
     // Handle image upload (เหมือนกับข่าวสาร)
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,9 +193,20 @@ export default function CreateProduct() {
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        
+        // Prepare data with discount_type and discount_amount for promotion
+        const submitData = { ...data };
+        if (data.category === 'promotion') {
+            submitData.discount_type = discountType;
+            if (discountType === 'amount') {
+                submitData.discount_amount = discountAmount;
+            }
+        }
+        
         if (isEditMode && product) {
             // Update existing product
             put(`/admin/products/${product.id}`, {
+                data: submitData,
                 onSuccess: () => {
                     router.visit('/free-plan/products');
                 },
@@ -169,6 +217,7 @@ export default function CreateProduct() {
         } else {
             // Create new product
             post('/admin/products', {
+                data: submitData,
                 onSuccess: () => {
                     router.visit('/free-plan/products');
                 },
@@ -341,23 +390,103 @@ export default function CreateProduct() {
 
                         {/* Discount Field (only show if category is promotion) */}
                         {data.category === 'promotion' && (
-                            <div>
-                                <label htmlFor="discount" className="mb-1 block font-medium text-white">
-                                    {translations.discount}
+                            <div className="space-y-4 rounded-lg bg-slate-700/50 p-4 border border-white/5">
+                                <label className="mb-2 block font-medium text-white">
+                                    ตั้งค่าส่วนลด
                                 </label>
-                                <input
-                                    id="discount"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={data.discount}
-                                    onChange={(e) => setData('discount', parseInt(e.target.value) || 0)}
-                                    className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                    placeholder="0"
-                                    disabled={processing}
-                                />
-                                {errors.discount && (
-                                    <div className="mt-1 text-sm text-red-400">{errors.discount}</div>
+                                
+                                {/* Discount Type Selection */}
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="discountType"
+                                            value="percent"
+                                            checked={discountType === 'percent'}
+                                            onChange={(e) => {
+                                                setDiscountType('percent');
+                                                setDiscountAmount(0);
+                                                setData('discount', 0);
+                                            }}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-slate-300">ลดเป็น %</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="discountType"
+                                            value="amount"
+                                            checked={discountType === 'amount'}
+                                            onChange={(e) => {
+                                                setDiscountType('amount');
+                                                setDiscountAmount(0);
+                                                setData('discount', 0);
+                                            }}
+                                            className="w-4 h-4 text-blue-600"
+                                        />
+                                        <span className="text-slate-300">ลดเป็นบาท</span>
+                                    </label>
+                                </div>
+
+                                {/* Discount Value Input */}
+                                {discountType === 'percent' ? (
+                                    <div>
+                                        <label htmlFor="discount" className="mb-1 block text-sm font-medium text-slate-300">
+                                            ส่วนลด (%)
+                                        </label>
+                                        <input
+                                            id="discount"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="0.01"
+                                            value={data.discount}
+                                            onChange={(e) => setData('discount', parseFloat(e.target.value) || 0)}
+                                            className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                                            placeholder="0"
+                                            disabled={processing}
+                                        />
+                                        {errors.discount && (
+                                            <div className="mt-1 text-sm text-red-400">{errors.discount}</div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label htmlFor="discountAmount" className="mb-1 block text-sm font-medium text-slate-300">
+                                            ส่วนลด (บาท)
+                                        </label>
+                                        <input
+                                            id="discountAmount"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={discountAmount}
+                                            onChange={(e) => {
+                                                const amount = parseFloat(e.target.value) || 0;
+                                                setDiscountAmount(amount);
+                                                // Calculate discount percentage
+                                                if (data.originalPrice > 0) {
+                                                    const percent = (amount / data.originalPrice) * 100;
+                                                    setData('discount', percent);
+                                                }
+                                            }}
+                                            className="w-full rounded-md border border-slate-500 bg-white p-2.5 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                                            placeholder="0.00"
+                                            disabled={processing}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Price Preview */}
+                                {data.originalPrice > 0 && (
+                                    <div className="rounded-lg bg-slate-800/50 p-3 border border-white/5">
+                                        <div className="text-sm text-slate-400 mb-1">ราคาเดิม: {new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 }).format(data.originalPrice)}</div>
+                                        <div className="text-lg font-bold text-green-400">ราคาหลังลด: {new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 }).format(data.price)}</div>
+                                        {data.discount && Number(data.discount) > 0 && (
+                                            <div className="text-sm text-slate-400 mt-1">ส่วนลด: {Number(data.discount).toFixed(2)}%</div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}

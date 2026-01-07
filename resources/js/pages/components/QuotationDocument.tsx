@@ -1633,7 +1633,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             ${renderHeader()}
                             
                             <div class="flex flex-col items-center justify-center">
-                                <h1 class="text-2xl font-bold mb-8 text-center">{t('แผนผังโครงการระบบชลประทาน')}</h1>
+                                <h1 class="text-2xl font-bold mb-8 text-center">แผนผังโครงการ</h1>
                                 <div class="flex items-center justify-center w-full max-h-[800px]">
                                     <img
                                         src="${editableProjectImage}"
@@ -1713,6 +1713,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 </div>
             `
                     : '';
+
 
             const tableHeaderHTML = `
                 <thead>
@@ -1876,6 +1877,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             </div>
         </>
     );
+
 
     const renderTableHeader = () => (
         <thead>
@@ -2116,7 +2118,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                 <div className="flex flex-col items-center justify-center">
                     <h1 className="mb-8 text-center text-2xl font-bold">
-                        {t('แผนผังโครงการระบบชลประทาน')}
+                        {t('แผนผังโครงการ')}
                     </h1>
                     <div className="relative flex max-h-[800px] w-full items-center justify-center">
                         {isEditing ? (
@@ -2341,6 +2343,22 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             />
 
             <div className="mx-auto my-8 max-w-4xl p-4">
+                {/* Note สำหรับผู้ใช้ - แสดงด้านซ้ายของกระดาษ */}
+                <div className="no-print fixed left-4 top-20 w-64 rounded-lg border-2 border-yellow-500 bg-yellow-50 p-4 shadow-lg">
+                    <div className="flex items-start">
+                        <div className="mr-2 text-2xl">⚠️</div>
+                        <div className="text-sm text-gray-800">
+                            <p className="mb-2 font-bold text-yellow-800">
+                                {t('หมายเหตุสำคัญ:')}
+                            </p>
+                            <p className="leading-relaxed">
+                                {t('นี่เป็นเพียงการประเมินจำนวนและราคาของอุปกรณ์จากโปรแกรม ซึ่งอาจมีความคลาดเคลื่อนจากหน้างานจริง กรุณาติดต่อทีมผู้เชี่ยวชาญของบริษัทเพื่อตรวจสอบจากหน้างานจริงอีกครั้ง')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Debug info */}
                 <div className="no-print fixed bottom-4 left-4 rounded bg-gray-900 p-2 text-xs text-white">
                     <div>Items: {items.length}</div>
                     <div>Has image page: {hasProjectImagePage ? 'Yes' : 'No'}</div>

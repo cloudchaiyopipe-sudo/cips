@@ -788,6 +788,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // เพิ่ม Route สำหรับ Products
     Route::resource('products', ProductAdminController::class);
+    Route::post('products/create-from-equipments', [ProductAdminController::class, 'createFromEquipments'])->name('products.create-from-equipments');
 });
 
 // Free Plan Routes - ไม่ต้อง verify email (ย้ายออกมาจาก middleware verified)
@@ -795,6 +796,7 @@ Route::middleware(['auth'])->group(function () {
     // Free Plan Product Route - Sales users cannot access
     Route::get('/free-plan/products', [ProductController::class, 'index'])->name('free.products');
     Route::get('/free-plan/products/{id}', [ProductController::class, 'show'])->name('free.product.show')->where('id', '[0-9]+');
+    Route::get('/api/promotions', [ProductController::class, 'getPromotions'])->name('api.promotions');
 
     // Free Plan Routes - Sales users cannot access
     Route::get('/free-plan', function () {

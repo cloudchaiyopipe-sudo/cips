@@ -2131,8 +2131,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     </div>
                 </div>
             </div>
+            <p className="text-sm mt-4 text-red-400">** หมายเหตุ : ราคานี้เป็นเพียงแค่ราคาสินค้า ยังไม่รวมค่าติดตั้ง และราคาสินค้าเป็นเพียงราคาประมาณการซึ่งราคาอาจจะเปลี่ยนแปลงไปตามแหล่งที่ซื้อและช่วงโปรโมชั่น **</p>
 
-            <div className="mt-6 text-center">
+            <div className="mt-4 text-center">
                 <button
                     onClick={onQuotationClick}
                     className="rounded bg-gradient-to-r from-blue-500 to-purple-600 px-8 py-3 text-lg font-bold text-white hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"

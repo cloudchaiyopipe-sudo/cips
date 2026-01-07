@@ -13,16 +13,48 @@ class ProductController extends Controller
     {
         // 4. ดึงสินค้าทั้งหมดจาก DB และแปลงข้อมูลให้ตรงกับ frontend
         $products = Product::orderBy('created_at', 'desc')->get()->map(function ($product) {
+            // สำหรับสินค้าที่มี equipment_id ให้ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
+            // ถ้ามี ให้ใช้ราคา equipment ที่ถูกอัปเดต (ราคาหลังลด) และแสดง original_price เป็นราคาเดิม
+            $displayPrice = (float) $product->price;
+            $originalPrice = $product->original_price ? (float) $product->original_price : null;
+            $discount = $product->discount && $product->discount > 0 ? $product->discount : null;
+            
+            if ($product->equipment_id) {
+                $equipment = Equipment::find($product->equipment_id);
+                if ($equipment) {
+                    // ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
+                    $existingPromotion = Product::where('equipment_id', $product->equipment_id)
+                        ->where('category', 'promotion')
+                        ->where('id', '!=', $product->id)
+                        ->first();
+                    
+                    if ($existingPromotion && $existingPromotion->original_price) {
+                        // ถ้ามี promotion อยู่แล้ว:
+                        // - ใช้ราคา equipment ที่ถูกอัปเดต (ราคาหลังลด) เป็นราคาแสดง
+                        // - ใช้ original_price ของ promotion เป็นราคาเดิม
+                        $displayPrice = (float) $equipment->price; // ราคาหลังลด
+                        $originalPrice = (float) $existingPromotion->original_price; // ราคาเดิม
+                        $discount = $existingPromotion->discount && $existingPromotion->discount > 0 
+                            ? $existingPromotion->discount 
+                            : null;
+                    } else {
+                        // ถ้าไม่มี promotion ให้ใช้ราคา equipment ปัจจุบัน
+                        $displayPrice = (float) $equipment->price;
+                    }
+                }
+            }
+            
             return [
                 'id' => $product->id,
                 'name' => $product->name,
                 'description' => $product->description,
-                'price' => (float) $product->price,
-                'originalPrice' => $product->original_price ? (float) $product->original_price : null,
+                'price' => $displayPrice,
+                'originalPrice' => $originalPrice,
                 'image_url' => $product->image_url ?? '/images/no-image.jpg',
                 'video_url' => $product->video_url ?? null,
                 'category' => $product->category,
-                'discount' => $product->discount && $product->discount > 0 ? $product->discount : null,
+                'discount' => $discount,
+                'equipment_id' => $product->equipment_id,
                 'isNew' => $product->category === 'new',
                 'isPromotion' => $product->category === 'promotion',
                 'isRecommended' => $product->category === 'recommended',
@@ -42,18 +74,49 @@ class ProductController extends Controller
         $product = Product::find($id);
         
         if ($product) {
+            // สำหรับสินค้าที่มี equipment_id ให้ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
+            // ถ้ามี ให้ใช้ราคา equipment ที่ถูกอัปเดต (ราคาหลังลด) และแสดง original_price เป็นราคาเดิม
+            $displayPrice = (float) $product->price;
+            $originalPrice = $product->original_price ? (float) $product->original_price : null;
+            $discount = $product->discount && $product->discount > 0 ? $product->discount : null;
+            
+            if ($product->equipment_id) {
+                $equipment = Equipment::find($product->equipment_id);
+                if ($equipment) {
+                    // ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
+                    $existingPromotion = Product::where('equipment_id', $product->equipment_id)
+                        ->where('category', 'promotion')
+                        ->where('id', '!=', $product->id)
+                        ->first();
+                    
+                    if ($existingPromotion && $existingPromotion->original_price) {
+                        // ถ้ามี promotion อยู่แล้ว:
+                        // - ใช้ราคา equipment ที่ถูกอัปเดต (ราคาหลังลด) เป็นราคาแสดง
+                        // - ใช้ original_price ของ promotion เป็นราคาเดิม
+                        $displayPrice = (float) $equipment->price; // ราคาหลังลด
+                        $originalPrice = (float) $existingPromotion->original_price; // ราคาเดิม
+                        $discount = $existingPromotion->discount && $existingPromotion->discount > 0 
+                            ? $existingPromotion->discount 
+                            : null;
+                    } else {
+                        // ถ้าไม่มี promotion ให้ใช้ราคา equipment ปัจจุบัน
+                        $displayPrice = (float) $equipment->price;
+                    }
+                }
+            }
+            
             // Found as Product, return as is
             return Inertia::render('free-plan/freeProductDetail', [
                 'product' => [
                     'id' => $product->id,
                     'name' => $product->name,
                     'description' => $product->description,
-                    'price' => (float) $product->price,
-                    'originalPrice' => $product->original_price ? (float) $product->original_price : null,
+                    'price' => $displayPrice,
+                    'originalPrice' => $originalPrice,
                     'image_url' => $product->image_url ?? null,
                     'video_url' => $product->video_url ?? null,
                     'category' => $product->category,
-                    'discount' => $product->discount && $product->discount > 0 ? $product->discount : null,
+                    'discount' => $discount,
                     'created_at' => $product->created_at?->toDateTimeString(),
                     'updated_at' => $product->updated_at?->toDateTimeString(),
                 ]
@@ -67,6 +130,26 @@ class ProductController extends Controller
             // Use toCalculationFormat() to get all equipment data including attributes
             // This method automatically includes all attribute values like waterVolumeLitersPerMinute, radiusMeters, pressureBar
             $equipmentData = $equipment->toCalculationFormat();
+            
+            // ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
+            $displayPrice = (float) ($equipmentData['price'] ?? 0);
+            $originalPrice = null;
+            $discount = null;
+            
+            $existingPromotion = Product::where('equipment_id', $equipment->id)
+                ->where('category', 'promotion')
+                ->first();
+            
+            if ($existingPromotion && $existingPromotion->original_price) {
+                // ถ้ามี promotion อยู่แล้ว:
+                // - ใช้ราคา equipment ที่ถูกอัปเดต (ราคาหลังลด) เป็นราคาแสดง
+                // - ใช้ original_price ของ promotion เป็นราคาเดิม
+                $displayPrice = (float) $equipment->price; // ราคาหลังลด
+                $originalPrice = (float) $existingPromotion->original_price; // ราคาเดิม
+                $discount = $existingPromotion->discount && $existingPromotion->discount > 0 
+                    ? $existingPromotion->discount 
+                    : null;
+            }
             
             // Get all attributes for display
             // Try formatted_attributes first, then attributes_raw, then extract from equipmentData
@@ -93,10 +176,12 @@ class ProductController extends Controller
                     'id' => $equipmentData['id'],
                     'name' => $equipmentData['name'] ?? '',
                     'description' => $equipmentData['description'] ?? '',
-                    'price' => (float) ($equipmentData['price'] ?? 0),
+                    'price' => $displayPrice,
+                    'originalPrice' => $originalPrice,
                     'image_url' => $equipmentData['image'] ?? null, // Already uses image_url accessor
                     'video_url' => $equipmentData['video_link'] ?? null,
                     'category' => 'recommended',
+                    'discount' => $discount,
                     'product_code' => $equipmentData['product_code'] ?? $equipmentData['productCode'] ?? null,
                     'brand' => $equipmentData['brand'] ?? null,
                     // These come from getAttributesArray() via toCalculationFormat()
@@ -114,5 +199,23 @@ class ProductController extends Controller
         
         // Not found as both Product and Equipment
         abort(404, 'Product or Equipment not found');
+    }
+    
+    // API endpoint สำหรับ fetch promotions
+    public function getPromotions()
+    {
+        $products = Product::where('category', 'promotion')
+            ->whereNotNull('equipment_id')
+            ->whereNotNull('original_price')
+            ->get(['id', 'equipment_id', 'original_price']);
+        
+        $promotions = $products->map(function ($product) {
+            return [
+                'equipment_id' => $product->equipment_id,
+                'originalPrice' => (float) $product->original_price,
+            ];
+        });
+        
+        return response()->json(['promotions' => $promotions]);
     }
 }

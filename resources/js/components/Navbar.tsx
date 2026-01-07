@@ -229,8 +229,8 @@ const Navbar: React.FC = () => {
     return (
         <>
             <nav className="fixed top-0 left-0 right-0 z-50 border-b border-gray-700 bg-gray-800 shadow-lg">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="flex h-16 items-center justify-between">
+                <div className="mx-auto max-w-7xl px-2 sm:px-4 md:px-6 lg:px-8">
+                    <div className="flex h-14 sm:h-16 items-center justify-between">
                         {/* App Name and Logo */}
                         <div className="flex items-center">
                             <Link
@@ -261,7 +261,7 @@ const Navbar: React.FC = () => {
                         </div>
 
                         {/* Right side - Language Switcher and User Avatar */}
-                        <div className="flex items-center space-x-2 sm:space-x-4">
+                        <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
                             {/* Super User Dashboard Link */}
                             {auth?.user?.is_super_user && (
                                 <Link
@@ -273,7 +273,7 @@ const Navbar: React.FC = () => {
                                 </Link>
                             )}
 
-                            <div className="flex items-center gap-1 sm:gap-3">
+                            <div className="flex items-center gap-0.5 sm:gap-1 md:gap-3">
                                 {/* Help Programs Button */}
                                 <button
                                     onClick={() => setShowHelpProgramsModal(true)}
@@ -357,20 +357,20 @@ const Navbar: React.FC = () => {
 
             {/* Token Pricing Modal */}
             {showTokenPricingModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
-                    <div className="relative z-[10000] max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-gray-900 p-8">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4">
+                    <div className="relative z-[10000] max-h-[95vh] sm:max-h-[90vh] w-full max-w-[calc(100vw-1rem)] sm:max-w-2xl overflow-y-auto rounded-2xl bg-gray-900 p-4 sm:p-6 md:p-8 mx-2 sm:mx-0">
                         {/* Header */}
-                        <div className="mb-8 flex items-center justify-between">
-                            <div>
-                                <h2 className="mb-2 text-3xl font-bold text-white">Token System</h2>
-                                <p className="text-gray-400">Manage your tokens and view pricing</p>
+                        <div className="mb-4 sm:mb-6 md:mb-8 flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                                <h2 className="mb-1 sm:mb-2 text-xl sm:text-2xl md:text-3xl font-bold text-white">Token System</h2>
+                                <p className="text-xs sm:text-sm text-gray-400">Manage your tokens and view pricing</p>
                             </div>
                             <button
                                 onClick={() => setShowTokenPricingModal(false)}
-                                className="text-gray-400 transition-colors hover:text-white"
+                                className="text-gray-400 transition-colors hover:text-white flex-shrink-0"
                             >
                                 <svg
-                                    className="h-8 w-8"
+                                    className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -386,13 +386,13 @@ const Navbar: React.FC = () => {
                         </div>
 
                         {/* Token Packages */}
-                        <div className="mb-8">
-                            <h3 className="mb-4 text-xl font-semibold text-white">
+                        <div className="mb-4 sm:mb-6 md:mb-8">
+                            <h3 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold text-white">
                                 Buy Token Packages
                             </h3>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3">
                                 {/* Starter Package */}
-                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center transition-colors hover:border-blue-500">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6 text-center transition-colors hover:border-blue-500">
                                     <div className="mb-4">
                                         <div className="text-3xl font-bold text-blue-400">XXX</div>
                                         <div className="text-sm text-gray-400">Tokens</div>
@@ -413,9 +413,9 @@ const Navbar: React.FC = () => {
                                 </div>
 
                                 {/* Popular Package */}
-                                <div className="relative rounded-lg border-2 border-green-500 bg-gray-800 p-6 text-center">
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
-                                        <span className="whitespace-nowrap rounded-full bg-green-500 px-2 py-1 text-xs font-medium text-white">
+                                <div className="relative rounded-lg border-2 border-green-500 bg-gray-800 p-4 sm:p-5 md:p-6 text-center">
+                                    <div className="absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 transform">
+                                        <span className="whitespace-nowrap rounded-full bg-green-500 px-1.5 py-0.5 sm:px-2 sm:py-1 text-xs font-medium text-white">
                                             Most Popular
                                         </span>
                                     </div>
@@ -440,7 +440,7 @@ const Navbar: React.FC = () => {
                                 </div>
 
                                 {/* Premium Package */}
-                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center transition-colors hover:border-purple-500">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6 text-center transition-colors hover:border-purple-500">
                                     <div className="mb-4">
                                         <div className="text-3xl font-bold text-purple-400">
                                             XXX
@@ -465,7 +465,7 @@ const Navbar: React.FC = () => {
                             </div>
 
                             {/* Enterprise Package */}
-                            <div className="mt-6 rounded-lg border border-yellow-500 bg-gray-800 p-6 text-center">
+                            <div className="mt-4 sm:mt-6 rounded-lg border border-yellow-500 bg-gray-800 p-4 sm:p-5 md:p-6 text-center">
                                 <div className="mb-4">
                                     <div className="text-3xl font-bold text-yellow-400">XXX</div>
                                     <div className="text-sm text-gray-400">Tokens</div>
@@ -490,11 +490,11 @@ const Navbar: React.FC = () => {
                         </div>
 
                         {/* Token System Info */}
-                        <div className="rounded-lg border border-gray-700 bg-gray-800 p-6">
-                            <h3 className="mb-4 text-xl font-semibold text-white">
+                        <div className="rounded-lg border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6">
+                            <h3 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold text-white">
                                 How Token System Works
                             </h3>
-                            <div className="space-y-3 text-gray-300">
+                            <div className="space-y-2 sm:space-y-3 text-sm sm:text-base text-gray-300">
                                 <div className="flex items-start gap-3">
                                     <span className="text-green-400">✅</span>
                                     <div>
@@ -528,11 +528,11 @@ const Navbar: React.FC = () => {
 
                         {/* Usage Statistics */}
                         {tokenStatus && (
-                            <div className="mt-6 rounded-lg border border-gray-700 bg-gray-800 p-6">
-                                <h3 className="mb-4 text-xl font-semibold text-white">
+                            <div className="mt-4 sm:mt-6 rounded-lg border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6">
+                                <h3 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold text-white">
                                     Your Usage Statistics
                                 </h3>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                     <div>
                                         <div className="text-2xl font-bold text-blue-400">
                                             {tokenStatus.total_used || 0}
@@ -550,24 +550,24 @@ const Navbar: React.FC = () => {
 
             {/* Help Programs Modal */}
             {showHelpProgramsModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
-                    <div className="relative z-[10000] max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-gray-900 p-8">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4">
+                    <div className="relative z-[10000] max-h-[95vh] sm:max-h-[90vh] w-full max-w-[calc(100vw-1rem)] sm:max-w-4xl overflow-y-auto rounded-2xl bg-gray-900 p-4 sm:p-6 md:p-8 mx-2 sm:mx-0">
                         {/* Header */}
-                        <div className="mb-8 flex items-center justify-between">
-                            <div>
-                                <h2 className="mb-2 text-3xl font-bold text-white">
+                        <div className="mb-4 sm:mb-6 md:mb-8 flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                                <h2 className="mb-1 sm:mb-2 text-xl sm:text-2xl md:text-3xl font-bold text-white">
                                     {t('โปรแกรมช่วยเหลือ')}
                                 </h2>
-                                <p className="text-gray-400">
+                                <p className="text-xs sm:text-sm text-gray-400">
                                     {t('รายการโปรแกรมและเครื่องมือที่ช่วยในการวางแผนระบบชลประทาน')}
                                 </p>
                             </div>
                             <button
                                 onClick={() => setShowHelpProgramsModal(false)}
-                                className="text-gray-400 transition-colors hover:text-white"
+                                className="text-gray-400 transition-colors hover:text-white flex-shrink-0"
                             >
                                 <svg
-                                    className="h-8 w-8"
+                                    className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -583,36 +583,36 @@ const Navbar: React.FC = () => {
                         </div>
 
                         {/* Programs List */}
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
                             {helpPrograms.map((program, index) => (
                                 <div
                                     key={index}
-                                    className="group rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all hover:border-purple-500 hover:shadow-lg"
+                                    className="group rounded-lg border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6 transition-all hover:border-purple-500 hover:shadow-lg"
                                 >
-                                    <div className="mb-4 flex items-center gap-3">
-                                        <span className="text-3xl">{program.icon}</span>
-                                        <div className="flex-1">
-                                            <h3 className="text-xl font-semibold text-white">
+                                    <div className="mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
+                                        <span className="text-2xl sm:text-3xl flex-shrink-0">{program.icon}</span>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg sm:text-xl font-semibold text-white truncate">
                                                 {program.name}
                                             </h3>
-                                            <p className="mt-1 text-sm text-gray-400">
+                                            <p className="mt-1 text-xs sm:text-sm text-gray-400">
                                                 <span className="font-medium text-gray-300">
                                                     {t('เจ้าของ')}:
                                                 </span>{' '}
-                                                {program.owner}
+                                                <span className="break-words">{program.owner}</span>
                                             </p>
                                         </div>
                                     </div>
-                                    <p className="mb-4 text-gray-300">{program.description}</p>
+                                    <p className="mb-3 sm:mb-4 text-sm sm:text-base text-gray-300">{program.description}</p>
                                     <a
                                         href={program.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+                                        className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-white transition-colors hover:bg-purple-700"
                                     >
                                         <span>{t('เปิดโปรแกรม')}</span>
                                         <svg
-                                            className="h-4 w-4"
+                                            className="h-3 w-3 sm:h-4 sm:w-4"
                                             fill="none"
                                             stroke="currentColor"
                                             viewBox="0 0 24 24"

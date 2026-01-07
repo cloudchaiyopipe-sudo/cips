@@ -15,11 +15,18 @@ class Product extends Model
         'discount',
         'image_url',
         'video_url',
+        'equipment_id',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'original_price' => 'decimal:2',
-        'discount' => 'integer',
+        'discount' => 'decimal:2',
+        'equipment_id' => 'integer',
     ];
+
+    public function equipment()
+    {
+        return $this->belongsTo(Equipment::class);
+    }
 }

@@ -1,5 +1,4 @@
 <?php
-// this is file : database\migrations\2025_10_29_040347_add_sales_role_to_users_table.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -12,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->enum('role', ['user', 'sales', 'super_user'])->default('user')->after('is_super_user');
+        Schema::table('products', function (Blueprint $table) {
+            $table->foreignId('equipment_id')->nullable()->after('id')->constrained('equipments')->onDelete('cascade');
         });
     }
 
@@ -22,8 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('role');
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropForeign(['equipment_id']);
+            $table->dropColumn('equipment_id');
         });
     }
 };

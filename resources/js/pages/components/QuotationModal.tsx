@@ -36,7 +36,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             </label>
                             <input
                                 type="text"
-                                value={quotationData.yourReference}
+                                value={quotationData.yourReference || 'ผู้เชี่ยวชาญ'}
                                 onChange={(e) =>
                                     onQuotationDataChange({
                                         ...quotationData,
@@ -65,11 +65,11 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                         </div>
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('Salesperson:')}
+                                {t('ผู้ออกใบเสนอราคา:')}
                             </label>
                             <input
                                 type="text"
-                                value={quotationData.salesperson}
+                                value={quotationData.salesperson || 'ลูกค้า'}
                                 onChange={(e) =>
                                     onQuotationDataChange({
                                         ...quotationData,
@@ -117,7 +117,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                         </div> */}
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('ProjectName:')}
+                                {t('ชื่อโครงการ:')}
                             </label>
                             <input
                                 type="text"
@@ -129,11 +129,11 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                                     })
                                 }
                                 className="w-full rounded border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
-                                placeholder={t('ชื่อโครงการ')}
+                                placeholder={t('เช่น สวนทุเรียน 14 ไร่')}
                             />
                         </div>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{t('Name:')}</label>
+                            <label className="mb-2 block text-sm font-medium">{t('ชื่อ - นามสกุล:')}</label>
                             <input
                                 type="text"
                                 value={quotationDataCustomer.name}
@@ -150,7 +150,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
 
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('Address:')}
+                                {t('ที่อยู่:')}
                             </label>
                             <input
                                 type="text"
@@ -166,7 +166,7 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{t('Phone:')}</label>
+                            <label className="mb-2 block text-sm font-medium">{t('มือถือ:')}</label>
                             <input
                                 type="text"
                                 value={quotationDataCustomer.phone}
