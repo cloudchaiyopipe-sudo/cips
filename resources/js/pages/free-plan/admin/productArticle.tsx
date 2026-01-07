@@ -70,7 +70,7 @@ export default function CreateProduct() {
     }, [product]);
 
     // 1. เพิ่ม field ทั้งหมด รวมถึง 'image_url' แทน 'image'
-    const { data, setData, post, put, processing, errors } = useForm({
+    const { data, setData, processing, errors } = useForm({
         name: product?.name || '',
         description: product?.description || '',
         price: product?.price ? Number(product.price) : 0,
@@ -102,6 +102,7 @@ export default function CreateProduct() {
                 setData('price', data.originalPrice);
             }
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.category, data.originalPrice, data.discount, discountType, discountAmount]);
 
     // Handle image upload (เหมือนกับข่าวสาร)
@@ -205,8 +206,7 @@ export default function CreateProduct() {
         
         if (isEditMode && product) {
             // Update existing product
-            put(`/admin/products/${product.id}`, {
-                data: submitData,
+            router.put(`/admin/products/${product.id}`, submitData, {
                 onSuccess: () => {
                     router.visit('/free-plan/products');
                 },
@@ -216,8 +216,7 @@ export default function CreateProduct() {
             });
         } else {
             // Create new product
-            post('/admin/products', {
-                data: submitData,
+            router.post('/admin/products', submitData, {
                 onSuccess: () => {
                     router.visit('/free-plan/products');
                 },
@@ -403,7 +402,7 @@ export default function CreateProduct() {
                                             name="discountType"
                                             value="percent"
                                             checked={discountType === 'percent'}
-                                            onChange={(e) => {
+                                            onChange={() => {
                                                 setDiscountType('percent');
                                                 setDiscountAmount(0);
                                                 setData('discount', 0);
@@ -418,7 +417,7 @@ export default function CreateProduct() {
                                             name="discountType"
                                             value="amount"
                                             checked={discountType === 'amount'}
-                                            onChange={(e) => {
+                                            onChange={() => {
                                                 setDiscountType('amount');
                                                 setDiscountAmount(0);
                                                 setData('discount', 0);
