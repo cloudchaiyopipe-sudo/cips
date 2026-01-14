@@ -11,8 +11,10 @@ import {
     WaterSource,
     Pipe,
     ZONE_TYPES,
+    SPRINKLER_TYPES,
     clipCircleToPolygon,
     calculatePolygonArea,
+    getManualSprinklerColor,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -920,15 +922,61 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
         };
     }, [props.gardenZones, props.sprinklers]);
 
+    // ตรวจสอบว่าเป็นหัวฉีดอัตโนมัติหรือไม่ (จาก id pattern)
+    const isAutoSprinkler = useCallback((sprinkler: Sprinkler): boolean => {
+        // หัวฉีดอัตโนมัติมี id pattern: ${zone.id}_sprinkler_... หรือ ${zone.id}_corner_...
+        // หัวฉีดที่เพิ่มเองมี id pattern: sprinkler_${Date.now()}
+        return (
+            sprinkler.id.includes('_corner_') ||
+            sprinkler.id.match(/^[^_]+_sprinkler_/) !== null
+        );
+    }, []);
+
+    // ตรวจสอบว่าหัวฉีดที่เพิ่มเองตรงกับอัตโนมัติหรือไม่
+    // ถ้าคุณสมบัติ (รัศมี, แรงดัน, อัตราการไหล) เท่ากับหัวฉีดอัตโนมัติ → แสดงสีเดียวกัน (สีฟ้า)
+    const isMatchingAutoSprinkler = useCallback((sprinkler: Sprinkler): boolean => {
+        // หัวฉีดอัตโนมัติเป็นสีฟ้าเสมอ
+        if (isAutoSprinkler(sprinkler)) {
+            return true;
+        }
+        
+        // สำหรับหัวฉีดที่เพิ่มเอง: ตรวจสอบว่าคุณสมบัติตรงกับ SPRINKLER_TYPES ใดๆ หรือไม่
+        // ถ้ารัศมี, แรงดัน, อัตราการไหล เท่ากับหัวฉีดอัตโนมัติ → return true (แสดงสีฟ้า)
+        // ใช้การเปรียบเทียบที่ยืดหยุ่น: ใช้ tolerance 0.01 เพื่อหลีกเลี่ยงปัญหา floating point
+        const autoType = SPRINKLER_TYPES.find(
+            (st) => {
+                // ใช้ tolerance 0.01 สำหรับการเปรียบเทียบ (แม่นยำกว่า)
+                const radiusMatch = Math.abs(st.radius - sprinkler.type.radius) < 0.01;
+                const pressureMatch = Math.abs(st.pressure - sprinkler.type.pressure) < 0.01;
+                const flowRateMatch = Math.abs(st.flowRate - sprinkler.type.flowRate) < 0.01;
+                
+                return radiusMatch && pressureMatch && flowRateMatch;
+            }
+        );
+        
+        return !!autoType;
+    }, [isAutoSprinkler]);
+
     const createSprinklerIcon = useCallback(
         (
             sprinkler: Sprinkler,
             isSelected: boolean = false,
             orientation?: number
         ): google.maps.Symbol => {
+            // กำหนดสี:
+            // - หัวฉีดอัตโนมัติหรือตรงกับ SPRINKLER_TYPES = สีฟ้า (#33CCFF)
+            // - หัวฉีดที่เพิ่มเองที่มีคุณสมบัติเหมือนกัน = สีเดียวกัน (จาก 10 สี)
+            // - หัวฉีดที่เพิ่มเองที่มีคุณสมบัติต่างกัน = สีต่างกัน
+            const baseColor = getManualSprinklerColor(
+                sprinkler,
+                props.sprinklers,
+                isAutoSprinkler,
+                isMatchingAutoSprinkler
+            );
+
             return {
                 path: google.maps.SymbolPath.CIRCLE,
-                fillColor: isSelected ? '#FFD700' : sprinkler.type.color || '#33CCFF',
+                fillColor: isSelected ? '#FFD700' : baseColor,
                 fillOpacity: 0.9,
                 strokeColor: '#FFFFFF',
                 strokeWeight: isSelected ? 3 : 2,
@@ -936,7 +984,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                 rotation: orientation || 0,
             };
         },
-        []
+        [isAutoSprinkler, isMatchingAutoSprinkler, props.sprinklers]
     );
 
     const createWaterSourceIcon = useCallback((type: 'main' | 'pump'): google.maps.Icon => {

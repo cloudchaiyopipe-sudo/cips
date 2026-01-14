@@ -6,22 +6,29 @@ use App\Models\Product;
 use App\Models\Equipment;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Exception;
 
 class ProductController extends Controller
 {
     public function index()
     {
-        // 4. ดึงสินค้าทั้งหมดจาก DB และแปลงข้อมูลให้ตรงกับ frontend
-        $products = Product::orderBy('created_at', 'desc')->get()->map(function ($product) {
+        try {
+            // 4. ดึงสินค้าทั้งหมดจาก DB และแปลงข้อมูลให้ตรงกับ frontend
+            $products = Product::orderBy('created_at', 'desc')->get()->map(function ($product) {
             // สำหรับสินค้าที่มี equipment_id ให้ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
             // ถ้ามี ให้ใช้ราคา equipment ที่ถูกอัปเดต (ราคาหลังลด) และแสดง original_price เป็นราคาเดิม
             $displayPrice = (float) $product->price;
             $originalPrice = $product->original_price ? (float) $product->original_price : null;
             $discount = $product->discount && $product->discount > 0 ? $product->discount : null;
             
+            $productCode = null;
             if ($product->equipment_id) {
                 $equipment = Equipment::find($product->equipment_id);
                 if ($equipment) {
+                    // ดึง product_code จาก equipment
+                    $productCode = $equipment->product_code ?? null;
+                    
                     // ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
                     $existingPromotion = Product::where('equipment_id', $product->equipment_id)
                         ->where('category', 'promotion')
@@ -55,16 +62,30 @@ class ProductController extends Controller
                 'category' => $product->category,
                 'discount' => $discount,
                 'equipment_id' => $product->equipment_id,
+                'product_code' => $productCode,
                 'isNew' => $product->category === 'new',
                 'isPromotion' => $product->category === 'promotion',
                 'isRecommended' => $product->category === 'recommended',
             ];
-        });
+            });
 
-        // 5. ส่ง 'products' ไปเป็น Props
-        return Inertia::render('free-plan/productList', [
-            'products' => $products 
-        ]);
+            // 5. ส่ง 'products' ไปเป็น Props
+            return Inertia::render('free-plan/productList', [
+                'products' => $products 
+            ]);
+        } catch (Exception $e) {
+            Log::error('ProductController::index error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            
+            // Return empty products on error instead of crashing
+            return Inertia::render('free-plan/productList', [
+                'products' => []
+            ]);
+        }
     }
 
     // หน้า FreeProductDetail.tsx - รองรับทั้ง Product และ Equipment (Sprinkler)
@@ -79,10 +100,15 @@ class ProductController extends Controller
             $displayPrice = (float) $product->price;
             $originalPrice = $product->original_price ? (float) $product->original_price : null;
             $discount = $product->discount && $product->discount > 0 ? $product->discount : null;
+            $equipmentData = null;
+            $attributesRaw = null;
             
             if ($product->equipment_id) {
-                $equipment = Equipment::find($product->equipment_id);
+                $equipment = Equipment::with(['category', 'attributeValues.attribute'])->find($product->equipment_id);
                 if ($equipment) {
+                    // ใช้ toCalculationFormat() เพื่อดึงข้อมูล equipment รวมถึง attributes
+                    $equipmentData = $equipment->toCalculationFormat();
+                    
                     // ตรวจสอบว่ามี promotion อยู่แล้วหรือไม่
                     $existingPromotion = Product::where('equipment_id', $product->equipment_id)
                         ->where('category', 'promotion')
@@ -102,24 +128,54 @@ class ProductController extends Controller
                         // ถ้าไม่มี promotion ให้ใช้ราคา equipment ปัจจุบัน
                         $displayPrice = (float) $equipment->price;
                     }
+                    
+                    // Get all attributes for display
+                    // Try formatted_attributes first, then attributes_raw, then extract from equipmentData
+                    if (isset($equipmentData['formatted_attributes']) && is_array($equipmentData['formatted_attributes'])) {
+                        $attributesRaw = $equipmentData['formatted_attributes'];
+                    } elseif (isset($equipmentData['attributes_raw']) && is_array($equipmentData['attributes_raw'])) {
+                        $attributesRaw = $equipmentData['attributes_raw'];
+                    } else {
+                        // Extract attributes from equipmentData (skip basic fields)
+                        $skipFields = ['id', 'category_id', 'categoryId', 'product_code', 'productCode', 'name', 'brand', 'image', 'video_link', 'price', 'stock', 'description', 'is_active', 'category', 'attributes', 'formatted_attributes', 'attributes_raw', 'pumpAccessories', 'pumpAccessory', 'created_at', 'updated_at'];
+                        $attributesRaw = [];
+                        foreach ($equipmentData as $key => $value) {
+                            if (!in_array($key, $skipFields) && $value !== null && $value !== '') {
+                                $attributesRaw[$key] = $value;
+                            }
+                        }
+                    }
                 }
             }
             
-            // Found as Product, return as is
+            // Found as Product, return with equipment attributes if available
+            $productData = [
+                'id' => $product->id,
+                'name' => $product->name,
+                'description' => $product->description,
+                'price' => $displayPrice,
+                'originalPrice' => $originalPrice,
+                'image_url' => $product->image_url ?? null,
+                'video_url' => $product->video_url ?? null,
+                'category' => $product->category,
+                'discount' => $discount,
+                'created_at' => $product->created_at?->toDateTimeString(),
+                'updated_at' => $product->updated_at?->toDateTimeString(),
+            ];
+            
+            // Add equipment-related fields if equipment exists
+            if ($equipmentData) {
+                $productData['product_code'] = $equipmentData['product_code'] ?? $equipmentData['productCode'] ?? null;
+                $productData['brand'] = $equipmentData['brand'] ?? null;
+                $productData['waterVolumeLitersPerMinute'] = $equipmentData['waterVolumeLitersPerMinute'] ?? null;
+                $productData['radiusMeters'] = $equipmentData['radiusMeters'] ?? null;
+                $productData['pressureBar'] = $equipmentData['pressureBar'] ?? null;
+                $productData['attributes_raw'] = $attributesRaw;
+                $productData['stock'] = $equipmentData['stock'] ?? null;
+            }
+            
             return Inertia::render('free-plan/freeProductDetail', [
-                'product' => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'description' => $product->description,
-                    'price' => $displayPrice,
-                    'originalPrice' => $originalPrice,
-                    'image_url' => $product->image_url ?? null,
-                    'video_url' => $product->video_url ?? null,
-                    'category' => $product->category,
-                    'discount' => $discount,
-                    'created_at' => $product->created_at?->toDateTimeString(),
-                    'updated_at' => $product->updated_at?->toDateTimeString(),
-                ]
+                'product' => $productData
             ]);
         }
         

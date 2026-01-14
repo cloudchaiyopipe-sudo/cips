@@ -2103,10 +2103,10 @@ const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
     const totalPlantSpacings: number[] = [];
 
     subMainPipes.forEach((subMain) => {
-        const branchCount = subMain.branchPipes.length;
+        const branchCount = subMain.branchPipes?.length || 0;
         totalBranches += branchCount;
 
-        if (branchCount > 1) {
+        if (branchCount > 1 && subMain.branchPipes) {
             for (let i = 1; i < subMain.branchPipes.length; i++) {
                 const prevBranch = subMain.branchPipes[i - 1];
                 const currentBranch = subMain.branchPipes[i];
@@ -2125,8 +2125,8 @@ const calculateExactSpacingStats = (subMainPipes: SubMainPipe[]) => {
             }
         }
 
-        subMain.branchPipes.forEach((branch) => {
-            if (branch.plants.length > 1) {
+        (subMain.branchPipes || []).forEach((branch) => {
+            if (branch.plants && branch.plants.length > 1) {
                 for (let i = 1; i < branch.plants.length; i++) {
                     const plant1 = branch.plants[i - 1];
                     const plant2 = branch.plants[i];
@@ -3838,7 +3838,7 @@ const ManualZoneDrawingManager: React.FC<{
                             > = {};
                             let totalPlantCount = 0;
                             let totalWaterNeed = 0;
-                            zone.plants.forEach((plant) => {
+                            (zone.plants || []).forEach((plant) => {
                                 const name = plant.plantData.name;
                                 const waterNeed = Number(plant.plantData.waterNeed) || 0;
                                 if (!plantSummary[name]) {
@@ -5068,7 +5068,7 @@ const RealTimeBranchControlModal = ({
                         <strong>{t('ท่อเมนรอง')}:</strong> {subMainPipe.id}
                     </div>
                     <div>
-                        <strong>{t('จำนวนท่อย่อย')}:</strong> {subMainPipe.branchPipes.length}{' '}
+                        <strong>{t('จำนวนท่อย่อย')}:</strong> {subMainPipe.branchPipes?.length || 0}{' '}
                         {t('เส้น')}
                     </div>
                     <div>
@@ -5395,7 +5395,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                             string,
                                             { count: number; totalWater: number }
                                         > = {};
-                                        lateralPipe.plants.forEach((plant) => {
+                                        (lateralPipe.plants || []).forEach((plant) => {
                                             const name = plant.plantData.name;
                                             if (!plantSummary[name]) {
                                                 plantSummary[name] = { count: 0, totalWater: 0 };
@@ -5593,6 +5593,10 @@ export default function EnhancedHorticulturePlannerPage() {
     const [showRealTimeBranchModal, setShowRealTimeBranchModal] = useState(false);
 
     const [showPipeSegmentModal, setShowPipeSegmentModal] = useState(false);
+    
+    // Save Draft Modal state
+    const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
+    const [showProjectNameModal, setShowProjectNameModal] = useState(false);
     const [selectedBranchForSegment, setSelectedBranchForSegment] = useState<BranchPipe | null>(
         null
     );
@@ -5852,7 +5856,29 @@ export default function EnhancedHorticulturePlannerPage() {
         future: [],
     });
 
+    // Update mainArea ref
+    useEffect(() => {
+        latestMainAreaRef.current = history.present.mainArea;
+    }, [history.present.mainArea]);
+
+    // Update refs for plants, irrigationZones, selectedPlantType
+    useEffect(() => {
+        latestPlantsRef.current = history.present.plants;
+    }, [history.present.plants]);
+
+    useEffect(() => {
+        latestIrrigationZonesRef.current = history.present.irrigationZones;
+    }, [history.present.irrigationZones]);
+
+    useEffect(() => {
+        latestSelectedPlantTypeRef.current = history.present.selectedPlantType;
+    }, [history.present.selectedPlantType]);
+
     const latestLateralPipesRef = useRef(history.present.lateralPipes);
+    const latestMainAreaRef = useRef(history.present.mainArea);
+    const latestPlantsRef = useRef(history.present.plants);
+    const latestIrrigationZonesRef = useRef(history.present.irrigationZones);
+    const latestSelectedPlantTypeRef = useRef(history.present.selectedPlantType);
 
     useEffect(() => {
         latestLateralPipesRef.current = history.present.lateralPipes;
@@ -5966,7 +5992,7 @@ export default function EnhancedHorticulturePlannerPage() {
             const movedPlants: PlantLocation[] = [];
             const removedPlantIds = new Set<string>();
 
-            history.present.plants.forEach((plant) => {
+            (history.present.plants || []).forEach((plant) => {
                 const newPosition: Coordinate = {
                     lat: plant.position.lat + offset.lat,
                     lng: plant.position.lng + offset.lng,
@@ -6283,7 +6309,7 @@ export default function EnhancedHorticulturePlannerPage() {
             );
             const removedPlantIds = new Set<string>();
 
-            history.present.plants.forEach((plant) => {
+            (history.present.plants || []).forEach((plant) => {
                 if (selectedPlantsForMove.has(plant.id)) {
                     const newPosition: Coordinate = {
                         lat: plant.position.lat + offset.lat,
@@ -7171,7 +7197,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     const allPlantsFromBothPipes: PlantLocation[] = [...plants];
 
                     if (fromLateralPipe) {
-                        fromLateralPipe.plants.forEach((plant: any) => {
+                        (fromLateralPipe.plants || []).forEach((plant: any) => {
                             if (!allPlantsFromBothPipes.some((p) => p.id === plant.id)) {
                                 allPlantsFromBothPipes.push(plant);
                             }
@@ -7179,7 +7205,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     }
 
                     if (toLateralPipe) {
-                        toLateralPipe.plants.forEach((plant: any) => {
+                        (toLateralPipe.plants || []).forEach((plant: any) => {
                             if (!allPlantsFromBothPipes.some((p) => p.id === plant.id)) {
                                 allPlantsFromBothPipes.push(plant);
                             }
@@ -7335,7 +7361,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     }
                 }
                 if (fromLateralPipe) {
-                    (fromLateralPipe as any).plants.forEach((plant: any) => {
+                    ((fromLateralPipe as any).plants || []).forEach((plant: any) => {
                         if (!allPlantsForNewPipe.some((p) => p.id === plant.id)) {
                             allPlantsForNewPipe.push(plant);
                         }
@@ -7350,7 +7376,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     }
                 }
                 if (toLateralPipe) {
-                    (toLateralPipe as any).plants.forEach((plant: any) => {
+                    ((toLateralPipe as any).plants || []).forEach((plant: any) => {
                         if (!allPlantsForNewPipe.some((p) => p.id === plant.id)) {
                             allPlantsForNewPipe.push(plant);
                         }
@@ -7551,6 +7577,9 @@ export default function EnhancedHorticulturePlannerPage() {
                         minAngle: 0,
                         angleStep: 1,
                     },
+                    // ✅ Enable edit mode เพื่อให้เครื่องมือวาดทำงานได้
+                    isEditModeEnabled: true,
+                    editMode: null,
                 };
 
                 dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
@@ -7558,14 +7587,16 @@ export default function EnhancedHorticulturePlannerPage() {
                 // Update lateral pipes state with loaded data
                 setLateralPipesState(loadedState.lateralPipes || []);
 
-                if (projectData.mainArea && projectData.mainArea.length > 0) {
+                if (projectData.mainArea && Array.isArray(projectData.mainArea) && projectData.mainArea.length > 0) {
                     setTimeout(() => {
                         if (mapRef.current) {
                             try {
                                 const bounds = new google.maps.LatLngBounds();
 
                                 projectData.mainArea.forEach((coord: any) => {
-                                    bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                    if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
+                                        bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                    }
                                 });
 
                                 mapRef.current.fitBounds(bounds, {
@@ -7627,6 +7658,9 @@ export default function EnhancedHorticulturePlannerPage() {
                         autoGenerateEmitters: true,
                         emitterDiameter: 4,
                     },
+                    // ✅ Enable edit mode เพื่อให้เครื่องมือวาดทำงานได้
+                    isEditModeEnabled: true,
+                    editMode: null,
                 };
 
                 if (!safeLocalStorageSet('currentFieldId', fieldId)) {
@@ -7650,14 +7684,16 @@ export default function EnhancedHorticulturePlannerPage() {
                     // ไม่ต้องเรียก regeneratePlantsForAllZones เพราะข้อมูลพืชมีอยู่แล้ว
                 }, 500);
 
-                if (projectData.mainArea && projectData.mainArea.length > 0) {
+                if (projectData.mainArea && Array.isArray(projectData.mainArea) && projectData.mainArea.length > 0) {
                     setTimeout(() => {
                         if (mapRef.current) {
                             try {
                                 const bounds = new google.maps.LatLngBounds();
 
                                 projectData.mainArea.forEach((coord: any) => {
-                                    bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                    if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
+                                        bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                    }
                                 });
 
                                 mapRef.current.fitBounds(bounds, {
@@ -9230,7 +9266,9 @@ export default function EnhancedHorticulturePlannerPage() {
                     [0, 0]
                 );
                 setMapCenter([center[0] / coordinates.length, center[1] / coordinates.length]);
+                
                 pushToHistory({ mainArea: coordinates });
+                
                 setEditMode(null);
                 setTimeout(() => {
                     if (mapRef.current && coordinates.length > 0) {
@@ -9907,37 +9945,286 @@ export default function EnhancedHorticulturePlannerPage() {
         ]
     );
 
-    const handleSaveDraft = useCallback(
-        async (customLateralPipes?: LateralPipe[]) => {
-            const existingFieldId = localStorage.getItem('currentFieldId');
-            const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-');
+    // Project Name Modal Component
+    const ProjectNameModal: React.FC<{
+        isOpen: boolean;
+        onClose: () => void;
+        onSave: (projectName: string) => void;
+        defaultName: string;
+        isEditingExisting: boolean;
+        t: (key: string) => string;
+    }> = ({ isOpen, onClose, onSave, defaultName, isEditingExisting, t }) => {
+        const [projectName, setProjectName] = useState(defaultName);
 
-            const draftName = isEditingExisting
-                ? localStorage.getItem('currentFieldName') ||
-                `Draft - ${new Date().toLocaleString('th-TH')}`
-                : `Draft - ${new Date().toLocaleString('th-TH')}`;
+        useEffect(() => {
+            if (isOpen) {
+                setProjectName(defaultName);
+            }
+        }, [isOpen, defaultName]);
+
+        const handleSave = () => {
+            if (projectName.trim() === '') {
+                alert(t('กรุณากรอกชื่อโครงการ'));
+                return;
+            }
+            onSave(projectName.trim());
+        };
+
+        if (!isOpen) return null;
+
+        return (
+            <>
+                {/* Backdrop */}
+                <div
+                    className="fixed inset-0 z-[9998] bg-black bg-opacity-50"
+                    onClick={onClose}
+                />
+
+                {/* Modal */}
+                <div className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-300 bg-white shadow-2xl">
+                    {/* Header */}
+                    <div className="flex items-center justify-between rounded-t-lg bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 text-white">
+                        <div className="flex items-center gap-2">
+                            <FaSave size={20} />
+                            <span className="text-lg font-semibold">
+                                {isEditingExisting ? t('แก้ไขชื่อโครงการ') : t('ตั้งชื่อโครงการ')}
+                            </span>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="text-blue-200 transition-colors hover:text-white"
+                            title={t('ปิด')}
+                        >
+                            <FaTimes size={18} />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6">
+                        <div className="mb-4">
+                            <label className="mb-2 block text-sm font-medium text-gray-700">
+                                {t('ชื่อโครงการ')}
+                            </label>
+                            <input
+                                type="text"
+                                value={projectName}
+                                onChange={(e) => setProjectName(e.target.value)}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleSave();
+                                    }
+                                }}
+                                placeholder={t('เช่น สวนทุเรียน จ.จันทบุรี 34 ไร่')}
+                                className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                            />
+                            {isEditingExisting && (
+                                <p className="mt-2 text-sm text-gray-500">
+                                    {t('แก้ไขชื่อโครงการเดิม')} <strong>{defaultName}</strong>
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3">
+                            {/* Cancel Button */}
+                            <button
+                                onClick={onClose}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                            >
+                                <FaTimes size={14} />
+                                <span>{t('ยกเลิก')}</span>
+                            </button>
+
+                            {/* Save Button */}
+                            <button
+                                onClick={handleSave}
+                                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-600"
+                            >
+                                <FaSave size={16} />
+                                <span>{t('บันทึก')}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    };
+
+    // Save Draft Modal Component
+    const SaveDraftModal: React.FC<{
+        isOpen: boolean;
+        onClose: () => void;
+        onSave: (draftName: string) => void;
+        onSaveAs: () => void;
+        draftName: string;
+        t: (key: string) => string;
+    }> = ({ isOpen, onClose, onSave, onSaveAs, draftName, t }) => {
+        if (!isOpen) return null;
+
+        return (
+            <>
+                {/* Backdrop */}
+                <div
+                    className="fixed inset-0 z-[9998] bg-black bg-opacity-50"
+                    onClick={onClose}
+                />
+
+                {/* Modal */}
+                <div className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-300 bg-white shadow-2xl">
+                    {/* Header */}
+                    <div className="flex items-center justify-between rounded-t-lg bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 text-white">
+                        <div className="flex items-center gap-2">
+                            <FaSave size={20} />
+                            <span className="text-lg font-semibold">
+                                {t('บันทึกแบบร่าง')}
+                            </span>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="text-blue-200 transition-colors hover:text-white"
+                            title={t('ปิด')}
+                        >
+                            <FaTimes size={18} />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6">
+                        <div className="mb-4">
+                            <div className="bg-blue-50 border-l-4 border-blue-500 rounded p-3 mb-3">
+                                <p className="text-lg font-semibold text-blue-900">
+                                    {draftName || 'Untitled Project'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* Save Button */}
+                            <button
+                                onClick={() => {
+                                    onSave(draftName);
+                                    onClose();
+                                }}
+                                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-600"
+                            >
+                                <FaSave size={16} />
+                                <span>{t('บันทึกทับแบบร่างเดิม')}</span>
+                            </button>
+
+                            {/* Save As Button */}
+                            <button
+                                onClick={() => {
+                                    onSaveAs();
+                                    onClose();
+                                }}
+                                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-blue-500 bg-white px-4 py-3 font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                            >
+                                <FaCopy size={16} />
+                                <span>{t('บันทึกเป็นแบบร่างใหม่')}</span>
+                            </button>
+
+                            {/* Cancel Button */}
+                            <button
+                                onClick={onClose}
+                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                            >
+                                <FaTimes size={14} />
+                                <span>{t('ยกเลิก')}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    };
+
+    // Handler for Save Draft button click
+    const handleSaveDraftClick = useCallback(() => {
+        const existingFieldId = localStorage.getItem('currentFieldId');
+        const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-');
+
+        if (isEditingExisting) {
+            // ถ้าเป็นการแก้ไข draft เดิม → แสดง SaveDraftModal ก่อน
+            setShowSaveDraftModal(true);
+        } else {
+            // ถ้าเป็นการบันทึกครั้งแรก → แสดง ProjectNameModal ให้ตั้งชื่อ
+            setShowProjectNameModal(true);
+        }
+    }, []);
+
+    const handleSaveDraft = useCallback(
+        async (customLateralPipes?: LateralPipe[], forceSaveAs: boolean = false, customProjectName?: string) => {
+            const existingFieldId = localStorage.getItem('currentFieldId');
+            const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-') && !forceSaveAs;
+
+            const draftName = customProjectName || 
+                (isEditingExisting
+                    ? localStorage.getItem('currentFieldName') ||
+                    `Draft - ${new Date().toLocaleString('th-TH')}`
+                    : `Draft - ${new Date().toLocaleString('th-TH')}`);
 
             // Use customLateralPipes if provided, otherwise use lateralPipesState if available, otherwise fall back to history state
             const currentLateralPipes =
                 customLateralPipes ||
                 (lateralPipesState.length > 0 ? lateralPipesState : history.present.lateralPipes);
 
+            // Calculate total water need from irrigationZones or plants
+            const calculateTotalWaterNeed = () => {
+                if (history.present.irrigationZones && history.present.irrigationZones.length > 0) {
+                    return history.present.irrigationZones.reduce(
+                        (sum, zone) => sum + (zone.totalWaterNeed || 0),
+                        0
+                    );
+                }
+                // Fallback to plants calculation
+                return history.present.plants.reduce(
+                    (sum, plant) => sum + (plant.plantData?.waterNeed || 0),
+                    0
+                );
+            };
+
+            const totalWaterNeed = calculateTotalWaterNeed();
+
+            // Use latestRef to get the most up-to-date data
+            const currentMainArea = latestMainAreaRef.current;
+            const currentPlants = latestPlantsRef.current;
+            const currentIrrigationZones = latestIrrigationZonesRef.current;
+            const currentSelectedPlantType = latestSelectedPlantTypeRef.current;
+            
+            const currentTotalArea = calculateAreaFromCoordinates(currentMainArea);
+            
+            // Recalculate total water need with current data
+            const currentTotalWaterNeed = (() => {
+                if (currentIrrigationZones && currentIrrigationZones.length > 0) {
+                    return currentIrrigationZones.reduce(
+                        (sum, zone) => sum + (zone.totalWaterNeed || 0),
+                        0
+                    );
+                }
+                return currentPlants.reduce(
+                    (sum, plant) => sum + (plant.plantData?.waterNeed || 0),
+                    0
+                );
+            })();
+
+
             const projectData = {
                 projectName: draftName,
                 customerName: customerName || 'Draft Customer',
                 version: '4.0.0',
-                totalArea: totalArea,
-                mainArea: history.present.mainArea,
+                totalArea: currentTotalArea,
+                mainArea: currentMainArea,
                 pump: history.present.pump,
                 zones: history.present.zones,
-                irrigationZones: history.present.irrigationZones, // Add irrigation zones
+                irrigationZones: currentIrrigationZones, // Use current irrigation zones
                 mainPipes: history.present.mainPipes,
                 subMainPipes: history.present.subMainPipes,
                 lateralPipes: currentLateralPipes,
                 exclusionAreas: history.present.exclusionAreas,
-                plants: history.present.plants,
+                plants: currentPlants, // Use current plants
                 useZones: history.present.useZones,
-                selectedPlantType: history.present.selectedPlantType,
+                selectedPlantType: currentSelectedPlantType, // Use current selected plant type
+                availablePlants: history.present.availablePlants, // Add availablePlants
                 branchPipeSettings: history.present.branchPipeSettings,
                 lateralPipeSettings: history.present.lateralPipeSettings,
                 createdAt: new Date().toISOString(),
@@ -9990,9 +10277,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 projectStats: {
                     totalAreaInRai: totalArea / 1600,
                     totalPlants: history.present.plants.length,
-                    totalWaterNeedPerSession:
-                        history.present.plants.length *
-                        (history.present.selectedPlantType?.waterNeed || 50),
+                    totalWaterNeedPerSession: totalWaterNeed,
                     zones: history.present.zones.length,
                     mainPipes: history.present.mainPipes.length,
                     subMainPipes: history.present.subMainPipes.length,
@@ -10031,13 +10316,14 @@ export default function EnhancedHorticulturePlannerPage() {
                 category: 'horticulture',
                 status: 'unfinished',
                 is_completed: false,
-                total_area: totalArea / 1600,
-                total_plants: history.present.plants.length,
-                total_water_need:
-                    history.present.plants.length *
-                    (history.present.selectedPlantType?.waterNeed || 50),
-                area_coordinates: history.present.mainArea,
-                plant_type_id: history.present.selectedPlantType?.id || 1,
+                total_area: currentTotalArea / 1600,
+                total_plants: currentPlants.length,
+                total_water_need: currentTotalWaterNeed,
+                area_coordinates: currentMainArea,
+                // Use default plant type (1) if custom plant (id > 10)
+                plant_type_id: (currentSelectedPlantType?.id && currentSelectedPlantType.id <= 10) 
+                    ? currentSelectedPlantType.id 
+                    : 1,
                 area_type: 'polygon',
                 zone_operation_mode: 'sequential',
                 zone_operation_groups: [],
@@ -10058,11 +10344,9 @@ export default function EnhancedHorticulturePlannerPage() {
                 project_mode: 'horticulture',
                 project_data: projectData,
                 project_stats: {
-                    totalAreaInRai: totalArea / 1600,
-                    totalPlants: history.present.plants.length,
-                    totalWaterNeedPerSession:
-                        history.present.plants.length *
-                        (history.present.selectedPlantType?.waterNeed || 50),
+                    totalAreaInRai: currentTotalArea / 1600,
+                    totalPlants: currentPlants.length,
+                    totalWaterNeedPerSession: currentTotalWaterNeed,
                     zones: history.present.zones.length,
                     mainPipes: history.present.mainPipes.length,
                     subMainPipes: history.present.subMainPipes.length,
@@ -10075,6 +10359,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 },
                 last_saved: new Date().toISOString(),
             };
+
 
             try {
                 let response;
@@ -10110,15 +10395,15 @@ export default function EnhancedHorticulturePlannerPage() {
                         is_completed: false,
                         total_area: totalArea / 1600,
                         total_plants: history.present.plants.length,
-                        total_water_need:
-                            history.present.plants.length *
-                            (history.present.selectedPlantType?.waterNeed || 50),
+                        total_water_need: totalWaterNeed,
                         area_coordinates: history.present.mainArea,
                         plant_type_id: history.present.selectedPlantType?.id || 1,
                         area_type: 'polygon',
                     };
 
+
                     await axios.put(`/api/fields/${existingFieldId}`, basicFieldData);
+                    
 
                     const jsonFieldData = {
                         status: 'unfinished',
@@ -10144,9 +10429,7 @@ export default function EnhancedHorticulturePlannerPage() {
                         project_stats: {
                             totalAreaInRai: totalArea / 1600,
                             totalPlants: history.present.plants.length,
-                            totalWaterNeedPerSession:
-                                history.present.plants.length *
-                                (history.present.selectedPlantType?.waterNeed || 50),
+                            totalWaterNeedPerSession: totalWaterNeed,
                             zones: history.present.zones.length,
                             mainPipes: history.present.mainPipes.length,
                             subMainPipes: history.present.subMainPipes.length,
@@ -10165,11 +10448,17 @@ export default function EnhancedHorticulturePlannerPage() {
                         jsonFieldData
                     );
                 } else {
+                    // สร้าง draft ใหม่ - ลบ currentFieldId และ currentFieldName เพื่อให้เป็น draft ใหม่
+                    if (forceSaveAs) {
+                        localStorage.removeItem('currentFieldId');
+                        localStorage.removeItem('currentFieldName');
+                    }
                     response = await axios.post('/api/fields', fieldData);
                 }
 
                 if (response.data.success) {
                     const fieldId = response.data.field?.id || response.data.field_id;
+                    
 
                     if (!safeLocalStorageSet('currentFieldId', fieldId)) {
                         console.error('❌ Failed to save currentFieldId');
@@ -12778,7 +13067,7 @@ export default function EnhancedHorticulturePlannerPage() {
             let closestPlant: any = null;
             let minDistance = Infinity;
 
-            history.present.plants.forEach((plant: any) => {
+            (history.present.plants || []).forEach((plant: any) => {
                 const distance = Math.sqrt(
                     Math.pow(plant.position.lat - waypointPosition.lat, 2) +
                     Math.pow(plant.position.lng - waypointPosition.lng, 2)
@@ -14521,7 +14810,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                             > = {};
                                                                             let totalPlantCount = 0;
                                                                             let totalWaterNeed = 0;
-                                                                            zone.plants.forEach(
+                                                                            (zone.plants || []).forEach(
                                                                                 (plant) => {
                                                                                     const name =
                                                                                         plant
@@ -15426,7 +15715,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                 <span className="font-medium">
                                                                     {history.present.subMainPipes.reduce(
                                                                         (sum, sm) =>
-                                                                            sum + sm.branchPipes.length,
+                                                                            sum + (sm.branchPipes?.length || 0),
                                                                         0
                                                                     ) +
                                                                         history.present.lateralPipes
@@ -15662,10 +15951,10 @@ export default function EnhancedHorticulturePlannerPage() {
                     )}
                     {isCompactMode ? (
                         <>
-                            <button
-                                onClick={() => handleSaveDraft()}
-                                disabled={!canSaveDraft}
-                                className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${canSaveDraft
+                                            <button
+                                                onClick={handleSaveDraftClick}
+                                                disabled={!canSaveDraft}
+                                                className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${canSaveDraft
                                     ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                                     : 'cursor-not-allowed bg-gray-300 text-gray-500'
                                     }`}
@@ -15710,7 +15999,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     ) : (
                         <div className="flex w-full space-x-1">
                             <button
-                                onClick={() => handleSaveDraft()}
+                                onClick={handleSaveDraftClick}
                                 disabled={!canSaveDraft}
                                 className={`flex flex-1 items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${canSaveDraft
                                     ? 'bg-yellow-600 text-white hover:bg-yellow-700'
@@ -16434,6 +16723,21 @@ export default function EnhancedHorticulturePlannerPage() {
                 t={t}
             />
 
+            <SaveDraftModal
+                isOpen={showSaveDraftModal}
+                onClose={() => setShowSaveDraftModal(false)}
+                onSave={() => {
+                    setShowSaveDraftModal(false);
+                    handleSaveDraft(undefined, false);
+                }}
+                onSaveAs={() => {
+                    setShowSaveDraftModal(false);
+                    handleSaveDraft(undefined, true);
+                }}
+                draftName={localStorage.getItem('currentFieldName') || `Draft - ${new Date().toLocaleString('th-TH')}`}
+                t={t}
+            />
+
             <RealTimeBranchControlModal
                 isOpen={showRealTimeBranchModal}
                 onClose={() => setShowRealTimeBranchModal(false)}
@@ -16520,6 +16824,38 @@ export default function EnhancedHorticulturePlannerPage() {
                 onSave={handleSprinklerConfigSave}
                 plantCount={history.present.plants.length}
                 selectedPlantType={history.present.selectedPlantType}
+                t={t}
+            />
+
+            {/* Save Draft Modal (for editing existing draft) */}
+            <SaveDraftModal
+                isOpen={showSaveDraftModal}
+                onClose={() => setShowSaveDraftModal(false)}
+                onSave={(draftName) => {
+                    // บันทึกทับร่างเดิม (ใช้ชื่อเดิม)
+                    setShowSaveDraftModal(false);
+                    handleSaveDraft(undefined, false, draftName);
+                }}
+                onSaveAs={() => {
+                    // บันทึกเป็นร่างใหม่ → แสดง ProjectNameModal ให้ตั้งชื่อ
+                    setShowSaveDraftModal(false);
+                    setShowProjectNameModal(true);
+                }}
+                draftName={localStorage.getItem('currentFieldName') || 'Draft'}
+                t={t}
+            />
+
+            {/* Project Name Modal */}
+            <ProjectNameModal
+                isOpen={showProjectNameModal}
+                onClose={() => setShowProjectNameModal(false)}
+                onSave={(projectName) => {
+                    // บันทึก draft ใหม่ (forceSaveAs = true)
+                    setShowProjectNameModal(false);
+                    handleSaveDraft(undefined, true, projectName);
+                }}
+                defaultName=""
+                isEditingExisting={false}
                 t={t}
             />
 
@@ -17176,8 +17512,8 @@ const EnhancedGoogleMapsOverlays: React.FC<{
             }
 
             // Only render zones if not using irrigation zones to avoid double rendering
-            if (layerVisibility.zones && !data.useZones) {
-                data.zones.forEach((zone, index) => {
+            if (layerVisibility.zones && !data.useZones && data.zones) {
+                (data.zones || []).forEach((zone, index) => {
                     const isSelected = data.selectedItems.zones.includes(zone.id);
                     // ใช้สีใหม่ตาม index แทนสีเดิม
                     const zoneColor = getZoneColor(index);
@@ -17233,8 +17569,8 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 });
             }
 
-            if (layerVisibility.exclusions) {
-                data.exclusionAreas.forEach((area) => {
+            if (layerVisibility.exclusions && data.exclusionAreas) {
+                (data.exclusionAreas || []).forEach((area) => {
                     const exclusionPolygon = new google.maps.Polygon({
                         paths: area.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                         fillColor: area.color,
@@ -17414,9 +17750,9 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 );
             }
 
-            if (manualZones && manualZones.length > 0) {
+            if (manualZones && Array.isArray(manualZones) && manualZones.length > 0) {
                 manualZones.forEach((zone) => {
-                    if (zone.coordinates.length > 0) {
+                    if (zone.coordinates && Array.isArray(zone.coordinates) && zone.coordinates.length > 0) {
                         const isSelectedForEdit =
                             isZoneEditMode && selectedZoneForEdit && selectedZoneForEdit.id === zone.id;
                         // ใช้สีใหม่ตาม zoneIndex แทนสีเดิม
@@ -17476,9 +17812,9 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 });
             }
 
-            if (data.irrigationZones && data.irrigationZones.length > 0) {
+            if (data.irrigationZones && Array.isArray(data.irrigationZones) && data.irrigationZones.length > 0) {
                 data.irrigationZones.forEach((zone, index) => {
-                    if (zone && zone.coordinates && zone.coordinates.length >= 3) {
+                    if (zone && zone.coordinates && Array.isArray(zone.coordinates) && zone.coordinates.length >= 3) {
                         const isSelectedForEdit =
                             isZoneEditMode && selectedZoneForEdit && selectedZoneForEdit.id === zone.id;
 
@@ -17678,8 +18014,8 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 overlaysRef.current.infoWindows.set(data.pump.id, infoWindow);
             }
 
-            if (layerVisibility.pipes) {
-                data.mainPipes.forEach((pipe) => {
+            if (layerVisibility.pipes && data.mainPipes) {
+                (data.mainPipes || []).forEach((pipe) => {
                     const isSelected = data.selectedItems.pipes.includes(pipe.id);
 
                     let mainPipeStrokeWeight = 5;
@@ -17819,7 +18155,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                             new google.maps.LatLng(originalStartPoint.lat, originalStartPoint.lng)
                         );
 
-                        data.lateralPipeDrawing.waypoints.forEach((waypoint) => {
+                        (data.lateralPipeDrawing.waypoints || []).forEach((waypoint) => {
                             completedPath.push(new google.maps.LatLng(waypoint.lat, waypoint.lng));
                         });
 
@@ -18755,7 +19091,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     });
                 }
 
-                data.subMainPipes.forEach((pipe) => {
+                (data.subMainPipes || []).forEach((pipe) => {
                     const isHighlighted = highlightedPipes.includes(pipe.id);
                     const isSelected = data.selectedItems.pipes.includes(pipe.id);
                     const isSelectedInConnectionMode =
@@ -18854,11 +19190,11 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                                 handleDeletePipe(pipe.id, 'subMainPipe');
                             }
 
-                            return false;
-                        }
-                    );
+                        return false;
+                    }
+                );
 
-                    pipe.branchPipes.forEach((branchPipe) => {
+                    (pipe.branchPipes || []).forEach((branchPipe) => {
                         const isBranchHighlighted = highlightedPipes.includes(branchPipe.id);
                         const isBranchSelected = data.selectedItems.pipes.includes(branchPipe.id);
                         const branchColor = getPipeColor(branchPipe);
@@ -18960,7 +19296,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                 const currentZoom = map?.getZoom();
                 const plantSize = calculatePlantSize(currentZoom);
 
-                data.plants.forEach((plant) => {
+                (data.plants || []).forEach((plant) => {
                     const isConnectionStart = connectionStartPlant?.id === plant.id;
                     const isSelected = data.selectedItems.plants.includes(plant.id);
                     const isCurrentlyDragging =

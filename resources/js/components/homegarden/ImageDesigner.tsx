@@ -9,6 +9,7 @@ import {
     WaterSource,
     Pipe,
     ZONE_TYPES,
+    SPRINKLER_TYPES,
     isPointInPolygon,
     calculateDistance,
     calculatePolygonArea,
@@ -17,6 +18,7 @@ import {
     clipCircleToPolygon,
     canvasToGPS,
     calculatePipeStatistics,
+    getManualSprinklerColor,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -41,7 +43,7 @@ interface ImageDesignerProps {
     imageData: any;
     gardenZones: GardenZone[];
     sprinklers: Sprinkler[];
-    waterSource: WaterSource | null;
+    waterSources: WaterSource[];
     pipes: Pipe[];
     selectedZoneType: string;
     editMode: string;
@@ -58,17 +60,22 @@ interface ImageDesignerProps {
     onSprinklerDragged: (sprinklerId: string, newPos: CanvasCoordinate) => void;
     onSprinklerClick: (sprinklerId: string) => void;
     onSprinklerDelete: (sprinklerId: string) => void;
-    onWaterSourceDelete: () => void;
+    onWaterSourceDelete: (sourceId: string) => void;
     onPipeClick: (pipeId: string) => void;
     onScaleChange: (scale: number) => void;
     pipeEditMode?: string;
+    polylinePoints: CanvasCoordinate[];
+    isDrawingPolyline: boolean;
+    currentPolylinePoint: CanvasCoordinate | null;
+    onPolylinePipeClick?: (point: CanvasCoordinate, isDoubleClick: boolean) => void;
+    onPolylineMouseMove?: (point: CanvasCoordinate) => void;
 }
 
 const ImageDesigner: React.FC<ImageDesignerProps> = ({
     imageData,
     gardenZones,
     sprinklers,
-    waterSource,
+    waterSources,
     pipes,
     selectedZoneType,
     editMode,
@@ -89,6 +96,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
     onPipeClick,
     onScaleChange,
     pipeEditMode,
+    polylinePoints,
+    isDrawingPolyline,
+    currentPolylinePoint,
+    onPolylinePipeClick,
+    onPolylineMouseMove,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -159,6 +171,11 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         distance: 0,
     });
     const [mousePos, setMousePos] = useState<CanvasCoordinate>({ x: 0, y: 0 });
+
+    // Refs for polyline drawing double-click detection
+    const lastClickTimeRef = useRef<number>(0);
+    const lastClickPointRef = useRef<CanvasCoordinate | null>(null);
+    const isDraggingPolylineRef = useRef<boolean>(false);
 
     const isScaleSet = useMemo(() => {
         const hasValidScale = imageData?.scale && imageData.scale !== 20 && imageData.scale > 0;
@@ -291,14 +308,69 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
     const findWaterSourceAtPosition = useCallback(
         (pos: CanvasCoordinate): boolean => {
-            if (!waterSource || !waterSource.canvasPosition) return false;
-            const dist = Math.sqrt(
-                Math.pow(pos.x - waterSource.canvasPosition.x, 2) +
-                    Math.pow(pos.y - waterSource.canvasPosition.y, 2)
-            );
-            return dist < 25;
+            return waterSources.some((waterSource) => {
+                if (!waterSource || !waterSource.canvasPosition) return false;
+                const dist = Math.sqrt(
+                    Math.pow(pos.x - waterSource.canvasPosition.x, 2) +
+                        Math.pow(pos.y - waterSource.canvasPosition.y, 2)
+                );
+                return dist < 25 / zoom;
+            });
         },
-        [waterSource]
+        [waterSources, zoom]
+    );
+
+    // Find nearest snap target (pipe endpoint or sprinkler) for polyline drawing
+    const findNearestSnapTarget = useCallback(
+        (
+            worldPos: CanvasCoordinate,
+            snapTolerance: number = 15 // pixels
+        ): CanvasCoordinate | null => {
+            let nearestSnap: CanvasCoordinate | null = null;
+            let minDistance = Infinity;
+            const tolerance = snapTolerance / zoom; // Convert pixels to world units
+
+            // Check pipe endpoints
+            pipes.forEach((pipe) => {
+                if (pipe.canvasStart) {
+                    const dist = Math.sqrt(
+                        Math.pow(worldPos.x - pipe.canvasStart.x, 2) +
+                            Math.pow(worldPos.y - pipe.canvasStart.y, 2)
+                    );
+                    if (dist < minDistance && dist < tolerance) {
+                        minDistance = dist;
+                        nearestSnap = pipe.canvasStart;
+                    }
+                }
+                if (pipe.canvasEnd) {
+                    const dist = Math.sqrt(
+                        Math.pow(worldPos.x - pipe.canvasEnd.x, 2) +
+                            Math.pow(worldPos.y - pipe.canvasEnd.y, 2)
+                    );
+                    if (dist < minDistance && dist < tolerance) {
+                        minDistance = dist;
+                        nearestSnap = pipe.canvasEnd;
+                    }
+                }
+            });
+
+            // Check sprinkler positions
+            sprinklers.forEach((sprinkler) => {
+                if (sprinkler.canvasPosition) {
+                    const dist = Math.sqrt(
+                        Math.pow(worldPos.x - sprinkler.canvasPosition.x, 2) +
+                            Math.pow(worldPos.y - sprinkler.canvasPosition.y, 2)
+                    );
+                    if (dist < minDistance && dist < tolerance) {
+                        minDistance = dist;
+                        nearestSnap = sprinkler.canvasPosition;
+                    }
+                }
+            });
+
+            return nearestSnap;
+        },
+        [pipes, sprinklers, zoom]
     );
 
     const createRectangleZone = useCallback(
@@ -709,6 +781,42 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
             const point = getCanvasCoordinate(e.clientX, e.clientY);
 
+            // Handle polyline pipe drawing first (before panning check)
+            if (pipeEditMode === 'draw-polyline' && onPolylinePipeClick && e.button === 0) {
+                let worldPos = point;
+                
+                // Find snap targets (junctions and sprinklers)
+                const snapTarget = findNearestSnapTarget(worldPos);
+                const finalPoint = snapTarget || worldPos;
+                
+                // Check for double click
+                const now = Date.now();
+                const timeSinceLastClick = now - lastClickTimeRef.current;
+                const isDoubleClick = timeSinceLastClick < 300 && 
+                    lastClickPointRef.current &&
+                    Math.sqrt(
+                        Math.pow(finalPoint.x - lastClickPointRef.current.x, 2) +
+                        Math.pow(finalPoint.y - lastClickPointRef.current.y, 2)
+                    ) < 10 / zoom;
+                
+                if (isDoubleClick) {
+                    // Finish drawing - double click
+                    onPolylinePipeClick(finalPoint, true);
+                    lastClickTimeRef.current = 0;
+                    lastClickPointRef.current = null;
+                    isDraggingPolylineRef.current = false;
+                } else {
+                    // Start or add point - single click
+                    onPolylinePipeClick(finalPoint, false);
+                    lastClickTimeRef.current = now;
+                    lastClickPointRef.current = finalPoint;
+                    
+                    // Start dragging for polyline preview
+                    isDraggingPolylineRef.current = true;
+                }
+                return;
+            }
+
             // ปิดการ panning และการลากรูปภาพในโหมดรูปแบบแปลน
             if (
                 e.button === 0 &&
@@ -721,7 +829,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                 !dimensionMode &&
                 !draggedItem &&
                 !measurementMode &&
-                !pipeEditMode
+                pipeEditMode !== 'draw-polyline'
             ) {
                 // ไม่ทำการ panning หรือการลากรูปภาพในโหมดรูปแบบแปลน
                 return;
@@ -761,27 +869,46 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             }
 
             try {
-                // Handle pipe click for pipe selection
+                // Check sprinkler clicks FIRST (higher priority than pipes)
+                if (editMode === 'connect-sprinklers' || pipeEditMode) {
+                    const clickedSprinkler = sprinklers.find((s) => {
+                        if (!s.canvasPosition) return false;
+                        const dist = Math.sqrt(
+                            Math.pow(point.x - s.canvasPosition.x, 2) +
+                                Math.pow(point.y - s.canvasPosition.y, 2)
+                        );
+                        return dist < 20 / zoom;
+                    });
+
+                    if (clickedSprinkler) {
+                        onSprinklerClick(clickedSprinkler.id);
+                        return;
+                    }
+                }
+
+                // Handle pipe click for pipe selection (AFTER sprinkler check)
                 if (editMode === 'select-pipes' || pipeEditMode) {
                     for (const pipe of pipes) {
                         if (!pipe.canvasStart || !pipe.canvasEnd) continue;
                         const dist = distanceToLine(point, pipe.canvasStart, pipe.canvasEnd);
-                        if (dist < 5) {
+                        if (dist < 5 / zoom) {
                             onPipeClick(pipe.id);
                             return;
                         }
                     }
                 }
 
-                if (waterSource && waterSource.canvasPosition) {
-                    const dist = Math.sqrt(
-                        Math.pow(point.x - waterSource.canvasPosition.x, 2) +
-                            Math.pow(point.y - waterSource.canvasPosition.y, 2)
-                    );
-                    if (dist < 25) {
-                        if (editMode === 'drag-sprinkler') {
-                            setDraggedItem({ type: 'waterSource', id: waterSource.id });
-                            return;
+                for (const waterSource of waterSources) {
+                    if (waterSource && waterSource.canvasPosition) {
+                        const dist = Math.sqrt(
+                            Math.pow(point.x - waterSource.canvasPosition.x, 2) +
+                                Math.pow(point.y - waterSource.canvasPosition.y, 2)
+                        );
+                        if (dist < 25 / zoom) {
+                            if (editMode === 'drag-sprinkler') {
+                                setDraggedItem({ type: 'waterSource', id: waterSource.id });
+                                return;
+                            }
                         }
                     }
                 }
@@ -793,7 +920,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             Math.pow(point.x - s.canvasPosition.x, 2) +
                                 Math.pow(point.y - s.canvasPosition.y, 2)
                         );
-                        return dist < 20;
+                        return dist < 20 / zoom;
                     });
 
                     if (clickedSprinkler) {
@@ -895,21 +1022,6 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     onMainPipePoint(point);
                     return;
                 }
-
-                if (editMode === 'connect-sprinklers' || pipeEditMode) {
-                    const clickedSprinkler = sprinklers.find((s) => {
-                        if (!s.canvasPosition) return false;
-                        const dist = Math.sqrt(
-                            Math.pow(point.x - s.canvasPosition.x, 2) +
-                                Math.pow(point.y - s.canvasPosition.y, 2)
-                        );
-                        return dist < 20;
-                    });
-
-                    if (clickedSprinkler) {
-                        onSprinklerClick(clickedSprinkler.id);
-                    }
-                }
             } catch (error) {
                 console.error('Error handling mouse down:', error);
             }
@@ -918,7 +1030,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             editMode,
             currentPolygon,
             sprinklers,
-            waterSource,
+            waterSources,
             pipes,
             isDrawing,
             measurementMode,
@@ -946,6 +1058,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             onMainPipePoint,
             onSprinklerClick,
             onPipeClick,
+            zoom,
+            onPolylinePipeClick,
+            findNearestSnapTarget,
         ]
     );
 
@@ -955,6 +1070,14 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
 
             const point = getCanvasCoordinate(e.clientX, e.clientY);
             setMousePos(point);
+
+            // Handle polyline mouse move (always update preview when in draw-polyline mode)
+            if (pipeEditMode === 'draw-polyline' && onPolylineMouseMove) {
+                const worldPos = point;
+                const snapTarget = findNearestSnapTarget(worldPos);
+                const finalPoint = snapTarget || worldPos;
+                onPolylineMouseMove(finalPoint);
+            }
 
             // จัดการการลากรูปภาพ
             if (isDraggingImage) {
@@ -1029,6 +1152,9 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             isPanning,
             panStartPos,
             lastPanOffset,
+            pipeEditMode,
+            onPolylineMouseMove,
+            findNearestSnapTarget,
         ]
     );
 
@@ -1041,7 +1167,12 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
         if (isDraggingImage) {
             handleImageDragEnd();
         }
-    }, [isDraggingImage]);
+
+        // Stop dragging polyline but keep drawing mode active (user can click again to add point)
+        if (pipeEditMode === 'draw-polyline') {
+            isDraggingPolylineRef.current = false;
+        }
+    }, [isDraggingImage, pipeEditMode]);
 
     const handleRightClick = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1061,14 +1192,16 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                     return;
                 }
 
-                if (waterSource && waterSource.canvasPosition) {
-                    const dist = Math.sqrt(
-                        Math.pow(point.x - waterSource.canvasPosition.x, 2) +
-                            Math.pow(point.y - waterSource.canvasPosition.y, 2)
-                    );
-                    if (dist < 25) {
-                        onWaterSourceDelete();
-                        return;
+                for (const waterSource of waterSources) {
+                    if (waterSource && waterSource.canvasPosition) {
+                        const dist = Math.sqrt(
+                            Math.pow(point.x - waterSource.canvasPosition.x, 2) +
+                                Math.pow(point.y - waterSource.canvasPosition.y, 2)
+                        );
+                        if (dist < 25 / zoom) {
+                            onWaterSourceDelete(waterSource.id);
+                            return;
+                        }
                     }
                 }
 
@@ -1079,7 +1212,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                             Math.pow(point.x - s.canvasPosition.x, 2) +
                                 Math.pow(point.y - s.canvasPosition.y, 2)
                         );
-                        return dist < 20;
+                        return dist < 20 / zoom;
                     });
 
                     if (clickedSprinkler) {
@@ -1108,7 +1241,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             currentPolygon,
             editMode,
             sprinklers,
-            waterSource,
+            waterSources,
             onZoneCreated,
             onSprinklerDelete,
             onWaterSourceDelete,
@@ -1116,6 +1249,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
             enhancedDrawing,
             finalizeEnhancedZone,
             getCanvasCoordinate,
+            zoom,
         ]
     );
 
@@ -1647,7 +1781,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     calculatePipeStatistics(
                                                         pipes,
                                                         sprinklers,
-                                                        waterSource,
+                                                        waterSources.length > 0 ? waterSources[0] : null,
                                                         true,
                                                         imageData?.scale || 20
                                                     ).totalLength
@@ -1659,7 +1793,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                     calculatePipeStatistics(
                                                         pipes,
                                                         sprinklers,
-                                                        waterSource,
+                                                        waterSources.length > 0 ? waterSources[0] : null,
                                                         true,
                                                         imageData?.scale || 20
                                                     ).longestPath
@@ -2543,6 +2677,58 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                             );
                                                         })}
 
+                                                    {/* Polyline preview */}
+                                                    {isDrawingPolyline && polylinePoints.length > 0 && currentPolylinePoint && (
+                                                        <>
+                                                            {/* Draw existing polyline segments */}
+                                                            {polylinePoints.map((point, index) => {
+                                                                if (index === 0) return null;
+                                                                const prevPoint = polylinePoints[index - 1];
+                                                                return (
+                                                                    <line
+                                                                        key={`polyline-segment-${index}`}
+                                                                        x1={prevPoint.x}
+                                                                        y1={prevPoint.y}
+                                                                        x2={point.x}
+                                                                        y2={point.y}
+                                                                        stroke="#FBBF24"
+                                                                        strokeWidth="4"
+                                                                        strokeLinecap="round"
+                                                                        strokeDasharray="10 5"
+                                                                    />
+                                                                );
+                                                            })}
+                                                            {/* Draw current segment from last point to cursor */}
+                                                            <line
+                                                                x1={polylinePoints[polylinePoints.length - 1].x}
+                                                                y1={polylinePoints[polylinePoints.length - 1].y}
+                                                                x2={currentPolylinePoint.x}
+                                                                y2={currentPolylinePoint.y}
+                                                                stroke="#FBBF24"
+                                                                strokeWidth="4"
+                                                                strokeLinecap="round"
+                                                                strokeDasharray="10 5"
+                                                            />
+                                                            {/* Draw points */}
+                                                            {polylinePoints.map((point, index) => (
+                                                                <circle
+                                                                    key={`polyline-point-${index}`}
+                                                                    cx={point.x}
+                                                                    cy={point.y}
+                                                                    r="5"
+                                                                    fill="#FBBF24"
+                                                                />
+                                                            ))}
+                                                            {/* Draw current mouse point */}
+                                                            <circle
+                                                                cx={currentPolylinePoint.x}
+                                                                cy={currentPolylinePoint.y}
+                                                                r="5"
+                                                                fill="#FBBF24"
+                                                            />
+                                                        </>
+                                                    )}
+
                                                     {/* Render sprinkler radii */}
                                                     {sprinklers.map((sprinkler) =>
                                                         renderSprinklerRadius(sprinkler)
@@ -2564,7 +2750,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                             return (
                                                 <div
                                                     key={sprinkler.id}
-                                                    className={`absolute flex h-3 w-3 -translate-x-1/2 -translate-y-1/2 items-center justify-center ${
+                                                    className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center ${
                                                         isSelected
                                                             ? 'rounded-full ring-4 ring-yellow-400'
                                                             : ''
@@ -2580,9 +2766,7 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                                     pipeEditMode
                                                                   ? 'pointer'
                                                                   : 'default',
-                                                        transform: sprinkler.orientation
-                                                            ? `translate(-50%, -50%) scale(${zoom}) rotate(${sprinkler.orientation}deg)`
-                                                            : `translate(-50%, -50%) scale(${zoom})`,
+                                                        transform: `translate(-50%, -50%) scale(${zoom})`,
                                                         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
                                                         pointerEvents:
                                                             editMode === 'drag-sprinkler' ||
@@ -2594,46 +2778,90 @@ const ImageDesigner: React.FC<ImageDesignerProps> = ({
                                                                 : 'none',
                                                     }}
                                                 >
-                                                    <span className="pointer-events-none text-[14px] font-bold">
-                                                        {sprinkler.type.icon}
-                                                    </span>
+                                                    {(() => {
+                                                        // Helper functions สำหรับตรวจสอบหัวฉีด
+                                                        const isAutoSprinkler = (s: Sprinkler) =>
+                                                            s.id.includes('_corner_') ||
+                                                            s.id.match(/^[^_]+_sprinkler_/) !== null;
+                                                        
+                                                        const isMatchingAutoSprinkler = (s: Sprinkler) => {
+                                                            if (isAutoSprinkler(s)) return true;
+                                                            return SPRINKLER_TYPES.some(
+                                                                (st) =>
+                                                                    Math.abs(st.radius - s.type.radius) < 0.01 &&
+                                                                    Math.abs(st.pressure - s.type.pressure) < 0.01 &&
+                                                                    Math.abs(st.flowRate - s.type.flowRate) < 0.01
+                                                            );
+                                                        };
+                                                        
+                                                        // กำหนดสีตามคุณสมบัติ
+                                                        const baseColor = getManualSprinklerColor(
+                                                            sprinkler,
+                                                            sprinklers,
+                                                            isAutoSprinkler,
+                                                            isMatchingAutoSprinkler
+                                                        );
+                                                        const fillColor = isSelected ? '#FFD700' : baseColor;
+                                                        const size = isSelected ? 12 : 10;
+
+                                                        return (
+                                                            <svg
+                                                                width={size}
+                                                                height={size}
+                                                                viewBox="0 0 12 12"
+                                                                className="pointer-events-none"
+                                                            >
+                                                                <circle
+                                                                    cx="6"
+                                                                    cy="6"
+                                                                    r="5"
+                                                                    fill={fillColor}
+                                                                    stroke="#FFFFFF"
+                                                                    strokeWidth={isSelected ? '2' : '1.5'}
+                                                                />
+                                                            </svg>
+                                                        );
+                                                    })()}
                                                 </div>
                                             );
                                         })}
 
-                                        {waterSource?.canvasPosition && (
-                                            <div
-                                                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow-lg"
-                                                style={{
-                                                    left: waterSource.canvasPosition.x * zoom,
-                                                    top: waterSource.canvasPosition.y * zoom,
-                                                    width: 24 * zoom,
-                                                    height: 24 * zoom,
-                                                    cursor:
-                                                        editMode === 'drag-sprinkler'
-                                                            ? 'move'
-                                                            : 'default',
-                                                    transform: `translate(-50%, -50%)`,
-                                                    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))',
-                                                    pointerEvents:
-                                                        editMode === 'drag-sprinkler' ||
-                                                        measurementMode ||
-                                                        dimensionMode
-                                                            ? 'auto'
-                                                            : 'none',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                }}
-                                            >
-                                                <img
-                                                    src="/images/water-pump.png"
-                                                    alt="Water Pump"
-                                                    className="object-contain"
-                                                    style={{ width: 20 * zoom, height: 20 * zoom }}
-                                                />
-                                            </div>
-                                        )}
+                                        {waterSources.map((waterSource) => (
+                                            waterSource?.canvasPosition && (
+                                                <div
+                                                    key={waterSource.id}
+                                                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow-lg"
+                                                    style={{
+                                                        left: waterSource.canvasPosition.x * zoom,
+                                                        top: waterSource.canvasPosition.y * zoom,
+                                                        width: 24 * zoom,
+                                                        height: 24 * zoom,
+                                                        cursor:
+                                                            editMode === 'drag-sprinkler'
+                                                                ? 'move'
+                                                                : 'default',
+                                                        transform: `translate(-50%, -50%)`,
+                                                        filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.6))',
+                                                        pointerEvents:
+                                                            editMode === 'drag-sprinkler' ||
+                                                            measurementMode ||
+                                                            dimensionMode
+                                                                ? 'auto'
+                                                                : 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    }}
+                                                >
+                                                    <img
+                                                        src="/images/water-pump.png"
+                                                        alt="Water Pump"
+                                                        className="object-contain"
+                                                        style={{ width: 20 * zoom, height: 20 * zoom }}
+                                                    />
+                                                </div>
+                                            )
+                                        ))}
                                     </>
                                 )}
                             </div>

@@ -91,12 +91,75 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     const [showResults, setShowResults] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [error, setError] = useState<string | null>(null);
-    const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
+    const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(() => {
+        // Check immediately on mount - ถ้า Google Maps API มีอยู่แล้ว ให้ ready ทันที
+        const isReady = !!(
+            window.google?.maps?.places?.PlacesService &&
+            window.google?.maps?.places?.AutocompleteService &&
+            window.google?.maps?.Geocoder
+        );
+        return isReady;
+    });
+
+    // ✅ Try to load Places Library using importLibrary API (Google Maps v3.50+)
+    useEffect(() => {
+        if (isGoogleMapsReady) return;
+
+        const loadPlacesLibrary = async () => {
+            if (!window.google?.maps) {
+                return;
+            }
+
+            if (window.google?.maps?.importLibrary) {
+                try {
+                    await window.google.maps.importLibrary('places');
+                    
+                    // Check if Places API is now available
+                    if (
+                        window.google?.maps?.places?.PlacesService &&
+                        window.google?.maps?.places?.AutocompleteService &&
+                        window.google?.maps?.Geocoder
+                    ) {
+                        setIsGoogleMapsReady(true);
+                    }
+                } catch (error) {
+                    console.error('❌ [HorticultureSearchControl] Failed to load Places Library:', error);
+                }
+            }
+        };
+
+        // Wait for Google Maps to be ready
+        const tryLoadLibrary = async () => {
+            let attempts = 0;
+            while (attempts < 50 && !window.google?.maps?.importLibrary) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (window.google?.maps?.importLibrary) {
+                await loadPlacesLibrary();
+            }
+        };
+
+        if (window.google?.maps) {
+            tryLoadLibrary();
+        } else {
+            const waitForGoogleMaps = setInterval(() => {
+                if (window.google?.maps) {
+                    clearInterval(waitForGoogleMaps);
+                    tryLoadLibrary();
+                }
+            }, 100);
+
+            setTimeout(() => clearInterval(waitForGoogleMaps), 5000);
+        }
+    }, [isGoogleMapsReady]);
     const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [showCategories, setShowCategories] = useState(false);
     const [isCoordinateSearch, setIsCoordinateSearch] = useState(false);
     const [, setLastSearchType] = useState<'text' | 'coordinate'>('text');
+
 
     useEffect(() => {
         const stored = localStorage.getItem('recentMapSearches');
@@ -112,26 +175,59 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
     useEffect(() => {
         const checkGoogleMapsReady = () => {
-            if (
+            const isReady = !!(
                 window.google?.maps?.places?.PlacesService &&
                 window.google?.maps?.places?.AutocompleteService &&
                 window.google?.maps?.Geocoder
-            ) {
+            );
+            
+            if (isReady) {
                 setIsGoogleMapsReady(true);
                 return true;
             }
             return false;
         };
 
-        if (!checkGoogleMapsReady()) {
-            const pollInterval = setInterval(() => {
-                if (checkGoogleMapsReady()) {
-                    clearInterval(pollInterval);
-                }
-            }, 500);
-
-            return () => clearInterval(pollInterval);
+        // Check immediately
+        if (checkGoogleMapsReady()) {
+            return;
         }
+
+        // Listen for map initialization events
+        const handleMapInit = () => {
+            checkGoogleMapsReady();
+        };
+        window.addEventListener('google-maps-loaded', handleMapInit);
+        
+        const handleMapReady = () => {
+            checkGoogleMapsReady();
+        };
+        window.addEventListener('map-ready', handleMapReady);
+
+        // Check again after a short delay
+        const immediateCheck = setTimeout(() => {
+            checkGoogleMapsReady();
+        }, 100);
+
+        // Poll with short interval
+        const pollInterval = setInterval(() => {
+            if (checkGoogleMapsReady()) {
+                clearInterval(pollInterval);
+            }
+        }, 50);
+
+        // Stop polling after 2 seconds (ถ้าไม่มี Places API ก็ซ่อนไปเลย)
+        const timeoutId = setTimeout(() => {
+            clearInterval(pollInterval);
+        }, 2000);
+
+        return () => {
+            clearInterval(pollInterval);
+            clearTimeout(timeoutId);
+            clearTimeout(immediateCheck);
+            window.removeEventListener('google-maps-loaded', handleMapInit);
+            window.removeEventListener('map-ready', handleMapReady);
+        };
     }, []);
 
     useEffect(() => {
@@ -605,14 +701,18 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         }
     };
 
+    // แสดงช่องค้นหาแบบ disabled ถ้า Places API ไม่พร้อม
     if (!isGoogleMapsReady) {
         return (
             <div className="enhanced-search-container absolute left-4 top-4 z-[0] w-[420px] max-w-[calc(100vw-2rem)]">
-                <div className="rounded-lg border border-gray-600 bg-gray-900/95 p-3 text-sm text-white shadow-xl backdrop-blur">
-                    <div className="flex items-center gap-2">
-                        <FaSpinner className="h-4 w-4 animate-spin text-gray-400" />
-                        <span>กำลังโหลด Google Maps...</span>
-                    </div>
+                <div className="relative">
+                    <input
+                        type="text"
+                        disabled
+                        placeholder="ค้นหาสถานที่หรือใส่พิกัด (ฟีเจอร์นี้ไม่พร้อมใช้งาน)"
+                        className="w-full rounded-lg border border-gray-400 bg-gray-200 px-4 py-3 pr-10 text-sm text-gray-500 cursor-not-allowed shadow-md"
+                    />
+                    <FaSearch className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
             </div>
         );
@@ -630,6 +730,16 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                         onChange={(e) => handleSearchChange(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onFocus={() => {
+                            // Re-check Google Maps readiness on focus
+                            if (
+                                !isGoogleMapsReady &&
+                                window.google?.maps?.places?.PlacesService &&
+                                window.google?.maps?.places?.AutocompleteService &&
+                                window.google?.maps?.Geocoder
+                            ) {
+                                setIsGoogleMapsReady(true);
+                            }
+                            
                             if (!searchQuery && recentSearches.length > 0) {
                                 setShowResults(true);
                             }

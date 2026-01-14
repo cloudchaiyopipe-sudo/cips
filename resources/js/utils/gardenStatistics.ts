@@ -79,7 +79,8 @@ export function calculateGardenStatistics(data: GardenPlannerData): GardenStatis
         throw new Error('ไม่มีข้อมูลโครงการ');
     }
 
-    const { gardenZones = [], sprinklers = [], pipes = [], waterSource } = data;
+    const { gardenZones = [], sprinklers = [], pipes = [], waterSources } = data;
+    const waterSource = waterSources?.[0] || null;
     const scale = getValidScale(data);
 
     // คำนวณข้อมูลรวม

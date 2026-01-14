@@ -19,6 +19,7 @@ import {
     clipCircleToPolygon,
     canvasToGPS,
     calculatePipeStatistics,
+    getManualSprinklerColor,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 interface ZoneDrawingTool {
@@ -55,7 +56,7 @@ interface ViewportState {
 interface CanvasDesignerProps {
     gardenZones: GardenZone[];
     sprinklers: Sprinkler[];
-    waterSource: WaterSource | null;
+    waterSources: WaterSource[];
     pipes: Pipe[];
     selectedZoneType: string;
     editMode: string;
@@ -72,16 +73,20 @@ interface CanvasDesignerProps {
     onSprinklerDragged: (sprinklerId: string, newPos: CanvasCoordinate) => void;
     onSprinklerClick: (sprinklerId: string) => void;
     onSprinklerDelete: (sprinklerId: string) => void;
-    onWaterSourceDelete: () => void;
+    onWaterSourceDelete: (sourceId: string) => void;
     onPipeClick: (pipeId: string) => void;
     hasMainArea: boolean;
     pipeEditMode?: string;
+    polylinePoints?: CanvasCoordinate[];
+    currentPolylinePoint?: CanvasCoordinate | null;
+    onPolylinePipeClick?: (point: CanvasCoordinate, isDoubleClick: boolean) => void;
+    onPolylineMouseMove?: (point: CanvasCoordinate) => void;
 }
 
 const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     gardenZones,
     sprinklers,
-    waterSource,
+    waterSources,
     pipes,
     selectedZoneType,
     editMode,
@@ -102,6 +107,10 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     onPipeClick,
     hasMainArea,
     pipeEditMode,
+    polylinePoints = [],
+    currentPolylinePoint = null,
+    onPolylinePipeClick,
+    onPolylineMouseMove,
 }) => {
     const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1054,6 +1063,41 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         [currentPolygon, selectedZoneType, enhancedMode, worldToScreen, viewport]
     );
 
+    // ตรวจสอบว่าเป็นหัวฉีดอัตโนมัติหรือไม่ (จาก id pattern)
+    const isAutoSprinkler = useCallback((sprinkler: Sprinkler): boolean => {
+        // หัวฉีดอัตโนมัติมี id pattern: ${zone.id}_sprinkler_... หรือ ${zone.id}_corner_...
+        // หัวฉีดที่เพิ่มเองมี id pattern: sprinkler_${Date.now()}
+        return (
+            sprinkler.id.includes('_corner_') ||
+            sprinkler.id.match(/^[^_]+_sprinkler_/) !== null
+        );
+    }, []);
+
+    // ตรวจสอบว่าหัวฉีดที่เพิ่มเองตรงกับอัตโนมัติหรือไม่
+    // ถ้าคุณสมบัติ (รัศมี, แรงดัน, อัตราการไหล) เท่ากับหัวฉีดอัตโนมัติ → แสดงสีเดียวกัน (สีฟ้า)
+    const isMatchingAutoSprinkler = useCallback((sprinkler: Sprinkler): boolean => {
+        // หัวฉีดอัตโนมัติเป็นสีฟ้าเสมอ
+        if (isAutoSprinkler(sprinkler)) {
+            return true;
+        }
+        
+        // สำหรับหัวฉีดที่เพิ่มเอง: ตรวจสอบว่าคุณสมบัติตรงกับ SPRINKLER_TYPES ใดๆ หรือไม่
+        // ถ้ารัศมี, แรงดัน, อัตราการไหล เท่ากับหัวฉีดอัตโนมัติ → return true (แสดงสีฟ้า)
+        // ใช้การเปรียบเทียบที่ยืดหยุ่น: ใช้ tolerance 0.01 เพื่อหลีกเลี่ยงปัญหา floating point
+        const autoType = SPRINKLER_TYPES.find(
+            (st) => {
+                // ใช้ tolerance 0.01 สำหรับการเปรียบเทียบ (แม่นยำกว่า)
+                const radiusMatch = Math.abs(st.radius - sprinkler.type.radius) < 0.01;
+                const pressureMatch = Math.abs(st.pressure - sprinkler.type.pressure) < 0.01;
+                const flowRateMatch = Math.abs(st.flowRate - sprinkler.type.flowRate) < 0.01;
+                
+                return radiusMatch && pressureMatch && flowRateMatch;
+            }
+        );
+        
+        return !!autoType;
+    }, [isAutoSprinkler]);
+
     const drawSprinkler = useCallback(
         (ctx: CanvasRenderingContext2D, sprinkler: Sprinkler) => {
             if (!sprinkler.canvasPosition) return;
@@ -1064,22 +1108,39 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const isHovered = hoveredItem?.type === 'sprinkler' && hoveredItem.id === sprinkler.id;
             const screenPos = worldToScreen(sprinkler.canvasPosition);
 
+            // กำหนดสี:
+            // - หัวฉีดอัตโนมัติหรือตรงกับ SPRINKLER_TYPES = สีฟ้า (#33CCFF)
+            // - หัวฉีดที่เพิ่มเองที่มีคุณสมบัติเหมือนกัน = สีเดียวกัน (จาก 10 สี)
+            // - หัวฉีดที่เพิ่มเองที่มีคุณสมบัติต่างกัน = สีต่างกัน
+            const baseColor = getManualSprinklerColor(
+                sprinkler,
+                sprinklers,
+                isAutoSprinkler,
+                isMatchingAutoSprinkler
+            );
+            const fillColor = isSelected ? '#FFD700' : baseColor;
+
             ctx.save();
             ctx.translate(screenPos.x, screenPos.y);
             if (sprinkler.orientation) {
                 ctx.rotate((sprinkler.orientation * Math.PI) / 180);
             }
 
-            ctx.fillStyle = isSelected ? '#FFD700' : sprinkler.type.color;
-            ctx.font = `bold ${20 / viewport.zoom}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            // วาดเป็นวงกลมแทน emoji
+            const radius = isSelected ? 8 / viewport.zoom : 6 / viewport.zoom;
+            ctx.fillStyle = fillColor;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = isSelected ? 3 / viewport.zoom : 2 / viewport.zoom;
             ctx.shadowColor = 'rgba(0,0,0,0.8)';
             ctx.shadowBlur = 3 / viewport.zoom;
             ctx.shadowOffsetX = 1 / viewport.zoom;
             ctx.shadowOffsetY = 1 / viewport.zoom;
 
-            ctx.fillText(sprinkler.type.icon, 0, 0);
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
             ctx.restore();
 
             if (isSelected || isHovered) {
@@ -1087,12 +1148,12 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 ctx.strokeStyle = isSelected ? '#FFD700' : '#FFF';
                 ctx.lineWidth = (isSelected ? 3 : 2) / viewport.zoom;
                 ctx.beginPath();
-                ctx.arc(screenPos.x, screenPos.y, 8 / viewport.zoom, 0, Math.PI * 2);
+                ctx.arc(screenPos.x, screenPos.y, (isSelected ? 10 : 8) / viewport.zoom, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.restore();
             }
         },
-        [selectedSprinkler, selectedSprinklersForPipe, hoveredItem, worldToScreen, viewport]
+        [selectedSprinkler, selectedSprinklersForPipe, hoveredItem, worldToScreen, viewport, isAutoSprinkler, isMatchingAutoSprinkler, sprinklers]
     );
 
     const imgPump = useMemo(() => {
@@ -1103,22 +1164,74 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
     const drawWaterSource = useCallback(
         (ctx: CanvasRenderingContext2D) => {
-            if (!waterSource || !waterSource.canvasPosition) return;
+            waterSources.forEach((waterSource) => {
+                if (!waterSource || !waterSource.canvasPosition) return;
 
-            const screenPos = worldToScreen(waterSource.canvasPosition);
+                const screenPos = worldToScreen(waterSource.canvasPosition);
 
-            ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = 12 / viewport.zoom;
-            ctx.shadowOffsetX = 4 / viewport.zoom;
-            ctx.shadowOffsetY = 4 / viewport.zoom;
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                ctx.shadowBlur = 12 / viewport.zoom;
+                ctx.shadowOffsetX = 4 / viewport.zoom;
+                ctx.shadowOffsetY = 4 / viewport.zoom;
 
-            const size = 24 / viewport.zoom;
-            ctx.drawImage(imgPump, screenPos.x - size / 2, screenPos.y - size / 2, size, size);
+                const size = 24 / viewport.zoom;
+                ctx.drawImage(imgPump, screenPos.x - size / 2, screenPos.y - size / 2, size, size);
 
-            ctx.restore();
+                ctx.restore();
+            });
         },
-        [waterSource, worldToScreen, viewport.zoom, imgPump]
+        [waterSources, worldToScreen, viewport.zoom, imgPump]
+    );
+
+    // Find nearest snap target (junction or sprinkler)
+    const findNearestSnapTarget = useCallback(
+        (point: CanvasCoordinate, pipes: Pipe[], sprinklers: Sprinkler[], zoom: number): CanvasCoordinate | null => {
+            const snapDistance = 15 / zoom;
+            let nearestPoint: CanvasCoordinate | null = null;
+            let minDistance = snapDistance;
+
+            // Check pipe junctions (start and end points)
+            const junctions = new Set<string>();
+            pipes.forEach((pipe) => {
+                if (pipe.canvasStart) {
+                    const key = `${pipe.canvasStart.x.toFixed(2)}_${pipe.canvasStart.y.toFixed(2)}`;
+                    if (!junctions.has(key)) {
+                        junctions.add(key);
+                        const dist = calculateDistance(point, pipe.canvasStart);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            nearestPoint = pipe.canvasStart;
+                        }
+                    }
+                }
+                if (pipe.canvasEnd) {
+                    const key = `${pipe.canvasEnd.x.toFixed(2)}_${pipe.canvasEnd.y.toFixed(2)}`;
+                    if (!junctions.has(key)) {
+                        junctions.add(key);
+                        const dist = calculateDistance(point, pipe.canvasEnd);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            nearestPoint = pipe.canvasEnd;
+                        }
+                    }
+                }
+            });
+
+            // Check sprinklers
+            sprinklers.forEach((sprinkler) => {
+                if (sprinkler.canvasPosition) {
+                    const dist = calculateDistance(point, sprinkler.canvasPosition);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestPoint = sprinkler.canvasPosition;
+                    }
+                }
+            });
+
+            return nearestPoint;
+        },
+        []
     );
 
     const drawPipes = useCallback(
@@ -1160,9 +1273,53 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 }
             }
 
+            // Draw polyline preview
+            if (pipeEditMode === 'draw-polyline' && polylinePoints.length > 0) {
+                ctx.strokeStyle = '#60A5FA';
+                ctx.lineWidth = 6 / viewport.zoom;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.setLineDash([]);
+                ctx.beginPath();
+
+                const firstPoint = worldToScreen(polylinePoints[0]);
+                ctx.moveTo(firstPoint.x, firstPoint.y);
+
+                for (let i = 1; i < polylinePoints.length; i++) {
+                    const screenPoint = worldToScreen(polylinePoints[i]);
+                    ctx.lineTo(screenPoint.x, screenPoint.y);
+                }
+
+                // Draw to current mouse position if available
+                if (currentPolylinePoint) {
+                    const currentScreen = worldToScreen(currentPolylinePoint);
+                    ctx.lineTo(currentScreen.x, currentScreen.y);
+                }
+
+                ctx.stroke();
+
+                // Draw points
+                ctx.fillStyle = '#60A5FA';
+                polylinePoints.forEach((pt) => {
+                    const screenPt = worldToScreen(pt);
+                    ctx.beginPath();
+                    ctx.arc(screenPt.x, screenPt.y, 4 / viewport.zoom, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Draw current point
+                if (currentPolylinePoint) {
+                    const currentScreen = worldToScreen(currentPolylinePoint);
+                    ctx.fillStyle = '#3B82F6';
+                    ctx.beginPath();
+                    ctx.arc(currentScreen.x, currentScreen.y, 5 / viewport.zoom, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
             ctx.restore();
         },
-        [pipes, worldToScreen, viewport, selectedPipes]
+        [pipes, worldToScreen, viewport, selectedPipes, pipeEditMode, polylinePoints, currentPolylinePoint]
     );
 
     const draw = useCallback(() => {
@@ -1311,6 +1468,11 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         worldToScreen,
     ]);
 
+    // Double click handler for polyline
+    const lastClickTimeRef = useRef<number>(0);
+    const lastClickPointRef = useRef<CanvasCoordinate | null>(null);
+    const isDraggingPolylineRef = useRef<boolean>(false);
+    
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<HTMLCanvasElement>) => {
             const canvas = canvasRef.current;
@@ -1319,6 +1481,14 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+
+            // Handle polyline mouse move
+            if (pipeEditMode === 'draw-polyline' && onPolylineMouseMove) {
+                const worldPos = screenToWorld({ x, y });
+                const snapTarget = findNearestSnapTarget(worldPos, pipes, sprinklers, viewport.zoom);
+                const finalPoint = snapTarget || worldPos;
+                onPolylineMouseMove(finalPoint);
+            }
 
             if (isPanning && panStart && lastPanPosition) {
                 const deltaX = x - panStart.x;
@@ -1345,6 +1515,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             }
 
             setMousePos(worldPos);
+
+            // Handle polyline mouse move (always update preview when in draw-polyline mode)
+            if (pipeEditMode === 'draw-polyline' && onPolylineMouseMove) {
+                const snapTarget = findNearestSnapTarget(worldPos, pipes, sprinklers, viewport.zoom);
+                const finalPoint = snapTarget || worldPos;
+                onPolylineMouseMove(finalPoint);
+            }
 
             if (enhancedDrawing.isDrawing && enhancedDrawing.startPoint) {
                 const distance = calculateDistance(enhancedDrawing.startPoint, worldPos);
@@ -1392,10 +1569,15 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 }
             }
 
-            if (!newHoveredItem && waterSource && waterSource.canvasPosition) {
-                const dist = calculateDistance(worldPos, waterSource.canvasPosition);
-                if (dist < 25 / viewport.zoom) {
-                    newHoveredItem = { type: 'waterSource', id: waterSource.id };
+            if (!newHoveredItem) {
+                for (const waterSource of waterSources) {
+                    if (waterSource && waterSource.canvasPosition) {
+                        const dist = calculateDistance(worldPos, waterSource.canvasPosition);
+                        if (dist < 25 / viewport.zoom) {
+                            newHoveredItem = { type: 'waterSource', id: waterSource.id };
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -1423,7 +1605,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             createRegularPolygon,
             draggedSprinkler,
             sprinklers,
-            waterSource,
+            waterSources,
             hoveredItem,
             viewport,
             onSprinklerDragged,
@@ -1439,9 +1621,43 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            // Handle polyline pipe drawing first (before panning check)
+            if (pipeEditMode === 'draw-polyline' && onPolylinePipeClick && e.button === 0) {
+                let worldPos = screenToWorld({ x, y });
+                
+                // Find snap targets (junctions and sprinklers)
+                const snapTarget = findNearestSnapTarget(worldPos, pipes, sprinklers, viewport.zoom);
+                const finalPoint = snapTarget || worldPos;
+                
+                // Check for double click
+                const now = Date.now();
+                const timeSinceLastClick = now - lastClickTimeRef.current;
+                const isDoubleClick = timeSinceLastClick < 300 && 
+                    lastClickPointRef.current &&
+                    calculateDistance(finalPoint, lastClickPointRef.current) < 10 / viewport.zoom;
+                
+                if (isDoubleClick) {
+                    // Finish drawing - double click
+                    onPolylinePipeClick(finalPoint, true);
+                    lastClickTimeRef.current = 0;
+                    lastClickPointRef.current = null;
+                    isDraggingPolylineRef.current = false;
+                } else {
+                    // Start or add point - single click
+                    onPolylinePipeClick(finalPoint, false);
+                    lastClickTimeRef.current = now;
+                    lastClickPointRef.current = finalPoint;
+                    
+                    // Start dragging for polyline preview
+                    isDraggingPolylineRef.current = true;
+                    setIsPanning(false);
+                }
+                return;
+            }
+
             // Allow panning when in view mode or when no specific tools are active
             const isMainClick =
-                (editMode === 'view' && !dimensionMode && !isSettingScale) ||
+                (editMode === 'view' && !dimensionMode && !isSettingScale && pipeEditMode !== 'draw-polyline') ||
                 (!dimensionMode &&
                     !isSettingScale &&
                     editMode !== 'draw' &&
@@ -1449,7 +1665,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     editMode !== 'edit' &&
                     editMode !== 'main-pipe' &&
                     editMode !== 'drag-sprinkler' &&
-                    editMode !== 'connect-sprinklers');
+                    editMode !== 'connect-sprinklers' &&
+                    pipeEditMode !== 'draw-polyline');
 
             if (isMainClick && e.button === 0) {
                 setIsPanning(true);
@@ -1639,7 +1856,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
-            if (editMode === 'edit' && !waterSource) {
+            if (editMode === 'edit') {
                 onWaterSourcePlaced(worldPos);
                 return;
             }
@@ -1659,7 +1876,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             snapToGrid,
             snapToVertex,
             checkDimensionLineClick,
-            waterSource,
+            waterSources,
             viewport.panX,
             viewport.panY,
             viewport.zoom,
@@ -1684,6 +1901,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             onSprinklerPlaced,
             onWaterSourcePlaced,
             onMainPipePoint,
+            findNearestSnapTarget,
+            onPolylinePipeClick,
+            onPolylineMouseMove,
         ]
     );
 
@@ -1709,11 +1929,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             const y = e.clientY - rect.top;
             const worldPos = screenToWorld({ x, y });
 
-            if (waterSource && waterSource.canvasPosition) {
-                const dist = calculateDistance(worldPos, waterSource.canvasPosition);
-                if (dist < 25 / viewport.zoom) {
-                    onWaterSourceDelete();
-                    return;
+            for (const waterSource of waterSources) {
+                if (waterSource && waterSource.canvasPosition) {
+                    const dist = calculateDistance(worldPos, waterSource.canvasPosition);
+                    if (dist < 25 / viewport.zoom) {
+                        onWaterSourceDelete(waterSource.id);
+                        return;
+                    }
                 }
             }
 
@@ -1743,7 +1965,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             finalizeEnhancedZone,
             currentPolygon,
             isDrawing,
-            waterSource,
+            waterSources,
             sprinklers,
             editMode,
             viewport,
@@ -1763,7 +1985,11 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             setPanStart(null);
             setLastPanPosition(null);
         }
-    }, [draggedSprinkler, isPanning]);
+        // Stop dragging polyline but keep drawing mode active (user can click again to add point)
+        if (pipeEditMode === 'draw-polyline') {
+            isDraggingPolylineRef.current = false;
+        }
+    }, [draggedSprinkler, isPanning, pipeEditMode]);
 
     const handleWheel = useCallback(
         (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1907,7 +2133,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     }, [
         gardenZones,
         sprinklers,
-        waterSource,
+            waterSources,
         pipes,
         mainPipeDrawing,
         selectedSprinkler,

@@ -1224,6 +1224,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     const costs = calculateTotalCosts();
     const effectivePump = selectedPump || results.autoSelectedPump;
 
+    // ✅ บันทึก totalCost ลง localStorage สำหรับใช้ตอนบันทึกโครงการ
+    React.useEffect(() => {
+        if (costs.totalCost) {
+            localStorage.setItem('calculatedTotalCost', costs.totalCost.toString());
+        }
+    }, [costs.totalCost]);
+
     const getSelectionStatus = (equipment: any, type: string, isAuto: boolean) => {
         if (!equipment) return `❌ ${t('ไม่มี')}${type}`;
 

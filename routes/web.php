@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\SuperUserController;
 use App\Http\Controllers\FarmController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\Admin\ArticleAdminController;
 use App\Http\Controllers\FreePlan\NewsController;
 use App\Http\Controllers\Admin\ProductAdminController;
@@ -348,12 +349,23 @@ Route::get('/fields-api', function () {
             ], 401);
         }
 
+        // Allow super admin to view other users' fields
+        $targetUserId = request()->input('user_id');
+        $userId = ($user->is_super_user && $targetUserId) ? $targetUserId : $user->id;
+
         // Fetch real fields from database with limit to avoid memory issues
-        $fields = \App\Models\Field::where('user_id', $user->id)
+        $fields = \App\Models\Field::where('user_id', $userId)
             ->with('plantType')
             ->orderBy('id', 'desc') // Use ID instead of created_at for better performance
             ->limit(100) // Add limit to prevent memory issues
             ->get();
+        
+        \Log::info('Fields API called', [
+            'user_id' => $user->id,
+            'fields_count' => $fields->count(),
+            'field_ids' => $fields->pluck('id')->toArray(),
+            'field_names' => $fields->pluck('name')->toArray(),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -362,52 +374,112 @@ Route::get('/fields-api', function () {
                 $projectStats = is_string($field->project_stats) ? json_decode($field->project_stats, true) : $field->project_stats;
                 $projectData = is_string($field->project_data) ? json_decode($field->project_data, true) : $field->project_data;
                 
-                // Get real calculated values
+                // Get real calculated values - Priority: field columns > project_stats > project_data
                 $realArea = 0;
                 $realWaterNeed = 0;
                 $realPlants = 0;
                 
-                if ($projectStats) {
-                    // Use the real calculated values from project_stats
-                    $realArea = $projectStats['totalAreaInRai'] ?? $projectStats['totalArea'] ?? 0;
-                    $realWaterNeed = $projectStats['totalWaterNeedPerSession'] ?? $projectStats['totalWaterNeed'] ?? 0;
-                    $realPlants = $projectStats['totalPlants'] ?? 0;
-                    
-                    // Check if data is in results object
-                    if (isset($projectStats['results'])) {
-                        $results = $projectStats['results'];
-                        $realArea = $results['totalArea'] ?? $realArea;
-                        $realWaterNeed = $results['totalWaterRequiredLPM'] ?? $realWaterNeed;
-                        $realPlants = $results['totalSprinklers'] ?? $realPlants;
-                    }
-                } elseif ($projectData) {
-                    // Fallback to project_data if project_stats is not available
-                    if (isset($projectData['plants']) && is_array($projectData['plants'])) {
-                        $realPlants = count($projectData['plants']);
-                    }
-                    if (isset($projectData['totalArea'])) {
-                        $realArea = $projectData['totalArea'];
-                    }
-                }
-                
-                // Convert area to ไร่ if it's in square meters
-                if ($realArea > 1000) { // If it's likely in square meters
-                    $realArea = $realArea / 1600; // Convert to ไร่ (1 ไร่ = 1600 ตร.ม.)
-                }
-                
-                // Also check if we have total_area from the field itself
+                // Priority 1: Use values from field columns (most reliable)
                 if ($field->total_area && $field->total_area > 0) {
-                    $realArea = $field->total_area / 1600; // Convert to ไร่
+                    // If total_area is less than 100, it's likely already in ไร่
+                    // If it's greater than 100, it might be in square meters
+                    if ($field->total_area < 100) {
+                        $realArea = $field->total_area; // Already in ไร่
+                    } else {
+                        $realArea = $field->total_area / 1600; // Convert from square meters to ไร่
+                    }
                 }
                 
-                // Also check if we have total_water_need from the field itself
                 if ($field->total_water_need && $field->total_water_need > 0) {
                     $realWaterNeed = $field->total_water_need;
                 }
                 
-                // Also check if we have total_plants from the field itself
                 if ($field->total_plants && $field->total_plants > 0) {
                     $realPlants = $field->total_plants;
+                }
+                
+                // Priority 2: Use project_stats if field columns are 0 or missing
+                if (($realArea == 0 || $realWaterNeed == 0 || $realPlants == 0) && $projectStats) {
+                    // Use the real calculated values from project_stats
+                    if ($realArea == 0) {
+                    $realArea = $projectStats['totalAreaInRai'] ?? $projectStats['totalArea'] ?? 0;
+                    }
+                    if ($realWaterNeed == 0) {
+                    $realWaterNeed = $projectStats['totalWaterNeedPerSession'] ?? $projectStats['totalWaterNeed'] ?? 0;
+                    }
+                    if ($realPlants == 0) {
+                    $realPlants = $projectStats['totalPlants'] ?? 0;
+                    }
+                    
+                    // Check if data is in results object
+                    if (isset($projectStats['results'])) {
+                        $results = $projectStats['results'];
+                        if ($realArea == 0 && isset($results['totalArea'])) {
+                            $realArea = $results['totalArea'];
+                        }
+                        if ($realWaterNeed == 0 && isset($results['totalWaterRequiredLPM'])) {
+                            $realWaterNeed = $results['totalWaterRequiredLPM'];
+                        }
+                        if ($realPlants == 0 && isset($results['totalSprinklers'])) {
+                            $realPlants = $results['totalSprinklers'];
+                        }
+                    }
+                }
+                
+                // Priority 3: Fallback to project_data if still 0
+                if (($realArea == 0 || $realWaterNeed == 0 || $realPlants == 0) && $projectData) {
+                    if ($realPlants == 0 && isset($projectData['plants']) && is_array($projectData['plants'])) {
+                        $realPlants = count($projectData['plants']);
+                    }
+                    
+                    if ($realArea == 0) {
+                        // Try to get from totalArea first
+                        if (isset($projectData['totalArea']) && $projectData['totalArea'] > 0) {
+                        $realArea = $projectData['totalArea'];
+                // Convert area to ไร่ if it's in square meters
+                if ($realArea > 1000) { // If it's likely in square meters
+                    $realArea = $realArea / 1600; // Convert to ไร่ (1 ไร่ = 1600 ตร.ม.)
+                }
+                        } 
+                        // If totalArea is 0 or missing, calculate from mainArea coordinates
+                        elseif (isset($projectData['mainArea']) && is_array($projectData['mainArea']) && count($projectData['mainArea']) >= 3) {
+                            // Calculate area from mainArea coordinates using shoelace formula
+                            $coordinates = $projectData['mainArea'];
+                            $area = 0;
+                            for ($i = 0; $i < count($coordinates); $i++) {
+                                $j = ($i + 1) % count($coordinates);
+                                $area += $coordinates[$i]['lat'] * $coordinates[$j]['lng'];
+                                $area -= $coordinates[$j]['lat'] * $coordinates[$i]['lng'];
+                            }
+                            $area = abs($area) / 2;
+                            
+                            // Convert to square meters
+                            $avgLat = array_sum(array_column($coordinates, 'lat')) / count($coordinates);
+                            $latFactor = 111000;
+                            $lngFactor = 111000 * cos(deg2rad($avgLat));
+                            
+                            $realArea = ($area * $latFactor * $lngFactor) / 1600; // Convert to ไร่
+                        }
+                }
+                
+                    // Calculate water need from plants if still 0
+                    if ($realWaterNeed == 0 && isset($projectData['plants']) && is_array($projectData['plants'])) {
+                        $realWaterNeed = array_sum(array_map(function($plant) {
+                            return $plant['plantData']['waterNeed'] ?? 0;
+                        }, $projectData['plants']));
+                }
+                
+                    // Or use irrigationZones if available
+                    if ($realWaterNeed == 0 && isset($projectData['irrigationZones']) && is_array($projectData['irrigationZones'])) {
+                        $realWaterNeed = array_sum(array_map(function($zone) {
+                            return $zone['totalWaterNeed'] ?? 0;
+                        }, $projectData['irrigationZones']));
+                    }
+                }
+                
+                // Final conversion: Convert area to ไร่ if it's in square meters (if not already converted)
+                if ($realArea > 1000) { // If it's likely in square meters
+                    $realArea = $realArea / 1600; // Convert to ไร่ (1 ไร่ = 1600 ตร.ม.)
                 }
                 
                 return [
@@ -420,14 +492,31 @@ Route::get('/fields-api', function () {
                     'status' => $field->status,
                     'isCompleted' => $field->is_completed,
                     'area' => is_string($field->area_coordinates) ? json_decode($field->area_coordinates, true) ?? [] : ($field->area_coordinates ?? []),
-                    'plantType' => $field->plantType ? [
+                    'plantType' => (function() use ($field, $projectData) {
+                        // Priority 1: Use plant type from project_data.selectedPlantType (for custom plants)
+                        if ($projectData && isset($projectData['selectedPlantType']) && isset($projectData['selectedPlantType']['name'])) {
+                            return [
+                                'id' => $projectData['selectedPlantType']['id'] ?? ($field->plantType->id ?? null),
+                                'name' => $projectData['selectedPlantType']['name'],
+                                'type' => $projectData['selectedPlantType']['type'] ?? ($field->plantType->type ?? 'horticulture'),
+                                'plant_spacing' => $projectData['selectedPlantType']['plantSpacing'] ?? ($field->plantType->plant_spacing ?? 0),
+                                'row_spacing' => $projectData['selectedPlantType']['rowSpacing'] ?? ($field->plantType->row_spacing ?? 0),
+                                'water_needed' => $projectData['selectedPlantType']['waterNeed'] ?? ($field->plantType->water_needed ?? 0),
+                            ];
+                        }
+                        // Priority 2: Use plant type from database relation
+                        if ($field->plantType) {
+                            return [
                         'id' => $field->plantType->id,
                         'name' => $field->plantType->name,
                         'type' => $field->plantType->type,
                         'plant_spacing' => $field->plantType->plant_spacing,
                         'row_spacing' => $field->plantType->row_spacing,
                         'water_needed' => $field->plantType->water_needed,
-                    ] : null,
+                            ];
+                        }
+                        return null;
+                    })(),
                     'totalPlants' => $realPlants, // Use real calculated value
                     'totalArea' => $realArea, // Use real calculated value
                     'total_water_need' => $realWaterNeed, // Use real calculated value
@@ -439,8 +528,10 @@ Route::get('/fields-api', function () {
                     'zoneSprinklers' => $field->zone_sprinklers,
                     'zoneOperationMode' => $field->zone_operation_mode,
                     'zoneOperationGroups' => $field->zone_operation_groups,
-                    'projectData' => $field->project_data,
-                    'projectStats' => $field->project_stats,
+                    'projectData' => $projectData, // Send decoded projectData
+                    'project_data' => $projectData, // Also send as project_data for compatibility
+                    'projectStats' => $projectStats, // Send decoded projectStats
+                    'project_stats' => $projectStats, // Also send as project_stats for compatibility
                     'effectiveEquipment' => $field->effective_equipment,
                     'zoneCalculationData' => $field->zone_calculation_data,
                     // Additional data for different field types
@@ -749,6 +840,15 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/api/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus'])->name('update-field-status');
     Route::put('/api/fields/{fieldId}/data', [FarmController::class, 'updateFieldData'])->name('update-field-data');
     Route::put('/api/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder'])->name('update-field-folder');
+    
+    // Field Move/Copy/Share/Rename Management - Sales users cannot access
+    Route::put('/api/fields/{fieldId}/name', [FarmController::class, 'renameField'])->name('rename-field');
+    Route::post('/api/fields/{fieldId}/copy', [FarmController::class, 'copyToFolder'])->name('copy-field');
+    Route::post('/api/fields/{fieldId}/share', [FarmController::class, 'shareToUser'])->name('share-field');
+    
+    // User Management Routes - Sales users cannot access (Super admin only)
+    Route::get('/api/users/search', [UserController::class, 'searchUsers'])->name('search-users');
+    Route::get('/api/users/{userId}/folders', [UserController::class, 'getUserFolders'])->name('get-user-folders');
     
     // Field Image Management - Sales users cannot access
     Route::put('/api/fields/{fieldId}/image', [FarmController::class, 'updateFieldImage'])->name('update-field-image');

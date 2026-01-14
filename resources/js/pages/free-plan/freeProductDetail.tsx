@@ -162,16 +162,19 @@ function FreeProductDetail() {
                 description: initialProduct.description || '',
             };
 
-            // Check if it's equipment (has equipment-specific fields)
-            const hasEquipmentFields =
+            // Check if it's equipment (has equipment-specific fields or attributes_raw)
+            const hasEquipmentFields = !!(
                 normalizedProduct.product_code !== undefined ||
                 normalizedProduct.brand !== undefined ||
                 normalizedProduct.waterVolumeLitersPerMinute !== undefined ||
                 normalizedProduct.radiusMeters !== undefined ||
-                normalizedProduct.pressureBar !== undefined;
+                normalizedProduct.pressureBar !== undefined ||
+                (normalizedProduct.attributes_raw && Object.keys(normalizedProduct.attributes_raw).length > 0)
+            );
 
             setProduct(normalizedProduct);
-            setIsEquipment(hasEquipmentFields && normalizedProduct.category === 'recommended');
+            // Show attributes for recommended, new, and promotion products if they have equipment data
+            setIsEquipment(hasEquipmentFields);
             setLoading(false);
         } else {
             // No product provided - this shouldn't happen with proper backend setup

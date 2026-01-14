@@ -629,41 +629,46 @@ const CanvasRenderer: React.FC<{
                     }
                 });
 
-                if (gardenData.waterSource?.canvasPosition) {
-                    const waterSourcePoint = transformPoint(gardenData.waterSource.canvasPosition);
+                // Render multiple water sources
+                if (gardenData.waterSources && gardenData.waterSources.length > 0) {
+                    gardenData.waterSources.forEach((waterSource) => {
+                        if (!waterSource?.canvasPosition) return;
+                        
+                        const waterSourcePoint = transformPoint(waterSource.canvasPosition);
 
-                    ctx.save();
+                        ctx.save();
 
-                    ctx.beginPath();
-                    ctx.arc(
-                        waterSourcePoint.x,
-                        waterSourcePoint.y,
-                        8 * Math.max(0.5, transform.scale / baseTransform.scale),
-                        0,
-                        Math.PI * 2
-                    );
-                    ctx.fill();
-
-                    ctx.shadowColor = 'transparent';
-                    ctx.fillStyle = '#fff';
-                    ctx.font = `bold ${24 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    if (gardenData.waterSource.type === 'pump') {
-                        ctx.fillText('⚡', waterSourcePoint.x, waterSourcePoint.y);
-                    } else {
-                        // วาดรูปภาพปั๊มน้ำ
-                        const pumpSize = 24 * Math.max(0.8, transform.scale / baseTransform.scale);
-                        ctx.drawImage(
-                            imgPump,
-                            waterSourcePoint.x - pumpSize / 2,
-                            waterSourcePoint.y - pumpSize / 2,
-                            pumpSize,
-                            pumpSize
+                        ctx.beginPath();
+                        ctx.arc(
+                            waterSourcePoint.x,
+                            waterSourcePoint.y,
+                            8 * Math.max(0.5, transform.scale / baseTransform.scale),
+                            0,
+                            Math.PI * 2
                         );
-                    }
+                        ctx.fill();
 
-                    ctx.restore();
+                        ctx.shadowColor = 'transparent';
+                        ctx.fillStyle = '#fff';
+                        ctx.font = `bold ${24 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        if (waterSource.type === 'pump') {
+                            ctx.fillText('⚡', waterSourcePoint.x, waterSourcePoint.y);
+                        } else {
+                            // วาดรูปภาพปั๊มน้ำ
+                            const pumpSize = 24 * Math.max(0.8, transform.scale / baseTransform.scale);
+                            ctx.drawImage(
+                                imgPump,
+                                waterSourcePoint.x - pumpSize / 2,
+                                waterSourcePoint.y - pumpSize / 2,
+                                pumpSize,
+                                pumpSize
+                            );
+                        }
+
+                        ctx.restore();
+                    });
                 }
 
                 drawDimensionLines(ctx);
@@ -960,8 +965,10 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                 });
             }
 
-            if (gardenData.waterSource?.position) {
-                allPoints.push(gardenData.waterSource.position);
+            if (gardenData.waterSources && gardenData.waterSources.length > 0) {
+                gardenData.waterSources.forEach((ws) => {
+                    if (ws?.position) allPoints.push(ws.position);
+                });
             }
 
             if (gardenData.pipes) {

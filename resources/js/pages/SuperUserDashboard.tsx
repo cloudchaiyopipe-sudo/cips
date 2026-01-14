@@ -8,9 +8,11 @@ import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import PaymentReviewModal from '../components/PaymentReviewModal';
 import PaymentEditModal from '../components/PaymentEditModal';
+import HorticultureMapPreview from '../components/horticulture/HorticultureMapPreview';
 import {
     FaUsers,
     FaFolder,
+    FaFolderOpen,
     FaMap,
     FaPlus,
     FaEdit,
@@ -51,6 +53,26 @@ type Field = {
     status: string;
     isCompleted: boolean;
     created_at: string;
+    category?: string;
+    folderId?: string | null;
+    total_water_need?: number;
+    plantType?: {
+        id: number;
+        name: string;
+        type: string;
+        plant_spacing: number;
+        row_spacing: number;
+        water_needed: number;
+    };
+    project_data?: any;
+    projectData?: any;
+    project_stats?: any;
+    garden_data?: any;
+    garden_stats?: any;
+    greenhouse_data?: any;
+    field_crop_data?: any;
+    createdAt?: string;
+    area?: Array<{ lat: number; lng: number }>;
 };
 
 type Folder = {
@@ -58,6 +80,7 @@ type Folder = {
     name: string;
     type: string;
     user: User;
+    parent_id?: string;
     color?: string;
     icon?: string;
     created_at: string;
@@ -100,7 +123,7 @@ export default function SuperUserDashboard() {
     const [folders, setFolders] = useState<Folder[]>([]);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'fields' | 'folders' | 'payments'>(
+    const [activeTab, setActiveTab] = useState<'users' | 'payments'>(
         'users'
     );
     const [activePaymentTab, setActivePaymentTab] = useState<'management' | 'history'>(
@@ -111,15 +134,37 @@ export default function SuperUserDashboard() {
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPaymentEditModal, setShowPaymentEditModal] = useState(false);
+    const [showViewProjectsModal, setShowViewProjectsModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+    const [userFolders, setUserFolders] = useState<Folder[]>([]);
+    const [userFields, setUserFields] = useState<Field[]>([]);
+    const [loadingUserProjects, setLoadingUserProjects] = useState(false);
     const [userViewMode, setUserViewMode] = useState<'grid' | 'table'>('grid');
     const [userSearchTerm, setUserSearchTerm] = useState('');
     const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'super_user' | 'sales' | 'user'>(
         'all'
     );
+    const [userSortOption, setUserSortOption] = useState<'default' | 'newest' | 'oldest' | 'name_asc' | 'name_desc'>(
+        'default'
+    );
     const [currentUserPage, setCurrentUserPage] = useState(1);
     const usersPerPage = 12;
+
+    // Project management states
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [fieldToRename, setFieldToRename] = useState<Field | null>(null);
+    const [showFolderSelectionModal, setShowFolderSelectionModal] = useState(false);
+    const [folderSelectionAction, setFolderSelectionAction] = useState<'move' | 'copy'>('move');
+    const [fieldToMoveOrCopy, setFieldToMoveOrCopy] = useState<Field | null>(null);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [fieldToShare, setFieldToShare] = useState<Field | null>(null);
+    const [selectedUserForShare, setSelectedUserForShare] = useState<any>(null);
+    const [userFoldersForShare, setUserFoldersForShare] = useState<Folder[]>([]);
+    const [showUserFolderSelectionModal, setShowUserFolderSelectionModal] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [fieldToDelete, setFieldToDelete] = useState<Field | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         loadDashboardData();
@@ -133,7 +178,7 @@ export default function SuperUserDashboard() {
                 fieldsResponse,
                 foldersResponse,
                 paymentsResponse,
-            ] = await Promise.all([
+            ] = await Promise.allSettled([
                 axios.get('/super/dashboard'),
                 axios.get('/super/users'),
                 axios.get('/super/fields'),
@@ -141,35 +186,40 @@ export default function SuperUserDashboard() {
                 axios.get('/api/admin/payments/all'),
             ]);
 
-            if (statsResponse.data.success) {
-                setStats(statsResponse.data.stats);
+            // Handle stats response
+            if (statsResponse.status === 'fulfilled' && statsResponse.value.data.success) {
+                setStats(statsResponse.value.data.stats);
             }
             
             // Handle users response with better error handling
-            if (usersResponse.data) {
-                if (usersResponse.data.success) {
-                    const usersData = usersResponse.data.users || [];
-                    console.log('Loaded users:', usersData.length, usersData);
+            if (usersResponse.status === 'fulfilled' && usersResponse.value.data) {
+                if (usersResponse.value.data.success) {
+                    const usersData = usersResponse.value.data.users || [];
                     setUsers(usersData);
                 } else {
-                    console.error('Users API returned success: false', usersResponse.data);
-                }
-            } else {
-                console.error('Users API response structure unexpected:', usersResponse.data);
-                // Try to set users anyway if data exists
-                if (usersResponse.data?.users) {
-                    setUsers(usersResponse.data.users);
+                    // Try to set users anyway if data exists
+                    if (usersResponse.value.data?.users) {
+                        setUsers(usersResponse.value.data.users);
+                    }
                 }
             }
             
-            if (fieldsResponse.data.success) {
-                setFields(fieldsResponse.data.fields);
+            // Handle fields response
+            if (fieldsResponse.status === 'fulfilled' && fieldsResponse.value.data.success) {
+                setFields(fieldsResponse.value.data.fields);
             }
-            if (foldersResponse.data.success) {
-                setFolders(foldersResponse.data.folders);
+            
+            // Handle folders response
+            if (foldersResponse.status === 'fulfilled' && foldersResponse.value.data.success) {
+                setFolders(foldersResponse.value.data.folders);
             }
-            if (paymentsResponse.data.success) {
-                setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+            
+            // Handle payments response (optional, don't crash if it fails)
+            if (paymentsResponse.status === 'fulfilled' && paymentsResponse.value.data.success) {
+                setPayments(paymentsResponse.value.data.payments.data || paymentsResponse.value.data.payments);
+            } else if (paymentsResponse.status === 'rejected') {
+                // Silently fail for payments - it's not critical for the dashboard
+                console.warn('Failed to load payments:', paymentsResponse.reason?.message || 'Unknown error');
             }
         } catch (error: any) {
             console.error('Error loading dashboard data:', error);
@@ -193,6 +243,84 @@ export default function SuperUserDashboard() {
         }
     };
 
+    // Project management handlers
+    const handleRenameProject = (field: Field) => {
+        setFieldToRename(field);
+        setShowRenameModal(true);
+    };
+
+    const handleSubmitRename = async (newName: string) => {
+        if (!fieldToRename) return;
+        
+        try {
+            const response = await axios.put(`/api/fields/${fieldToRename.id}/name`, {
+                name: newName,
+            });
+            
+            if (response.data.success) {
+                // Update field in userFields if it exists
+                setUserFields(prev => prev.map(f => 
+                    f.id === fieldToRename.id ? { ...f, name: newName } : f
+                ));
+                alert(t('rename_project_success'));
+            }
+        } catch (error: any) {
+            console.error('Error renaming project:', error);
+            alert(`Error renaming project: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setShowRenameModal(false);
+            setFieldToRename(null);
+        }
+    };
+
+    const handleMoveProject = (field: Field) => {
+        setFieldToMoveOrCopy(field);
+        setFolderSelectionAction('move');
+        setShowFolderSelectionModal(true);
+    };
+
+    const handleCopyProject = (field: Field) => {
+        setFieldToMoveOrCopy(field);
+        setFolderSelectionAction('copy');
+        setShowFolderSelectionModal(true);
+    };
+
+    const handleShareProject = (field: Field) => {
+        setFieldToShare(field);
+        setShowShareModal(true);
+    };
+
+    const handleDeleteField = (field: Field) => {
+        setFieldToDelete(field);
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!fieldToDelete) return;
+        
+        setDeleting(true);
+        try {
+            const response = await axios.delete(`/api/fields/${fieldToDelete.id}`);
+            if (response.data.success) {
+                // Remove field from userFields
+                setUserFields(prev => prev.filter(f => f.id !== fieldToDelete.id));
+                alert(t('delete_project_success') || 'ลบโครงการสำเร็จ');
+            }
+        } catch (error: any) {
+            console.error('Error deleting field:', error);
+            alert(`${t('error_deleting_field')}: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setDeleting(false);
+            setShowDeleteConfirm(false);
+            setFieldToDelete(null);
+        }
+    };
+
+    const cancelDelete = () => {
+        setShowDeleteConfirm(false);
+        setFieldToDelete(null);
+    };
+
     const handleCreateUser = async (
         userData: Omit<User, 'id' | 'created_at' | 'phone' | 'additional_details'> & {
             password: string;
@@ -206,7 +334,7 @@ export default function SuperUserDashboard() {
             }
         } catch (error) {
             console.error('Error creating user:', error);
-            alert('Error creating user');
+            alert(t('error_creating_user'));
         }
     };
 
@@ -220,15 +348,13 @@ export default function SuperUserDashboard() {
             }
         } catch (error) {
             console.error('Error updating user:', error);
-            alert('Error updating user');
+            alert(t('error_updating_user'));
         }
     };
 
     const handleDeleteUser = async (userId: number) => {
         if (
-            !confirm(
-                'Are you sure you want to delete this user? This will also delete all their fields and folders.'
-            )
+            !confirm(t('delete_user_confirm'))
         ) {
             return;
         }
@@ -240,28 +366,12 @@ export default function SuperUserDashboard() {
             }
         } catch (error) {
             console.error('Error deleting user:', error);
-            alert('Error deleting user');
-        }
-    };
-
-    const handleDeleteField = async (fieldId: string) => {
-        if (!confirm('Are you sure you want to delete this field?')) {
-            return;
-        }
-
-        try {
-            const response = await axios.delete(`/super/fields/${fieldId}`);
-            if (response.data.success) {
-                setFields((prev) => prev.filter((f) => f.id !== fieldId));
-            }
-        } catch (error) {
-            console.error('Error deleting field:', error);
-            alert('Error deleting field');
+            alert(t('error_deleting_user'));
         }
     };
 
     const handleDeleteFolder = async (folderId: string) => {
-        if (!confirm('Are you sure you want to delete this folder?')) {
+        if (!confirm(t('delete_folder_confirm'))) {
             return;
         }
 
@@ -272,7 +382,7 @@ export default function SuperUserDashboard() {
             }
         } catch (error) {
             console.error('Error deleting folder:', error);
-            alert('Error deleting folder');
+            alert(t('error_deleting_folder'));
         }
     };
 
@@ -291,7 +401,7 @@ export default function SuperUserDashboard() {
             }
         } catch (error) {
             console.error('Error creating folder:', error);
-            alert('Error creating folder');
+            alert(t('error_creating_folder'));
         }
     };
 
@@ -310,11 +420,11 @@ export default function SuperUserDashboard() {
                 }
                 setShowPaymentModal(false);
                 setSelectedPayment(null);
-                alert('Payment approved successfully');
+                alert(t('payment_approved_success'));
             }
         } catch (error) {
             console.error('Error approving payment:', error);
-            alert('Error approving payment');
+            alert(t('error_approving_payment'));
         }
     };
 
@@ -378,9 +488,9 @@ export default function SuperUserDashboard() {
                 }
                 setShowPaymentEditModal(false);
                 setSelectedPayment(null);
-                alert('Payment updated successfully');
+                alert(t('payment_updated_success'));
             } else {
-                alert(response.data.message || 'Error updating payment');
+                alert(response.data.message || t('error_updating_payment'));
             }
         } catch (error: any) {
             console.error('Error updating payment:', error);
@@ -388,7 +498,7 @@ export default function SuperUserDashboard() {
             console.error('Error status:', error.response?.status);
 
             const errorMessage =
-                error.response?.data?.message || 'Error updating payment. Please try again.';
+                error.response?.data?.message || t('error_updating_payment');
             alert(errorMessage);
         }
     };
@@ -416,17 +526,35 @@ export default function SuperUserDashboard() {
             return true;
         })
         .sort((a, b) => {
-            // Sort by role priority: super_user -> sales -> user
-            const rolePriority = { super_user: 0, sales: 1, user: 2 };
-            const aPriority = rolePriority[a.role as keyof typeof rolePriority] ?? 3;
-            const bPriority = rolePriority[b.role as keyof typeof rolePriority] ?? 3;
+            switch (userSortOption) {
+                case 'default': {
+                    // Sort by role priority: super_user -> sales -> user
+                    const rolePriority = { super_user: 0, sales: 1, user: 2 };
+                    const aPriority = rolePriority[a.role as keyof typeof rolePriority] ?? 3;
+                    const bPriority = rolePriority[b.role as keyof typeof rolePriority] ?? 3;
 
-            if (aPriority !== bPriority) {
-                return aPriority - bPriority;
+                    if (aPriority !== bPriority) {
+                        return aPriority - bPriority;
+                    }
+
+                    // Then sort by name
+                    return a.name.localeCompare(b.name, 'th', { sensitivity: 'base' });
+                }
+                case 'newest':
+                    // Sort by created_at descending (newest first)
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                case 'oldest':
+                    // Sort by created_at ascending (oldest first)
+                    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                case 'name_asc':
+                    // Sort by name A-Z (ก-ฮ)
+                    return a.name.localeCompare(b.name, 'th', { sensitivity: 'base' });
+                case 'name_desc':
+                    // Sort by name Z-A (ฮ-ก)
+                    return b.name.localeCompare(a.name, 'th', { sensitivity: 'base' });
+                default:
+                    return 0;
             }
-
-            // Then sort by name
-            return a.name.localeCompare(b.name);
         });
 
     // Pagination logic
@@ -436,10 +564,10 @@ export default function SuperUserDashboard() {
     const endIndex = startIndex + usersPerPage;
     const paginatedUsers = filteredAndSortedUsers.slice(startIndex, endIndex);
 
-    // Reset to first page when search term or role filter changes
+    // Reset to first page when search term, role filter, or sort option changes
     useEffect(() => {
         setCurrentUserPage(1);
-    }, [userSearchTerm, userRoleFilter]);
+    }, [userSearchTerm, userRoleFilter, userSortOption]);
 
     if (loading) {
         return (
@@ -468,9 +596,7 @@ export default function SuperUserDashboard() {
                             <nav className="flex space-x-8">
                                 {[
                                     { id: 'users', label: t('users'), icon: FaUsers },
-                                    { id: 'payments', label: 'Payments', icon: FaCreditCard },
-                                    { id: 'fields', label: t('fields'), icon: FaMap },
-                                    { id: 'folders', label: t('folders'), icon: FaFolder },
+                                    { id: 'payments', label: t('payments'), icon: FaCreditCard },
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
@@ -493,7 +619,7 @@ export default function SuperUserDashboard() {
                             <div>
                                 <div className="mb-6">
                                     <h2 className="text-xl font-semibold text-white">
-                                        Payment Dashboard
+                                        {t('payment_dashboard')}
                                     </h2>
                                 </div>
 
@@ -504,7 +630,7 @@ export default function SuperUserDashboard() {
                                             <FaCreditCard className="h-6 w-6" />
                                             <div className="ml-3">
                                                 <p className="text-sm opacity-90">
-                                                    Pending Payments
+                                                    {t('pending_payments')}
                                                 </p>
                                                 <p className="text-xl font-bold">
                                                     {
@@ -520,7 +646,7 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaCheck className="h-6 w-6" />
                                             <div className="ml-3">
-                                                <p className="text-sm opacity-90">Approved</p>
+                                                <p className="text-sm opacity-90">{t('approved')}</p>
                                                 <p className="text-xl font-bold">
                                                     {
                                                         payments.filter(
@@ -535,7 +661,7 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaTimes className="h-6 w-6" />
                                             <div className="ml-3">
-                                                <p className="text-sm opacity-90">Rejected</p>
+                                                <p className="text-sm opacity-90">{t('rejected')}</p>
                                                 <p className="text-xl font-bold">
                                                     {
                                                         payments.filter(
@@ -550,7 +676,7 @@ export default function SuperUserDashboard() {
                                         <div className="flex items-center">
                                             <FaChartBar className="h-6 w-6" />
                                             <div className="ml-3">
-                                                <p className="text-sm opacity-90">Total Revenue</p>
+                                                <p className="text-sm opacity-90">{t('total_revenue')}</p>
                                                 <p className="text-xl font-bold">
                                                     ฿
                                                     {payments
@@ -569,12 +695,12 @@ export default function SuperUserDashboard() {
                                         {[
                                             {
                                                 id: 'management',
-                                                label: 'Payment Management',
+                                                label: t('payment_management'),
                                                 icon: FaCreditCard,
                                             },
                                             {
                                                 id: 'history',
-                                                label: 'Payment History',
+                                                label: t('payment_history'),
                                                 icon: FaChartBar,
                                             },
                                         ].map((tab) => (
@@ -603,11 +729,10 @@ export default function SuperUserDashboard() {
                                     <div>
                                         <div className="mb-4">
                                             <h3 className="text-lg font-semibold text-white">
-                                                Pending Payments - Awaiting Review
+                                                {t('pending_payments_awaiting_review')}
                                             </h3>
                                             <p className="text-sm text-gray-400">
-                                                Review and approve or reject pending payment
-                                                requests
+                                                {t('review_and_approve_or_reject')}
                                             </p>
                                         </div>
 
@@ -638,14 +763,14 @@ export default function SuperUserDashboard() {
                                                                         <div className="text-sm text-gray-400">
                                                                             {payment.plan_type ===
                                                                             'token_purchase'
-                                                                                ? 'TOKEN PURCHASE'
-                                                                                : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`}
+                                                                                ? t('token_purchase')
+                                                                                : `${payment.plan_type.toUpperCase()} - ${payment.months} ${payment.months > 1 ? t('months') : t('month')}`}
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-center">
                                                                         <div className="text-lg font-semibold text-blue-400">
                                                                             {payment.tokens_purchased.toLocaleString()}{' '}
-                                                                            tokens
+                                                                            {t('tokens')}
                                                                         </div>
                                                                         <div className="text-sm text-gray-400">
                                                                             {new Date(
@@ -659,7 +784,7 @@ export default function SuperUserDashboard() {
                                                                     <div className="mt-3">
                                                                         <p className="text-sm text-gray-300">
                                                                             <strong>
-                                                                                User Notes:
+                                                                                {t('user_notes')}:
                                                                             </strong>{' '}
                                                                             {payment.notes}
                                                                         </p>
@@ -670,7 +795,7 @@ export default function SuperUserDashboard() {
                                                                     <div className="mt-3">
                                                                         <p className="mb-2 text-sm text-gray-300">
                                                                             <strong>
-                                                                                Payment Proof:
+                                                                                {t('payment_proof')}:
                                                                             </strong>
                                                                         </p>
                                                                         {payment.payment_proof.startsWith(
@@ -715,9 +840,7 @@ export default function SuperUserDashboard() {
                                                                                             📷
                                                                                         </div>
                                                                                         <div>
-                                                                                            Image
-                                                                                            not
-                                                                                            found
+                                                                                            {t('image_not_found')}
                                                                                         </div>
                                                                                         <div className="text-xs">
                                                                                             {
@@ -740,7 +863,7 @@ export default function SuperUserDashboard() {
 
                                                             <div className="ml-6 flex flex-col items-end gap-2">
                                                                 <span className="rounded-full bg-yellow-600 px-3 py-1 text-xs font-medium text-white">
-                                                                    PENDING
+                                                                    {t('pending')}
                                                                 </span>
 
                                                                 <button
@@ -750,7 +873,7 @@ export default function SuperUserDashboard() {
                                                                     }}
                                                                     className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
                                                                 >
-                                                                    Review
+                                                                    {t('review')}
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -762,10 +885,10 @@ export default function SuperUserDashboard() {
                                                 <div className="py-8 text-center">
                                                     <FaCreditCard className="mx-auto h-12 w-12 text-gray-400" />
                                                     <p className="mt-2 text-gray-400">
-                                                        No pending payments
+                                                        {t('no_pending_payments')}
                                                     </p>
                                                     <p className="text-sm text-gray-500">
-                                                        All payments have been processed
+                                                        {t('all_payments_processed')}
                                                     </p>
                                                 </div>
                                             )}
@@ -778,10 +901,10 @@ export default function SuperUserDashboard() {
                                     <div>
                                         <div className="mb-4">
                                             <h3 className="text-lg font-semibold text-white">
-                                                Payment History - All Processed Payments
+                                                {t('payment_history_all_processed')}
                                             </h3>
                                             <p className="text-sm text-gray-400">
-                                                Complete history of approved and rejected payments
+                                                {t('complete_history')}
                                             </p>
                                         </div>
 
@@ -816,14 +939,14 @@ export default function SuperUserDashboard() {
                                                                         <div className="text-sm text-gray-400">
                                                                             {payment.plan_type ===
                                                                             'token_purchase'
-                                                                                ? 'TOKEN PURCHASE'
-                                                                                : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`}
+                                                                                ? t('token_purchase')
+                                                                                : `${payment.plan_type.toUpperCase()} - ${payment.months} ${payment.months > 1 ? t('months') : t('month')}`}
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-center">
                                                                         <div className="text-lg font-semibold text-blue-400">
                                                                             {payment.tokens_purchased.toLocaleString()}{' '}
-                                                                            tokens
+                                                                            {t('tokens')}
                                                                         </div>
                                                                         <div className="text-sm text-gray-400">
                                                                             {new Date(
@@ -837,7 +960,7 @@ export default function SuperUserDashboard() {
                                                                     <div className="mt-3">
                                                                         <p className="text-sm text-gray-300">
                                                                             <strong>
-                                                                                User Notes:
+                                                                                {t('user_notes')}:
                                                                             </strong>{' '}
                                                                             {payment.notes}
                                                                         </p>
@@ -848,7 +971,7 @@ export default function SuperUserDashboard() {
                                                                     <div className="mt-3">
                                                                         <p className="text-sm text-gray-300">
                                                                             <strong>
-                                                                                Payment Proof:
+                                                                                {t('payment_proof')}:
                                                                             </strong>{' '}
                                                                             {payment.payment_proof}
                                                                         </p>
@@ -859,7 +982,7 @@ export default function SuperUserDashboard() {
                                                                     <div className="mt-3">
                                                                         <p className="text-sm text-gray-300">
                                                                             <strong>
-                                                                                Admin Notes:
+                                                                                {t('admin_notes')}:
                                                                             </strong>{' '}
                                                                             {payment.admin_notes}
                                                                         </p>
@@ -915,10 +1038,10 @@ export default function SuperUserDashboard() {
                                                 <div className="py-8 text-center">
                                                     <FaChartBar className="mx-auto h-12 w-12 text-gray-400" />
                                                     <p className="mt-2 text-gray-400">
-                                                        No payment history
+                                                        {t('no_payment_history')}
                                                     </p>
                                                     <p className="text-sm text-gray-500">
-                                                        No payments have been processed yet
+                                                        {t('no_payments_processed_yet')}
                                                     </p>
                                                 </div>
                                             )}
@@ -950,10 +1073,7 @@ export default function SuperUserDashboard() {
                                             <div className="relative">
                                                 <input
                                                     type="text"
-                                                    placeholder={
-                                                        t('search_users') ||
-                                                        'Search by name, email, or phone...'
-                                                    }
+                                                    placeholder={t('search_users')}
                                                     value={userSearchTerm}
                                                     onChange={(e) =>
                                                         setUserSearchTerm(e.target.value)
@@ -990,22 +1110,51 @@ export default function SuperUserDashboard() {
                                                 className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
                                             >
                                                 <option value="all">
-                                                    {t('ทั้งหมด') || 'All Roles'}
+                                                    {t('all_roles')}
                                                 </option>
                                                 <option value="super_user">
-                                                    {t('Admin') || 'Admin'}
+                                                    {t('admin_role')}
                                                 </option>
                                                 <option value="sales">
-                                                    {t('Sales') || 'Sales'}
+                                                    {t('sales_role')}
                                                 </option>
-                                                <option value="user">{t('User') || 'User'}</option>
+                                                <option value="user">{t('user_role')}</option>
+                                            </select>
+                                        </div>
+                                        <div className="min-w-48">
+                                            <select
+                                                value={userSortOption}
+                                                onChange={(e) =>
+                                                    setUserSortOption(
+                                                        e.target.value as
+                                                            | 'default'
+                                                            | 'newest'
+                                                            | 'oldest'
+                                                            | 'name_asc'
+                                                            | 'name_desc'
+                                                    )
+                                                }
+                                                className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
+                                            >
+                                                <option value="default">
+                                                    {t('filter_data') || 'กรองข้อมูล'}
+                                                </option>
+                                                <option value="newest">
+                                                    {t('newest_members') || 'สมาชิกใหม่สุด'}
+                                                </option>
+                                                <option value="oldest">
+                                                    {t('oldest_members') || 'สมาชิกเก่าสุด'}
+                                                </option>
+                                                <option value="name_asc">
+                                                    {t('sort_name_asc') || 'เรียงจาก ก-ฮ'}
+                                                </option>
+                                                <option value="name_desc">
+                                                    {t('sort_name_desc') || 'เรียงจาก ฮ-ก'}
+                                                </option>
                                             </select>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-400">
-                                            {t('view_mode') || 'View:'}
-                                        </span>
                                         <div className="flex rounded-lg border border-gray-600 bg-gray-700 p-1">
                                             <button
                                                 onClick={() => setUserViewMode('grid')}
@@ -1022,7 +1171,7 @@ export default function SuperUserDashboard() {
                                                 >
                                                     <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                                                 </svg>
-                                                {t('grid') || 'Grid'}
+                                                {t('grid')}
                                             </button>
                                             <button
                                                 onClick={() => setUserViewMode('table')}
@@ -1043,7 +1192,7 @@ export default function SuperUserDashboard() {
                                                         clipRule="evenodd"
                                                     />
                                                 </svg>
-                                                {t('table') || 'Table'}
+                                                {t('table')}
                                             </button>
                                         </div>
                                     </div>
@@ -1067,11 +1216,6 @@ export default function SuperUserDashboard() {
                                                     >
                                                         {t('clear_search') || 'Clear search'}
                                                     </button>
-                                                )}
-                                                {users.length === 0 && !loading && (
-                                                    <p className="mt-2 text-sm text-yellow-400">
-                                                        Debug: Users array is empty. Check console for API response.
-                                                    </p>
                                                 )}
                                             </div>
                                         ) : (
@@ -1111,7 +1255,7 @@ export default function SuperUserDashboard() {
                                                     return (
                                                         <div
                                                             key={user.id}
-                                                            className={`group relative overflow-hidden rounded-2xl border ${colors.border} bg-gradient-to-br ${colors.bg} backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-gray-900/50`}
+                                                            className={`group relative flex flex-col overflow-hidden rounded-2xl border ${colors.border} bg-gradient-to-br ${colors.bg} backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-gray-900/50`}
                                                         >
                                                             {/* Header with gradient */}
                                                             <div className={`relative h-20 bg-gradient-to-r ${
@@ -1154,7 +1298,7 @@ export default function SuperUserDashboard() {
                                                             </div>
 
                                                             {/* User Info */}
-                                                            <div className="px-5 pb-5 pt-3">
+                                                            <div className="flex flex-1 flex-col px-5 pb-5 pt-3">
                                                                 <h3 className="mb-1 text-center text-lg font-bold text-white">
                                                                     {user.name}
                                                                 </h3>
@@ -1219,23 +1363,49 @@ export default function SuperUserDashboard() {
                                                                 </div>
 
                                                                 {/* Action Buttons */}
-                                                                <div className="flex gap-2">
+                                                                <div className="mt-auto flex flex-col gap-2">
                                                                     <button
-                                                                        onClick={() => {
+                                                                        onClick={async () => {
                                                                             setSelectedUser(user);
-                                                                            setShowEditUserModal(true);
+                                                                            setShowViewProjectsModal(true);
+                                                                            setLoadingUserProjects(true);
+                                                                            try {
+                                                                                // Fetch user's folders and fields
+                                                                                const [foldersRes, fieldsRes] = await Promise.all([
+                                                                                    axios.get(`/api/users/${user.id}/folders`),
+                                                                                    axios.get(`/fields-api?user_id=${user.id}`)
+                                                                                ]);
+                                                                                setUserFolders(foldersRes.data.folders || []);
+                                                                                setUserFields(fieldsRes.data.fields || []);
+                                                                            } catch (error) {
+                                                                                console.error('Error loading user projects:', error);
+                                                                            } finally {
+                                                                                setLoadingUserProjects(false);
+                                                                            }
                                                                         }}
-                                                                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg ${colors.button} px-3 py-2.5 text-sm font-medium text-white transition-all hover:shadow-lg`}
+                                                                        className={`flex items-center justify-center gap-2 rounded-lg ${colors.button} px-3 py-2 text-sm font-medium text-white transition-all hover:shadow-lg`}
                                                                     >
-                                                                        <FaEdit className="h-4 w-4" />
-                                                                        <span>{t('edit')}</span>
+                                                                        <FaEye className="h-4 w-4" />
+                                                                        <span>{t('view_projects') || 'ดูโครงการ'}</span>
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteUser(user.id)}
-                                                                        className="flex items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-all hover:bg-red-700 hover:shadow-lg"
-                                                                    >
-                                                                        <FaTrash className="h-4 w-4" />
-                                                                    </button>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setSelectedUser(user);
+                                                                                setShowEditUserModal(true);
+                                                                            }}
+                                                                            className={`flex flex-1 items-center justify-center gap-2 rounded-lg ${colors.button} px-3 py-2 text-sm font-medium text-white transition-all hover:shadow-lg`}
+                                                                        >
+                                                                            <FaEdit className="h-4 w-4" />
+                                                                            <span>{t('edit')}</span>
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteUser(user.id)}
+                                                                            className="flex items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition-all hover:bg-red-700 hover:shadow-lg"
+                                                                        >
+                                                                            <FaTrash className="h-4 w-4" />
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1611,263 +1781,6 @@ export default function SuperUserDashboard() {
                             </div>
                         )}
 
-                        {activeTab === 'fields' && (
-                            <div>
-                                <div className="mb-6">
-                                    <h2 className="text-xl font-semibold text-white">
-                                        {t('field_management')}
-                                    </h2>
-                                </div>
-
-                                {/* Group fields by user */}
-                                {(() => {
-                                    const fieldsByUser = fields.reduce(
-                                        (acc, field) => {
-                                            const userId = field.user.id;
-                                            if (!acc[userId]) {
-                                                acc[userId] = {
-                                                    user: field.user,
-                                                    fields: [],
-                                                };
-                                            }
-                                            acc[userId].fields.push(field);
-                                            return acc;
-                                        },
-                                        {} as Record<number, { user: User; fields: Field[] }>
-                                    );
-
-                                    return (
-                                        <div className="space-y-8">
-                                            {Object.values(fieldsByUser).map(
-                                                ({ user, fields: userFields }) => (
-                                                    <div
-                                                        key={user.id}
-                                                        className="rounded-lg border border-gray-700 bg-gray-800 p-6"
-                                                    >
-                                                        <div className="mb-4 flex items-center justify-between">
-                                                            <div>
-                                                                <h3 className="text-lg font-semibold text-white">
-                                                                    {user.name}
-                                                                </h3>
-                                                                <p className="text-sm text-gray-400">
-                                                                    {user.email}
-                                                                </p>
-                                                                {user.is_super_user && (
-                                                                    <span className="mt-1 inline-block rounded bg-yellow-600 px-2 py-1 text-xs text-white">
-                                                                        {t('super_user')}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-sm text-gray-400">
-                                                                {userFields.length} {t('fields')}
-                                                            </span>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                            {userFields.map((field) => (
-                                                                <div
-                                                                    key={field.id}
-                                                                    className="rounded-lg border border-gray-600 bg-gray-700 p-4"
-                                                                >
-                                                                    <div className="mb-3">
-                                                                        <h4 className="font-semibold text-white">
-                                                                            {field.name}
-                                                                        </h4>
-                                                                        <p className="text-xs text-gray-400">
-                                                                            {field.status}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div className="mb-3 space-y-1 text-xs text-gray-300">
-                                                                        <div className="flex justify-between">
-                                                                            <span>
-                                                                                {t('area')}:
-                                                                            </span>
-                                                                            <span className="text-white">
-                                                                                {field.totalArea?.toFixed(
-                                                                                    2
-                                                                                )}{' '}
-                                                                                ไร่
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex justify-between">
-                                                                            <span>
-                                                                                {t('plants')}:
-                                                                            </span>
-                                                                            <span className="text-white">
-                                                                                {field.totalPlants}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex justify-between">
-                                                                            <span>
-                                                                                {t('status')}:
-                                                                            </span>
-                                                                            <span
-                                                                                className={`${
-                                                                                    field.isCompleted
-                                                                                        ? 'text-green-400'
-                                                                                        : 'text-yellow-400'
-                                                                                }`}
-                                                                            >
-                                                                                {field.isCompleted
-                                                                                    ? t('completed')
-                                                                                    : t(
-                                                                                          'in_progress'
-                                                                                      )}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex justify-between">
-                                                                            <span>
-                                                                                {t('created')}:
-                                                                            </span>
-                                                                            <span className="text-white">
-                                                                                {new Date(
-                                                                                    field.created_at
-                                                                                ).toLocaleDateString()}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleDeleteField(
-                                                                                field.id
-                                                                            )
-                                                                        }
-                                                                        className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                                    >
-                                                                        <FaTrash className="mr-1 h-3 w-3" />
-                                                                        {t('delete')}
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
-
-                        {activeTab === 'folders' && (
-                            <div>
-                                <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-white">
-                                        {t('folder_management')}
-                                    </h2>
-                                    <button
-                                        onClick={() => setShowCreateFolderModal(true)}
-                                        className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
-                                    >
-                                        <FaPlus className="h-4 w-4" />
-                                        {t('create_folder')}
-                                    </button>
-                                </div>
-
-                                {/* Group folders by user */}
-                                {(() => {
-                                    const foldersByUser = folders.reduce(
-                                        (acc, folder) => {
-                                            const userId = folder.user.id;
-                                            if (!acc[userId]) {
-                                                acc[userId] = {
-                                                    user: folder.user,
-                                                    folders: [],
-                                                };
-                                            }
-                                            acc[userId].folders.push(folder);
-                                            return acc;
-                                        },
-                                        {} as Record<number, { user: User; folders: Folder[] }>
-                                    );
-
-                                    return (
-                                        <div className="space-y-8">
-                                            {Object.values(foldersByUser).map(
-                                                ({ user, folders: userFolders }) => (
-                                                    <div
-                                                        key={user.id}
-                                                        className="rounded-lg border border-gray-700 bg-gray-800 p-6"
-                                                    >
-                                                        <div className="mb-4 flex items-center justify-between">
-                                                            <div>
-                                                                <h3 className="text-lg font-semibold text-white">
-                                                                    {user.name}
-                                                                </h3>
-                                                                <p className="text-sm text-gray-400">
-                                                                    {user.email}
-                                                                </p>
-                                                                {user.is_super_user && (
-                                                                    <span className="mt-1 inline-block rounded bg-yellow-600 px-2 py-1 text-xs text-white">
-                                                                        {t('super_user')}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-sm text-gray-400">
-                                                                {userFolders.length} {t('folders')}
-                                                            </span>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                                            {userFolders.map((folder) => (
-                                                                <div
-                                                                    key={folder.id}
-                                                                    className="rounded-lg border border-gray-600 bg-gray-700 p-4"
-                                                                >
-                                                                    <div className="mb-3">
-                                                                        <h4 className="font-semibold text-white">
-                                                                            {folder.name}
-                                                                        </h4>
-                                                                        <p className="text-xs text-gray-400">
-                                                                            {folder.type}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div className="mb-3 space-y-1 text-xs text-gray-300">
-                                                                        <div className="flex justify-between">
-                                                                            <span>
-                                                                                {t('created')}:
-                                                                            </span>
-                                                                            <span className="text-white">
-                                                                                {new Date(
-                                                                                    folder.created_at
-                                                                                ).toLocaleDateString()}
-                                                                            </span>
-                                                                        </div>
-                                                                        {folder.color && (
-                                                                            <div className="flex items-center justify-between">
-                                                                                <span>
-                                                                                    {t('color')}:
-                                                                                </span>
-                                                                                <div
-                                                                                    className="h-4 w-4 rounded-full border border-gray-500"
-                                                                                    style={{
-                                                                                        backgroundColor:
-                                                                                            folder.color,
-                                                                                    }}
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <button
-                                                                        onClick={() =>
-                                                                            handleDeleteFolder(
-                                                                                folder.id
-                                                                            )
-                                                                        }
-                                                                        className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                                    >
-                                                                        <FaTrash className="mr-1 h-3 w-3" />
-                                                                        {t('delete')}
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
@@ -1935,6 +1848,242 @@ export default function SuperUserDashboard() {
                     onUpdate={handleUpdatePayment}
                     t={t}
                 />
+            )}
+
+            {/* View User Projects Modal */}
+            {showViewProjectsModal && selectedUser && (
+                <ViewUserProjectsModal
+                    isOpen={showViewProjectsModal}
+                    onClose={() => {
+                        setShowViewProjectsModal(false);
+                        setSelectedUser(null);
+                        setUserFolders([]);
+                        setUserFields([]);
+                    }}
+                    user={selectedUser}
+                    folders={userFolders}
+                    fields={userFields}
+                    loading={loadingUserProjects}
+                    onRename={handleRenameProject}
+                    onMove={handleMoveProject}
+                    onCopy={handleCopyProject}
+                    onShare={handleShareProject}
+                    onDelete={handleDeleteField}
+                    isSuperUser={true}
+                    t={t}
+                />
+            )}
+
+            {/* Rename Project Modal */}
+            {fieldToRename && (
+                <RenameProjectModal
+                    isOpen={showRenameModal}
+                    onClose={() => {
+                        setShowRenameModal(false);
+                        setFieldToRename(null);
+                    }}
+                    onRename={handleSubmitRename}
+                    currentName={fieldToRename.name}
+                    t={t}
+                />
+            )}
+
+            {/* Folder Selection Modal for Move/Copy */}
+            <FolderSelectionModal
+                isOpen={showFolderSelectionModal}
+                onClose={() => {
+                    setShowFolderSelectionModal(false);
+                    setFieldToMoveOrCopy(null);
+                }}
+                onSelect={async (folderId) => {
+                    if (!fieldToMoveOrCopy) return;
+                    
+                    try {
+                        if (folderSelectionAction === 'move') {
+                            const response = await axios.put(`/api/fields/${fieldToMoveOrCopy.id}/folder`, {
+                                folder_id: folderId ? parseInt(folderId) : null,
+                            });
+                            
+                            if (response.data.success) {
+                                // Update field in userFields
+                                setUserFields(prev => prev.map(f => 
+                                    f.id === fieldToMoveOrCopy.id ? { ...f, folderId: folderId } : f
+                                ));
+                                alert(t('move_project_success'));
+                            }
+                        } else {
+                            // Copy project
+                            const response = await axios.post(`/api/fields/${fieldToMoveOrCopy.id}/copy`, {
+                                folder_id: folderId ? parseInt(folderId) : null,
+                            });
+                            
+                            if (response.data.success && response.data.field) {
+                                setUserFields(prev => [...prev, response.data.field]);
+                                alert(t('copy_project_success'));
+                            }
+                        }
+                    } catch (error: any) {
+                        console.error(`Error ${folderSelectionAction} project:`, error);
+                        alert(`Error ${folderSelectionAction} project: ${error.response?.data?.message || error.message}`);
+                    }
+                }}
+                action={folderSelectionAction}
+                currentFolderId={fieldToMoveOrCopy?.folderId}
+                folders={userFolders}
+                t={t}
+            />
+
+            {/* Share To User Modal */}
+            <ShareToUserModal
+                isOpen={showShareModal && !showUserFolderSelectionModal}
+                onClose={() => {
+                    setShowShareModal(false);
+                    setFieldToShare(null);
+                    setSelectedUserForShare(null);
+                    setUserFoldersForShare([]);
+                }}
+                onSelectUser={async (user) => {
+                    setSelectedUserForShare(user);
+                    // Fetch user's folders
+                    try {
+                        const response = await axios.get(`/api/users/${user.id}/folders`);
+                        setUserFoldersForShare(response.data.folders || []);
+                        setShowUserFolderSelectionModal(true);
+                    } catch (error) {
+                        console.error('Error fetching user folders:', error);
+                        alert('Error fetching user folders');
+                    }
+                }}
+                t={t}
+            />
+
+            {/* User Folder Selection Modal for Share */}
+            {selectedUserForShare && (
+                <FolderSelectionModal
+                    isOpen={showUserFolderSelectionModal}
+                    onClose={() => {
+                        setShowUserFolderSelectionModal(false);
+                        setSelectedUserForShare(null);
+                        setUserFoldersForShare([]);
+                        setFieldToShare(null);
+                        setShowShareModal(false);
+                    }}
+                    onSelect={async (folderId) => {
+                        if (!fieldToShare || !selectedUserForShare) {
+                            alert('Error: Missing required data. Please try again.');
+                            return;
+                        }
+                        
+                        try {
+                            // Share project to user
+                            const response = await axios.post(`/api/fields/${fieldToShare.id}/share`, {
+                                user_id: selectedUserForShare.id,
+                                folder_id: folderId ? parseInt(folderId) : null,
+                            });
+                            
+                            if (response.data.success) {
+                                alert(t('share_project_success') || 'แชร์โครงการสำเร็จ');
+                            } else {
+                                alert(`Error sharing project: ${response.data.message || 'Unknown error'}`);
+                            }
+                        } catch (error: any) {
+                            console.error('Error sharing project:', error);
+                            alert(`Error sharing project: ${error.response?.data?.message || error.message}`);
+                        } finally {
+                            setShowUserFolderSelectionModal(false);
+                            setSelectedUserForShare(null);
+                            setUserFoldersForShare([]);
+                            setFieldToShare(null);
+                            setShowShareModal(false);
+                        }
+                    }}
+                    action="share"
+                    folders={userFoldersForShare}
+                    showAllFolders={true}
+                    t={t}
+                />
+            )}
+
+            {/* Delete Field Confirmation Dialog */}
+            {showDeleteConfirm && fieldToDelete && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="relative z-[10000] mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
+                        <div className="mb-4 flex items-center">
+                            <div className="flex-shrink-0">
+                                <svg
+                                    className="h-6 w-6 text-red-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                                    />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-lg font-medium text-white">
+                                    {t('delete_project') || 'ลบโครงการ'}
+                                </h3>
+                            </div>
+                        </div>
+                        <div className="mb-6">
+                            <p className="text-gray-300">
+                                {t('delete_confirm') || 'คุณแน่ใจหรือไม่ที่จะลบโครงการ'}{' '}
+                                <span className="font-semibold text-white">
+                                    "{fieldToDelete.name}"
+                                </span>
+                                ?
+                            </p>
+                            <p className="mt-2 text-sm text-gray-400">{t('delete_warning') || 'การลบนี้ไม่สามารถยกเลิกได้'}</p>
+                        </div>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={cancelDelete}
+                                disabled={deleting}
+                                className="rounded px-4 py-2 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white disabled:opacity-50"
+                            >
+                                {t('cancel')}
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={deleting}
+                                className="flex items-center rounded bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {deleting ? (
+                                    <>
+                                        <svg
+                                            className="-ml-1 mr-2 h-4 w-4 animate-spin text-white"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                            ></circle>
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                        </svg>
+                                        {t('deleting') || 'กำลังลบ...'}
+                                    </>
+                                ) : (
+                                    t('delete') || 'ลบ'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -2403,6 +2552,844 @@ const EditUserModal = ({
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+};
+
+// View User Projects Modal Component
+const ViewUserProjectsModal = ({
+    isOpen,
+    onClose,
+    user,
+    folders,
+    fields,
+    loading,
+    onRename,
+    onMove,
+    onCopy,
+    onShare,
+    onDelete,
+    isSuperUser = false,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    user: User;
+    folders: Folder[];
+    fields: Field[];
+    loading: boolean;
+    onRename?: (field: Field) => void;
+    onMove?: (field: Field) => void;
+    onCopy?: (field: Field) => void;
+    onShare?: (field: Field) => void;
+    onDelete?: (field: Field) => void;
+    isSuperUser?: boolean;
+    t: (key: string) => string;
+}) => {
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+    const [selectedFieldMenu, setSelectedFieldMenu] = useState<string | null>(null);
+
+    const toggleFolder = (folderId: string) => {
+        const newExpanded = new Set(expandedFolders);
+        if (newExpanded.has(folderId)) {
+            newExpanded.delete(folderId);
+        } else {
+            newExpanded.add(folderId);
+        }
+        setExpandedFolders(newExpanded);
+    };
+
+    const getFieldsForFolder = (folderId: string | null) => {
+        if (!folderId) {
+            return fields.filter(f => !f.folderId);
+        }
+        return fields.filter(f => String(f.folderId) === String(folderId));
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-75 p-4">
+            <div className="relative w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-lg bg-gray-800 shadow-xl">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-gray-700 bg-gray-900 px-6 py-4">
+                    <h2 className="text-2xl font-bold text-white">
+                        {t('view_projects') || 'ดูโครงการ'} - {user.name}
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 transition-colors hover:text-white"
+                    >
+                        <FaTimes className="h-6 w-6" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                            <span className="ml-3 text-gray-400">{t('loading') || 'กำลังโหลด...'}</span>
+                        </div>
+                    ) : folders.length === 0 && fields.length === 0 ? (
+                        <div className="py-12 text-center text-gray-400">
+                            <p>{t('no_projects_found') || 'ไม่พบโครงการ'}</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {/* Folders */}
+                            {folders.map((folder) => {
+                                const folderFields = getFieldsForFolder(folder.id);
+                                const isExpanded = expandedFolders.has(folder.id);
+
+                                return (
+                                    <div key={folder.id} className="rounded-lg border border-gray-700 bg-gray-800/50">
+                                        {/* Folder Header */}
+                                        <button
+                                            onClick={() => toggleFolder(folder.id)}
+                                            className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-700/50"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <FaFolder className={`h-5 w-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                <span className="font-semibold text-white">{folder.name}</span>
+                                                <span className="rounded-full bg-gray-700 px-2 py-1 text-xs text-gray-300">
+                                                    {folderFields.length} {t('fields') || 'แปลง'}
+                                                </span>
+                                            </div>
+                                            <FaFolderOpen className="h-4 w-4 text-gray-400" />
+                                        </button>
+
+                                        {/* Folder Fields */}
+                                        {isExpanded && folderFields.length > 0 && (
+                                            <div className="border-t border-gray-700 p-4">
+                                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                                    {folderFields.map((field) => (
+                                                        <UserFieldCard
+                                                            key={field.id}
+                                                            field={field}
+                                                            onMenuToggle={(fieldId) => {
+                                                                setSelectedFieldMenu(selectedFieldMenu === fieldId ? null : fieldId);
+                                                            }}
+                                                            showMenu={selectedFieldMenu === field.id}
+                                                            onRename={onRename}
+                                                            onMove={onMove}
+                                                            onCopy={onCopy}
+                                                            onShare={onShare}
+                                                            onDelete={onDelete}
+                                                            isSuperUser={isSuperUser}
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+
+                            {/* Unassigned Fields */}
+                            {(() => {
+                                const unassignedFields = getFieldsForFolder(null);
+                                if (unassignedFields.length === 0) return null;
+
+                                return (
+                                    <div className="rounded-lg border border-gray-700 bg-gray-800/50">
+                                        <div className="p-4">
+                                            <h3 className="mb-4 font-semibold text-white">
+                                                {t('uncategorized_fields') || 'แปลงที่ยังไม่ได้จัดหมวดหมู่'} ({unassignedFields.length})
+                                            </h3>
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                                {unassignedFields.map((field) => (
+                                                    <UserFieldCard
+                                                        key={field.id}
+                                                        field={field}
+                                                        onMenuToggle={(fieldId) => {
+                                                            setSelectedFieldMenu(selectedFieldMenu === fieldId ? null : fieldId);
+                                                        }}
+                                                        showMenu={selectedFieldMenu === field.id}
+                                                        onRename={onRename}
+                                                        onMove={onMove}
+                                                        onCopy={onCopy}
+                                                        onShare={onShare}
+                                                        onDelete={onDelete}
+                                                        isSuperUser={isSuperUser}
+                                                        t={t}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// User Field Card Component (simplified version for modal)
+const UserFieldCard = ({
+    field,
+    onMenuToggle,
+    showMenu,
+    onRename,
+    onMove,
+    onCopy,
+    onShare,
+    onDelete,
+    isSuperUser = false,
+    t,
+}: {
+    field: Field;
+    onMenuToggle: (fieldId: string) => void;
+    showMenu: boolean;
+    onRename?: (field: Field) => void;
+    onMove?: (field: Field) => void;
+    onCopy?: (field: Field) => void;
+    onShare?: (field: Field) => void;
+    onDelete?: (field: Field) => void;
+    isSuperUser?: boolean;
+    t: (key: string) => string;
+}) => {
+    const isFinished = field.status === 'finished' || field.isCompleted;
+
+    return (
+        <div className="group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-4 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10">
+            {/* Field Header */}
+            <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="text-lg">{field.category === 'horticulture' ? '🌳' : field.category === 'home-garden' ? '🏡' : field.category === 'greenhouse' ? '🌱' : '📁'}</span>
+                    <h3 className="font-semibold text-white">{field.name}</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                    {/* Status Badge */}
+                    <button
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${isFinished
+                            ? 'bg-green-600 text-white'
+                            : 'bg-yellow-600 text-white'
+                        }`}
+                        title={isFinished ? t('finished') || 'เสร็จสิ้น' : t('unfinished') || 'ยังไม่เสร็จสิ้น'}
+                    >
+                        {isFinished ? '✅' : '⏳'}
+                    </button>
+
+                    {/* Three Dots Menu */}
+                    <div className="relative">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onMenuToggle(field.id);
+                            }}
+                            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+                        >
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                            </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showMenu && (
+                            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-700 bg-gray-800 py-1 shadow-lg">
+                                {onRename && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onMenuToggle('');
+                                            onRename(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        {t('rename_project') || 'เปลี่ยนชื่อโครงการ'}
+                                    </button>
+                                )}
+                                {onMove && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onMenuToggle('');
+                                            onMove(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                        </svg>
+                                        {t('move_project') || 'ย้ายโครงการ'}
+                                    </button>
+                                )}
+                                {onCopy && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onMenuToggle('');
+                                            onCopy(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        {t('copy_project') || 'คัดลอกโครงการ'}
+                                    </button>
+                                )}
+                                {onShare && isSuperUser && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onMenuToggle('');
+                                            onShare(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                        </svg>
+                                        {t('share_to_user') || 'แชร์ไปยังผู้คน'}
+                                    </button>
+                                )}
+                                {onDelete && (
+                                    <>
+                                        <hr className="my-1 border-gray-700" />
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onMenuToggle('');
+                                                onDelete(field);
+                                            }}
+                                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-900/20 hover:text-red-300"
+                                        >
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            {t('delete_project') || 'ลบโครงการ'}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Field Details */}
+            <div className="space-y-1 text-sm text-gray-300">
+                {field.category === 'horticulture' && (() => {
+                    const data = field.projectData || field.project_data;
+                    if (!data) return null;
+                    let parsedData = data;
+                    if (typeof data === 'string') {
+                        try {
+                            parsedData = JSON.parse(data);
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+                    if (!parsedData?.mainArea || parsedData.mainArea.length === 0) return null;
+                    return (
+                        <div className="mb-2">
+                            <HorticultureMapPreview
+                                fieldId={field.id}
+                                projectData={parsedData}
+                                height="120px"
+                            />
+                        </div>
+                    );
+                })()}
+
+                <div className="flex justify-between">
+                    <span>{t('plant_name') || 'ชื่อพืช'}:</span>
+                    <span className="text-white">
+                        {(() => {
+                            const projectData = field.projectData || field.project_data;
+                            if (projectData?.selectedPlantType?.name) {
+                                return projectData.selectedPlantType.name;
+                            }
+                            return field.plantType?.name || 'N/A';
+                        })()}
+                    </span>
+                </div>
+                <div className="flex justify-between">
+                    <span>{t('area_label') || 'พื้นที่'}:</span>
+                    <span className="text-white">
+                        {field.totalArea != null
+                            ? typeof field.totalArea === 'number'
+                                ? field.totalArea.toFixed(2)
+                                : (parseFloat(String(field.totalArea)) || 0).toFixed(2)
+                            : 'N/A'}{' '}
+                        {t('rai') || 'ไร่'}
+                    </span>
+                </div>
+                <div className="flex justify-between">
+                    <span>{t('quantity') || 'จำนวน'}:</span>
+                    <span className="text-white">
+                        {field.totalPlants != null ? field.totalPlants : 'N/A'} {t('plants_unit') || 'ต้น'}
+                    </span>
+                </div>
+                {field.total_water_need != null && (
+                    <div className="flex justify-between">
+                        <span>{t('water_need') || 'ความต้องการน้ำ'}:</span>
+                        <span className="text-white">
+                            {typeof field.total_water_need === 'number'
+                                ? field.total_water_need.toFixed(2)
+                                : (parseFloat(String(field.total_water_need)) || 0).toFixed(2)}{' '}
+                            {t('liters_per_session') || 'ลิตร/ครั้ง'}
+                        </span>
+                    </div>
+                )}
+                {isFinished && (() => {
+                    const projectStats = field.project_stats;
+                    if (!projectStats) return null;
+                    const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+                    const costNumber = Number(stats.totalCost);
+                    if (stats.totalCost == null || isNaN(costNumber) || costNumber < 0.01) return null;
+                    return (
+                        <div className="mt-2 flex justify-between border-t border-gray-600 pt-2">
+                            <span className="font-semibold text-yellow-400">💰 {t('total_cost') || 'ราคารวมสุทธิ'}:</span>
+                            <span className="font-bold text-yellow-300">
+                                {costNumber.toLocaleString('th-TH', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                }) + ' ' + (t('baht') || 'บาท')}
+                            </span>
+                        </div>
+                    );
+                })()}
+            </div>
+
+            <div className="mt-2 text-xs text-gray-400">
+                <span>{t('last_saved') || 'บันทึกล่าสุด'}: {new Date(field.created_at || field.createdAt || Date.now()).toLocaleDateString()}</span>
+            </div>
+        </div>
+    );
+};
+
+// Rename Project Modal
+const RenameProjectModal = ({
+    isOpen,
+    onClose,
+    onRename,
+    currentName,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onRename: (newName: string) => void;
+    currentName: string;
+    t: (key: string) => string;
+}) => {
+    const [newName, setNewName] = useState(currentName);
+    
+    useEffect(() => {
+        if (isOpen) {
+            setNewName(currentName);
+        }
+    }, [isOpen, currentName]);
+    
+    const handleSubmit = () => {
+        if (newName.trim()) {
+            onRename(newName.trim());
+            onClose();
+        }
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative z-[10000] w-full max-w-md rounded-lg bg-gray-800 p-6">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">{t('rename_project')}</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div className="mb-6">
+                    <label className="mb-2 block text-sm font-medium text-gray-300">
+                        {t('project_name')}
+                    </label>
+                    <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                handleSubmit();
+                            }
+                        }}
+                        className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                        placeholder={t('enter_new_project_name')}
+                        autoFocus
+                    />
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                    <button
+                        onClick={onClose}
+                        className="rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!newName.trim()}
+                        className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {t('save')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Share To User Modal
+const ShareToUserModal = ({
+    isOpen,
+    onClose,
+    onSelectUser,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelectUser: (user: any) => void;
+    t: (key: string) => string;
+}) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    
+    useEffect(() => {
+        if (!isOpen || searchQuery.length < 2) {
+            setUsers([]);
+            return;
+        }
+        
+        const searchUsers = async () => {
+            setLoading(true);
+            try {
+                const response = await axios.get(`/api/users/search?q=${encodeURIComponent(searchQuery)}`);
+                setUsers(response.data.users || []);
+            } catch (error) {
+                console.error('Error searching users:', error);
+                setUsers([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        const debounce = setTimeout(searchUsers, 300);
+        return () => clearTimeout(debounce);
+    }, [searchQuery, isOpen]);
+    
+    const handleClose = () => {
+        onClose();
+        setSearchQuery('');
+        setUsers([]);
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative z-[10000] max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-lg bg-gray-800 p-6">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">{t('share_to_user')}</h2>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-white">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div className="mb-4">
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                        placeholder={t('search_by_name_email_phone')}
+                        autoFocus
+                    />
+                </div>
+                
+                <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 p-4">
+                    {loading ? (
+                        <div className="py-8 text-center text-gray-400">
+                            <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                            {t('loading')}...
+                        </div>
+                    ) : searchQuery.length < 2 ? (
+                        <p className="py-8 text-center text-gray-400">{t('search_by_name_email_phone')}</p>
+                    ) : users.length === 0 ? (
+                        <p className="py-8 text-center text-gray-400">{t('no_users_found')}</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {users.map((user) => (
+                                <button
+                                    key={user.id}
+                                    onClick={() => {
+                                        onSelectUser(user);
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-lg border border-gray-700 bg-gray-800 p-3 text-left transition-colors hover:border-blue-500 hover:bg-blue-900/10"
+                                >
+                                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                                        {user.name?.charAt(0).toUpperCase() || '?'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-white">{user.name}</h3>
+                                        <p className="text-sm text-gray-400">{user.email}</p>
+                                        {user.phone && <p className="text-xs text-gray-500">{user.phone}</p>}
+                                    </div>
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                <div className="mt-6 flex justify-end">
+                    <button
+                        onClick={handleClose}
+                        className="rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Folder Selection Modal for Move/Copy/Share
+const FolderSelectionModal = ({
+    isOpen,
+    onClose,
+    onSelect,
+    action,
+    currentFolderId,
+    folders,
+    showAllFolders = false,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelect: (folderId: string | null) => void;
+    action: 'move' | 'copy' | 'share';
+    currentFolderId?: string | null;
+    folders: Folder[];
+    showAllFolders?: boolean;
+    t: (key: string) => string;
+}) => {
+    const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+    const [folderHistory, setFolderHistory] = useState<Folder[]>([]);
+    
+    const handleFolderClick = (folder: Folder) => {
+        if (showAllFolders) {
+            return;
+        }
+        
+        if (folderHistory.some(f => f.id === folder.id)) {
+            const existingIndex = folderHistory.findIndex(f => f.id === folder.id);
+            const newHistory = folderHistory.slice(0, existingIndex + 1);
+            setFolderHistory(newHistory);
+            setSelectedFolder(folder);
+            return;
+        }
+        
+        setFolderHistory([...folderHistory, folder]);
+        setSelectedFolder(folder);
+    };
+    
+    const handleGoBack = () => {
+        if (folderHistory.length > 0) {
+            const newHistory = [...folderHistory];
+            newHistory.pop();
+            const parentFolder = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null;
+            setSelectedFolder(parentFolder);
+            setFolderHistory(newHistory);
+        }
+    };
+    
+    const handleSelectHere = (folderToSelect?: Folder | null) => {
+        const folder = folderToSelect || selectedFolder;
+        onSelect(folder?.id || null);
+        onClose();
+        setSelectedFolder(null);
+        setFolderHistory([]);
+    };
+    
+    const getCurrentFolders = () => {
+        let result;
+        
+        if (showAllFolders) {
+            result = folders;
+        } else {
+            if (!selectedFolder) {
+                result = folders.filter(f => !f.parent_id);
+            } else {
+                result = folders.filter(f => f.parent_id === selectedFolder.id);
+            }
+        }
+        
+        const uniqueFolders = result.filter((folder, index, self) => 
+            index === self.findIndex(f => f.id === folder.id)
+        );
+        
+        return uniqueFolders;
+    };
+    
+    const handleClose = () => {
+        onClose();
+        setSelectedFolder(null);
+        setFolderHistory([]);
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative z-[10000] max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-lg bg-gray-800 p-6">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">
+                        {action === 'move' ? t('move_project') : action === 'share' ? t('share_to_user') : t('copy_project')}
+                    </h2>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-white">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                {!showAllFolders && (
+                    <div className="mb-4 flex items-center gap-2 text-sm text-gray-400">
+                        <button
+                            onClick={() => {
+                                setSelectedFolder(null);
+                                setFolderHistory([]);
+                            }}
+                            className="hover:text-white"
+                        >
+                            {t('all_folders')}
+                        </button>
+                        {folderHistory.map((folder, index) => (
+                            <React.Fragment key={`breadcrumb-${folder.id}-${index}`}>
+                                <span>/</span>
+                                <button
+                                    onClick={() => {
+                                        const newHistory = folderHistory.slice(0, index + 1);
+                                        setFolderHistory(newHistory);
+                                        setSelectedFolder(folder);
+                                    }}
+                                    className="hover:text-white"
+                                >
+                                    {folder.name}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                )}
+                
+                <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 p-4">
+                    {getCurrentFolders().length === 0 ? (
+                        <p className="py-8 text-center text-gray-400">{t('no_folders_yet')}</p>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {getCurrentFolders().map((folder, index) => (
+                                <button
+                                    key={`folder-${folder.id}-${index}`}
+                                    onClick={() => {
+                                        if (showAllFolders) {
+                                            handleSelectHere(folder);
+                                        } else {
+                                            handleFolderClick(folder);
+                                        }
+                                    }}
+                                    onDoubleClick={() => {
+                                        if (!showAllFolders && folder.id !== currentFolderId) {
+                                            handleSelectHere(folder);
+                                        }
+                                    }}
+                                    disabled={folder.id === currentFolderId}
+                                    className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                                        folder.id === currentFolderId
+                                            ? 'cursor-not-allowed border-gray-600 bg-gray-800 opacity-50'
+                                            : showAllFolders
+                                            ? 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10 cursor-pointer'
+                                            : 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10'
+                                    }`}
+                                >
+                                    <span className="text-2xl">
+                                        {folder.icon || '📂'}
+                                    </span>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-white">{folder.name}</h3>
+                                        <p className="text-xs text-gray-400">
+                                            {showAllFolders && folder.parent_id ? (
+                                                <>
+                                                    {t('parent_folder')}: {folders.find(f => f.id === folder.parent_id)?.name || 'N/A'}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {folders.filter(f => f.parent_id === folder.id).length} {t('sub_folders')}
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                    {!showAllFolders && (
+                                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    )}
+                                    {showAllFolders && (
+                                        <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                <div className="mt-6 flex items-center justify-between gap-3">
+                    {!showAllFolders && folderHistory.length > 0 && (
+                        <button
+                            onClick={handleGoBack}
+                            className="flex items-center gap-2 rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                        >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            {t('back')}
+                        </button>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                        onClick={handleClose}
+                        className="rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button
+                        onClick={() => {
+                            handleSelectHere();
+                        }}
+                        className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                    >
+                        {action === 'move' ? t('move_here') : t('copy_here')}
+                    </button>
+                </div>
             </div>
         </div>
     );

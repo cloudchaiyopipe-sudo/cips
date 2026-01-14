@@ -1077,6 +1077,7 @@ class FarmController extends Controller
 
             $formattedField = [
                 'id' => $field->id,
+                'name' => $field->name, // เพิ่ม name เพื่อให้ frontend อ่านได้
                 'field_name' => $field->name,
                 'customer_name' => $field->customer_name,
                 'user_name' => $field->user ? $field->user->name : 'Unknown User', // แก้ไข: ตรวจสอบ user
@@ -1228,23 +1229,34 @@ class FarmController extends Controller
     public function updateField(Request $request, $fieldId): JsonResponse
     {
         try {
-            \Log::info('Starting field update with request data:', [
+            \Log::info('🔍 [DEBUG] Starting field update with request data:', [
                 'field_id' => $fieldId,
                 'field_id_type' => gettype($fieldId),
                 'field_name' => $request->field_name,
                 'plant_type_id' => $request->plant_type_id,
+                'total_area' => $request->input('total_area'),
+                'total_plants' => $request->input('total_plants'),
+                'total_water_need' => $request->input('total_water_need'),
+                'area_coordinates_count' => is_array($request->input('area_coordinates')) ? count($request->input('area_coordinates')) : 0,
+                'status' => $request->input('status'),
                 'zones_count' => count($request->zones ?? []),
                 'planting_points_count' => count($request->planting_points ?? []),
                 'pipes_count' => count($request->pipes ?? [])
             ]);
 
+            // Determine if this is a draft (unfinished) or completed project
+            $isDraft = ($request->input('status') === 'unfinished' || $request->input('is_completed') === false);
+
             $validator = Validator::make($request->all(), [
                 'field_name' => 'required|string|max:255',
                 'customer_name' => 'nullable|string|max:255',
                 'category' => 'nullable|string|in:horticulture,home-garden,greenhouse,field-crop',
-                'area_coordinates' => 'required|array|min:3',
-                'area_coordinates.*.lat' => 'required|numeric',
-                'area_coordinates.*.lng' => 'required|numeric',
+                // For drafts, allow empty area_coordinates. For finished projects, require at least 3 points
+                'area_coordinates' => $isDraft 
+                    ? 'nullable|array' 
+                    : 'required|array|min:3',
+                'area_coordinates.*.lat' => 'required_with:area_coordinates|numeric',
+                'area_coordinates.*.lng' => 'required_with:area_coordinates|numeric',
                 'plant_type_id' => 'required|integer|exists:plant_types,id',
                 'total_plants' => 'required|integer|min:0',
                 'total_area' => 'required|numeric|min:0',
@@ -1307,12 +1319,21 @@ class FarmController extends Controller
                     'name' => $request->field_name,
                     'customer_name' => $request->customer_name,
                     'category' => $request->category,
-                    'area_coordinates' => $request->area_coordinates,
+                    'area_coordinates' => $request->area_coordinates ?? [],
                     'plant_type_id' => $request->plant_type_id,
                     'total_plants' => $request->total_plants,
                     'total_area' => $request->total_area,
                     'total_water_need' => $request->total_water_need,
                     'area_type' => $request->area_type
+                ]);
+
+                // Debug: Log updated field data
+                \Log::info('🔍 [DEBUG] Field updated successfully:', [
+                    'field_id' => $field->id,
+                    'total_area' => $field->total_area,
+                    'total_plants' => $field->total_plants,
+                    'total_water_need' => $field->total_water_need,
+                    'area_coordinates_count' => is_array($field->area_coordinates) ? count($field->area_coordinates) : 0,
                 ]);
 
                 // Delete existing related data
@@ -2389,16 +2410,27 @@ class FarmController extends Controller
             \Log::info('Creating new field', [
                 'user_id' => $user->id,
                 'field_name' => $request->input('name'),
-                'category' => $request->input('category')
+                'category' => $request->input('category'),
+                'total_area' => $request->input('total_area'),
+                'total_plants' => $request->input('total_plants'),
+                'total_water_need' => $request->input('total_water_need'),
+                'area_coordinates_count' => is_array($request->input('area_coordinates')) ? count($request->input('area_coordinates')) : 0,
+                'status' => $request->input('status'),
             ]);
+
+            // Determine if this is a draft (unfinished) or completed project
+            $isDraft = ($request->input('status') === 'unfinished' || $request->input('is_completed') === false);
 
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'customer_name' => 'nullable|string|max:255',
                 'category' => 'required|string|in:horticulture,home-garden,greenhouse,field-crop',
-                'area_coordinates' => 'required|array|min:3',
-                'area_coordinates.*.lat' => 'required|numeric',
-                'area_coordinates.*.lng' => 'required|numeric',
+                // For drafts, allow empty area_coordinates. For finished projects, require at least 3 points
+                'area_coordinates' => $isDraft 
+                    ? 'nullable|array' 
+                    : 'required|array|min:3',
+                'area_coordinates.*.lat' => 'required_with:area_coordinates|numeric',
+                'area_coordinates.*.lng' => 'required_with:area_coordinates|numeric',
                 'plant_type_id' => 'required|integer|exists:plant_types,id',
                 'total_plants' => 'required|integer|min:0',
                 'total_area' => 'required|numeric|min:0',
@@ -2433,6 +2465,16 @@ class FarmController extends Controller
                 ->where('type', 'unfinished')
                 ->first();
 
+            // Debug: Log validated data before creating field
+            \Log::info('🔍 [DEBUG] Creating field with validated data:', [
+                'total_area' => $validated['total_area'],
+                'total_plants' => $validated['total_plants'],
+                'total_water_need' => $validated['total_water_need'],
+                'area_coordinates_count' => is_array($validated['area_coordinates'] ?? []) ? count($validated['area_coordinates']) : 0,
+                'project_data_totalArea' => isset($validated['project_data']['totalArea']) ? $validated['project_data']['totalArea'] : null,
+                'project_stats_totalAreaInRai' => isset($validated['project_stats']['totalAreaInRai']) ? $validated['project_stats']['totalAreaInRai'] : null,
+            ]);
+
             // Create the field
             $field = Field::create([
                 'name' => $validated['name'],
@@ -2442,7 +2484,7 @@ class FarmController extends Controller
                 'category' => $validated['category'],
                 'status' => $validated['status'] ?? 'unfinished',
                 'is_completed' => $validated['is_completed'] ?? false,
-                'area_coordinates' => $validated['area_coordinates'],
+                'area_coordinates' => $validated['area_coordinates'] ?? [],
                 'plant_type_id' => $validated['plant_type_id'],
                 'total_plants' => $validated['total_plants'],
                 'total_area' => $validated['total_area'],
@@ -2485,6 +2527,15 @@ class FarmController extends Controller
                 }
             }
 
+            // Debug: Log created field data
+            \Log::info('🔍 [DEBUG] Field created successfully:', [
+                'field_id' => $field->id,
+                'total_area' => $field->total_area,
+                'total_plants' => $field->total_plants,
+                'total_water_need' => $field->total_water_need,
+                'area_coordinates_count' => is_array($field->area_coordinates) ? count($field->area_coordinates) : 0,
+            ]);
+
             \Log::info('New field created successfully', [
                 'field_id' => $field->id,
                 'user_id' => $user->id,
@@ -2503,6 +2554,330 @@ class FarmController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating field: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Rename a project
+     */
+    public function renameField(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+            ]);
+            
+            $field = Field::where('id', $fieldId)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+            
+            $field->update([
+                'name' => $validated['name'],
+            ]);
+            
+            \Log::info('Field renamed successfully', [
+                'field_id' => $field->id,
+                'old_name' => $field->name,
+                'new_name' => $validated['name'],
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'field' => $field,
+                'message' => 'Project renamed successfully'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error renaming field: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error renaming project: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Move a project to a different folder
+     */
+    public function moveToFolder(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            
+            $validated = $request->validate([
+                'folder_id' => 'nullable|integer|exists:folders,id',
+            ]);
+            
+            $field = Field::where('id', $fieldId)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+            
+            $field->update([
+                'folder_id' => $validated['folder_id'] ?? null,
+            ]);
+            
+            \Log::info('Field moved to folder', [
+                'field_id' => $field->id,
+                'folder_id' => $validated['folder_id'] ?? 'root',
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'field' => $field,
+                'message' => 'Project moved successfully'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error moving field to folder: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error moving project: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Copy a project to a different folder
+     */
+    public function copyToFolder(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            
+            $validated = $request->validate([
+                'folder_id' => 'nullable|integer|exists:folders,id',
+            ]);
+            
+            $originalField = Field::where('id', $fieldId)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+            
+            // Create a copy with "(Copy)" appended to the name
+            $newField = $originalField->replicate();
+            $newField->name = $originalField->name . ' (Copy)';
+            $newField->folder_id = $validated['folder_id'] ?? null;
+            $newField->created_at = now();
+            $newField->updated_at = now();
+            $newField->save();
+            
+            // Copy planting points if they exist (with new point_id)
+            $originalPoints = PlantingPoint::where('field_id', $originalField->id)->get();
+            foreach ($originalPoints as $point) {
+                $newPoint = $point->replicate();
+                $newPoint->field_id = $newField->id;
+                // Generate new unique point_id to avoid duplicate key error
+                $newPoint->point_id = 'plant_' . time() . '_' . uniqid() . '_' . rand(1000, 9999);
+                $newPoint->save();
+            }
+            
+            // Copy pipes if they exist
+            $originalPipes = Pipe::where('field_id', $originalField->id)->get();
+            foreach ($originalPipes as $pipe) {
+                $newPipe = $pipe->replicate();
+                $newPipe->field_id = $newField->id;
+                $newPipe->save();
+            }
+            
+            \Log::info('Field copied successfully', [
+                'original_field_id' => $originalField->id,
+                'new_field_id' => $newField->id,
+                'folder_id' => $validated['folder_id'] ?? 'root',
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'field' => $newField,
+                'message' => 'Project copied successfully'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error copying field: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error copying project: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Share a project to another user
+     */
+    public function shareToUser(Request $request, $fieldId): JsonResponse
+    {
+        try {
+            $currentUser = auth()->user();
+            
+            \Log::info('Share to user API called', [
+                'current_user_id' => $currentUser->id,
+                'current_user_is_super' => $currentUser->is_super_user ?? false,
+                'field_id' => $fieldId,
+                'request_data' => $request->all(),
+            ]);
+            
+            // Check if user is super admin
+            if (!$currentUser->is_super_user) {
+                \Log::warning('Unauthorized share attempt', [
+                    'user_id' => $currentUser->id,
+                    'field_id' => $fieldId,
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Only super admins can share projects.'
+                ], 403);
+            }
+            
+            $validated = $request->validate([
+                'user_id' => 'required|integer|exists:users,id',
+                'folder_id' => 'nullable|integer|exists:folders,id',
+            ]);
+            
+            \Log::info('Share validation passed', [
+                'target_user_id' => $validated['user_id'],
+                'folder_id' => $validated['folder_id'] ?? null,
+            ]);
+            
+            $originalField = Field::findOrFail($fieldId);
+            
+            \Log::info('Original field found', [
+                'field_id' => $originalField->id,
+                'field_name' => $originalField->name,
+                'field_user_id' => $originalField->user_id,
+            ]);
+            
+            // Verify folder belongs to target user
+            $targetFolderId = $validated['folder_id'] ?? null;
+            $targetFolder = null; // Store the verified folder object
+            
+            if ($targetFolderId) {
+                $folder = Folder::where('id', $targetFolderId)
+                    ->where('user_id', $validated['user_id'])
+                    ->first();
+                
+                if (!$folder) {
+                    // Folder doesn't belong to target user, use Unfinished folder instead
+                    \Log::warning('Specified folder does not belong to target user, using Unfinished folder instead', [
+                        'specified_folder_id' => $targetFolderId,
+                        'target_user_id' => $validated['user_id'],
+                    ]);
+                    
+                    $unfinishedFolder = Folder::where('user_id', $validated['user_id'])
+                        ->where('type', 'unfinished')
+                        ->first();
+                    
+                    if ($unfinishedFolder) {
+                        $targetFolderId = $unfinishedFolder->id;
+                        $targetFolder = $unfinishedFolder; // Use the verified folder
+                    } else {
+                        $targetFolderId = null;
+                    }
+                } else {
+                    $targetFolder = $folder; // Use the verified folder
+                }
+            } else {
+                // If no folder specified, put it in the "Unfinished" folder of the target user
+                $unfinishedFolder = Folder::where('user_id', $validated['user_id'])
+                    ->where('type', 'unfinished')
+                    ->first();
+                
+                if ($unfinishedFolder) {
+                    $targetFolderId = $unfinishedFolder->id;
+                    $targetFolder = $unfinishedFolder; // Use the verified folder
+                }
+            }
+            
+            // Create a copy for the target user
+            $newField = $originalField->replicate();
+            $newField->user_id = $validated['user_id'];
+            $newField->folder_id = $targetFolderId;
+            
+            // Keep the original status and is_completed from the original field
+            // This ensures that shared fields maintain their original status regardless of destination folder
+            $newField->status = $originalField->status;
+            $newField->is_completed = $originalField->is_completed;
+            
+            $newField->created_at = now();
+            $newField->updated_at = now();
+            
+            $newField->save();
+            
+            // Copy planting points (with new point_id)
+            $originalPoints = PlantingPoint::where('field_id', $originalField->id)->get();
+            foreach ($originalPoints as $point) {
+                $newPoint = $point->replicate();
+                $newPoint->field_id = $newField->id;
+                // Generate new unique point_id to avoid duplicate key error
+                $newPoint->point_id = 'plant_' . time() . '_' . uniqid() . '_' . rand(1000, 9999);
+                $newPoint->save();
+            }
+            
+            // Copy pipes
+            $originalPipes = Pipe::where('field_id', $originalField->id)->get();
+            foreach ($originalPipes as $pipe) {
+                $newPipe = $pipe->replicate();
+                $newPipe->field_id = $newField->id;
+                $newPipe->save();
+            }
+            
+            // Verify the field was created correctly
+            $verifyField = \App\Models\Field::find($newField->id);
+            
+            // Also verify by querying fields for the target user
+            $targetUserFields = \App\Models\Field::where('user_id', $validated['user_id'])->get();
+            
+            // Verify folder exists and get its details
+            $verifyFolder = $targetFolderId ? \App\Models\Folder::find($targetFolderId) : null;
+            
+            \Log::info('Field shared to user successfully', [
+                'original_field_id' => $originalField->id,
+                'original_field_name' => $originalField->name,
+                'new_field_id' => $newField->id,
+                'new_field_name' => $newField->name,
+                'target_user_id' => $validated['user_id'],
+                'folder_id' => $targetFolderId ?? 'root',
+                'status' => $newField->status,
+                'is_completed' => $newField->is_completed,
+                'verified_field_exists' => $verifyField ? true : false,
+                'verified_field_user_id' => $verifyField ? $verifyField->user_id : null,
+                'verified_field_folder_id' => $verifyField ? $verifyField->folder_id : null,
+                'verified_field_status' => $verifyField ? $verifyField->status : null,
+                'verified_field_is_completed' => $verifyField ? $verifyField->is_completed : null,
+                'verified_folder_exists' => $verifyFolder ? true : false,
+                'verified_folder_id' => $verifyFolder ? $verifyFolder->id : null,
+                'verified_folder_name' => $verifyFolder ? $verifyFolder->name : null,
+                'verified_folder_type' => $verifyFolder ? $verifyFolder->type : null,
+                'verified_folder_type' => $verifyFolder ? $verifyFolder->type : null,
+                'target_user_total_fields' => $targetUserFields->count(),
+                'target_user_field_ids' => $targetUserFields->pluck('id')->toArray(),
+                'target_user_fields_with_folder' => $targetUserFields->map(function($f) {
+                    return [
+                        'id' => $f->id,
+                        'name' => $f->name,
+                        'folder_id' => $f->folder_id,
+                        'status' => $f->status,
+                    ];
+                })->toArray(),
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'field' => $newField,
+                'message' => 'Project shared successfully',
+                'debug' => [
+                    'new_field_id' => $newField->id,
+                    'target_user_id' => $validated['user_id'],
+                    'folder_id' => $targetFolderId,
+                    'verified' => $verifyField ? [
+                        'exists' => true,
+                        'user_id' => $verifyField->user_id,
+                        'folder_id' => $verifyField->folder_id,
+                    ] : ['exists' => false],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error sharing field: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error sharing project: ' . $e->getMessage()
             ], 500);
         }
     }

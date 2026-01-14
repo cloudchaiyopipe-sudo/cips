@@ -270,6 +270,20 @@ const MapComponent: React.FC<{
                 setMap(newMap);
                 setIsMapInitialized(true);
                 onLoad?.(newMap);
+                
+                // ✅ Wait for Places API to be ready before dispatching event
+                const waitForPlacesAPI = () => {
+                    if (
+                        window.google?.maps?.places?.PlacesService &&
+                        window.google?.maps?.places?.AutocompleteService
+                    ) {
+                        window.dispatchEvent(new Event('google-maps-loaded'));
+                        window.dispatchEvent(new Event('map-ready'));
+                    } else {
+                        setTimeout(waitForPlacesAPI, 100);
+                    }
+                };
+                waitForPlacesAPI();
             } catch (error) {
                 console.error('Error creating Google Map:', error);
             }
@@ -302,6 +316,30 @@ const renderMap = (status: Status): React.ReactElement => {
         case Status.FAILURE:
             return <MapErrorComponent onRetry={() => window.location.reload()} />;
         case Status.SUCCESS:
+            // ✅ Wait for Places API and Drawing Library before dispatching event
+            setTimeout(() => {
+                const waitForAPIs = () => {
+                    const hasPlacesAPI = !!(
+                        window.google?.maps?.places?.PlacesService &&
+                        window.google?.maps?.places?.AutocompleteService
+                    );
+                    const hasDrawingLibrary = !!window.google?.maps?.drawing?.DrawingManager;
+                    
+                    if (hasPlacesAPI) {
+                        window.dispatchEvent(new Event('google-maps-loaded'));
+                        window.dispatchEvent(new Event('map-ready'));
+                    }
+                    
+                    if (hasDrawingLibrary) {
+                        window.dispatchEvent(new Event('drawing-library-loaded'));
+                    }
+                    
+                    if (!hasPlacesAPI || !hasDrawingLibrary) {
+                        setTimeout(waitForAPIs, 100);
+                    }
+                };
+                waitForAPIs();
+            }, 0);
             return <div style={{ width: '100%', height: '100%' }} />;
         default:
             return <MapLoadingComponent />;
@@ -320,6 +358,7 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
     if (!config.apiKey) {
         return <MapErrorComponent onRetry={() => window.location.reload()} />;
     }
+
 
     const validCenter =
         center &&

@@ -21,6 +21,7 @@ interface Product {
     isPromotion?: boolean;
     isRecommended?: boolean;
     equipment_id?: number;
+    product_code?: string;
 }
 
 interface Equipment {
@@ -101,6 +102,11 @@ function ProductList() {
     // States for all users
     const [categories, setCategories] = useState<EquipmentCategory[]>([]);
     const [selectedRecommendedCategoryId, setSelectedRecommendedCategoryId] = useState<number | null>(null);
+    const [recommendedSearchQuery, setRecommendedSearchQuery] = useState('');
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     
     // States for admin modal
     const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -284,10 +290,149 @@ function ProductList() {
         }
     }, [activeTab, selectedRecommendedCategoryId]);
 
+    // Smart search function - matches even if not 100% exact
+    const smartSearch = (text: string | null | undefined, query: string): boolean => {
+        if (!text || !query.trim()) return true;
+        
+        // Remove Thai tone marks (วรรณยุกต์) to handle variations like "ปั๊ม" vs "ปั้ม"
+        const removeToneMarks = (str: string) => 
+            str.replace(/[\u0E48-\u0E4E]/g, ''); // Remove Thai tone marks (ไม้เอก, ไม้โท, ไม้ตรี, ไม้จัตวา, ไม้ไต่คู้, ไม้ทัณฑฆาต, ไม้วิสรรชนีย์)
+        
+        // Normalize: lowercase, remove extra spaces, remove special characters but keep Thai characters
+        const normalize = (str: string) => {
+            let normalized = str.toLowerCase()
+               .replace(/[^\wก-๙\s]/g, '') // Remove special chars but keep Thai, alphanumeric, and spaces
+               .replace(/\s+/g, ' ')       // Replace multiple spaces with single space
+               .trim();
+            
+            // Remove tone marks for fuzzy matching
+            normalized = removeToneMarks(normalized);
+            return normalized;
+        };
+        
+        const normalizedText = normalize(text);
+        const normalizedQuery = normalize(query);
+        
+        // If query is empty after normalization, match everything
+        if (!normalizedQuery) return true;
+        
+        // Method 1: Check if full query appears as substring (exact or partial match)
+        if (normalizedText.includes(normalizedQuery)) return true;
+        
+        // Method 2: Split query into words and check if words appear (flexible matching)
+        const queryWords = normalizedQuery.split(/\s+/).filter(word => word.length > 0);
+        
+        if (queryWords.length === 0) return true;
+        
+        // For single word queries, check if it appears anywhere
+        if (queryWords.length === 1) {
+            const word = queryWords[0];
+            // If word is at least 2 characters, check if it appears in text
+            if (word.length >= 2 && normalizedText.includes(word)) return true;
+            // For single character, check if it appears
+            if (word.length === 1 && normalizedText.includes(word)) return true;
+        }
+        
+        // For multiple words, check if at least 70% of words match (fuzzy matching)
+        if (queryWords.length > 1) {
+            const matchingWords = queryWords.filter(word => 
+                word.length >= 2 && normalizedText.includes(word)
+            ).length;
+            const matchRatio = matchingWords / queryWords.length;
+            
+            // If most words match, consider it a match
+            if (matchRatio >= 0.7) return true;
+            
+            // Also check if any significant word (3+ chars) matches
+            const hasSignificantMatch = queryWords.some(word => 
+                word.length >= 3 && normalizedText.includes(word)
+            );
+            if (hasSignificantMatch) return true;
+        }
+        
+        // Method 3: For short queries (like product codes), check character sequence
+        // This allows finding "ABC123" when searching "A1" or "BC"
+        if (normalizedQuery.length <= 6) {
+            // Remove spaces for code matching
+            const codeText = normalizedText.replace(/\s/g, '');
+            const codeQuery = normalizedQuery.replace(/\s/g, '');
+            
+            // Check if query characters appear in order in the text
+            let textIndex = 0;
+            let matchedChars = 0;
+            
+            for (let i = 0; i < codeQuery.length; i++) {
+                const char = codeQuery[i];
+                const foundIndex = codeText.indexOf(char, textIndex);
+                if (foundIndex !== -1) {
+                    matchedChars++;
+                    textIndex = foundIndex + 1;
+                }
+            }
+            
+            // If at least 70% of characters match in order, consider it a match
+            if (matchedChars / codeQuery.length >= 0.7) return true;
+        }
+        
+        return false;
+    };
+
+    // Check if search query matches product_code exactly (100%)
+    const isExactCodeMatch = (productCode: string | null | undefined, query: string): boolean => {
+        if (!productCode || !query.trim()) return false;
+        
+        // Normalize both: lowercase, remove spaces, remove special chars
+        const normalize = (str: string) => 
+            str.toLowerCase()
+               .replace(/[^\wก-๙]/g, '') // Remove special chars but keep Thai and alphanumeric
+               .trim();
+        
+        const normalizedCode = normalize(productCode);
+        const normalizedQuery = normalize(query);
+        
+        // Check if they match exactly
+        return normalizedCode === normalizedQuery;
+    };
+
     // Filter products - use sprinklers for recommended, products for others
     const filteredProducts = activeTab === 'recommended' 
-        ? sprinklers 
+        ? sprinklers
+            .filter((sprinkler) => {
+                // Filter by search query (product_code or name) - smart search
+                if (recommendedSearchQuery.trim()) {
+                    const matchesCode = smartSearch(sprinkler.product_code, recommendedSearchQuery);
+                    const matchesName = smartSearch(sprinkler.name, recommendedSearchQuery);
+                    return matchesCode || matchesName;
+                }
+                return true;
+            })
+            .sort((a, b) => {
+                // If there's a search query, prioritize exact product_code matches
+                if (recommendedSearchQuery.trim()) {
+                    const aExactMatch = isExactCodeMatch(a.product_code, recommendedSearchQuery);
+                    const bExactMatch = isExactCodeMatch(b.product_code, recommendedSearchQuery);
+                    
+                    // Exact matches come first
+                    if (aExactMatch && !bExactMatch) return -1;
+                    if (!aExactMatch && bExactMatch) return 1;
+                    
+                    // If both are exact matches or both are not, maintain original order
+                    return 0;
+                }
+                return 0;
+            })
         : (products || []).filter((product) => product.category === activeTab);
+    
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+    
+    // Reset to page 1 when tab changes or search query changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, selectedRecommendedCategoryId, recommendedSearchQuery]);
 
     // Filter equipments for admin modal
     const filteredEquipments = useMemo(() => {
@@ -731,24 +876,68 @@ function ProductList() {
                     </div>
                 </div>
 
-                {/* Category Filter for Recommended Tab (All Users) */}
+                {/* Category Filter and Search for Recommended Tab (All Users) */}
                 {activeTab === 'recommended' && (
-                    <div className="mb-6 rounded-xl bg-slate-800/40 p-4 backdrop-blur-sm border border-white/5">
-                        <label className="mb-2 block text-sm font-medium text-slate-300">
-                            หมวดหมู่สินค้า
-                        </label>
-                        <select
-                            value={selectedRecommendedCategoryId || ''}
-                            onChange={(e) => setSelectedRecommendedCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-                            className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
-                        >
-                            <option value="">ทุกหมวดหมู่</option>
-                            {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                    {category.display_name || category.name}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="mb-6 space-y-4">
+                        <div className="rounded-xl bg-slate-800/40 p-4 backdrop-blur-sm border border-white/5">
+                            <label className="mb-2 block text-sm font-medium text-slate-300">
+                                หมวดหมู่สินค้า
+                            </label>
+                            <select
+                                value={selectedRecommendedCategoryId || ''}
+                                onChange={(e) => {
+                                    setSelectedRecommendedCategoryId(e.target.value ? parseInt(e.target.value) : null);
+                                    setRecommendedSearchQuery(''); // Reset search when category changes
+                                }}
+                                className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+                            >
+                                <option value="">ทุกหมวดหมู่</option>
+                                {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                        {category.display_name || category.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="rounded-xl bg-slate-800/40 p-4 backdrop-blur-sm border border-white/5">
+                            <label className="mb-2 block text-sm font-medium text-slate-300">
+                                ค้นหาสินค้า
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={recommendedSearchQuery}
+                                    onChange={(e) => setRecommendedSearchQuery(e.target.value)}
+                                    placeholder="พิมพ์รหัสสินค้าหรือชื่อสินค้า..."
+                                    className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 pl-10 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                                />
+                                <svg 
+                                    className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                {recommendedSearchQuery && (
+                                    <button
+                                        onClick={() => setRecommendedSearchQuery('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-600 hover:text-white transition-colors"
+                                        aria-label="ล้างการค้นหา"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+                            {recommendedSearchQuery && (
+                                <p className="mt-2 text-xs text-slate-400">
+                                    พบ {filteredProducts.length} รายการ
+                                </p>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -774,7 +963,12 @@ function ProductList() {
                     ) : activeTab === 'recommended' ? (
                         // E-commerce Grid Layout for Recommended Products
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {filteredProducts.map((product) => {
+                            {paginatedProducts.map((product) => {
+                                // Calculate discount percentage if originalPrice exists
+                                const discountPercent = product.originalPrice && product.originalPrice > product.price
+                                    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                                    : null;
+                                
                                 return (
                                     <motion.div
                                         key={product.id}
@@ -784,6 +978,18 @@ function ProductList() {
                                         onClick={() => handleProductClick(product.id)}
                                         className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/5 bg-slate-800/60 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:border-blue-500/50 hover:bg-slate-800/80 hover:shadow-2xl hover:shadow-blue-900/20"
                                     >
+                                        {/* Discount Badge - Top Right */}
+                                        {discountPercent && discountPercent > 0 && (
+                                            <div className="absolute right-3 top-3 z-20">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-400/90 font-bold text-black shadow-lg backdrop-blur-sm">
+                                                    <div className="flex flex-col items-center leading-none">
+                                                        <span className="text-xs font-bold">
+                                                            -{discountPercent}%
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Product Image */}
                                         <div className="relative w-full overflow-hidden bg-slate-900/50">
@@ -803,7 +1009,7 @@ function ProductList() {
                                         {/* Product Info */}
                                         <div className="flex flex-1 flex-col p-4">
                                             <h3 className="mb-2 line-clamp-3 text-sm font-medium text-slate-100 transition-colors group-hover:text-blue-400">
-                                                {product.name}
+                                                {product.product_code ? `[${product.product_code}] ` : ''}{product.name}
                                             </h3>
 
                                             {/* Price & Action */}
@@ -843,7 +1049,13 @@ function ProductList() {
                     ) : (
                         // Original Layout for New and Promotion Products (All Users)
                         <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            {filteredProducts.map((product) => (
+                            {paginatedProducts.map((product) => {
+                                // Calculate discount percentage if originalPrice exists
+                                const discountPercent = product.originalPrice && product.originalPrice > product.price
+                                    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                                    : null;
+                                
+                                return (
                                 <div
                                     key={product.id}
                                     onClick={() => handleProductClick(product.id)}
@@ -863,20 +1075,37 @@ function ProductList() {
                                         )}
                                     </div>
 
-                                    {/* Discount Bubble */}
-                                    {product.category === 'promotion' && product.discount && product.discount > 0 && (
-                                        <div className="absolute right-3 top-3 z-20">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-400/90 font-bold text-black shadow-lg backdrop-blur-sm">
-                                                <div className="flex flex-col items-center leading-none">
-                                                    <span className="text-xs font-bold">
-                                                        {-parseFloat(Number(product.discount).toFixed(2)).toString()}
-                                                        {Number.isInteger(product.discount) ? '' : ''}
-                                                        %
-                                                    </span>
+                                    {/* Discount Badge - Top Right */}
+                                    {/* Show for promotion tab with discount field, or for new/recommended tabs if originalPrice exists */}
+                                    {(() => {
+                                        // Check conditions separately to avoid TypeScript type narrowing issues
+                                        let shouldShow = false;
+                                        let discountText = '';
+                                        
+                                        if (activeTab === 'promotion' && product.discount && product.discount > 0) {
+                                            shouldShow = true;
+                                            discountText = `-${Math.round(product.discount)}%`;
+                                        }
+                                        
+                                        if (activeTab !== 'promotion' && (activeTab === 'new' || activeTab === 'recommended') && discountPercent && discountPercent > 0) {
+                                            shouldShow = true;
+                                            discountText = `-${discountPercent}%`;
+                                        }
+                                        
+                                        if (!shouldShow) return null;
+                                        
+                                        return (
+                                            <div className="absolute right-3 top-3 z-20">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-400/90 font-bold text-black shadow-lg backdrop-blur-sm">
+                                                    <div className="flex flex-col items-center leading-none">
+                                                        <span className="text-xs font-bold">
+                                                            {discountText}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
 
                                     {/* Product Image */}
                                     <div className="relative w-full overflow-hidden bg-white/5 p-2">
@@ -896,7 +1125,7 @@ function ProductList() {
                                     {/* Content */}
                                     <div className="flex flex-1 flex-col p-2">
                                         <h4 className="mb-2 text-sm font-medium text-slate-100 transition-colors group-hover:text-green-400">
-                                            {product.name}
+                                            {product.product_code ? `[${product.product_code}] ` : ''}{product.name}
                                         </h4>
 
                                         {/* Footer: Price & Action */}
@@ -970,7 +1199,75 @@ function ProductList() {
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
+                        </div>
+                    )}
+                    
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 px-2 sm:gap-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="rounded-lg bg-slate-700 px-2 py-1.5 text-sm font-semibold text-white transition-all hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed sm:px-3 sm:py-2"
+                                aria-label="หน้าก่อนหน้า"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            
+                            <div className="flex items-center gap-0.5 sm:gap-1">
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                                    // Show first page, last page, current page, and pages around current
+                                    // On mobile, show fewer pages to avoid overflow
+                                    const shouldShow = 
+                                        page === 1 ||
+                                        page === totalPages ||
+                                        (page >= currentPage - 1 && page <= currentPage + 1) ||
+                                        (totalPages <= 5); // Show all if 5 or fewer pages
+                                    
+                                    if (shouldShow) {
+                                        return (
+                                            <button
+                                                key={page}
+                                                onClick={() => setCurrentPage(page)}
+                                                className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-all sm:px-3 sm:py-2 sm:text-sm ${
+                                                    currentPage === page
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                                }`}
+                                            >
+                                                {page}
+                                            </button>
+                                        );
+                                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                                        return (
+                                            <span key={page} className="px-1 text-xs text-slate-400 sm:px-2 sm:text-sm">
+                                                ...
+                                            </span>
+                                        );
+                                    }
+                                    return null;
+                                })}
+                            </div>
+                            
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="rounded-lg bg-slate-700 px-2 py-1.5 text-sm font-semibold text-white transition-all hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed sm:px-3 sm:py-2"
+                                aria-label="หน้าถัดไป"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                            
+                            <span className="w-full basis-full text-center text-xs text-slate-400 sm:basis-auto sm:ml-3 sm:w-auto sm:text-sm">
+                                <span className="hidden sm:inline">หน้า {currentPage} จาก {totalPages} ({filteredProducts.length} รายการ)</span>
+                                <span className="sm:hidden">{currentPage}/{totalPages}</span>
+                            </span>
                         </div>
                     )}
                 </div>

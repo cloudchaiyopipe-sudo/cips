@@ -18,6 +18,7 @@ interface HorticultureProject {
     zones: Zone[];
     mainPipes?: MainPipe[];
     subMainPipes?: SubMainPipe[];
+    lateralPipes?: any[];
     plants: any[];
     useZones: boolean;
     irrigationZones?: any[];
@@ -95,6 +96,7 @@ import {
 import type { TourStep } from '../utils/onboardingTourUtils';
 
 import { router } from '@inertiajs/react';
+import { loadSprinklerConfig } from '../utils/sprinklerUtils';
 
 type ProjectMode = 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
 
@@ -1771,6 +1773,11 @@ export default function Product() {
         phone: '',
     });
 
+    // State สำหรับ SaveProjectModal
+    const [showSaveProjectModal, setShowSaveProjectModal] = useState(false);
+    const [saveProjectName, setSaveProjectName] = useState('');
+    const [saveAsNewProject, setSaveAsNewProject] = useState(false);
+
     const [currentZonePumpHead, setCurrentZonePumpHead] = useState<number>(0);
 
     // เก็บค่า Pump Head ของทุกโซน (zoneId -> pumpHead)
@@ -2329,27 +2336,402 @@ export default function Product() {
                 return;
             }
 
-            // เตรียมข้อมูลโปรเจคตามรูปแบบที่ FarmController ต้องการ
-            // สร้างข้อมูล default coordinates ถ้าไม่มี (ต้องมีอย่างน้อย 3 จุด)
+            // ตรวจสอบว่ากำลังแก้ไขโครงการเดิมหรือไม่
+            const existingFieldId = localStorage.getItem('currentFieldId');
+            const existingFieldName = localStorage.getItem('currentFieldName');
+            const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-');
+
+            // ถ้ามี draft หรือโครงการเดิม → เด้ง modal ให้ยืนยันชื่อ
+            if (isEditingExisting) {
+                setSaveProjectName(existingFieldName || projectData?.projectName || 'โครงการใหม่');
+                setSaveAsNewProject(false);
+                setShowSaveProjectModal(true);
+                return;
+            }
+
+            // ถ้าไม่มี draft → ให้ตั้งชื่อใหม่
+            if (!projectData?.projectName || projectData.projectName === 'โครงการใหม่') {
+                setSaveProjectName('โครงการใหม่');
+                setSaveAsNewProject(true);
+                setShowSaveProjectModal(true);
+                return;
+            }
+
+            // ถ้ามีชื่อโครงการแล้ว → บันทึกเลย
+            await performSaveProject(null, false);
+        } catch (error) {
+            console.error('Error in handleSaveProject:', error);
+            alert(t('เกิดข้อผิดพลาดในการบันทึกโครงการ กรุณาลองใหม่อีกครั้ง'));
+        }
+    };
+
+    // ฟังก์ชันจริงสำหรับบันทึกโครงการ
+    const performSaveProject = async (customProjectName?: string | null, forceSaveAsNew: boolean = false) => {
+        try {
+            const existingFieldId = localStorage.getItem('currentFieldId');
+            const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-') && !forceSaveAsNew;
+
+            // ✅ Step 1: ประกาศและโหลด enhancedProjectData ก่อนทุกอย่าง
+            let enhancedProjectData: any = projectData || {};
+            
+            try {
+                // ✅ ให้โหลดจาก API เสมอถ้ามี existingFieldId (เพื่อให้แน่ใจว่าข้อมูลถูกต้อง)
+                if (existingFieldId && !existingFieldId.startsWith('mock-')) {
+                    try {
+                        const response = await fetch(`/api/fields/${existingFieldId}`);
+                        if (response.ok) {
+                            const fieldData = await response.json();
+                            
+                            if (fieldData.success && fieldData.field) {
+                                const apiProjectData = fieldData.field.projectData || fieldData.field.project_data;
+                                if (apiProjectData) {
+                                    const parsedApiData = typeof apiProjectData === 'string' 
+                                        ? JSON.parse(apiProjectData) 
+                                        : apiProjectData;
+                                    
+                                    enhancedProjectData = {
+                                        ...projectData,
+                                        ...parsedApiData,
+                                    };
+                                    console.log('✅ Loaded project_data from API for field:', existingFieldId);
+                                }
+                            }
+                        }
+                    } catch (apiError) {
+                        console.error('❌ Error loading from API:', apiError);
+                    }
+                } else {
+                    // ✅ ถ้าไม่มี existingFieldId (โปรเจคใหม่) ให้ใช้ localStorage
+                    const storedProjectData = localStorage.getItem('horticultureProjectData');
+                    if (storedProjectData) {
+                        const parsedData = JSON.parse(storedProjectData);
+                        enhancedProjectData = {
+                            ...projectData,
+                            ...parsedData,
+                        };
+                        console.log('✅ Loaded project_data from localStorage (new project)');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error loading project data:', error);
+            }
+
+            console.log('📊 [DEBUG] performSaveProject data:', {
+                projectDataExists: !!enhancedProjectData,
+                selectedPlantType: enhancedProjectData?.selectedPlantType,
+                plants: enhancedProjectData?.plants?.length || 0,
+                irrigationZones: enhancedProjectData?.irrigationZones?.length || 0,
+                mainArea: enhancedProjectData?.mainArea?.length || 0,
+                totalArea: enhancedProjectData?.totalArea,
+            });
+
+            // ✅ Step 2: หลังจากโหลด enhancedProjectData แล้ว ค่อยสร้างตัวแปรอื่นๆ
             const defaultCoordinates = [
                 { lat: 12.611267079196681, lng: 102.04609486363057 },
                 { lat: 12.611253783181395, lng: 102.045455417409 },
                 { lat: 12.611156776381648, lng: 102.0449031449758 },
             ];
+            
             const mainAreaCoordinates =
-                projectData?.mainArea && projectData.mainArea.length >= 3
-                    ? projectData.mainArea
+                enhancedProjectData?.mainArea && enhancedProjectData.mainArea.length >= 3
+                    ? enhancedProjectData.mainArea
                     : defaultCoordinates;
+            
+            console.log('🔍 [DEBUG] mainAreaCoordinates source:', {
+                from_enhancedProjectData: enhancedProjectData?.mainArea?.length || 0,
+                from_projectData: projectData?.mainArea?.length || 0,
+                final_mainAreaCoordinates: mainAreaCoordinates.length,
+            });
 
+            // Load sprinklerConfig สำหรับ horticulture mode
+            let sprinklerConfig = null;
+            if (projectMode === 'horticulture') {
+                sprinklerConfig = loadSprinklerConfig() || horticultureSystemData?.sprinklerConfig;
+            }
+
+            // ✅ สำหรับ Finished project: ไม่ส่ง pipes array เพราะข้อมูลถูกเก็บใน project_data แล้ว
+            // Backend validation สำหรับ pipes มีความซับซ้อน และข้อมูลทั้งหมดอยู่ใน project_data อยู่แล้ว
+            const pipes: any[] = [];
+
+            // ✅ Prepare zones และ exclusion areas (หลังจาก load enhancedProjectData แล้ว)
+            // Prepare irrigationZones for zones array (if horticulture mode)
+            const zonesToSave = projectMode === 'horticulture' && enhancedProjectData?.irrigationZones
+                ? enhancedProjectData.irrigationZones.map((zone: any) => ({
+                      id: zone.id || `zone-${Math.random().toString(36).substr(2, 9)}`,
+                      name: zone.name || `โซน ${zone.layoutIndex || 0}`,
+                      polygon_coordinates:
+                          zone.coordinates && zone.coordinates.length >= 3
+                              ? zone.coordinates
+                              : defaultCoordinates,
+                      color: zone.color || '#22C55E',
+                      pipe_direction: 'horizontal',
+                  }))
+                : enhancedProjectData?.zones?.map((zone) => ({
+                      id: zone.id || `zone-${Math.random().toString(36).substr(2, 9)}`,
+                      name: zone.name,
+                      polygon_coordinates:
+                          (zone as any).coordinates && (zone as any).coordinates.length >= 3
+                              ? (zone as any).coordinates
+                              : defaultCoordinates,
+                      color: '#22C55E',
+                      pipe_direction: 'horizontal',
+                  })) || [];
+
+            // Prepare exclusion areas as layers
+            const exclusionAreaLayers =
+                enhancedProjectData?.exclusionAreas?.map((area: any) => ({
+                    type: 'exclusion',
+                    coordinates: area.coordinates || [],
+                    name: area.name || 'Exclusion Area',
+                    exclusion_type: area.type || 'other',
+                })) || [];
+
+            // Calculate total area in rai using precise calculation from mainArea coordinates
+            const calculateAreaFromCoordinates = (coordinates: any[]) => {
+                if (!coordinates || coordinates.length < 3) return 0;
+                
+                // Shoelace formula
+                let area = 0;
+                for (let i = 0; i < coordinates.length; i++) {
+                    const j = (i + 1) % coordinates.length;
+                    area += coordinates[i].lat * coordinates[j].lng;
+                    area -= coordinates[j].lat * coordinates[i].lng;
+                }
+                area = Math.abs(area) / 2;
+                
+                // Convert to square meters
+                const avgLat = coordinates.reduce((sum, coord) => sum + coord.lat, 0) / coordinates.length;
+                const latFactor = 111000;
+                const lngFactor = 111000 * Math.cos(avgLat * Math.PI / 180);
+                
+                return (area * latFactor * lngFactor); // Return in square meters
+            };
+            
+            let totalAreaInRai = 0;
+            
+            console.log('🔍 [DEBUG] Area calculation inputs:', {
+                mainAreaCoordinates_length: mainAreaCoordinates?.length || 0,
+                irrigationZones_count: enhancedProjectData?.irrigationZones?.length || 0,
+                totalArea_from_enhancedProjectData: enhancedProjectData?.totalArea,
+            });
+            
+            // ✅ Priority 1: คำนวณจาก mainArea coordinates (แม่นยำที่สุด)
+            if (mainAreaCoordinates && mainAreaCoordinates.length >= 3) {
+                const areaInSqM = calculateAreaFromCoordinates(mainAreaCoordinates);
+                totalAreaInRai = areaInSqM / 1600; // Convert to ไร่
+                console.log('✅ [Priority 1] Calculated from mainArea coordinates:', {
+                    areaInSqM: areaInSqM.toFixed(2),
+                    totalAreaInRai: totalAreaInRai.toFixed(2),
+                });
+            }
+            
+            // ✅ Priority 2: ถ้ายังเป็น 0 ให้รวมจาก irrigationZones
+            if (totalAreaInRai === 0 && projectMode === 'horticulture' && enhancedProjectData?.irrigationZones && enhancedProjectData.irrigationZones.length > 0) {
+                const totalAreaInSqM = enhancedProjectData.irrigationZones.reduce(
+                    (sum: number, zone: any) => sum + (zone.area || 0),
+                    0
+                );
+                if (totalAreaInSqM > 0) {
+                    totalAreaInRai = totalAreaInSqM / 1600; // Convert to ไร่
+                    console.log('✅ [Priority 2] Calculated from irrigationZones:', {
+                        totalAreaInSqM: totalAreaInSqM.toFixed(2),
+                        totalAreaInRai: totalAreaInRai.toFixed(2),
+                    });
+                }
+            }
+            
+            // ✅ Priority 3: ถ้ายังเป็น 0 ให้ใช้จาก enhancedProjectData.totalArea
+            if (totalAreaInRai === 0 && enhancedProjectData?.totalArea) {
+                if (enhancedProjectData.totalArea > 1000) {
+                    totalAreaInRai = enhancedProjectData.totalArea / 1600;
+                    console.log('✅ [Priority 3] From enhancedProjectData.totalArea (>1000):', {
+                        totalArea: enhancedProjectData.totalArea.toFixed(2),
+                        totalAreaInRai: totalAreaInRai.toFixed(2),
+                    });
+                } else {
+                    totalAreaInRai = enhancedProjectData.totalArea;
+                    console.log('✅ [Priority 3] From enhancedProjectData.totalArea (<=1000):', {
+                        totalArea: enhancedProjectData.totalArea.toFixed(2),
+                        totalAreaInRai: totalAreaInRai.toFixed(2),
+                    });
+                }
+            }
+            
+            console.log('📊 [FINAL] Total area in rai:', totalAreaInRai.toFixed(2));
+
+            // Get plant_type_id - use default (1) if custom plant (id > 10)
+            let plantTypeId = 1; // Default plant type
+            if (enhancedProjectData?.selectedPlantType?.id) {
+                // Only use plant_type_id if it's a standard plant (id <= 10)
+                // Custom plants (id > 10) should use default plant type
+                if (enhancedProjectData.selectedPlantType.id <= 10) {
+                    plantTypeId = enhancedProjectData.selectedPlantType.id;
+                }
+            }
+
+            const finalProjectName = customProjectName || enhancedProjectData?.projectName || 'โครงการใหม่';
+            
+            // ✅ ใช้ totalCost ที่ CostSummary.tsx คำนวณและบันทึกไว้ใน localStorage
+            const storedTotalCost = localStorage.getItem('calculatedTotalCost');
+            const totalCost = storedTotalCost ? parseFloat(storedTotalCost) : 0;
+
+            // ฟังก์ชันลดขนาดข้อมูลเพื่อป้องกัน MySQL packet size error
+            const compressProjectData = (data: any) => {
+                if (!data) return null;
+                
+                return {
+                    ...data,
+                    projectName: data.projectName,
+                    customerName: data.customerName,
+                    totalArea: data.totalArea,
+                    selectedPlantType: data.selectedPlantType,
+                    // เก็บเฉพาะข้อมูลสำคัญของ plants (ไม่เก็บทุกต้นถ้ามีเยอะ)
+                    plants: data.plants ? (
+                        data.plants.length > 500 
+                            ? data.plants.slice(0, 500).map((p: any) => ({
+                                id: p.id,
+                                position: p.position,
+                                zoneId: p.zoneId,
+                                plantData: p.plantData ? { waterNeed: p.plantData.waterNeed } : undefined
+                            }))
+                            : data.plants.map((p: any) => ({
+                                id: p.id,
+                                position: p.position,
+                                zoneId: p.zoneId,
+                                plantData: p.plantData ? { waterNeed: p.plantData.waterNeed } : undefined
+                            }))
+                    ) : [],
+                    mainArea: data.mainArea,
+                    zones: data.zones,
+                    irrigationZones: data.irrigationZones,
+                    // ลด coordinates ของท่อ (เก็บเฉพาะจุดสำคัญ)
+                    mainPipes: data.mainPipes?.map((pipe: any) => ({
+                        id: pipe.id,
+                        toZone: pipe.toZone,
+                        coordinates: pipe.coordinates?.length > 20 
+                            ? [pipe.coordinates[0], pipe.coordinates[Math.floor(pipe.coordinates.length / 2)], pipe.coordinates[pipe.coordinates.length - 1]]
+                            : pipe.coordinates,
+                        length: pipe.length,
+                    })),
+                    subMainPipes: data.subMainPipes?.map((pipe: any) => ({
+                        id: pipe.id,
+                        zoneId: pipe.zoneId,
+                        coordinates: pipe.coordinates?.length > 20
+                            ? [pipe.coordinates[0], pipe.coordinates[Math.floor(pipe.coordinates.length / 2)], pipe.coordinates[pipe.coordinates.length - 1]]
+                            : pipe.coordinates,
+                        length: pipe.length,
+                    })),
+                    lateralPipes: data.lateralPipes?.slice(0, 100).map((pipe: any) => ({ // เก็บแค่ 100 เส้นแรก
+                        id: pipe.id,
+                        zoneId: pipe.zoneId,
+                        coordinates: [pipe.coordinates?.[0], pipe.coordinates?.[pipe.coordinates?.length - 1]], // เก็บแค่ต้น-ปลาย
+                        placementMode: pipe.placementMode,
+                    })),
+                    exclusionAreas: data.exclusionAreas,
+                    pump: data.pump ? {
+                        position: data.pump.position,
+                        specs: data.pump.specs,
+                    } : undefined,
+                    sprinklerConfig: data.sprinklerConfig,
+                };
+            };
+
+            // ลดขนาด results
+            const compressResults = (res: any) => {
+                if (!res) return null;
+                return {
+                    totalSprinklers: res.totalSprinklers,
+                    totalWaterRequiredLPM: res.totalWaterRequiredLPM,
+                    totalBranchPipeM: res.totalBranchPipeM,
+                    totalSecondaryPipeM: res.totalSecondaryPipeM,
+                    totalMainPipeM: res.totalMainPipeM,
+                    totalEmitterPipeM: res.totalEmitterPipeM,
+                    hasValidMainPipe: res.hasValidMainPipe,
+                    hasValidSecondaryPipe: res.hasValidSecondaryPipe,
+                    // ✅ เพิ่มข้อมูลที่ QuotationDocument ต้องการ
+                    autoSelectedBranchPipe: res.autoSelectedBranchPipe,
+                    autoSelectedSecondaryPipe: res.autoSelectedSecondaryPipe,
+                    autoSelectedMainPipe: res.autoSelectedMainPipe,
+                    autoSelectedEmitterPipe: res.autoSelectedEmitterPipe,
+                    autoSelectedPump: res.autoSelectedPump,
+                    branchPipeRolls: res.branchPipeRolls,
+                    secondaryPipeRolls: res.secondaryPipeRolls,
+                    mainPipeRolls: res.mainPipeRolls,
+                    emitterPipeRolls: res.emitterPipeRolls,
+                    // ✅ เพิ่ม analyzedPipes สำหรับการค้นหา extraPipe (จำกัดแค่ข้อมูลที่จำเป็น)
+                    analyzedBranchPipes: res.analyzedBranchPipes?.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        price: p.price,
+                        sizeMM: p.sizeMM,
+                        lengthM: p.lengthM,
+                        productCode: p.productCode,
+                    })),
+                    analyzedSecondaryPipes: res.analyzedSecondaryPipes?.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        price: p.price,
+                        sizeMM: p.sizeMM,
+                        lengthM: p.lengthM,
+                        productCode: p.productCode,
+                    })),
+                    analyzedMainPipes: res.analyzedMainPipes?.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        price: p.price,
+                        sizeMM: p.sizeMM,
+                        lengthM: p.lengthM,
+                        productCode: p.productCode,
+                    })),
+                    // ไม่เก็บ allZoneResults ที่ใหญ่มาก
+                };
+            };
+
+            // คำนวณค่ารวมทั้งหมดจากทุกโซน (ไม่ใช่แค่โซนเดียว)
+            let actualTotalPlants = 0;
+            let actualTotalWaterNeed = 0;
+            
+            // 1. คำนวณจำนวนพืชจริง
+            if (projectMode === 'horticulture' && enhancedProjectData?.plants) {
+                actualTotalPlants = enhancedProjectData.plants.length; // ✅ นับต้นไม้ทั้งหมด
+            } else if (projectMode === 'garden' && gardenData?.gardenZones) {
+                actualTotalPlants = gardenData.gardenZones.reduce((sum, zone: any) => sum + (zone.sprinklers?.length || 0), 0);
+            } else {
+                actualTotalPlants = results.totalSprinklers || 0;
+            }
+            
+            // 2. คำนวณความต้องการน้ำรวมทั้งหมด (จากทุกโซน)
+            if (projectMode === 'horticulture' && enhancedProjectData?.irrigationZones) {
+                // ✅ รวมจากทุก irrigationZones
+                actualTotalWaterNeed = enhancedProjectData.irrigationZones.reduce(
+                    (sum: number, zone: any) => sum + (zone.totalWaterNeed || 0),
+                    0
+                );
+            } else if (projectMode === 'horticulture' && enhancedProjectData?.plants) {
+                // ✅ ถ้าไม่มี irrigationZones ให้รวมจาก plants
+                actualTotalWaterNeed = enhancedProjectData.plants.reduce(
+                    (sum: number, plant: any) => sum + (plant.plantData?.waterNeed || 0),
+                    0
+                );
+            } else if (projectMode === 'garden' && gardenStats) {
+                actualTotalWaterNeed = (gardenStats.zones as any[]).reduce(
+                    (sum, zone: any) => sum + (zone.totalWaterNeed || 0),
+                    0
+                );
+            } else {
+                // Fallback: ใช้จาก results
+                actualTotalWaterNeed = results.totalWaterRequiredLPM || 0;
+            }
+            
             const projectDataToSave = {
-                field_name: projectData?.projectName || 'โครงการใหม่',
-                customer_name: projectData?.customerName || 'ลูกค้า',
+                field_name: finalProjectName,
+                customer_name: enhancedProjectData?.customerName || 'ลูกค้า',
                 category: projectMode,
                 area_coordinates: mainAreaCoordinates,
-                plant_type_id: projectData?.selectedPlantType?.id || 1, // Use selected plant type or default
-                total_plants: results.totalSprinklers || 0,
-                total_area: projectData?.totalArea || 0,
-                total_water_need: results.totalWaterRequiredLPM || 0,
+                plant_type_id: plantTypeId,
+                total_plants: actualTotalPlants, // ✅ รวมทุกโซน
+                total_area: totalAreaInRai, // ✅ รวมทุกโซน
+                total_water_need: actualTotalWaterNeed, // ✅ รวมทุกโซน
                 area_type: 'irrigation',
                 layers: [
                     {
@@ -2357,45 +2739,151 @@ export default function Product() {
                         coordinates: mainAreaCoordinates,
                         is_initial_map: true,
                     },
+                    ...exclusionAreaLayers,
                 ],
-                zones:
-                    projectData?.zones?.map((zone) => ({
-                        id: zone.id || `zone-${Math.random().toString(36).substr(2, 9)}`,
-                        name: zone.name,
-                        polygon_coordinates:
-                            (zone as any).coordinates && (zone as any).coordinates.length >= 3
-                                ? (zone as any).coordinates
-                                : defaultCoordinates,
-                        color: '#22C55E',
-                        pipe_direction: 'horizontal',
-                    })) || [],
+                zones: zonesToSave,
                 planting_points:
-                    projectData?.plants?.map((plant) => ({
-                        lat: plant.position.lat,
-                        lng: plant.position.lng,
-                        point_id: plant.id,
-                        zone_id: null,
-                    })) || [],
-                pipes: [],
-                // เก็บข้อมูลเพิ่มเติมไว้ใน JSON fields
-                project_data: projectData,
+                    enhancedProjectData?.plants?.map((plant, index) => {
+                        // ✅ แปลง zone_id เป็น null ถ้าไม่ใช่ตัวเลข (backend ต้องการ integer เท่านั้น)
+                        let zoneId: number | null = null;
+                        if (plant.zoneId) {
+                            const parsed = parseInt(plant.zoneId);
+                            if (!isNaN(parsed)) {
+                                zoneId = parsed;
+                            }
+                        }
+                        
+                        // ✅ ทำให้ point_id unique ทุกครั้ง เพื่อป้องกัน duplicate entry error
+                        // ใช้ plant.id + timestamp + random string
+                        const uniquePointId = `${plant.id}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                        
+                        // Debug log สำหรับต้นแรกเท่านั้น
+                        if (index === 0) {
+                            console.log('🔍 [DEBUG] Sample planting_point:', {
+                                original_point_id: plant.id,
+                                unique_point_id: uniquePointId,
+                                original_zoneId: plant.zoneId,
+                                converted_zoneId: zoneId,
+                                type: typeof zoneId,
+                            });
+                        }
+                        
+                        return {
+                            lat: plant.position.lat,
+                            lng: plant.position.lng,
+                            point_id: uniquePointId, // ✅ ใช้ unique ID แทน plant.id เดิม
+                            zone_id: zoneId, // จะเป็น integer หรือ null เท่านั้น
+                        };
+                    }) || [],
+                pipes: pipes,
+                // เก็บข้อมูลเพิ่มเติมไว้ใน JSON fields (ลดขนาดข้อมูล)
+                project_data: compressProjectData({
+                    ...enhancedProjectData,
+                    projectName: finalProjectName,
+                    mainArea: mainAreaCoordinates, // ✅ เพิ่ม mainArea ที่เตรียมไว้
+                    selectedPlantType: enhancedProjectData?.selectedPlantType, // ✅ บันทึก selectedPlantType
+                    totalArea: totalAreaInRai * 1600, // บันทึกพื้นที่ใน sq meters
+                    irrigationZones: enhancedProjectData?.irrigationZones || [],
+                    lateralPipes: enhancedProjectData?.lateralPipes || [],
+                    mainPipes: enhancedProjectData?.mainPipes || [],
+                    subMainPipes: enhancedProjectData?.subMainPipes || [],
+                    exclusionAreas: enhancedProjectData?.exclusionAreas || [],
+                    plants: enhancedProjectData?.plants || [], // ✅ บันทึก plants
+                    zones: enhancedProjectData?.zones || [],
+                    pump: enhancedProjectData?.pump || null,
+                    sprinklerConfig: sprinklerConfig,
+                    projectImage: projectImage, // ✅ บันทึก projectImage
+                }),
                 garden_data: gardenData,
+                garden_stats: gardenStats, // ✅ บันทึก gardenStats
                 greenhouse_data: greenhouseData,
                 field_crop_data: fieldCropData,
                 project_stats: {
                     zoneInputs: zoneInputs,
                     zoneSprinklers: zoneSprinklers,
                     selectedPipes: selectedPipes,
+                    selectedPump: selectedPump ? {
+                        id: selectedPump.id,
+                        name: selectedPump.name,
+                        price: selectedPump.price,
+                        productCode: selectedPump.productCode,
+                        product_code: selectedPump.product_code,
+                        brand: selectedPump.brand,
+                        powerHP: selectedPump.powerHP,
+                        phase: selectedPump.phase,
+                        image_url: selectedPump.image_url,
+                        image: selectedPump.image,
+                        // ✅ บันทึก pumpAccessories ทั้งหมด (แต่ลดขนาดของแต่ละ item)
+                        pumpAccessories: selectedPump.pumpAccessories?.map((acc: any) => ({
+                            id: acc.id,
+                            name: acc.name,
+                            price: acc.price,
+                            quantity: acc.quantity,
+                            is_included: acc.is_included,
+                            accessory_type: acc.accessory_type,
+                            size: acc.size,
+                            sort_order: acc.sort_order,
+                            group_id: acc.group_id,
+                            group: acc.group,
+                            group_items: acc.group_items?.map((item: any) => ({
+                                id: item.id,
+                                equipment_id: item.equipment_id,
+                                quantity: item.quantity,
+                                unit_price: item.unit_price,
+                                total_price: item.total_price,
+                                name: item.name,
+                                equipment: item.equipment ? {
+                                    id: item.equipment.id,
+                                    name: item.equipment.name,
+                                    product_code: item.equipment.product_code,
+                                    price: item.equipment.price,
+                                    image: item.equipment.image,
+                                    image_url: item.equipment.image_url,
+                                } : null,
+                            })),
+                            image_url: acc.image_url,
+                            image: acc.image,
+                        })),
+                    } : null,
                     sprinklerEquipmentSets: sprinklerEquipmentSets,
                     connectionEquipments: connectionEquipments,
-                    results: results,
+                    results: compressResults(results), // ลดขนาด results
+                    totalCost: totalCost,
+                    // ✅ ค่ารวมจากทุกโซน
+                    totalPlants: actualTotalPlants,
+                    totalAreaInRai: totalAreaInRai,
+                    totalWaterNeedPerSession: actualTotalWaterNeed,
                 },
                 status: 'finished',
                 is_completed: true,
             };
 
-            const response = await fetch('/api/save-field', {
-                method: 'POST',
+            // Log ขนาดข้อมูลเพื่อ debug
+            const dataSize = new Blob([JSON.stringify(projectDataToSave)]).size;
+            console.log(`📊 Project data size: ${(dataSize / 1024).toFixed(2)} KB`);
+            
+            if (dataSize > 15 * 1024 * 1024) { // ถ้าเกิน 15MB
+                console.warn('⚠️ Data size is very large. This might cause MySQL packet size error.');
+                alert(t('ข้อมูลโครงการมีขนาดใหญ่เกินไป กรุณาติดต่อผู้ดูแลระบบเพื่อเพิ่ม max_allowed_packet'));
+                return;
+            }
+
+            // Use PUT if editing existing project, POST if creating new
+            const endpoint = isEditingExisting
+                ? `/api/fields/${existingFieldId}`
+                : '/api/save-field';
+            const method = isEditingExisting ? 'PUT' : 'POST';
+
+            console.log('🔍 [DEBUG] API Request:', {
+                endpoint,
+                method,
+                isEditingExisting,
+                existingFieldId,
+                forceSaveAsNew,
+            });
+
+            const response = await fetch(endpoint, {
+                method: method,
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN':
@@ -2408,7 +2896,19 @@ export default function Product() {
             const responseData = await response.json();
             if (response.ok) {
                 if (responseData.success) {
-                    alert(t('บันทึกโครงการสำเร็จแล้ว! โปรเจคจะถูกเก็บไว้ในโฟลเดอร์ Finished'));
+                    const message = isEditingExisting
+                        ? t('อัปเดตโครงการสำเร็จแล้ว! โปรเจคได้รับการอัปเดตในโฟลเดอร์ Finished')
+                        : t('บันทึกโครงการสำเร็จแล้ว! โปรเจคจะถูกเก็บไว้ในโฟลเดอร์ Finished');
+                    alert(message);
+                    
+                    // อัปเดต localStorage ถ้าบันทึกเป็นโครงการใหม่
+                    if (!isEditingExisting && responseData.field && responseData.field.id) {
+                        localStorage.setItem('currentFieldId', responseData.field.id.toString());
+                        localStorage.setItem('currentFieldName', finalProjectName);
+                    } else if (isEditingExisting && customProjectName) {
+                        localStorage.setItem('currentFieldName', finalProjectName);
+                    }
+                    
                     // กลับไปหน้า home
                     router.visit('/');
                 } else {
@@ -2419,8 +2919,14 @@ export default function Product() {
                     `Server error: ${response.status} - ${responseData.message || 'Unknown error'}`
                 );
             }
-        } catch (error) {
-            alert(t('เกิดข้อผิดพลาดในการบันทึกโครงการ กรุณาลองใหม่อีกครั้ง'));
+        } catch (error: any) {
+            console.error('❌ Error in performSaveProject:', error);
+            console.error('❌ Error message:', error?.message);
+            console.error('❌ Error stack:', error?.stack);
+            
+            // แสดง error message ที่ชัดเจนกว่า
+            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            alert(`${t('เกิดข้อผิดพลาดในการบันทึกโครงการ')}\n\nError: ${errorMessage}\n\n${t('กรุณาลองใหม่อีกครั้ง')}`);
         }
     };
 
@@ -3613,6 +4119,103 @@ export default function Product() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Save Project Modal */}
+            {showSaveProjectModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
+                    <div className="relative w-full max-w-lg rounded-lg bg-gray-800 p-6 shadow-xl">
+                        <button
+                            onClick={() => {
+                                setShowSaveProjectModal(false);
+                                setSaveAsNewProject(false);
+                            }}
+                            className="absolute right-4 top-4 text-3xl text-gray-400 hover:text-white"
+                        >
+                            ×
+                        </button>
+
+                        <h2 className="mb-4 text-2xl font-bold text-yellow-400">
+                            💾 {t('บันทึกโครงการ')}
+                        </h2>
+
+                        <div className="mb-4">
+                            <label className="mb-2 block text-sm font-medium text-gray-300">
+                                {t('ชื่อโครงการ')}
+                            </label>
+                            <input
+                                type="text"
+                                value={saveProjectName}
+                                onChange={(e) => setSaveProjectName(e.target.value)}
+                                className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 text-white focus:border-blue-500 focus:outline-none"
+                                placeholder={t('กรอกชื่อโครงการ...')}
+                            />
+                        </div>
+
+                        {/* แสดงปุ่มเลือกถ้ามี draft เดิม */}
+                        {localStorage.getItem('currentFieldId') && 
+                         !localStorage.getItem('currentFieldId')?.startsWith('mock-') && (
+                            <div className="mb-4 rounded-lg bg-gray-700 p-4">
+                                <p className="mb-3 text-sm text-gray-300">
+                                    {t('เลือกวิธีการบันทึก:')}
+                                </p>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={async () => {
+                                            setShowSaveProjectModal(false);
+                                            await performSaveProject(saveProjectName, false);
+                                        }}
+                                        className="w-full rounded-lg bg-blue-600 px-4 py-3 text-white hover:bg-blue-700 transition-colors"
+                                    >
+                                        📝 {t('บันทึกทับงานเดิม')}
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (!saveProjectName || saveProjectName.trim() === '' || saveProjectName === 'โครงการใหม่') {
+                                                alert(t('กรุณาตั้งชื่อโครงการใหม่'));
+                                                return;
+                                            }
+                                            setShowSaveProjectModal(false);
+                                            await performSaveProject(saveProjectName, true);
+                                        }}
+                                        className="w-full rounded-lg bg-green-600 px-4 py-3 text-white hover:bg-green-700 transition-colors"
+                                    >
+                                        ➕ {t('บันทึกเป็นงานใหม่')}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ถ้าไม่มี draft → แสดงปุ่มบันทึกเดียว */}
+                        {(!localStorage.getItem('currentFieldId') || 
+                          localStorage.getItem('currentFieldId')?.startsWith('mock-')) && (
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowSaveProjectModal(false);
+                                        setSaveAsNewProject(false);
+                                    }}
+                                    className="rounded-lg bg-gray-600 px-6 py-2 text-white hover:bg-gray-700"
+                                >
+                                    {t('ยกเลิก')}
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (!saveProjectName || saveProjectName.trim() === '' || saveProjectName === 'โครงการใหม่') {
+                                            alert(t('กรุณาตั้งชื่อโครงการ'));
+                                            return;
+                                        }
+                                        setShowSaveProjectModal(false);
+                                        await performSaveProject(saveProjectName, false);
+                                    }}
+                                    className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
+                                >
+                                    💾 {t('บันทึก')}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

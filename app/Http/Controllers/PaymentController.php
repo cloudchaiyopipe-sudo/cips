@@ -232,4 +232,247 @@ class PaymentController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get all payments (admin only)
+     */
+    public function getAllPayments(Request $request)
+    {
+        try {
+            // Check if user is super admin
+            $user = auth()->user();
+            if (!$user || !$user->is_super_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Super admin access required.'
+                ], 403);
+            }
+
+            $payments = \App\Models\Payment::with(['user', 'approver'])
+                ->orderBy('created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
+
+            return response()->json([
+                'success' => true,
+                'payments' => $payments
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting all payments', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving payments: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get pending payments (admin only)
+     */
+    public function getPendingPayments(Request $request)
+    {
+        try {
+            // Check if user is super admin
+            $user = auth()->user();
+            if (!$user || !$user->is_super_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Super admin access required.'
+                ], 403);
+            }
+
+            $payments = \App\Models\Payment::with(['user', 'approver'])
+                ->where('status', 'pending')
+                ->orderBy('created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
+
+            return response()->json([
+                'success' => true,
+                'payments' => $payments
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting pending payments', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving pending payments: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get payment statistics (admin only)
+     */
+    public function getPaymentStats()
+    {
+        try {
+            // Check if user is super admin
+            $user = auth()->user();
+            if (!$user || !$user->is_super_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Super admin access required.'
+                ], 403);
+            }
+
+            $stats = [
+                'total' => \App\Models\Payment::count(),
+                'pending' => \App\Models\Payment::where('status', 'pending')->count(),
+                'approved' => \App\Models\Payment::where('status', 'approved')->count(),
+                'rejected' => \App\Models\Payment::where('status', 'rejected')->count(),
+                'total_amount' => \App\Models\Payment::where('status', 'approved')->sum('amount'),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'stats' => $stats
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting payment stats', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving payment stats: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve a payment (admin only)
+     */
+    public function approvePayment($paymentId)
+    {
+        try {
+            // Check if user is super admin
+            $user = auth()->user();
+            if (!$user || !$user->is_super_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Super admin access required.'
+                ], 403);
+            }
+
+            $payment = \App\Models\Payment::findOrFail($paymentId);
+            $payment->status = 'approved';
+            $payment->approved_by = $user->id;
+            $payment->approved_at = now();
+            $payment->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment approved successfully',
+                'payment' => $payment->load(['user', 'approver'])
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error approving payment', [
+                'payment_id' => $paymentId,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error approving payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Reject a payment (admin only)
+     */
+    public function rejectPayment($paymentId)
+    {
+        try {
+            // Check if user is super admin
+            $user = auth()->user();
+            if (!$user || !$user->is_super_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Super admin access required.'
+                ], 403);
+            }
+
+            $payment = \App\Models\Payment::findOrFail($paymentId);
+            $payment->status = 'rejected';
+            $payment->approved_by = $user->id;
+            $payment->approved_at = now();
+            $payment->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment rejected successfully',
+                'payment' => $payment->load(['user', 'approver'])
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error rejecting payment', [
+                'payment_id' => $paymentId,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error rejecting payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a payment (admin only)
+     */
+    public function updatePayment(Request $request, $paymentId)
+    {
+        try {
+            // Check if user is super admin
+            $user = auth()->user();
+            if (!$user || !$user->is_super_user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Super admin access required.'
+                ], 403);
+            }
+
+            $payment = \App\Models\Payment::findOrFail($paymentId);
+            
+            if ($request->has('status')) {
+                $payment->status = $request->input('status');
+                if ($request->input('status') === 'approved' || $request->input('status') === 'rejected') {
+                    $payment->approved_by = $user->id;
+                    $payment->approved_at = now();
+                }
+            }
+            
+            if ($request->has('admin_notes')) {
+                $payment->admin_notes = $request->input('admin_notes');
+            }
+            
+            $payment->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment updated successfully',
+                'payment' => $payment->load(['user', 'approver'])
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error updating payment', [
+                'payment_id' => $paymentId,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

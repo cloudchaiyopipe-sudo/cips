@@ -11,6 +11,8 @@ import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { refreshCsrfToken } from '../bootstrap';
 import { calculatePolygonArea } from '../utils/homeGardenData';
+import HorticultureMapPreview from '../components/horticulture/HorticultureMapPreview';
+import QuotationDocument from './components/QuotationDocument';
 import {
     FaFolder,
     FaFolderOpen,
@@ -55,6 +57,7 @@ type Field = {
     greenhouse_data?: any;
     field_crop_data?: any;
     project_data?: any;
+    projectData?: any; // camelCase from backend
     project_stats?: any;
 };
 
@@ -224,6 +227,11 @@ const FieldCard = ({
     onDragStart,
     onDragEnd,
     isDragging,
+    onRename,
+    onMove,
+    onCopy,
+    onShare,
+    isSuperUser,
     t,
 }: {
     field: Field;
@@ -233,8 +241,25 @@ const FieldCard = ({
     onDragStart?: (field: Field) => void;
     onDragEnd?: () => void;
     isDragging?: boolean;
+    onRename?: (field: Field) => void;
+    onMove?: (field: Field) => void;
+    onCopy?: (field: Field) => void;
+    onShare?: (field: Field) => void;
+    isSuperUser?: boolean;
     t: (key: string) => string;
 }) => {
+    const [showMenu, setShowMenu] = useState(false);
+    
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => {
+            if (showMenu) setShowMenu(false);
+        };
+        
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [showMenu]);
+    
     const getCategoryDisplay = (category: string) => {
         const categoryMap: Record<string, string> = {
             horticulture: '🌳',
@@ -250,44 +275,135 @@ const FieldCard = ({
 
     return (
         <div
-            className={`group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10 ${
-                isDragging ? 'scale-95 opacity-50' : ''
-            }`}
+            className={`group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-6 py-4 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10 ${isDragging ? 'scale-95 opacity-50' : ''
+                }`}
             draggable
             onDragStart={() => onDragStart?.(field)}
             onDragEnd={() => onDragEnd?.()}
         >
-            {/* Status Badge */}
-            <div className="absolute right-3 top-3">
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (onStatusChange) {
-                            const newStatus = isFinished ? 'unfinished' : 'finished';
-                            const newIsCompleted = !isFinished;
-                            onStatusChange(field.id, newStatus, newIsCompleted);
-                        }
-                    }}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                        isFinished
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-yellow-600 text-white hover:bg-yellow-700'
-                    }`}
-                    title={isFinished ? t('mark_as_unfinished') : t('mark_as_finished')}
-                >
-                    {isFinished ? '✅' : '⏳'}
-                </button>
-            </div>
+
 
             {/* Field Content */}
             <div className="cursor-pointer" onClick={() => onSelect(field)}>
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <span className="text-2xl">{getCategoryDisplay(field.category || '')}</span>
+                        {/* <span className="text-2xl">{getCategoryDisplay(field.category || '')}</span> */}
                         <div>
                             <h3 className="font-semibold text-white">{field.name}</h3>
-                            {field.customerName && (
-                                <p className="text-sm text-gray-400">{field.customerName}</p>
+                        </div>
+                    </div>
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onStatusChange) {
+                                    const newStatus = isFinished ? 'unfinished' : 'finished';
+                                    const newIsCompleted = !isFinished;
+                                    onStatusChange(field.id, newStatus, newIsCompleted);
+                                }
+                            }}
+                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${isFinished
+                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                    : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                }`}
+                            title={isFinished ? t('mark_as_unfinished') : t('mark_as_finished')}
+                        >
+                            {isFinished ? '✅' : '⏳'}
+                        </button>
+                        
+                        {/* Three Dots Menu */}
+                        <div className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowMenu(!showMenu);
+                                }}
+                                className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+                                title="เพิ่มเติม"
+                            >
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                                </svg>
+                            </button>
+                            
+                            {/* Dropdown Menu */}
+                            {showMenu && (
+                                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-700 bg-gray-800 py-1 shadow-lg">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onRename?.(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        {t('rename_project')}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onMove?.(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                        </svg>
+                                        {t('move_project')}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onCopy?.(field);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        {t('copy_project')}
+                                    </button>
+                                    
+                                    {isSuperUser && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onShare?.(field);
+                                            }}
+                                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                                        >
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                            </svg>
+                                            {t('share_to_user')}
+                                        </button>
+                                    )}
+                                    
+                                    <hr className="my-1 border-gray-700" />
+                                    
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onDelete(field.id);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-400 transition-colors hover:bg-red-900/20 hover:text-red-300"
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        {t('delete_project')}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -298,7 +414,7 @@ const FieldCard = ({
                         // Home Garden specific display
                         <>
                             <div className="flex justify-between">
-                                <span>พื้นที่:</span>
+                                <span>{t('area_label')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         // Try multiple sources for area data
@@ -316,11 +432,11 @@ const FieldCard = ({
                                                     const scale =
                                                         field.garden_data?.designMode ===
                                                             'canvas' ||
-                                                        field.garden_data?.designMode === 'image'
+                                                            field.garden_data?.designMode === 'image'
                                                             ? field.garden_data?.canvasData
-                                                                  ?.scale ||
-                                                              field.garden_data?.imageData?.scale ||
-                                                              20
+                                                                ?.scale ||
+                                                            field.garden_data?.imageData?.scale ||
+                                                            20
                                                             : undefined;
                                                     return (
                                                         total + calculatePolygonArea(coords, scale)
@@ -348,19 +464,19 @@ const FieldCard = ({
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>การออกแบบ:</span>
+                                <span>{t('design_mode')}:</span>
                                 <span className="text-white">
                                     {field.garden_data?.designMode === 'image'
-                                        ? 'ใช้แปลน'
+                                        ? t('using_plan')
                                         : field.garden_data?.designMode === 'canvas'
-                                          ? 'วาดเอง'
-                                          : field.garden_data?.designMode === 'map'
-                                            ? 'ใช้แผนที่'
-                                            : 'N/A'}
+                                            ? t('draw_yourself')
+                                            : field.garden_data?.designMode === 'map'
+                                                ? t('using_map')
+                                                : 'N/A'}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>จำนวนโซน:</span>
+                                <span>{t('number_of_zones')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         const zonesFromStats =
@@ -379,7 +495,7 @@ const FieldCard = ({
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>หัวฉีด:</span>
+                                <span>{t('sprinklers')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         const sprinklersFromStats =
@@ -402,7 +518,7 @@ const FieldCard = ({
                         // Greenhouse specific display
                         <>
                             <div className="flex justify-between">
-                                <span>พื้นที่โรงเรือน:</span>
+                                <span>{t('greenhouse_area')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         const areaFromStats =
@@ -430,7 +546,7 @@ const FieldCard = ({
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>จำนวนแปลง:</span>
+                                <span>{t('number_of_plots')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         const plotsFromData =
@@ -449,7 +565,7 @@ const FieldCard = ({
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>พืชที่ปลูก:</span>
+                                <span>{t('crops_planted')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         const cropsFromData = field.greenhouse_data?.selectedCrops;
@@ -463,7 +579,7 @@ const FieldCard = ({
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>ระบบน้ำ:</span>
+                                <span>{t('irrigation_system')}:</span>
                                 <span className="text-white">
                                     {(() => {
                                         const irrigationFromData =
@@ -473,10 +589,10 @@ const FieldCard = ({
                                             return irrigationFromData === 'mini-sprinkler'
                                                 ? 'มินิสปริงเกลอร์'
                                                 : irrigationFromData === 'drip'
-                                                  ? 'น้ำหยด'
-                                                  : irrigationFromData === 'mixed'
-                                                    ? 'ผสม'
-                                                    : 'N/A';
+                                                    ? 'น้ำหยด'
+                                                    : irrigationFromData === 'mixed'
+                                                        ? 'ผสม'
+                                                        : 'N/A';
                                         } else {
                                             return 'N/A';
                                         }
@@ -485,66 +601,117 @@ const FieldCard = ({
                             </div>
                         </>
                     ) : (
-                        // Default display for other categories
+                        // Default display for horticulture and other categories
                         <>
+                            {/* Map Preview for horticulture */}
+                            {field.category === 'horticulture' && (() => {
+                                const data = (field as any).projectData || field.project_data;
+
+                                if (!data) return null;
+
+                                let parsedData = data;
+                                // Parse if it's a string
+                                if (typeof data === 'string') {
+                                    try {
+                                        parsedData = JSON.parse(data);
+                                    } catch (e) {
+                                        console.error('Error parsing project_data:', e);
+                                        return null;
+                                    }
+                                }
+
+                                // Check if mainArea exists and has data
+                                if (!parsedData?.mainArea || parsedData.mainArea.length === 0) {
+                                    return null;
+                                }
+
+                                return (
+                                    <div className="mb-3">
+                                        <HorticultureMapPreview
+                                            fieldId={field.id}
+                                            projectData={parsedData}
+                                            height="180px"
+                                        />
+                                    </div>
+                                );
+                            })()}
+
                             <div className="flex justify-between">
-                                <span>{t('plant_type')}:</span>
-                                <span className="text-white">{field.plantType?.name || 'N/A'}</span>
+                                <span>{t('plant_name')}:</span>
+                                <span className="text-white">
+                                    {(() => {
+                                        // Priority 1: Use plant name from projectData.selectedPlantType (for custom plants)
+                                        // Check both projectData (from backend) and project_data (for compatibility)
+                                        const projectData = (field as any).projectData || field.project_data;
+                                        if (projectData?.selectedPlantType?.name) {
+                                            return projectData.selectedPlantType.name;
+                                        }
+                                        // Priority 2: Use plant name from plantType relation
+                                        return field.plantType?.name || 'N/A';
+                                    })()}
+                                </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>{t('area')}:</span>
+                                <span>{t('area_label')}:</span>
                                 <span className="text-white">
-                                    {field.totalArea
+                                    {field.totalArea != null
                                         ? typeof field.totalArea === 'number'
                                             ? field.totalArea.toFixed(2)
                                             : (parseFloat(field.totalArea) || 0).toFixed(2)
                                         : 'N/A'}{' '}
-                                    ไร่
+                                    {t('rai')}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span>{t('plants')}:</span>
-                                <span className="text-white">{field.totalPlants || 'N/A'}</span>
+                                <span>{t('quantity')}:</span>
+                                <span className="text-white">
+                                    {field.totalPlants != null ? field.totalPlants : 'N/A'} {t('plants_unit')}
+                                </span>
                             </div>
                             <div className="flex justify-between">
                                 <span>{t('water_need')}:</span>
                                 <span className="text-white">
-                                    {field.total_water_need
+                                    {field.total_water_need != null
                                         ? typeof field.total_water_need === 'number'
                                             ? field.total_water_need.toFixed(2)
                                             : (parseFloat(field.total_water_need) || 0).toFixed(2)
                                         : 'N/A'}{' '}
-                                    ลิตร/ครั้ง
+                                    {t('liters_per_session')}
                                 </span>
                             </div>
+                            {/* แสดงราคาสำหรับโครงการที่เสร็จแล้ว (Finished) */}
+                            {isFinished && (() => {
+                                const projectStats = (field as any).projectStats || field.project_stats;
+                                if (!projectStats) return null;
+                                const stats = typeof projectStats === 'string'
+                                    ? JSON.parse(projectStats)
+                                    : projectStats;
+                                // ซ่อนไม่ต้องแสดงถ้าไม่มีหรือเป็น null/undefined หรือไม่ใช่ตัวเลข หรือเป็น NaN หรือต่ำกว่า 1 สตางค์
+                                const costNumber = Number(stats.totalCost);
+                                if (
+                                    stats.totalCost == null ||
+                                    isNaN(costNumber) ||
+                                    costNumber < 0.01
+                                )
+                                    return null;
+                                return (
+                                    <div className="mt-2 flex justify-between border-t border-gray-600 pt-2">
+                                        <span className="font-semibold text-yellow-400">💰 {t('total_cost')}:</span>
+                                        <span className="font-bold text-yellow-300">
+                                            {costNumber.toLocaleString('th-TH', {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                            }) + ' ' + t('baht')}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
                         </>
                     )}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
-                    <span>{new Date(field.createdAt).toLocaleDateString()}</span>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(field.id);
-                        }}
-                        className="text-red-400 hover:text-red-300"
-                        title={t('delete_field')}
-                    >
-                        <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                        </svg>
-                    </button>
+                <div className="mt-4 text-xs text-gray-400">
+                    <span>{t('last_saved')}: {new Date(field.createdAt).toLocaleDateString()}</span>
                 </div>
             </div>
         </div>
@@ -724,9 +891,8 @@ const FolderCard = ({
 
     return (
         <div
-            className={`cursor-pointer rounded-lg border p-4 transition-all hover:scale-105 ${
-                isSelected ? 'ring-2 ring-blue-400' : ''
-            } ${getFolderColor()}`}
+            className={`cursor-pointer rounded-lg border p-4 transition-all hover:scale-105 ${isSelected ? 'ring-2 ring-blue-400' : ''
+                } ${getFolderColor()}`}
             onClick={() => onSelect(folder)}
             onDragOver={(e) => {
                 e.preventDefault();
@@ -771,6 +937,459 @@ const FolderCard = ({
                         title={t('delete_folder')}
                     >
                         <FaTrash className="h-4 w-4" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Rename Project Modal
+const RenameProjectModal = ({
+    isOpen,
+    onClose,
+    onRename,
+    currentName,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onRename: (newName: string) => void;
+    currentName: string;
+    t: (key: string) => string;
+}) => {
+    const [newName, setNewName] = useState(currentName);
+    
+    useEffect(() => {
+        if (isOpen) {
+            setNewName(currentName);
+        }
+    }, [isOpen, currentName]);
+    
+    const handleSubmit = () => {
+        if (newName.trim()) {
+            onRename(newName.trim());
+            onClose();
+        }
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative z-[10000] w-full max-w-md rounded-lg bg-gray-800 p-6">
+                {/* Header */}
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">{t('rename_project')}</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                {/* Input */}
+                <div className="mb-6">
+                    <label className="mb-2 block text-sm font-medium text-gray-300">
+                        {t('project_name')}
+                    </label>
+                    <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                handleSubmit();
+                            }
+                        }}
+                        className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                        placeholder={t('enter_new_project_name')}
+                        autoFocus
+                    />
+                </div>
+                
+                {/* Actions */}
+                <div className="flex justify-end gap-3">
+                    <button
+                        onClick={onClose}
+                        className="rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!newName.trim()}
+                        className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {t('save')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Share To User Modal
+const ShareToUserModal = ({
+    isOpen,
+    onClose,
+    onSelectUser,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelectUser: (user: any) => void;
+    t: (key: string) => string;
+}) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    
+    // Search users
+    useEffect(() => {
+        if (!isOpen || searchQuery.length < 2) {
+            setUsers([]);
+            return;
+        }
+        
+        const searchUsers = async () => {
+            setLoading(true);
+            try {
+                const response = await axios.get(`/api/users/search?q=${encodeURIComponent(searchQuery)}`);
+                setUsers(response.data.users || []);
+            } catch (error) {
+                console.error('Error searching users:', error);
+                setUsers([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        const debounce = setTimeout(searchUsers, 300);
+        return () => clearTimeout(debounce);
+    }, [searchQuery, isOpen]);
+    
+    const handleClose = () => {
+        onClose();
+        setSearchQuery('');
+        setUsers([]);
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative z-[10000] max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-lg bg-gray-800 p-6">
+                {/* Header */}
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">{t('share_to_user')}</h2>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-white">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                {/* Search Box */}
+                <div className="mb-4">
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full rounded-lg border border-gray-600 bg-gray-700 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                        placeholder={t('search_by_name_email_phone')}
+                        autoFocus
+                    />
+                </div>
+                
+                {/* User List */}
+                <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 p-4">
+                    {loading ? (
+                        <div className="py-8 text-center text-gray-400">
+                            <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                            {t('loading')}...
+                        </div>
+                    ) : searchQuery.length < 2 ? (
+                        <p className="py-8 text-center text-gray-400">{t('search_by_name_email_phone')}</p>
+                    ) : users.length === 0 ? (
+                        <p className="py-8 text-center text-gray-400">{t('no_users_found')}</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {users.map((user) => (
+                                <button
+                                    key={user.id}
+                                    onClick={() => {
+                                        onSelectUser(user);
+                                        // Don't close the modal here, it will be closed when FolderSelectionModal closes
+                                    }}
+                                    className="flex w-full items-center gap-3 rounded-lg border border-gray-700 bg-gray-800 p-3 text-left transition-colors hover:border-blue-500 hover:bg-blue-900/10"
+                                >
+                                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                                        {user.name?.charAt(0).toUpperCase() || '?'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-white">{user.name}</h3>
+                                        <p className="text-sm text-gray-400">{user.email}</p>
+                                        {user.phone && <p className="text-xs text-gray-500">{user.phone}</p>}
+                                    </div>
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                {/* Close Button */}
+                <div className="mt-6 flex justify-end">
+                    <button
+                        onClick={handleClose}
+                        className="rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Folder Selection Modal for Move/Copy
+const FolderSelectionModal = ({
+    isOpen,
+    onClose,
+    onSelect,
+    action,
+    currentFolderId,
+    folders,
+    showAllFolders = false,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelect: (folderId: string | null) => void;
+    action: 'move' | 'copy' | 'share';
+    currentFolderId?: string | null;
+    folders: Folder[];
+    showAllFolders?: boolean;
+    t: (key: string) => string;
+}) => {
+    const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+    const [folderHistory, setFolderHistory] = useState<Folder[]>([]);
+    
+    const handleFolderClick = (folder: Folder) => {
+        // If showAllFolders is true, don't navigate into folders (flat list mode)
+        if (showAllFolders) {
+            return;
+        }
+        
+        // Prevent adding duplicate folders to history
+        if (folderHistory.some(f => f.id === folder.id)) {
+            // If folder already in history, navigate to that point instead
+            const existingIndex = folderHistory.findIndex(f => f.id === folder.id);
+            const newHistory = folderHistory.slice(0, existingIndex + 1);
+            setFolderHistory(newHistory);
+            setSelectedFolder(folder);
+            return;
+        }
+        
+        setFolderHistory([...folderHistory, folder]);
+        setSelectedFolder(folder);
+    };
+    
+    const handleGoBack = () => {
+        if (folderHistory.length > 0) {
+            const newHistory = [...folderHistory];
+            newHistory.pop();
+            const parentFolder = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null;
+            setSelectedFolder(parentFolder);
+            setFolderHistory(newHistory);
+        }
+    };
+    
+    const handleSelectHere = (folderToSelect?: Folder | null) => {
+        // Use folderToSelect if provided, otherwise use selectedFolder
+        const folder = folderToSelect || selectedFolder;
+        
+        onSelect(folder?.id || null);
+        onClose();
+        setSelectedFolder(null);
+        setFolderHistory([]);
+    };
+    
+    // Get current level folders
+    const getCurrentFolders = () => {
+        let result;
+        
+        if (showAllFolders) {
+            // Show all folders when share mode (flat list, no hierarchy)
+            // Always show all folders regardless of selectedFolder
+            result = folders;
+        } else {
+            // Normal mode: show hierarchical folders
+            if (!selectedFolder) {
+                result = folders.filter(f => !f.parent_id);
+            } else {
+                result = folders.filter(f => f.parent_id === selectedFolder.id);
+            }
+        }
+        
+        // Remove duplicates by id to prevent React key warnings
+        const uniqueFolders = result.filter((folder, index, self) => 
+            index === self.findIndex(f => f.id === folder.id)
+        );
+        
+        return uniqueFolders;
+    };
+    
+    // Close handler
+    const handleClose = () => {
+        onClose();
+        setSelectedFolder(null);
+        setFolderHistory([]);
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="relative z-[10000] max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-lg bg-gray-800 p-6">
+                {/* Header */}
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">
+                        {action === 'move' ? t('move_project') : action === 'share' ? t('share_to_user') : t('copy_project')}
+                    </h2>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-white">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                {/* Breadcrumb Navigation - Only show in normal mode */}
+                {!showAllFolders && (
+                    <div className="mb-4 flex items-center gap-2 text-sm text-gray-400">
+                        <button
+                            onClick={() => {
+                                setSelectedFolder(null);
+                                setFolderHistory([]);
+                            }}
+                            className="hover:text-white"
+                        >
+                            {t('all_folders')}
+                        </button>
+                        {folderHistory.map((folder, index) => (
+                            <React.Fragment key={`breadcrumb-${folder.id}-${index}`}>
+                                <span>/</span>
+                                <button
+                                    onClick={() => {
+                                        const newHistory = folderHistory.slice(0, index + 1);
+                                        setFolderHistory(newHistory);
+                                        setSelectedFolder(folder);
+                                    }}
+                                    className="hover:text-white"
+                                >
+                                    {folder.name}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                    </div>
+                )}
+                
+                {/* Folder List */}
+                <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 p-4">
+                    {getCurrentFolders().length === 0 ? (
+                        <p className="py-8 text-center text-gray-400">{t('no_folders_yet')}</p>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {getCurrentFolders().map((folder, index) => (
+                                <button
+                                    key={`folder-${folder.id}-${index}`}
+                                    onClick={() => {
+                                        if (showAllFolders) {
+                                            // In flat list mode, single click selects the folder
+                                            // Pass folder directly to handleSelectHere to avoid async state issue
+                                            handleSelectHere(folder);
+                                        } else {
+                                            handleFolderClick(folder);
+                                        }
+                                    }}
+                                    onDoubleClick={() => {
+                                        if (!showAllFolders && folder.id !== currentFolderId) {
+                                            // Pass folder directly to handleSelectHere to avoid async state issue
+                                            handleSelectHere(folder);
+                                        }
+                                    }}
+                                    disabled={folder.id === currentFolderId}
+                                    className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                                        folder.id === currentFolderId
+                                            ? 'cursor-not-allowed border-gray-600 bg-gray-800 opacity-50'
+                                            : showAllFolders
+                                            ? 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10 cursor-pointer'
+                                            : 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10'
+                                    }`}
+                                >
+                                    <span className="text-2xl">
+                                        {folder.icon || (folder.type === 'customer' ? '👤' : folder.type === 'category' ? '📁' : '📂')}
+                                    </span>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-white">{folder.name}</h3>
+                                        <p className="text-xs text-gray-400">
+                                            {showAllFolders && folder.parent_id ? (
+                                                <>
+                                                    {t('parent_folder')}: {folders.find(f => f.id === folder.parent_id)?.name || 'N/A'}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {folders.filter(f => f.parent_id === folder.id).length} {t('sub_folders')}
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                    {!showAllFolders && (
+                                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    )}
+                                    {showAllFolders && (
+                                        <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                {/* Actions */}
+                <div className="mt-6 flex items-center justify-between gap-3">
+                    {!showAllFolders && folderHistory.length > 0 && (
+                        <button
+                            onClick={handleGoBack}
+                            className="flex items-center gap-2 rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                        >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            {t('back')}
+                        </button>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                        onClick={handleClose}
+                        className="rounded bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button
+                        onClick={() => {
+                            handleSelectHere();
+                        }}
+                        className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                    >
+                        {action === 'move' ? t('move_here') : t('copy_here')}
                     </button>
                 </div>
             </div>
@@ -833,7 +1452,7 @@ const CreateFolderModal = ({
                 <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-white">
                         {parentFolder
-                            ? `Create Sub-folder in "${parentFolder.name}"`
+                            ? `${t('create_sub_folder')} "${parentFolder.name}"`
                             : t('create_folder')}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -876,35 +1495,13 @@ const CreateFolderModal = ({
                                     key={icon}
                                     type="button"
                                     onClick={() => setFolderIcon(icon)}
-                                    className={`rounded p-2 text-xl ${
-                                        folderIcon === icon
+                                    className={`rounded p-2 text-xl ${folderIcon === icon
                                             ? 'bg-blue-600'
                                             : 'bg-gray-700 hover:bg-gray-600'
-                                    }`}
+                                        }`}
                                 >
                                     {icon}
                                 </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="mb-6">
-                        <label className="mb-2 block text-sm font-medium text-gray-300">
-                            {t('folder_color')}
-                        </label>
-                        <div className="grid grid-cols-6 gap-2">
-                            {colors.map((color) => (
-                                <button
-                                    key={color.value}
-                                    type="button"
-                                    onClick={() => setFolderColor(color.value)}
-                                    className={`h-8 w-8 rounded-full border-2 ${
-                                        folderColor === color.value
-                                            ? 'border-white'
-                                            : 'border-gray-600'
-                                    }`}
-                                    style={{ backgroundColor: color.value }}
-                                    title={color.name}
-                                />
                             ))}
                         </div>
                     </div>
@@ -1026,38 +1623,17 @@ const EditFolderModal = ({
                                     key={icon}
                                     type="button"
                                     onClick={() => setFolderIcon(icon)}
-                                    className={`rounded p-2 text-xl ${
-                                        folderIcon === icon
+                                    className={`rounded p-2 text-xl ${folderIcon === icon
                                             ? 'bg-blue-600'
                                             : 'bg-gray-700 hover:bg-gray-600'
-                                    }`}
+                                        }`}
                                 >
                                     {icon}
                                 </button>
                             ))}
                         </div>
                     </div>
-                    <div className="mb-6">
-                        <label className="mb-2 block text-sm font-medium text-gray-300">
-                            {t('folder_color')}
-                        </label>
-                        <div className="grid grid-cols-6 gap-2">
-                            {colors.map((color) => (
-                                <button
-                                    key={color.value}
-                                    type="button"
-                                    onClick={() => setFolderColor(color.value)}
-                                    className={`h-8 w-8 rounded-full border-2 ${
-                                        folderColor === color.value
-                                            ? 'border-white'
-                                            : 'border-gray-600'
-                                    }`}
-                                    style={{ backgroundColor: color.value }}
-                                    title={color.name}
-                                />
-                            ))}
-                        </div>
-                    </div>
+                    
                     <div className="flex justify-end space-x-3">
                         <button
                             type="button"
@@ -1114,12 +1690,27 @@ export default function Home() {
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
     const [showEditFolderModal, setShowEditFolderModal] = useState(false);
     const [folderToEdit, setFolderToEdit] = useState<Folder | null>(null);
+    const [showFinishedProjectModal, setShowFinishedProjectModal] = useState(false);
+    const [selectedFinishedProject, setSelectedFinishedProject] = useState<Field | null>(null);
+    const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
     const [showFolderDeleteConfirm, setShowFolderDeleteConfirm] = useState(false);
     const [draggedField, setDraggedField] = useState<Field | null>(null);
     const [draggedFolder, setDraggedFolder] = useState<Folder | null>(null);
     const [parentFolderForModal, setParentFolderForModal] = useState<Folder | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    
+    // New states for move/copy/share/rename functionality
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [fieldToRename, setFieldToRename] = useState<Field | null>(null);
+    const [showFolderSelectionModal, setShowFolderSelectionModal] = useState(false);
+    const [folderSelectionAction, setFolderSelectionAction] = useState<'move' | 'copy'>('move');
+    const [fieldToMoveOrCopy, setFieldToMoveOrCopy] = useState<Field | null>(null);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [fieldToShare, setFieldToShare] = useState<Field | null>(null);
+    const [selectedUserForShare, setSelectedUserForShare] = useState<any>(null);
+    const [userFoldersForShare, setUserFoldersForShare] = useState<Folder[]>([]);
+    const [showUserFolderSelectionModal, setShowUserFolderSelectionModal] = useState(false);
 
     const plantCategories = getPlantCategories(t);
 
@@ -1165,7 +1756,7 @@ export default function Home() {
             return fields.filter(
                 (field) =>
                     (field.status === 'finished' || field.isCompleted) &&
-                    field.folderId === selectedFolder.id
+                    String(field.folderId) === String(selectedFolder.id)
             );
         }
         if (selectedFolder.name === t('unfinished') || selectedFolder.name === 'Unfinished') {
@@ -1174,7 +1765,7 @@ export default function Home() {
                 (field) =>
                     field.status !== 'finished' &&
                     !field.isCompleted &&
-                    field.folderId === selectedFolder.id
+                    String(field.folderId) === String(selectedFolder.id)
             );
         }
 
@@ -1185,20 +1776,24 @@ export default function Home() {
     const getFieldCountForFolder = (folder: Folder) => {
         // Check by folder name since system folders are created in the backend
         if (folder.name === t('finished') || folder.name === 'Finished') {
-            return fields.filter(
+            const count = fields.filter(
                 (field) =>
                     (field.status === 'finished' || field.isCompleted) &&
-                    field.folderId === folder.id
+                    String(field.folderId) === String(folder.id)
             ).length;
+            
+            return count;
         }
         if (folder.name === t('unfinished') || folder.name === 'Unfinished') {
             // Count fields that are unfinished AND are assigned to this specific folder (not unassigned ones)
-            return fields.filter(
+            const count = fields.filter(
                 (field) =>
                     field.status !== 'finished' &&
                     !field.isCompleted &&
-                    field.folderId === folder.id
+                    String(field.folderId) === String(folder.id)
             ).length;
+            
+            return count;
         }
 
         return getFieldsByFolder(folder.id).length;
@@ -1214,9 +1809,27 @@ export default function Home() {
                 ]);
 
                 if (fieldsResponse.data.fields) {
+                    const allFields = fieldsResponse.data.fields.map((f: any) => ({
+                        id: f.id,
+                        name: f.name,
+                        folderId: f.folderId,
+                        folderIdType: typeof f.folderId,
+                        status: f.status,
+                        isCompleted: f.isCompleted,
+                    }));
+                    
+                    const unfinishedFields = fieldsResponse.data.fields.filter((f: any) => 
+                        f.status !== 'finished' && !f.isCompleted
+                    ).map((f: any) => ({
+                        id: f.id,
+                        name: f.name,
+                        folderId: f.folderId,
+                        folderIdType: typeof f.folderId,
+                    }));
+                    
                     setFields(fieldsResponse.data.fields);
                 }
-
+                
                 if (foldersResponse.data.folders) {
                     setFolders(foldersResponse.data.folders);
 
@@ -1302,12 +1915,12 @@ export default function Home() {
         try {
             // Validate field data before navigation
             if (!field.area || field.area.length < 3) {
-                alert('ข้อมูลพื้นที่ไม่ถูกต้อง กรุณาตรวจสอบข้อมูลแปลง');
+                alert(t('invalid_area_data'));
                 return;
             }
 
             if (!field.plantType) {
-                alert('ข้อมูลพืชไม่ถูกต้อง กรุณาตรวจสอบข้อมูลแปลง');
+                alert(t('invalid_plant_data'));
                 return;
             }
 
@@ -1315,17 +1928,10 @@ export default function Home() {
             localStorage.setItem('currentFieldId', field.id);
             localStorage.setItem('currentFieldName', field.name);
 
-            // Check if field is finished - if so, go directly to product page with appropriate mode
+            // Check if field is finished - if so, show modal with 3 options
             if (field.status === 'finished' || field.isCompleted) {
-                const productModeMap: { [key: string]: string } = {
-                    horticulture: '',
-                    'home-garden': '?mode=garden',
-                    'field-crop': '?mode=field-crop',
-                    greenhouse: '?mode=greenhouse',
-                    // 'khok-nong-na': '?mode=khok-nong-na',
-                };
-                const modeParam = productModeMap[field.category || 'horticulture'] || '';
-                navigateToRoute(`/product${modeParam}`);
+                setSelectedFinishedProject(field);
+                setShowFinishedProjectModal(true);
                 return;
             }
 
@@ -1392,6 +1998,10 @@ export default function Home() {
 
                 case 'horticulture':
                 default: {
+                    // Store field name in localStorage before navigation
+                    localStorage.setItem('currentFieldId', field.id);
+                    localStorage.setItem('currentFieldName', field.name);
+
                     // Prepare the data in the same format as map-planner for horticulture
                     const params = new URLSearchParams({
                         area: JSON.stringify(field.area),
@@ -1406,7 +2016,7 @@ export default function Home() {
             }
         } catch (error) {
             console.error('Error preparing field data for navigation:', error);
-            alert('เกิดข้อผิดพลาดในการเปิดข้อมูลแปลง กรุณาลองใหม่อีกครั้ง');
+            alert(t('error_opening_field'));
         }
     };
 
@@ -1446,7 +2056,7 @@ export default function Home() {
             }
         } catch (error) {
             console.error('Error updating field status:', error);
-            alert('Error updating field status');
+            alert(t('error_updating_status'));
         }
     };
 
@@ -1473,7 +2083,7 @@ export default function Home() {
                     setFieldToDelete(null);
                 } else {
                     console.error('Backend returned success: false');
-                    alert('Failed to delete field');
+                    alert(t('error_deleting_field'));
                 }
             }
         } catch (error: any) {
@@ -1504,7 +2114,7 @@ export default function Home() {
                 setShowDeleteConfirm(false);
                 setFieldToDelete(null);
             } else {
-                alert('Error deleting field');
+                alert(t('error_deleting_field'));
             }
         } finally {
             setDeleting(false);
@@ -1528,7 +2138,7 @@ export default function Home() {
             }
         } catch (error) {
             console.error('Error creating folder:', error);
-            alert('Error creating folder');
+            alert(t('error_creating_folder'));
         }
     };
 
@@ -1554,7 +2164,7 @@ export default function Home() {
             }
         } catch (error) {
             console.error('Error updating folder:', error);
-            alert('Error updating folder');
+            alert(t('error_updating_folder'));
         }
     };
 
@@ -1594,7 +2204,7 @@ export default function Home() {
         } catch (error: any) {
             console.error('Error deleting folder:', error);
             console.error('Error details:', error.response?.data);
-            alert('Error deleting folder');
+            alert(t('error_deleting_folder'));
         }
     };
 
@@ -1679,6 +2289,56 @@ export default function Home() {
         setSelectedFolder(null);
         setFolderHistory([]);
     };
+    
+    // Handler for rename project
+    const handleRenameProject = (field: Field) => {
+        setFieldToRename(field);
+        setShowRenameModal(true);
+    };
+    
+    // Handler for submitting rename
+    const handleSubmitRename = async (newName: string) => {
+        if (!fieldToRename) return;
+        
+        try {
+            const response = await axios.put(`/api/fields/${fieldToRename.id}/name`, {
+                name: newName,
+            });
+            
+            if (response.data.success) {
+                setFields(prev => prev.map(f => 
+                    f.id === fieldToRename.id ? { ...f, name: newName } : f
+                ));
+                alert(t('rename_project_success'));
+            }
+        } catch (error: any) {
+            console.error('Error renaming project:', error);
+            alert(`Error renaming project: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setShowRenameModal(false);
+            setFieldToRename(null);
+        }
+    };
+    
+    // Handler for move project
+    const handleMoveProject = (field: Field) => {
+        setFieldToMoveOrCopy(field);
+        setFolderSelectionAction('move');
+        setShowFolderSelectionModal(true);
+    };
+    
+    // Handler for copy project
+    const handleCopyProject = (field: Field) => {
+        setFieldToMoveOrCopy(field);
+        setFolderSelectionAction('copy');
+        setShowFolderSelectionModal(true);
+    };
+    
+    // Handler for share project
+    const handleShareProject = (field: Field) => {
+        setFieldToShare(field);
+        setShowShareModal(true);
+    };
 
     if (loading) {
         return (
@@ -1691,7 +2351,7 @@ export default function Home() {
     return (
         <div className="flex min-h-screen flex-col bg-gray-900">
             <Navbar />
-            <div className="flex-1 pt-20">
+            <div className="flex-1 min-h-screen pt-20">
                 <div className="p-6">
                     <div className="mx-auto max-w-7xl">
                         {/* Main Content Header */}
@@ -1746,17 +2406,16 @@ export default function Home() {
                                         onClick={handleGoBack}
                                     >
                                         <FaArrowLeft />
-                                        {folderHistory.length > 0 ? 'Back' : t('all_folders')}
+                                        {folderHistory.length > 0 ? t('back') : t('all_folders')}
                                     </button>
 
                                     {/* Breadcrumb */}
                                     {folderHistory.length > 0 && (
                                         <div
-                                            className={`flex items-center gap-2 text-gray-400 ${
-                                                isDragging
+                                            className={`flex items-center gap-2 text-gray-400 ${isDragging
                                                     ? 'rounded border-2 border-dashed border-blue-500 bg-blue-500/10 p-2'
                                                     : ''
-                                            }`}
+                                                }`}
                                             onDragOver={(e) => {
                                                 e.preventDefault();
                                                 e.currentTarget.classList.add(
@@ -1808,12 +2467,7 @@ export default function Home() {
                                                         : 'Drop here to make unassigned'}
                                                 </span>
                                             )}
-                                            <button
-                                                className="hover:text-white hover:underline"
-                                                onClick={handleGoHome}
-                                            >
-                                                Home
-                                            </button>
+
                                             <span>/</span>
                                             {folderHistory.map((folder, index) => (
                                                 <div
@@ -1848,15 +2502,6 @@ export default function Home() {
                         {!selectedFolder ? (
                             // Show all folders and category folders
                             <div>
-                                <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-white">
-                                        {t('folders')}
-                                    </h2>
-                                    <div className="text-sm text-gray-400">
-                                        {t('click_folder_view')}
-                                    </div>
-                                </div>
-
                                 {/* System Folders */}
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {getAllFolders().map((folder) => (
@@ -1867,12 +2512,12 @@ export default function Home() {
                                             onSelect={handleFolderSelect}
                                             onEdit={
                                                 folder.type === 'category'
-                                                    ? () => {}
+                                                    ? () => { }
                                                     : handleEditFolder
                                             }
                                             onDelete={
                                                 folder.type === 'category'
-                                                    ? () => {}
+                                                    ? () => { }
                                                     : handleDeleteFolder
                                             }
                                             onDrop={handleFolderDrop}
@@ -1890,7 +2535,7 @@ export default function Home() {
                                     return unassignedFields.length > 0 ? (
                                         <div className="mt-8">
                                             <h3 className="mb-4 text-lg font-semibold text-white">
-                                                Unassigned Fields ({unassignedFields.length})
+                                                {t('unassigned_fields')} ({unassignedFields.length})
                                             </h3>
                                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                                 {unassignedFields.map((field) => (
@@ -1906,6 +2551,11 @@ export default function Home() {
                                                             isDragging &&
                                                             draggedField?.id === field.id
                                                         }
+                                                        onRename={handleRenameProject}
+                                                        onMove={handleMoveProject}
+                                                        onCopy={handleCopyProject}
+                                                        onShare={handleShareProject}
+                                                        isSuperUser={auth?.user?.is_super_user}
                                                         t={t}
                                                     />
                                                 ))}
@@ -1913,70 +2563,10 @@ export default function Home() {
                                         </div>
                                     ) : null;
                                 })()}
-
-                                {/* Homepage Drop Zone for Unassigned Fields */}
-                                <div className="mt-8">
-                                    <div
-                                        className={`rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
-                                            isDragging
-                                                ? 'border-blue-500 bg-blue-500/10'
-                                                : 'border-gray-600 bg-gray-800/50'
-                                        }`}
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.add(
-                                                'border-blue-500',
-                                                'bg-blue-500/10'
-                                            );
-                                        }}
-                                        onDragLeave={(e) => {
-                                            e.currentTarget.classList.remove(
-                                                'border-blue-500',
-                                                'bg-blue-500/10'
-                                            );
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.remove(
-                                                'border-blue-500',
-                                                'bg-blue-500/10'
-                                            );
-                                            handleFolderDrop(null);
-                                        }}
-                                    >
-                                        <div className="text-gray-400">
-                                            <svg
-                                                className="mx-auto mb-2 h-8 w-8"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M12 4v16m8-8H4"
-                                                />
-                                            </svg>
-                                            <p className="text-sm">
-                                                Drop fields here to make them unassigned
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         ) : (
                             // Show fields and sub-folders in selected folder
                             <div>
-                                <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-xl font-semibold text-white">
-                                        {selectedFolder.name} ({getCurrentFields().length})
-                                    </h2>
-                                    <div className="text-sm text-gray-400">
-                                        {t('click_field_manage')}
-                                    </div>
-                                </div>
-
                                 {/* Sub-folders Section */}
                                 {(() => {
                                     const subFolders = folders.filter(
@@ -1986,7 +2576,7 @@ export default function Home() {
                                     return subFolders.length > 0 ? (
                                         <div className="mb-8">
                                             <h3 className="mb-4 text-lg font-semibold text-white">
-                                                Sub-folders
+                                                {t('sub_folders')}
                                             </h3>
                                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                                 {subFolders.map((subFolder) => (
@@ -2036,9 +2626,6 @@ export default function Home() {
 
                                     return hasAnyCategoryFields ? (
                                         <div className="mb-8">
-                                            <h3 className="mb-4 text-lg font-semibold text-white">
-                                                {t('project_categories')}
-                                            </h3>
                                             <div className="space-y-6">
                                                 {categorySections.map(({ category, fields }) => {
                                                     if (fields.length === 0) return null;
@@ -2078,8 +2665,13 @@ export default function Home() {
                                                                         isDragging={
                                                                             isDragging &&
                                                                             draggedField?.id ===
-                                                                                field.id
+                                                                            field.id
                                                                         }
+                                                                        onRename={handleRenameProject}
+                                                                        onMove={handleMoveProject}
+                                                                        onCopy={handleCopyProject}
+                                                                        onShare={handleShareProject}
+                                                                        isSuperUser={auth?.user?.is_super_user}
                                                                         t={t}
                                                                     />
                                                                 ))}
@@ -2118,7 +2710,7 @@ export default function Home() {
                                     return uncategorizedFields.length > 0 ? (
                                         <div className="mb-8">
                                             <h3 className="mb-4 text-lg font-semibold text-white">
-                                                Uncategorized Fields ({uncategorizedFields.length})
+                                                {t('uncategorized_fields')} ({uncategorizedFields.length})
                                             </h3>
                                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                                 {uncategorizedFields.map((field) => (
@@ -2134,6 +2726,11 @@ export default function Home() {
                                                             isDragging &&
                                                             draggedField?.id === field.id
                                                         }
+                                                        onRename={handleRenameProject}
+                                                        onMove={handleMoveProject}
+                                                        onCopy={handleCopyProject}
+                                                        onShare={handleShareProject}
+                                                        isSuperUser={auth?.user?.is_super_user}
                                                         t={t}
                                                     />
                                                 ))}
@@ -2149,7 +2746,7 @@ export default function Home() {
                                         className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
                                     >
                                         <FaPlus className="h-4 w-4" />
-                                        Create Sub-folder in "{selectedFolder.name}"
+                                        {t('create_sub_folder')} "{selectedFolder.name}"
                                     </button>
                                 </div>
                             </div>
@@ -2167,6 +2764,153 @@ export default function Home() {
                 plantCategories={plantCategories}
                 t={t}
             />
+            
+            {/* Rename Project Modal */}
+            <RenameProjectModal
+                isOpen={showRenameModal}
+                onClose={() => {
+                    setShowRenameModal(false);
+                    setFieldToRename(null);
+                }}
+                onRename={handleSubmitRename}
+                currentName={fieldToRename?.name || ''}
+                t={t}
+            />
+            
+            {/* Folder Selection Modal for Move/Copy */}
+            <FolderSelectionModal
+                isOpen={showFolderSelectionModal}
+                onClose={() => {
+                    setShowFolderSelectionModal(false);
+                    setFieldToMoveOrCopy(null);
+                }}
+                onSelect={async (folderId) => {
+                    if (!fieldToMoveOrCopy) return;
+                    
+                    try {
+                        if (folderSelectionAction === 'move') {
+                            // Move project (using existing updateFieldFolder endpoint)
+                            const response = await axios.put(`/api/fields/${fieldToMoveOrCopy.id}/folder`, {
+                                folder_id: folderId ? parseInt(folderId) : null,
+                            });
+                            
+                            if (response.data.success) {
+                                setFields(prev => prev.map(f => 
+                                    f.id === fieldToMoveOrCopy.id ? { ...f, folderId } : f
+                                ));
+                                alert(t('move_project_success'));
+                                // Reload fields to reflect the change
+                                window.location.reload();
+                            }
+                        } else {
+                            // Copy project
+                            const response = await axios.post(`/api/fields/${fieldToMoveOrCopy.id}/copy`, {
+                                folder_id: folderId ? parseInt(folderId) : null,
+                            });
+                            
+                            if (response.data.success && response.data.field) {
+                                setFields(prev => [...prev, response.data.field]);
+                                alert(t('copy_project_success'));
+                                // Reload fields to reflect the change
+                                window.location.reload();
+                            }
+                        }
+                    } catch (error: any) {
+                        console.error(`Error ${folderSelectionAction} project:`, error);
+                        alert(`Error ${folderSelectionAction} project: ${error.response?.data?.message || error.message}`);
+                    }
+                }}
+                action={folderSelectionAction}
+                currentFolderId={fieldToMoveOrCopy?.folderId}
+                folders={folders}
+                t={t}
+            />
+            
+            {/* Share To User Modal */}
+            <ShareToUserModal
+                isOpen={showShareModal && !showUserFolderSelectionModal}
+                onClose={() => {
+                    setShowShareModal(false);
+                    // Reset all share-related states when closing ShareToUserModal
+                    setFieldToShare(null);
+                    setSelectedUserForShare(null);
+                    setUserFoldersForShare([]);
+                }}
+                onSelectUser={async (user) => {
+                    setSelectedUserForShare(user);
+                    // Fetch user's folders
+                    try {
+                        const response = await axios.get(`/api/users/${user.id}/folders`);
+                        setUserFoldersForShare(response.data.folders || []);
+                        setShowUserFolderSelectionModal(true);
+                    } catch (error) {
+                        console.error('Error fetching user folders:', error);
+                        alert('Error fetching user folders');
+                    }
+                }}
+                t={t}
+            />
+            
+            {/* User Folder Selection Modal for Share */}
+            {selectedUserForShare && (
+                <FolderSelectionModal
+                    isOpen={showUserFolderSelectionModal}
+                    onClose={() => {
+                        setShowUserFolderSelectionModal(false);
+                        setSelectedUserForShare(null);
+                        setUserFoldersForShare([]);
+                        // Reset fieldToShare and close ShareToUserModal when closing the folder selection modal
+                        setFieldToShare(null);
+                        setShowShareModal(false);
+                    }}
+                    onSelect={async (folderId) => {
+                        if (!fieldToShare || !selectedUserForShare) {
+                            alert('Error: Missing required data. Please try again.');
+                            return;
+                        }
+                        
+                        try {
+                            // Share project to user
+                            const response = await axios.post(`/api/fields/${fieldToShare.id}/share`, {
+                                user_id: selectedUserForShare.id,
+                                folder_id: folderId ? parseInt(folderId) : null,
+                            });
+                            
+                            if (response.data.success) {
+                                // Show detailed success message
+                                const message = `โครงการ "${fieldToShare.name}" ถูกแชร์ไปยัง "${selectedUserForShare.name}" สำเร็จแล้ว\n\n` +
+                                    `Field ID: ${response.data.field?.id}\n` +
+                                    `User ID: ${response.data.debug?.target_user_id}\n` +
+                                    `Folder ID: ${response.data.debug?.folder_id || 'Unfinished'}\n\n` +
+                                    `ผู้ใช้ที่รับแชร์จะเห็นโครงการนี้เมื่อ refresh หน้า`;
+                                alert(message);
+                                
+                                // Reload fields to show the shared project
+                                window.location.reload();
+                            } else {
+                                console.error('❌ [DEBUG] Share failed:', response.data);
+                                alert(`Error sharing project: ${response.data.message || 'Unknown error'}`);
+                            }
+                        } catch (error: any) {
+                            console.error('❌ [DEBUG] Error sharing project:', error);
+                            console.error('❌ [DEBUG] Error response:', error.response?.data);
+                            console.error('❌ [DEBUG] Error status:', error.response?.status);
+                            alert(`Error sharing project: ${error.response?.data?.message || error.message}`);
+                        } finally {
+                            // Close modals and reset states
+                            setShowUserFolderSelectionModal(false);
+                            setSelectedUserForShare(null);
+                            setUserFoldersForShare([]);
+                            setFieldToShare(null);
+                            setShowShareModal(false);
+                        }
+                    }}
+                    action="share"
+                    folders={userFoldersForShare}
+                    showAllFolders={true}
+                    t={t}
+                />
+            )}
 
             <CreateFolderModal
                 isOpen={showCreateFolderModal}
@@ -2327,6 +3071,281 @@ export default function Home() {
                     </div>
                 </div>
             )}
+
+            {/* Finished Project Modal - 3 Options */}
+            {showFinishedProjectModal && selectedFinishedProject && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-75">
+                    <div className="relative mx-4 w-full max-w-lg rounded-lg bg-gray-800 p-6 shadow-xl">
+                        <button
+                            onClick={() => {
+                                setShowFinishedProjectModal(false);
+                                setSelectedFinishedProject(null);
+                            }}
+                            className="absolute right-4 top-4 text-3xl text-gray-400 hover:text-white"
+                        >
+                            ×
+                        </button>
+
+                        <h2 className="mb-2 text-2xl font-bold text-yellow-400">
+                            📁 {selectedFinishedProject.name}
+                        </h2>
+                        <p className="mb-6 text-sm text-gray-400">
+                            {t('select_action')}
+                        </p>
+
+                        <div className="space-y-3">
+                            {/* Option 1: Open in Planner */}
+                            <button
+                                onClick={() => {
+                                    setShowFinishedProjectModal(false);
+                                    localStorage.setItem('currentFieldId', selectedFinishedProject.id);
+                                    localStorage.setItem('currentFieldName', selectedFinishedProject.name);
+
+                                    // ✅ ตั้ง flag เพื่อให้ Planner โหลดข้อมูลจาก localStorage
+                                    localStorage.setItem('isEditingExistingProject', 'true'); // แก้ key ให้ตรงกับ HorticulturePlannerPage
+
+                                    // โหลด project_data เพื่อให้ planner แสดงพื้นที่ที่วาดไว้
+                                    const projectData = (selectedFinishedProject as any).projectData || selectedFinishedProject.project_data;
+                                    if (projectData) {
+                                        const data = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+
+                                        // ✅ บันทึกลง horticultureIrrigationData (key หลักที่ HorticulturePlannerPage ใช้)
+                                        localStorage.setItem('horticultureIrrigationData', JSON.stringify(data));
+
+                                        // ✅ บันทึกข้อมูลเพิ่มเติมสำหรับ planner (สำหรับ backward compatibility)
+                                        localStorage.setItem('horticultureProjectData', JSON.stringify(data));
+                                        if (data.mainArea) localStorage.setItem('horticultureMainArea', JSON.stringify(data.mainArea));
+                                        if (data.plants) localStorage.setItem('horticulturePlants', JSON.stringify(data.plants));
+                                        if (data.irrigationZones) localStorage.setItem('horticultureIrrigationZones', JSON.stringify(data.irrigationZones));
+                                        if (data.zones) localStorage.setItem('horticultureZones', JSON.stringify(data.zones));
+                                        if (data.exclusionAreas) localStorage.setItem('horticultureExclusionAreas', JSON.stringify(data.exclusionAreas));
+                                        if (data.mainPipes) localStorage.setItem('horticultureMainPipes', JSON.stringify(data.mainPipes));
+                                        if (data.subMainPipes) localStorage.setItem('horticultureSubMainPipes', JSON.stringify(data.subMainPipes));
+                                        if (data.lateralPipes) localStorage.setItem('horticultureLateralPipes', JSON.stringify(data.lateralPipes));
+                                        if (data.pump) localStorage.setItem('horticulturePump', JSON.stringify(data.pump));
+                                        if (data.selectedPlantType) localStorage.setItem('selectedPlantType', JSON.stringify(data.selectedPlantType));
+                                    }
+
+                                    // โหลด project_stats (ถ้ามี)
+                                    const projectStats = (selectedFinishedProject as any).projectStats || selectedFinishedProject.project_stats;
+                                    if (projectStats) {
+                                        const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+                                        // ✅ ใช้ key ที่ถูกต้องสำหรับ horticulture
+                                        if (stats.zoneInputs) localStorage.setItem('horticultureZoneInputs', JSON.stringify(stats.zoneInputs));
+                                        if (stats.zoneSprinklers) localStorage.setItem('horticultureZoneSprinklers', JSON.stringify(stats.zoneSprinklers));
+                                    }
+
+                                    // ✅ โหลด gardenData สำหรับ home-garden mode
+                                    if (selectedFinishedProject.category === 'home-garden') {
+                                        if (selectedFinishedProject.garden_data) {
+                                            const gardenData = typeof selectedFinishedProject.garden_data === 'string'
+                                                ? JSON.parse(selectedFinishedProject.garden_data)
+                                                : selectedFinishedProject.garden_data;
+                                            localStorage.setItem('gardenData', JSON.stringify(gardenData));
+                                        }
+                                        if (selectedFinishedProject.garden_stats) {
+                                            const gardenStats = typeof selectedFinishedProject.garden_stats === 'string'
+                                                ? JSON.parse(selectedFinishedProject.garden_stats)
+                                                : selectedFinishedProject.garden_stats;
+                                            localStorage.setItem('gardenStatistics', JSON.stringify(gardenStats));
+                                        }
+                                    }
+
+                                    // ✅ โหลด fieldCropData สำหรับ field-crop mode
+                                    if (selectedFinishedProject.category === 'field-crop' && selectedFinishedProject.field_crop_data) {
+                                        const fieldCropData = typeof selectedFinishedProject.field_crop_data === 'string'
+                                            ? JSON.parse(selectedFinishedProject.field_crop_data)
+                                            : selectedFinishedProject.field_crop_data;
+                                        localStorage.setItem('fieldCropData', JSON.stringify(fieldCropData));
+                                    }
+
+                                    // ✅ โหลด greenhouseData สำหรับ greenhouse mode
+                                    if (selectedFinishedProject.category === 'greenhouse' && selectedFinishedProject.greenhouse_data) {
+                                        const greenhouseData = typeof selectedFinishedProject.greenhouse_data === 'string'
+                                            ? JSON.parse(selectedFinishedProject.greenhouse_data)
+                                            : selectedFinishedProject.greenhouse_data;
+                                        localStorage.setItem('greenhouseData', JSON.stringify(greenhouseData));
+                                    }
+
+                                    // ✅ แก้ไข route ให้ถูกต้อง
+                                    const plannerModeMap: { [key: string]: string } = {
+                                        horticulture: '/horticulture/planner',
+                                        'home-garden': '/garden/planner',
+                                        'field-crop': '/field-crop/planner',
+                                        greenhouse: '/greenhouse/planner',
+                                    };
+                                    const plannerRoute = plannerModeMap[selectedFinishedProject.category || 'horticulture'] || '/horticulture/planner';
+                                    navigateToRoute(plannerRoute);
+                                }}
+                                className="w-full rounded-lg bg-green-600 px-6 py-4 text-left text-white transition-colors hover:bg-green-700"
+                            >
+                                <div className="flex items-center">
+                                    <span className="mr-3 text-2xl">🗺️</span>
+                                    <div>
+                                        <p className="font-semibold">{t('open_in_planner')}</p>
+                                        <p className="text-sm text-green-200">{t('edit_map_and_layout')}</p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Option 2: Open in Product Page */}
+                            <button
+                                onClick={() => {
+                                    setShowFinishedProjectModal(false);
+                                    localStorage.setItem('currentFieldId', selectedFinishedProject.id);
+                                    localStorage.setItem('currentFieldName', selectedFinishedProject.name);
+
+                                    // ✅ โหลด project_data เพื่อใช้ในหน้า product (สำหรับการบันทึก)
+                                    const projectData = (selectedFinishedProject as any).projectData || selectedFinishedProject.project_data;
+                                    if (projectData) {
+                                        const data = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+                                        localStorage.setItem('horticultureProjectData', JSON.stringify(data));
+                                    }
+
+                                    // โหลดข้อมูลจาก project_stats เพื่อใช้ในหน้า product
+                                    const projectStats = (selectedFinishedProject as any).projectStats || selectedFinishedProject.project_stats;
+                                    if (projectStats) {
+                                        const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+                                        // บันทึกข้อมูลที่จำเป็นลง localStorage
+                                        if (stats.zoneInputs) localStorage.setItem('zoneInputs', JSON.stringify(stats.zoneInputs));
+                                        if (stats.zoneSprinklers) localStorage.setItem('zoneSprinklers', JSON.stringify(stats.zoneSprinklers));
+                                        if (stats.selectedPipes) localStorage.setItem('selectedPipes', JSON.stringify(stats.selectedPipes));
+                                        if (stats.selectedPump) localStorage.setItem('selectedPump', JSON.stringify(stats.selectedPump));
+                                        if (stats.sprinklerEquipmentSets) localStorage.setItem('sprinklerEquipmentSets', JSON.stringify(stats.sprinklerEquipmentSets));
+                                        if (stats.connectionEquipments) localStorage.setItem('connectionEquipments', JSON.stringify(stats.connectionEquipments));
+                                        if (stats.results) localStorage.setItem('calculationResults', JSON.stringify(stats.results));
+                                    }
+
+                                    const productModeMap: { [key: string]: string } = {
+                                        horticulture: '',
+                                        'home-garden': '?mode=garden',
+                                        'field-crop': '?mode=field-crop',
+                                        greenhouse: '?mode=greenhouse',
+                                    };
+                                    const modeParam = productModeMap[selectedFinishedProject.category || 'horticulture'] || '';
+                                    navigateToRoute(`/product${modeParam}`);
+                                }}
+                                className="w-full rounded-lg bg-blue-600 px-6 py-4 text-left text-white transition-colors hover:bg-blue-700"
+                            >
+                                <div className="flex items-center">
+                                    <span className="mr-3 text-2xl">🛠️</span>
+                                    <div>
+                                        <p className="font-semibold">{t('open_in_product')}</p>
+                                        <p className="text-sm text-blue-200">{t('edit_equipment_and_costs')}</p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Option 3: View Quotation */}
+                            <button
+                                onClick={() => {
+                                    setShowFinishedProjectModal(false);
+                                    setSelectedFinishedProject(selectedFinishedProject);
+                                    setShowQuotationModal(true);
+                                }}
+                                className="w-full rounded-lg bg-purple-600 px-6 py-4 text-left text-white transition-colors hover:bg-purple-700"
+                            >
+                                <div className="flex items-center">
+                                    <span className="mr-3 text-2xl">📋</span>
+                                    <div>
+                                        <p className="font-semibold">{t('view_quotation')}</p>
+                                        <p className="text-sm text-purple-200">{t('view_and_print_quotation')}</p>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setShowFinishedProjectModal(false);
+                                setSelectedFinishedProject(null);
+                            }}
+                            className="mt-6 w-full rounded-lg bg-gray-600 px-6 py-2 text-white transition-colors hover:bg-gray-700"
+                        >
+                            {t('cancel')}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Quotation Modal (For Option 3) */}
+            {showQuotationModal && selectedFinishedProject && (() => {
+                // เตรียมข้อมูลสำหรับ QuotationDocument
+                const projectStats = (selectedFinishedProject as any).projectStats || selectedFinishedProject.project_stats;
+                const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+
+                const projectData = (selectedFinishedProject as any).projectData || selectedFinishedProject.project_data;
+                const parsedProjectData = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+
+                return (
+                    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black bg-opacity-90">
+                        <div className="relative mx-4 h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white p-6">
+                            <button
+                                onClick={() => {
+                                    setShowQuotationModal(false);
+                                    setSelectedFinishedProject(null);
+                                }}
+                                className="absolute right-4 top-4 z-10 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                            >
+                                ×
+                            </button>
+
+                            {/* แสดง QuotationDocument */}
+                            {stats && stats.results ? (() => {
+                                return (
+                                    <QuotationDocument
+                                        show={true}
+                                        results={stats.results}
+                                        zoneSprinklers={stats.zoneSprinklers || {}}
+                                        selectedPipes={stats.selectedPipes || {}}
+                                        selectedSprinkler={Object.values(stats.zoneSprinklers || {})[0] || null}
+                                        selectedPump={stats.selectedPump}
+                                        selectedBranchPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.branch || null}
+                                        selectedSecondaryPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.secondary || null}
+                                        selectedMainPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.main || null}
+                                        selectedEmitterPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.emitter || null}
+                                        projectData={parsedProjectData}
+                                        gardenData={selectedFinishedProject.garden_data}
+                                        gardenStats={selectedFinishedProject.garden_stats}
+                                        fieldCropData={selectedFinishedProject.field_crop_data}
+                                        greenhouseData={selectedFinishedProject.greenhouse_data}
+                                        zoneInputs={stats.zoneInputs || {}}
+                                        quotationData={{
+                                            yourReference: '',
+                                            quotationDate: new Date().toLocaleString('th-TH'),
+                                            salesperson: '',
+                                            paymentTerms: '0',
+                                        }}
+                                        quotationDataCustomer={{
+                                            name: selectedFinishedProject.customerName || '',
+                                            projectName: selectedFinishedProject.name,
+                                            address: '',
+                                            phone: '',
+                                        }}
+                                        projectMode={selectedFinishedProject.category as any}
+                                        sprinklerEquipmentSets={stats.sprinklerEquipmentSets || {}}
+                                        connectionEquipments={stats.connectionEquipments || {}}
+                                        projectImage={parsedProjectData?.projectImage || null}
+                                        showPump={true}
+                                        onClose={() => {
+                                            setShowQuotationModal(false);
+                                            setSelectedFinishedProject(null);
+                                        }}
+                                    />
+                                );
+                            })() : (
+                                <div className="text-center text-gray-800">
+                                    <h2 className="mb-4 text-2xl font-bold">📋 {t('quotation_title')}</h2>
+                                    <p className="mb-4">{t('project_label')}: {selectedFinishedProject.name}</p>
+                                    <p className="text-red-600">
+                                        {t('no_quotation_data')}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

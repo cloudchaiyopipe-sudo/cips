@@ -6,8 +6,11 @@ import {
     Coordinate,
     GardenPlannerData,
     ZONE_TYPES,
+    SPRINKLER_TYPES,
+    Sprinkler,
     clipCircleToPolygon,
     isCornerSprinkler,
+    getManualSprinklerColor,
 } from '../../utils/homeGardenData';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -492,11 +495,56 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
         overlaysRef.current.clear();
     }, []);
 
+    // ตรวจสอบว่าเป็นหัวฉีดอัตโนมัติหรือไม่ (จาก id pattern)
+    const isAutoSprinkler = useCallback((sprinkler: Sprinkler): boolean => {
+        // หัวฉีดอัตโนมัติมี id pattern: ${zone.id}_sprinkler_... หรือ ${zone.id}_corner_...
+        // หัวฉีดที่เพิ่มเองมี id pattern: sprinkler_${Date.now()}
+        return (
+            sprinkler.id.includes('_corner_') ||
+            sprinkler.id.match(/^[^_]+_sprinkler_/) !== null
+        );
+    }, []);
+
+    // ตรวจสอบว่าหัวฉีดที่เพิ่มเองตรงกับอัตโนมัติหรือไม่
+    // ถ้าคุณสมบัติ (รัศมี, แรงดัน, อัตราการไหล) เท่ากับหัวฉีดอัตโนมัติ → แสดงสีเดียวกัน (สีฟ้า)
+    const isMatchingAutoSprinkler = useCallback((sprinkler: Sprinkler): boolean => {
+        // หัวฉีดอัตโนมัติเป็นสีฟ้าเสมอ
+        if (isAutoSprinkler(sprinkler)) {
+            return true;
+        }
+        
+        // สำหรับหัวฉีดที่เพิ่มเอง: ตรวจสอบว่าคุณสมบัติตรงกับ SPRINKLER_TYPES ใดๆ หรือไม่
+        // ถ้ารัศมี, แรงดัน, อัตราการไหล เท่ากับหัวฉีดอัตโนมัติ → return true (แสดงสีฟ้า)
+        // ใช้การเปรียบเทียบที่ยืดหยุ่น: ใช้ tolerance 0.01 เพื่อหลีกเลี่ยงปัญหา floating point
+        const autoType = SPRINKLER_TYPES.find(
+            (st) => {
+                // ใช้ tolerance 0.01 สำหรับการเปรียบเทียบ (แม่นยำกว่า)
+                const radiusMatch = Math.abs(st.radius - sprinkler.type.radius) < 0.01;
+                const pressureMatch = Math.abs(st.pressure - sprinkler.type.pressure) < 0.01;
+                const flowRateMatch = Math.abs(st.flowRate - sprinkler.type.flowRate) < 0.01;
+                
+                return radiusMatch && pressureMatch && flowRateMatch;
+            }
+        );
+        return !!autoType;
+    }, [isAutoSprinkler]);
+
     const createSprinklerIcon = useCallback(
-        (sprinkler: any, orientation?: number): google.maps.Symbol => {
+        (sprinkler: Sprinkler, orientation?: number): google.maps.Symbol => {
+            // กำหนดสี:
+            // - หัวฉีดอัตโนมัติหรือตรงกับ SPRINKLER_TYPES = สีฟ้า (#33CCFF)
+            // - หัวฉีดที่เพิ่มเองที่มีคุณสมบัติเหมือนกัน = สีเดียวกัน (จาก 10 สี)
+            // - หัวฉีดที่เพิ่มเองที่มีคุณสมบัติต่างกัน = สีต่างกัน
+            const baseColor = getManualSprinklerColor(
+                sprinkler,
+                gardenData.sprinklers,
+                isAutoSprinkler,
+                isMatchingAutoSprinkler
+            );
+
             return {
                 path: google.maps.SymbolPath.CIRCLE,
-                fillColor: sprinkler.color || '#33CCFF',
+                fillColor: baseColor,
                 fillOpacity: 0.9,
                 strokeColor: '#FFFFFF',
                 strokeWeight: 2,
@@ -504,7 +552,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                 rotation: orientation || 0,
             };
         },
-        []
+        [isAutoSprinkler, isMatchingAutoSprinkler]
     );
 
     const createWaterSourceIcon = useCallback((): google.maps.Icon => {
@@ -586,7 +634,7 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
 
                     const marker = new google.maps.Marker({
                         position: { lat: sprinkler.position.lat, lng: sprinkler.position.lng },
-                        icon: createSprinklerIcon(sprinkler.type, sprinkler.orientation),
+                        icon: createSprinklerIcon(sprinkler as any, sprinkler.orientation),
                         title: `หัวฉีด: ${sprinkler.type.nameEN} | รัศมี: ${sprinkler.type.radius}ม. | แรงดัน: ${sprinkler.type.pressure}บาร์ | อัตราการไหล: ${sprinkler.type.flowRate}ล./นาที`,
                         map: map,
                     });
@@ -596,15 +644,15 @@ const GoogleMapSummaryContent: React.FC<GoogleMapSummaryProps & { map?: google.m
                 }
             });
 
-            if (gardenData.waterSource?.position) {
+            if (gardenData.waterSources?.[0]?.position) {
                 try {
                     const marker = new google.maps.Marker({
                         position: {
-                            lat: gardenData.waterSource.position.lat,
-                            lng: gardenData.waterSource.position.lng,
+                            lat: gardenData.waterSources[0].position.lat,
+                            lng: gardenData.waterSources[0].position.lng,
                         },
                         icon: createWaterSourceIcon(),
-                        title: `แหล่งน้ำ: ${gardenData.waterSource.type === 'pump' ? 'ปั๊มน้ำ' : 'ท่อเมน'}`,
+                        title: `แหล่งน้ำ: ${gardenData.waterSources[0].type === 'pump' ? 'ปั๊มน้ำ' : 'ท่อเมน'}`,
                         map: map,
                     });
                     overlaysRef.current.set('water-source', marker);

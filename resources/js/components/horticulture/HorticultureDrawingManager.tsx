@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     findClosestPointOnLineSegment as utilsFindClosestPointOnLineSegment,
     calculateDistanceBetweenPoints as utilsCalculateDistanceBetweenPoints,
@@ -452,9 +452,109 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     onLateralPipeMouseMove,
 }) => {
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+    const [isDrawingLibraryReady, setIsDrawingLibraryReady] = useState(() => {
+        return !!window.google?.maps?.drawing?.DrawingManager;
+    });
+
+
+    // ✅ Separate useEffect to wait for Drawing Library
+    useEffect(() => {
+        if (isDrawingLibraryReady) return;
+
+        // Listen for drawing-library-loaded event
+        const handleDrawingLibraryLoaded = () => {
+            if (window.google?.maps?.drawing?.DrawingManager) {
+                console.log('✅ [HorticultureDrawingManager] Drawing Library loaded via event!');
+                setIsDrawingLibraryReady(true);
+            }
+        };
+        window.addEventListener('drawing-library-loaded', handleDrawingLibraryLoaded);
+
+        // ✅ Try to load Drawing Library using importLibrary API (Google Maps v3.50+)
+        const loadDrawingLibrary = async () => {
+            if (!window.google?.maps) {
+                console.log('⏳ [HorticultureDrawingManager] Waiting for Google Maps to load...');
+                return;
+            }
+
+            if (window.google?.maps?.importLibrary) {
+                try {
+                    await window.google.maps.importLibrary('drawing');
+                    setIsDrawingLibraryReady(true);
+                    return true;
+                } catch (error) {
+                    console.error('❌ [HorticultureDrawingManager] Failed to load Drawing Library:', error);
+                }
+            }
+            return false;
+        };
+
+        // Try importLibrary first (modern approach) - wait a bit for Google Maps to fully initialize
+        const tryLoadLibrary = async () => {
+            // Wait for Google Maps to be ready (max 5 seconds)
+            let attempts = 0;
+            while (attempts < 50 && !window.google?.maps?.importLibrary) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (window.google?.maps?.importLibrary) {
+                await loadDrawingLibrary();
+            }
+        };
+
+        if (window.google?.maps) {
+            tryLoadLibrary();
+        } else {
+            // Wait for Google Maps to load first
+            const waitForGoogleMaps = setInterval(() => {
+                if (window.google?.maps) {
+                    clearInterval(waitForGoogleMaps);
+                    tryLoadLibrary();
+                }
+            }, 100);
+
+            setTimeout(() => clearInterval(waitForGoogleMaps), 5000);
+        }
+
+        // Also poll as fallback (silent, no logs)
+        const checkInterval = setInterval(() => {
+            if (window.google?.maps?.drawing?.DrawingManager) {
+                setIsDrawingLibraryReady(true);
+                clearInterval(checkInterval);
+            }
+        }, 100);
+
+        const timeout = setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!window.google?.maps?.drawing?.DrawingManager) {
+                console.error('❌ [HorticultureDrawingManager] Drawing Library failed to load after 10 seconds');
+                console.error('💡 Please check:');
+                console.error('   1. Google Maps API Key has "Maps JavaScript API" enabled');
+                console.error('   2. Libraries parameter includes "drawing"');
+                console.error('   3. Current Google Maps objects:', window.google?.maps ? Object.keys(window.google.maps) : 'Google Maps not loaded');
+                console.error('   4. Full window.google.maps:', window.google?.maps);
+            }
+        }, 10000);
+
+        return () => {
+            window.removeEventListener('drawing-library-loaded', handleDrawingLibraryLoaded);
+            clearInterval(checkInterval);
+            clearTimeout(timeout);
+        };
+    }, [isDrawingLibraryReady]);
 
     useEffect(() => {
-        if (!map || !window.google?.maps?.drawing || !window.google?.maps) {
+        if (!map || !window.google?.maps) {
+            if (drawingManagerRef.current) {
+                drawingManagerRef.current.setMap(null);
+                drawingManagerRef.current = null;
+            }
+            return;
+        }
+
+        // ✅ รอให้ Drawing Library โหลดเสร็จ (อาจจะช้ากว่า map)
+        if (!isDrawingLibraryReady) {
             if (drawingManagerRef.current) {
                 drawingManagerRef.current.setMap(null);
                 drawingManagerRef.current = null;
@@ -751,6 +851,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         onMainPipeClick,
         onLateralPipeClick,
         onLateralPipeMouseMove,
+        isDrawingLibraryReady, // ✅ Re-run when Drawing Library loads
     ]);
 
     useEffect(() => {
