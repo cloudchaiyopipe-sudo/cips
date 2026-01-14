@@ -1055,7 +1055,16 @@ export default function SuperUserDashboard() {
                             <div>
                                 <div className="mb-6 flex items-center justify-between">
                                     <h2 className="text-xl font-semibold text-white">
-                                        {t('user_management')}
+                                        {(() => {
+                                            const adminCount = users.filter(u => u.role === 'super_user').length;
+                                            const salesCount = users.filter(u => u.role === 'sales').length;
+                                            const memberCount = users.filter(u => u.role === 'user').length;
+                                            return (
+                                                <>
+                                                    {t('admin_role')} {adminCount} {t('people') || 'คน'}, {t('sales_role')} {salesCount} {t('people') || 'คน'}, {t('members') || 'สมาชิก'} {memberCount} {t('people') || 'คน'}
+                                                </>
+                                            );
+                                        })()}
                                     </h2>
                                     <button
                                         onClick={() => setShowCreateUserModal(true)}
@@ -2424,8 +2433,20 @@ const EditUserModal = ({
 }) => {
     const [userName, setUserName] = useState(user.name);
     const [userEmail, setUserEmail] = useState(user.email);
+    const [userPhone, setUserPhone] = useState(user.phone || '');
+    const [userAdditionalDetails, setUserAdditionalDetails] = useState(user.additional_details || '');
     const [userPassword, setUserPassword] = useState('');
     const [userRole, setUserRole] = useState<'user' | 'sales' | 'super_user'>(user.role || 'user');
+
+    // Update state when user changes
+    useEffect(() => {
+        setUserName(user.name);
+        setUserEmail(user.email);
+        setUserPhone(user.phone || '');
+        setUserAdditionalDetails(user.additional_details || '');
+        setUserRole(user.role || 'user');
+        setUserPassword(''); // Reset password field
+    }, [user]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -2434,6 +2455,8 @@ const EditUserModal = ({
         const updateData: Partial<User> = {
             name: userName.trim(),
             email: userEmail.trim(),
+            phone: userPhone.trim(),
+            additional_details: userAdditionalDetails.trim(),
             is_super_user: userRole === 'super_user',
             role: userRole,
         };
@@ -2495,6 +2518,30 @@ const EditUserModal = ({
                             className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
                             placeholder={t('enter_email')}
                             required
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('phone') || 'Phone'}
+                        </label>
+                        <input
+                            type="tel"
+                            value={userPhone}
+                            onChange={(e) => setUserPhone(e.target.value)}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                            placeholder={t('enter_phone') || 'Enter phone number'}
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('additional_details') || 'Additional Details'}
+                        </label>
+                        <textarea
+                            value={userAdditionalDetails}
+                            onChange={(e) => setUserAdditionalDetails(e.target.value)}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                            placeholder={t('enter_additional_details') || 'Enter additional details'}
+                            rows={3}
                         />
                     </div>
                     <div className="mb-4">

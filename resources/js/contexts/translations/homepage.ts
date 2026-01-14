@@ -32,6 +32,7 @@ export const homepageTranslations = {
         efficient_distribution: 'Efficient water distribution',
         weather_integration: 'Weather integration',
         yield_optimization: 'Yield optimization',
+        under_development: 'Under Development',
 
         // Navigation
         dashboard: 'Dashboard',
@@ -453,6 +454,12 @@ export const homepageTranslations = {
         error_approving_payment: 'Error approving payment',
         error_updating_payment: 'Error updating payment',
         error_deleting_field: 'Error deleting field',
+        phone: 'Phone',
+        enter_phone: 'Enter phone number',
+        additional_details: 'Additional Details',
+        enter_additional_details: 'Enter additional details',
+        people: 'people',
+        members: 'Members',
 
         // Address translations
         '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150':
@@ -492,6 +499,12 @@ export const homepageTranslations = {
         error_approving_payment: 'เกิดข้อผิดพลาดในการอนุมัติการชำระเงิน',
         error_updating_payment: 'เกิดข้อผิดพลาดในการอัปเดตการชำระเงิน',
         error_deleting_field: 'เกิดข้อผิดพลาดในการลบแปลง',
+        phone: 'เบอร์โทร',
+        enter_phone: 'กรอกเบอร์โทร',
+        additional_details: 'รายละเอียด',
+        enter_additional_details: 'กรอกรายละเอียด',
+        people: 'คน',
+        members: 'สมาชิก',
 
         // Address translations
         '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150':
@@ -680,6 +693,7 @@ export const homepageTranslations = {
         efficient_distribution: 'การกระจายน้ำที่มีประสิทธิภาพ',
         weather_integration: 'การรวมสภาพอากาศ',
         yield_optimization: 'การปรับแต่งผลผลิต',
+        under_development: 'กำลังพัฒนา',
 
         // Navigation
         dashboard: 'แดชบอร์ด',

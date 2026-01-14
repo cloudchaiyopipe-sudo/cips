@@ -91,6 +91,7 @@ type PlantCategory = {
     color: string;
     route: string;
     features: string[];
+    isAvailable?: boolean; // true = พร้อมใช้งาน, false = กำลังพัฒนา
 };
 
 // Constants
@@ -139,6 +140,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('elevation_analysis'),
             t('comprehensive_stats'),
         ],
+        isAvailable: true, // พร้อมใช้งาน
     },
     {
         id: 'home-garden',
@@ -154,6 +156,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('easy_interface'),
             t('residential_focus'),
         ],
+        isAvailable: false, // กำลังพัฒนา
     },
     {
         id: 'greenhouse',
@@ -169,6 +172,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('crop_optimization'),
             t('environmental_monitoring'),
         ],
+        isAvailable: false, // กำลังพัฒนา
     },
     {
         id: 'field-crop',
@@ -184,6 +188,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('weather_integration'),
             t('yield_optimization'),
         ],
+        isAvailable: false, // กำลังพัฒนา
     },
     // {
     //     id: 'khok-nong-na',
@@ -727,10 +732,20 @@ const CategoryCard = ({
     onSelect: (category: PlantCategory) => void;
     t: (key: string) => string;
 }) => {
+    const isAvailable = category.isAvailable !== false; // Default to true if not specified
+    
     return (
         <div
-            className={`bg-gradient-to-br ${category.color} transform cursor-pointer rounded-xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
-            onClick={() => onSelect(category)}
+            className={`bg-gradient-to-br ${category.color} transform rounded-xl p-6 transition-all duration-300 ${
+                isAvailable 
+                    ? 'cursor-pointer hover:scale-105 hover:shadow-2xl' 
+                    : 'cursor-not-allowed opacity-60'
+            }`}
+            onClick={() => {
+                if (isAvailable) {
+                    onSelect(category);
+                }
+            }}
         >
             <div className="mb-4 flex items-center">
                 <div className="mr-4 text-4xl">{category.icon}</div>
@@ -762,20 +777,30 @@ const CategoryCard = ({
             </div>
 
             <div className="mt-6 flex items-center justify-between">
-                <span className="text-sm text-white/80">{t('click_start_planning')}</span>
-                <svg
-                    className="h-5 w-5 text-white/80"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                    />
-                </svg>
+                {isAvailable ? (
+                    <>
+                        <span className="text-sm text-white/80">{t('click_start_planning')}</span>
+                        <svg
+                            className="h-5 w-5 text-white/80"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5l7 7-7 7"
+                            />
+                        </svg>
+                    </>
+                ) : (
+                    <div className="flex w-full items-center justify-center gap-2 rounded-lg bg-yellow-500/20 px-4 py-2">
+                        <span className="text-sm font-semibold text-yellow-300">
+                            🔧 {t('under_development')}
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -534,59 +534,25 @@ export default function NewHome() {
                             className="relative"
                         >
                             <div className="rounded-2xl border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg p-4 shadow-2xl transition-all duration-300 hover:shadow-3xl hover:shadow-slate-900/50">
-                                <div className="aspect-video overflow-hidden rounded-lg">
-                                    <img
-                                        src="/images/app-screenshot.png"
-                                        alt="อินเทอร์เฟซระบบจัดการการชลประทานอัจฉริยะ"
-                                        className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                                        onError={(e) => {
-                                            // Fallback to placeholder if image fails to load
-                                            const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                            const fallback =
-                                                target.nextElementSibling as HTMLElement;
-                                            if (fallback) fallback.style.display = 'flex';
-                                        }}
-                                    />
-                                    <div
-                                        className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800"
-                                        style={{ display: 'none' }}
+                                <div className="aspect-video overflow-hidden rounded-lg flex items-center justify-center bg-black">
+                                    <video
+                                        className="h-full w-full object-cover"
+                                        autoPlay
+                                        loop
+                                        muted
+                                        playsInline
+                                        poster="/images/app-screenshot.png"
                                     >
-                                        <div className="text-center">
-                                            <div className="mb-4 text-6xl">🌱</div>
-                                            <p className="font-medium text-slate-300">
-                                                ภาพหน้าจอแอปพลิเคชัน
-                                            </p>
-                                            <p className="text-sm text-slate-400">
-                                                อินเทอร์เฟซการวางแผนการชลประทานของคุณ
-                                            </p>
-                                        </div>
-                                    </div>
+                                        <source src="/videos/video-test.mp4" type="video/mp4" />
+                                        เบราว์เซอร์ของคุณไม่รองรับการแสดงวิดีโอ
+                                    </video>
                                 </div>
                             </div>
-                            {/* Floating elements */}
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.5, delay: 0.6 }}
-                                whileHover={{ scale: 1.1, rotate: 10 }}
-                                className="absolute -right-4 -top-4 rounded-full bg-green-500 p-3 shadow-lg shadow-green-500/50"
-                            >
-                                <span className="text-2xl">💧</span>
-                            </motion.div>
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.5, delay: 0.8 }}
-                                whileHover={{ scale: 1.1, rotate: -10 }}
-                                className="absolute -bottom-4 -left-4 rounded-full bg-blue-500 p-3 shadow-lg shadow-blue-500/50"
-                            >
-                                <span className="text-2xl">📊</span>
-                            </motion.div>
                         </motion.div>
                     </div>
                 </div>
             </section>
+
             {/* Pricing Section */}
             <section className="bg-slate-900 py-20">
                 <div className="mx-auto max-w-7xl px-6">
@@ -1035,10 +1001,9 @@ export default function NewHome() {
                             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-900/30">
                                 <span className="text-xl">⚡</span>
                             </div>
-                            <h3 className="mb-2 text-lg font-semibold text-white">การตั้งค่าอย่างรวดเร็ว</h3>
+                            <h3 className="mb-2 text-lg font-semibold text-white">ออกแบบอย่างรวดเร็ว</h3>
                             <p className="text-sm text-slate-300">
-                                เริ่มต้นใช้งานได้ในไม่กี่นาทีด้วยอินเทอร์เฟซที่ใช้งานง่ายและกระบวนการตั้งค่า
-                                ที่มีคำแนะนำ
+                                สามารถออกแบบพื้นที่การปลูกสำหรับพืชและตำแหน่งต่างๆของอุแกรณ์ในสวนได้อย่างรวดเร็ว
                             </p>
                         </motion.div>
 
@@ -1053,10 +1018,10 @@ export default function NewHome() {
                                 <span className="text-xl">🎯</span>
                             </div>
                             <h3 className="mb-2 text-lg font-semibold text-white">
-                                การควบคุมที่แม่นยำ
+                                การคำนวณที่แม่นยำ
                             </h3>
                             <p className="text-sm text-slate-300">
-                                ปรับแต่งทุกด้านของระบบชลประทานของคุณด้วยความแม่นยำระดับมิลลิเมตร
+                                ระบบร์สามารถคำนวณปริมาณน้ำที่ต้องการสำหรับการปลูกพืชและการปรับปรุงการใช้น้ำให้มีประสิทธิภาพมากขึ้น
                             </p>
                         </motion.div>
 
@@ -1071,11 +1036,10 @@ export default function NewHome() {
                                 <span className="text-xl">📊</span>
                             </div>
                             <h3 className="mb-2 text-lg font-semibold text-white">
-                                การวิเคราะห์แบบเรียลไทม์
+                                การวิเคราะห์ข้อมูล
                             </h3>
                             <p className="text-sm text-slate-300">
-                                ตรวจสอบประสิทธิภาพและเพิ่มประสิทธิภาพด้วยข้อมูลสดและ
-                                ข้อมูลเชิงลึก
+                                ระบบสามารถวิเคราะห์ข้อมูลสดและเชิงลึกเพื่อการปรับปรุงการใช้น้ำและการปลูกพืช และแนะนำอุปกรณ์ที่เหมาะสมสำหรับการปลูกพืช
                             </p>
                         </motion.div>
                     </div>
