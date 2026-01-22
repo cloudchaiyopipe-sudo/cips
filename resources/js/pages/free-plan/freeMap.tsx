@@ -39,6 +39,10 @@ interface MapOptions {
     fullscreenControlOptions?: {
         position: unknown;
     };
+    streetViewControl?: boolean;
+    rotateControl?: boolean;
+    tiltControl?: boolean;
+    zoomControl?: boolean;
 }
 
 // 2. Component
@@ -54,13 +58,24 @@ function FreeMap() {
     const [placesService, setPlacesService] = useState<google.maps.places.PlacesService | null>(
         null
     );
+    // Note: projectName and selectedPlant are used in logic (useEffect, data processing) but not in JSX
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [projectName, setProjectName] = useState('');
     const [mapLoaded, setMapLoaded] = useState(false);
     const [apiLoading, setApiLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [selectedPlant, setSelectedPlant] = useState<GardenPlant | null>(null);
     const [currentStep, setCurrentStep] = useState(0); // 0: draw area, 1: water, 2: place pump, 3: zones, 4: generate pipe system
     const [completedSteps, setCompletedSteps] = useState<number[]>([]);
     const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [polygonPointMarkers, setPolygonPointMarkers] = useState<
+        Array<{
+            id: number;
+            position: { lat: number; lng: number };
+            marker: unknown;
+            isFirst: boolean;
+        }>
+    >([]);
     const [drawnShapes, setDrawnShapes] = useState<
         Array<{
             overlay: unknown;
@@ -157,9 +172,38 @@ function FreeMap() {
         }, 3000);
     }, []);
     const mapRef = useRef<HTMLDivElement>(null);
-    const drawingManagerRef = useRef<unknown>(null);
     const mapInstanceRef = useRef<unknown>(null);
+    
+    // Freehand drawing refs
+    const isDrawingRef = useRef(false);
+    const currentPathRef = useRef<Array<{ lat: number; lng: number }>>([]);
+    const tempPolylineRef = useRef<google.maps.Polyline | null>(null);
+    const drawingListenersRef = useRef<Array<() => void>>([]);
+    const handleFinishDrawingRef = useRef<(() => void) | null>(null);
+    const pointMarkersRef = useRef<Array<google.maps.Marker>>([]); // Markers for each clicked point
     const [mapInitialized, setMapInitialized] = useState(false);
+    
+    // Freehand drawing functions (defined outside useEffect to be accessible)
+    const cleanupFreehandDrawing = useCallback(() => {
+        if (tempPolylineRef.current) {
+            tempPolylineRef.current.setMap(null);
+            tempPolylineRef.current = null;
+        }
+        // Remove all point markers
+        pointMarkersRef.current.forEach(marker => {
+            marker.setMap(null);
+        });
+        pointMarkersRef.current = [];
+        currentPathRef.current = [];
+        isDrawingRef.current = false;
+        setIsDrawingMode(false);
+        
+        // Remove all listeners
+        drawingListenersRef.current.forEach(cleanup => {
+            cleanup();
+        });
+        drawingListenersRef.current = [];
+    }, []);
     // Keep track of all pipe overlays to ensure they can be cleared on reset
     const allPipeOverlaysRef = useRef<Array<google.maps.Polyline>>([]);
     // Remove plant points that overlap a given position within a small radius
@@ -590,7 +634,7 @@ function FreeMap() {
                             // Use green circle for custom plants
                             markerIcon = {
                                 path: window.google.maps.SymbolPath.CIRCLE,
-                                scale: 8,
+                                scale: 4,
                                 fillColor: '#22c55e', // green-500
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
@@ -601,8 +645,8 @@ function FreeMap() {
                             const plantImagePath = getPlantImagePath(plantData.name);
                             markerIcon = {
                                 url: plantImagePath,
-                                scaledSize: new window.google.maps.Size(24, 24),
-                                anchor: new window.google.maps.Point(12, 12),
+                                scaledSize: new window.google.maps.Size(12, 12),
+                                anchor: new window.google.maps.Point(6, 6),
                             };
                         }
                         
@@ -805,33 +849,24 @@ function FreeMap() {
                 }
             }
 
-            // Determine map type control position based on screen size
-            const isMobile = window.innerWidth < 768; // Mobile breakpoint
-            const mapTypeControlPosition = isMobile
-                ? window.google.maps.ControlPosition.TOP_LEFT
-                : window.google.maps.ControlPosition.TOP_RIGHT;
-
             const mapOptions: MapOptions = {
                 zoom: startZoom,
                 center: startCenter,
-                mapTypeId: window.google.maps.MapTypeId.SATELLITE,
-                mapTypeControl: true,
-                mapTypeControlOptions: {
-                    style: window.google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                    position: mapTypeControlPosition,
-                    mapTypeIds: [
-                        window.google.maps.MapTypeId.SATELLITE, // ภาพดาวเทียมไม่มีรายละเอียดสถานที่
-                        window.google.maps.MapTypeId.HYBRID, // ภาพดาวเทียมมีรายละเอียดสถานที่
-                    ],
-                },
+                mapTypeId: window.google.maps.MapTypeId.HYBRID, // Use HYBRID to show place labels
+                mapTypeControl: false, // Hide satellite button
                 // Allow scroll wheel zoom without holding Ctrl
                 gestureHandling: 'greedy',
                 scrollwheel: true,
-                // Adjust fullscreen control position
+                // Enable fullscreen control (ปุ่มขยายแผนที่)
                 fullscreenControl: true,
                 fullscreenControlOptions: {
                     position: window.google.maps.ControlPosition.BOTTOM_RIGHT,
                 },
+                // Hide Street View Pegman (ปุ่มคนสีเหลือง)
+                streetViewControl: false,
+                // Hide camera control buttons (ปุ่มควบคุมกล้อง)
+                rotateControl: false,
+                tiltControl: false,
             };
 
             const map = new window.google.maps.Map(mapRef.current, mapOptions);
@@ -1070,73 +1105,7 @@ function FreeMap() {
                 localStorage.setItem('freeMapView', JSON.stringify(view));
             });
 
-            // Initialize drawing manager with proper error handling
-            const initializeDrawingManager = () => {
-                try {
-                    // Check if drawing library is available
-                    if (!window.google?.maps?.drawing?.DrawingManager) {
-                        console.warn(
-                            'Google Maps drawing library not ready yet. Scheduling retry...'
-                        );
-                        setTimeout(() => {
-                            initializeDrawingManager();
-                        }, 500);
-                        return;
-                    }
-
-                    const drawingManager = new window.google.maps.drawing.DrawingManager({
-                        drawingMode: null,
-                        drawingControl: false, // Initially hidden
-                        drawingControlOptions: {
-                            position: window.google.maps.ControlPosition.LEFT_TOP,
-                            drawingModes: [
-                                window.google.maps.drawing.OverlayType.POLYGON,
-                                window.google.maps.drawing.OverlayType.RECTANGLE,
-                                window.google.maps.drawing.OverlayType.CIRCLE,
-                            ],
-                        },
-                        polygonOptions: {
-                            fillColor: '#10b981',
-                            fillOpacity: 0.2, // Lower opacity so zones can be seen on top
-                            strokeColor: '#10b981',
-                            strokeOpacity: 0.6,
-                            strokeWeight: 2,
-                            clickable: true,
-                            zIndex: 100, // Lower z-index to appear below zones
-                        },
-                        rectangleOptions: {
-                            fillColor: '#10b981',
-                            fillOpacity: 0.2, // Lower opacity so zones can be seen on top
-                            strokeColor: '#10b981',
-                            strokeOpacity: 0.6,
-                            strokeWeight: 2,
-                            clickable: true,
-                            zIndex: 100, // Lower z-index to appear below zones
-                        },
-                        circleOptions: {
-                            fillColor: '#10b981',
-                            fillOpacity: 0.2, // Lower opacity so zones can be seen on top
-                            strokeColor: '#10b981',
-                            strokeOpacity: 0.6,
-                            strokeWeight: 2,
-                            clickable: true,
-                            zIndex: 100, // Lower z-index to appear below zones
-                        },
-                    });
-
-                    drawingManager.setMap(map);
-                    drawingManagerRef.current = drawingManager;
-                } catch (error) {
-                    console.error('❌ Failed to initialize DrawingManager:', error);
-                    // Retry after a longer delay
-                    setTimeout(() => {
-                        initializeDrawingManager();
-                    }, 1000);
-                }
-            };
-
-            // Initialize drawing manager
-            initializeDrawingManager();
+            // Freehand drawing functions are defined at component level
 
             // Recreate zone overlays from saved data
             if (zones.length > 0) {
@@ -1219,7 +1188,7 @@ function FreeMap() {
                             // Use green circle for custom plants
                             markerIcon = {
                                 path: window.google.maps.SymbolPath.CIRCLE,
-                                scale: 8,
+                                scale: 4,
                                 fillColor: '#22c55e', // green-500
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
@@ -1230,8 +1199,8 @@ function FreeMap() {
                             const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                             markerIcon = {
                                 url: plantImagePath,
-                                scaledSize: new window.google.maps.Size(24, 24),
-                                anchor: new window.google.maps.Point(12, 12),
+                                scaledSize: new window.google.maps.Size(12, 12),
+                                anchor: new window.google.maps.Point(6, 6),
                             };
                         }
                         
@@ -1660,243 +1629,8 @@ function FreeMap() {
                 }
             );
 
-            // Add event listeners for drawing events
-            window.google.maps.event.addListener(
-                drawingManagerRef.current,
-                'overlaycomplete',
-                (event: { overlay: unknown; type: string }) => {
-                    const overlay = event.overlay;
-                    const type = event.type;
-
-                    // Extract data from overlay for storage
-                    let overlayData: {
-                        bounds?: { north: number; south: number; east: number; west: number };
-                        center?: { lat: number; lng: number };
-                        radius?: number;
-                        path?: Array<{ lat: number; lng: number }>;
-                    } = {};
-
-                    if (type === window.google.maps.drawing.OverlayType.POLYGON) {
-                        const polygon = overlay as {
-                            getPath: () => {
-                                getArray: () => Array<{ lat: () => number; lng: () => number }>;
-                            };
-                        };
-                        const path = polygon
-                            .getPath()
-                            .getArray()
-                            .map((point) => ({
-                                lat: point.lat(),
-                                lng: point.lng(),
-                            }));
-                        overlayData = { path };
-                    } else if (type === window.google.maps.drawing.OverlayType.RECTANGLE) {
-                        const rectangle = overlay as {
-                            getBounds: () => {
-                                getNorthEast: () => { lat: () => number; lng: () => number };
-                                getSouthWest: () => { lat: () => number; lng: () => number };
-                            };
-                        };
-                        const bounds = rectangle.getBounds();
-                        overlayData = {
-                            bounds: {
-                                north: bounds.getNorthEast().lat(),
-                                east: bounds.getNorthEast().lng(),
-                                south: bounds.getSouthWest().lat(),
-                                west: bounds.getSouthWest().lng(),
-                            },
-                        };
-                    } else if (type === window.google.maps.drawing.OverlayType.CIRCLE) {
-                        const circle = overlay as {
-                            getCenter: () => { lat: () => number; lng: () => number };
-                            getRadius: () => number;
-                        };
-                        overlayData = {
-                            center: {
-                                lat: circle.getCenter().lat(),
-                                lng: circle.getCenter().lng(),
-                            },
-                            radius: circle.getRadius(),
-                        };
-                    }
-
-                    // Add the drawn shape to our state (only allow one shape)
-                    const newShape = { overlay, type, id: Date.now(), data: overlayData };
-                    setDrawnShapes([newShape]); // Replace all shapes with just the new one
-
-                    // Add click listener to the newly drawn overlay
-                    window.google.maps.event.addListener(
-                        overlay,
-                        'click',
-                        (event: { latLng: { lat: () => number; lng: () => number } }) => {
-                            const clickedLat = event.latLng.lat();
-                            const clickedLng = event.latLng.lng();
-
-                            // Get current step from localStorage as backup
-                            const savedProgress = localStorage.getItem('mapStepProgress');
-                            if (savedProgress) {
-                                try {
-                                    JSON.parse(savedProgress);
-                                } catch (error) {
-                                    console.error('Error parsing saved progress:', error);
-                                }
-                            }
-
-                            // Get the actual current step from localStorage (more reliable than state)
-                            let actualCurrentStep = currentStep;
-
-                            if (savedProgress) {
-                                try {
-                                    const progress = JSON.parse(savedProgress);
-                                    actualCurrentStep = progress.currentStep;
-                                } catch (error) {
-                                    console.error('Error parsing saved progress:', error);
-                                }
-                            }
-
-                            // Handle water source placement
-                            if (actualCurrentStep === 1) {
-                                // Create water source marker
-                                const waterMarker = createWaterSourceMarkerSimple(
-                                    { lat: clickedLat, lng: clickedLng },
-                                    map as google.maps.Map
-                                );
-
-                                if (waterMarker) {
-                                    // Add to water sources state
-                                    const newWaterSource = {
-                                        id: Date.now(),
-                                        position: { lat: clickedLat, lng: clickedLng },
-                                        marker: waterMarker,
-                                    };
-
-                                    setWaterSources((prev) => {
-                                        const updated = [...prev, newWaterSource];
-                                        return updated;
-                                    });
-
-                                    // Save to localStorage
-                                    const waterSourcesForStorage = [
-                                        ...waterSources,
-                                        newWaterSource,
-                                    ].map((ws) => ({
-                                        id: ws.id,
-                                        position: ws.position,
-                                    }));
-                                    localStorage.setItem(
-                                        'waterSources',
-                                        JSON.stringify(waterSourcesForStorage)
-                                    );
-
-
-                                    // Auto-advance to Place Pump step after placing water source
-                                    setCompletedSteps((prev) => {
-                                        const newCompletedSteps = [...prev, 1]; // Mark step 1 (Water) as completed
-
-                                        // Save progress to localStorage
-                                        const progressData = {
-                                            currentStep: 2, // Move to step 2 (Place Pump)
-                                            completedSteps: newCompletedSteps,
-                                        };
-                                        localStorage.setItem(
-                                            'mapStepProgress',
-                                            JSON.stringify(progressData)
-                                        );
-
-
-                                        return newCompletedSteps;
-                                    });
-
-                                    setCurrentStep(2); // Move to step 2 (Place Pump)
-
-                                    // Create pump placement points immediately after placing water source
-                                    const placementPoints = createPumpPlacementPoints(
-                                        { lat: clickedLat, lng: clickedLng },
-                                        map as google.maps.Map
-                                    );
-                                    setPumpPlacementPoints(placementPoints);
-                                } else {
-                                    console.error('❌ Failed to create water marker');
-                                }
-                            } else if (actualCurrentStep === 2) {
-                                // Pump placement step - no action needed
-                            } else {
-                                // Other steps - no action needed
-                            }
-                        }
-                    );
-
-                    // Save only the data part to localStorage (not the overlay object)
-                    const shapesForStorage = [
-                        {
-                            type: newShape.type,
-                            id: newShape.id,
-                            data: newShape.data,
-                        },
-                    ];
-                    localStorage.setItem('drawnShapes', JSON.stringify(shapesForStorage));
-
-                    // Make the overlay non-editable (clickable is set during creation)
-                    if (type === window.google.maps.drawing.OverlayType.POLYGON) {
-                        const polygon = overlay as {
-                            setEditable: (editable: boolean) => void;
-                            setDraggable: (draggable: boolean) => void;
-                        };
-                        polygon.setEditable(false);
-                        polygon.setDraggable(false);
-                    } else if (type === window.google.maps.drawing.OverlayType.RECTANGLE) {
-                        const rectangle = overlay as {
-                            setEditable: (editable: boolean) => void;
-                            setDraggable: (draggable: boolean) => void;
-                        };
-                        rectangle.setEditable(false);
-                        rectangle.setDraggable(false);
-                    } else if (type === window.google.maps.drawing.OverlayType.CIRCLE) {
-                        const circle = overlay as {
-                            setEditable: (editable: boolean) => void;
-                            setDraggable: (draggable: boolean) => void;
-                        };
-                        circle.setEditable(false);
-                        circle.setDraggable(false);
-                    }
-
-                    // Exit drawing mode after drawing
-                    if (drawingManagerRef.current) {
-                        (
-                            drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-                        ).setDrawingMode(null);
-                    }
-                    setIsDrawingMode(false);
-
-                    // Create plant points after drawing area
-                    const newPlantPoints = createPlantPoints(map, overlayData, type);
-
-                    if (newPlantPoints && newPlantPoints.length > 0) {
-                        // Plant points created successfully
-                    } else {
-                        // No plant points created
-                    }
-
-                    // Auto-advance to next step (Water)
-                    setCompletedSteps((prev) => {
-                        const newCompletedSteps = [...prev, 0]; // Mark step 0 (Draw Area) as completed
-
-                        // Save progress to localStorage
-                        const progressData = {
-                            currentStep: 1, // Move to step 1 (Water)
-                            completedSteps: newCompletedSteps,
-                        };
-                        localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
-
-                        return newCompletedSteps;
-                    });
-
-                    setCurrentStep(1); // Move to step 1 (Water)
-
-                    // Force a re-render to ensure state is updated
-                    setTimeout(() => {}, 100);
-                }
-            );
+            // Removed overlaycomplete listener - using freehand drawing instead
+            // Old Drawing Manager code completely removed
         };
 
         loadGoogleMaps();
@@ -1935,8 +1669,8 @@ function FreeMap() {
                 title: translations.waterPump,
                 icon: {
                     url: '/images/water-pump.png',
-                    scaledSize: new window.google.maps.Size(32, 32),
-                    anchor: new window.google.maps.Point(16, 16),
+                    scaledSize: new window.google.maps.Size(24, 24),
+                    anchor: new window.google.maps.Point(12, 12),
                 },
                 draggable: false,
                 clickable: true,
@@ -2358,34 +2092,6 @@ function FreeMap() {
         translations,
         createZoneCenterMarker,
     ]);
-    const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newName = e.target.value.trim();
-        const oldName = projectName; // Store old name before updating
-
-        setProjectName(newName);
-        // Save project name to localStorage
-        localStorage.setItem('projectName', newName);
-
-        // Update saved project name if it exists and oldName is not empty
-        if (oldName && oldName.trim() && newName) {
-            try {
-                const savedProjects = localStorage.getItem('freePlanProjects');
-                if (savedProjects) {
-                    const projects = JSON.parse(savedProjects);
-                    const projectIndex = projects.findIndex(
-                        (p: { projectName: string }) => p.projectName === oldName.trim()
-                    );
-                    if (projectIndex >= 0) {
-                        projects[projectIndex].projectName = newName;
-                        localStorage.setItem('freePlanProjects', JSON.stringify(projects));
-                    }
-                }
-            } catch (error) {
-                console.error('Error updating saved project name:', error);
-            }
-        }
-    };
-
     // Load project name from localStorage on mount
     useEffect(() => {
         const savedProjectName = localStorage.getItem('projectName');
@@ -2444,6 +2150,16 @@ function FreeMap() {
                 }
             });
 
+            // Clear all polygon point markers
+            polygonPointMarkers.forEach((pm) => {
+                if (pm.marker) {
+                    (pm.marker as { setMap: (map: unknown) => void }).setMap(null);
+                }
+            });
+            
+            // Cleanup freehand drawing
+            cleanupFreehandDrawing();
+
             // Clear all main pipes from state
             mainPipes.forEach((pipe) => {
                 if (pipe.overlay) {
@@ -2473,17 +2189,8 @@ function FreeMap() {
             });
         }
 
-        // Reset drawing manager
-        if (drawingManagerRef.current) {
-            (
-                drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-            ).setDrawingMode(null);
-            (
-                drawingManagerRef.current as {
-                    setOptions: (options: { drawingControl: boolean }) => void;
-                }
-            ).setOptions({ drawingControl: false });
-        }
+        // Cleanup freehand drawing
+        cleanupFreehandDrawing();
 
         // Clear localStorage FIRST to prevent useEffect from recreating pipes
         // Clear step progress, drawn shapes, water sources, pumps, zones, plant points, main pipes, sub-main pipes, and lateral pipes from localStorage, keep plant data
@@ -2505,6 +2212,7 @@ function FreeMap() {
         setPumps([]);
         setZones([]);
         setPlantPoints([]);
+        setPolygonPointMarkers([]);
         setPumpPlacementPoints([]);
         setMainPipes([]);
         setSubMainPipes([]);
@@ -2614,43 +2322,188 @@ function FreeMap() {
         }
     };
 
-    // Draw Area handler
-    const handleDrawAreaClick = () => {
-        if (!drawingManagerRef.current) return;
+    // Initialize freehand drawing - set up event listeners (moved after handleFinishDrawing)
+    // This will be defined after handleFinishDrawing
+    let initializeFreehandDrawing: (() => void) | null = null;
+    
+    const _initializeFreehandDrawing = useCallback(() => {
+        const map = mapInstanceRef.current as google.maps.Map;
+        if (!map) return;
 
-        if (isDrawingMode) {
-            // Exit drawing mode
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-                ).setDrawingMode(null);
-            }
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: false });
-            }
-            setIsDrawingMode(false);
-        } else {
-            // Clear existing shapes before entering drawing mode
-            if (drawnShapes.length > 0) {
-                setDrawnShapes([]);
-                localStorage.removeItem('drawnShapes');
+        cleanupFreehandDrawing();
+
+        const mapDiv = map.getDiv();
+        mapDiv.style.cursor = 'crosshair';
+
+        // Helper function to get lat/lng from click/touch event
+        const getLatLngFromEvent = (e: MouseEvent | TouchEvent): { lat: number; lng: number } | null => {
+            const mapRect = mapDiv.getBoundingClientRect();
+            const bounds = map.getBounds();
+            if (!bounds) return null;
+
+            let clientX: number, clientY: number;
+
+            if (e instanceof TouchEvent) {
+                if (e.touches.length === 0 && e.changedTouches.length === 0) return null;
+                const touch = e.touches.length > 0 ? e.touches[0] : e.changedTouches[0];
+                clientX = touch.clientX;
+                clientY = touch.clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
             }
 
-            // Enter drawing mode
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: true });
+            // Check if click is within map bounds
+            if (
+                clientX < mapRect.left ||
+                clientX > mapRect.right ||
+                clientY < mapRect.top ||
+                clientY > mapRect.bottom
+            ) {
+                return null;
             }
+
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            const x = clientX - mapRect.left;
+            const y = clientY - mapRect.top;
+
+            const lat = sw.lat() + (ne.lat() - sw.lat()) * (1 - y / mapRect.height);
+            const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / mapRect.width);
+
+            return { lat, lng };
+        };
+
+        // Function to create a point marker
+        const createPointMarker = (position: { lat: number; lng: number }, isFirst: boolean): google.maps.Marker => {
+            return new window.google.maps.Marker({
+                position: position,
+                map: map,
+                icon: {
+                    path: window.google.maps.SymbolPath.CIRCLE,
+                    scale: isFirst ? 10 : 8, // First point is larger
+                    fillColor: isFirst ? '#ef4444' : '#10b981', // First point is red, others are green
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                },
+                zIndex: 2000,
+                title: isFirst ? 'จุดเริ่มต้น' : 'จุด',
+            });
+        };
+
+        // Function to update polyline connecting all points
+        const updatePolyline = () => {
+            if (currentPathRef.current.length < 2) return;
+
+            if (tempPolylineRef.current) {
+                tempPolylineRef.current.setMap(null);
+            }
+
+            tempPolylineRef.current = new window.google.maps.Polyline({
+                path: currentPathRef.current,
+                geodesic: true,
+                strokeColor: '#10b981',
+                strokeOpacity: 0.8,
+                strokeWeight: 3,
+                map: map,
+                zIndex: 1000,
+            });
+        };
+
+        // Handle click/tap to add point
+        const handleClick = (e: MouseEvent | TouchEvent) => {
+            // Prevent default for touch events
+            if (e instanceof TouchEvent) {
+                e.preventDefault();
+            }
+
+            const target = e.target as HTMLElement;
+            // Ignore clicks on map controls
+            if (
+                target &&
+                (target.closest('.gmnoprint') ||
+                    target.closest('[role="button"]') ||
+                    target.closest('.gm-control-active') ||
+                    target.closest('.gm-style-iw'))
+            ) {
+                return;
+            }
+
+            const point = getLatLngFromEvent(e);
+            if (!point) return;
+
+            isDrawingRef.current = true;
             setIsDrawingMode(true);
+
+            // Check if clicking on first point (close polygon)
+            if (currentPathRef.current.length >= 3) {
+                const firstPoint = currentPathRef.current[0];
+                const distance = Math.sqrt(
+                    Math.pow(point.lat - firstPoint.lat, 2) +
+                    Math.pow(point.lng - firstPoint.lng, 2)
+                );
+                // If clicking near first point (within ~10 meters), finish drawing
+                if (distance < 0.0001) {
+                    if (handleFinishDrawingRef.current) {
+                        handleFinishDrawingRef.current();
+                    }
+                    return;
+                }
+            }
+
+            // Add new point
+            const isFirst = currentPathRef.current.length === 0;
+            currentPathRef.current.push(point);
+
+            // Create marker for this point
+            const marker = createPointMarker(point, isFirst);
+            pointMarkersRef.current.push(marker);
+
+            // Update polyline
+            updatePolyline();
+        };
+
+        // Mouse click event
+        mapDiv.addEventListener('click', handleClick as EventListener);
+        // Touch tap event (use touchend to avoid conflicts with map panning)
+        mapDiv.addEventListener('touchend', handleClick as EventListener, { passive: false });
+
+        // Store cleanup function
+        const cleanup = () => {
+            mapDiv.removeEventListener('click', handleClick as EventListener);
+            mapDiv.removeEventListener('touchend', handleClick as EventListener);
+            mapDiv.style.cursor = '';
+        };
+
+        drawingListenersRef.current.push(cleanup);
+    }, [cleanupFreehandDrawing]);
+    
+    // Assign to the outer variable so it can be used in useEffect
+    initializeFreehandDrawing = _initializeFreehandDrawing;
+
+    // Draw Area handler - reset and restart drawing (like App Ling)
+    const handleDrawAreaClick = () => {
+        // Clear existing shapes and restart drawing
+        if (drawnShapes.length > 0) {
+            drawnShapes.forEach((shape) => {
+                if (shape.overlay) {
+                    (shape.overlay as { setMap: (map: unknown) => void }).setMap(null);
+                }
+            });
+            setDrawnShapes([]);
+            localStorage.removeItem('drawnShapes');
         }
+
+        // Reset step 0 completion
+        setCompletedSteps((prev) => prev.filter(step => step !== 0));
+        
+        // Restart drawing mode
+        cleanupFreehandDrawing();
+        setIsDrawingMode(true);
+        initializeFreehandDrawing();
     };
+    
 
 
     // Function to handle pump placement click
@@ -2826,7 +2679,7 @@ function FreeMap() {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="36" height="36" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                             <!-- Outer circle background -->
                             <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
                             <!-- Water drop shape -->
@@ -2835,8 +2688,8 @@ function FreeMap() {
                             <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                         </svg>
                     `),
-                        size: new window.google.maps.Size(48, 48),
-                        anchor: new window.google.maps.Point(24, 24),
+                        size: new window.google.maps.Size(36, 36),
+                        anchor: new window.google.maps.Point(18, 18),
                     },
                     draggable: false,
                     clickable: true,
@@ -2870,6 +2723,162 @@ function FreeMap() {
         [removeOverlappedPlantPoints, translations.waterSource]
     );
 
+    // Finish freehand drawing handler (defined after createWaterSourceMarkerSimple and createPumpPlacementPoints)
+    const handleFinishDrawing = useCallback(() => {
+        if (!isDrawingRef.current || currentPathRef.current.length < 3) {
+            showToast(translations.pleaseDrawAtLeast3Points || 'Please draw at least 3 points', 'error');
+            return;
+        }
+
+        const map = mapInstanceRef.current as google.maps.Map;
+        if (!map) return;
+
+        // Close the path by connecting last point to first point
+        const closedPath = [...currentPathRef.current, currentPathRef.current[0]];
+
+        // Create polygon from freehand path
+        const polygon = new window.google.maps.Polygon({
+            paths: closedPath,
+            fillColor: '#10b981',
+            fillOpacity: 0.2,
+            strokeColor: '#10b981',
+            strokeOpacity: 0.6,
+            strokeWeight: 2,
+            clickable: true,
+            zIndex: 100,
+        });
+
+        polygon.setMap(map);
+
+        // Extract data for storage
+        const overlayData = {
+            path: currentPathRef.current,
+        };
+
+        const newShape = {
+            overlay: polygon,
+            type: window.google.maps.drawing.OverlayType.POLYGON,
+            id: Date.now(),
+            data: overlayData,
+        };
+
+        setDrawnShapes([newShape]);
+
+        // Save to localStorage
+        const shapesForStorage = [
+            {
+                type: newShape.type,
+                id: newShape.id,
+                data: newShape.data,
+            },
+        ];
+        localStorage.setItem('drawnShapes', JSON.stringify(shapesForStorage));
+
+        // Add click listener to polygon
+        window.google.maps.event.addListener(
+            polygon,
+            'click',
+            (event: { latLng: { lat: () => number; lng: () => number } }) => {
+                const clickedLat = event.latLng.lat();
+                const clickedLng = event.latLng.lng();
+
+                const savedProgress = localStorage.getItem('mapStepProgress');
+                let actualCurrentStep = currentStep;
+
+                if (savedProgress) {
+                    try {
+                        const progress = JSON.parse(savedProgress);
+                        actualCurrentStep = progress.currentStep;
+                    } catch (error) {
+                        console.error('Error parsing saved progress:', error);
+                    }
+                }
+
+                if (actualCurrentStep === 1) {
+                    const waterMarker = createWaterSourceMarkerSimple(
+                        { lat: clickedLat, lng: clickedLng },
+                        map
+                    );
+
+                    if (waterMarker) {
+                        const newWaterSource = {
+                            id: Date.now(),
+                            position: { lat: clickedLat, lng: clickedLng },
+                            marker: waterMarker,
+                        };
+
+                        setWaterSources((prev) => {
+                            const updated = [...prev, newWaterSource];
+                            return updated;
+                        });
+
+                        const waterSourcesForStorage = [
+                            ...waterSources,
+                            newWaterSource,
+                        ].map((ws) => ({
+                            id: ws.id,
+                            position: ws.position,
+                        }));
+                        localStorage.setItem(
+                            'waterSources',
+                            JSON.stringify(waterSourcesForStorage)
+                        );
+
+                        setCompletedSteps((prev) => {
+                            const newCompletedSteps = [...prev, 1];
+                            const progressData = {
+                                currentStep: 2,
+                                completedSteps: newCompletedSteps,
+                            };
+                            localStorage.setItem(
+                                'mapStepProgress',
+                                JSON.stringify(progressData)
+                            );
+                            return newCompletedSteps;
+                        });
+
+                        setCurrentStep(2);
+
+                        const placementPoints = createPumpPlacementPoints(
+                            { lat: clickedLat, lng: clickedLng },
+                            map
+                        );
+                        setPumpPlacementPoints(placementPoints);
+                    }
+                }
+            }
+        );
+
+        // Create plant points after drawing area
+        const newPlantPoints = createPlantPoints(map, overlayData, window.google.maps.drawing.OverlayType.POLYGON);
+        if (newPlantPoints) {
+            setPlantPoints(newPlantPoints);
+        }
+
+        // Cleanup
+        cleanupFreehandDrawing();
+
+        // Mark step 0 as completed and move to step 1
+        setCompletedSteps((prev) => {
+            if (!prev.includes(0)) {
+                const newCompletedSteps = [...prev, 0];
+                const progressData = {
+                    currentStep: 1,
+                    completedSteps: newCompletedSteps,
+                };
+                localStorage.setItem('mapStepProgress', JSON.stringify(progressData));
+                setCurrentStep(1); // Update current step to 1
+                return newCompletedSteps;
+            }
+            return prev;
+        });
+
+        showToast(translations.areaDrawnSuccessfully || 'Area drawn successfully', 'success');
+    }, [currentStep, waterSources, cleanupFreehandDrawing, showToast, translations, createWaterSourceMarkerSimple, createPumpPlacementPoints, createPlantPoints]);
+
+    // Store handleFinishDrawing in ref so it can be accessed in initializeFreehandDrawing
+    handleFinishDrawingRef.current = handleFinishDrawing;
+
     // Function to create water source marker (with drag functionality)
     const createWaterSourceMarker = useCallback(
         (position: { lat: number; lng: number }, map: google.maps.Map) => {
@@ -2883,7 +2892,7 @@ function FreeMap() {
                         url:
                             'data:image/svg+xml;charset=UTF-8,' +
                             encodeURIComponent(`
-                        <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="36" height="36" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                             <!-- Outer circle background -->
                             <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
                             <!-- Water drop shape -->
@@ -2892,8 +2901,8 @@ function FreeMap() {
                             <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                         </svg>
                     `),
-                        size: new window.google.maps.Size(48, 48),
-                        anchor: new window.google.maps.Point(24, 24),
+                        size: new window.google.maps.Size(36, 36),
+                        anchor: new window.google.maps.Point(18, 18),
                     },
                     draggable: false,
                     clickable: true,
@@ -2958,70 +2967,28 @@ function FreeMap() {
 
     // Auto-activate steps based on current step and completion status
     useEffect(() => {
-        if (!mapInitialized || !drawingManagerRef.current) return;
+        if (!mapInitialized) return;
 
-
-        // Step 0: Draw Area - Auto-activate drawing when page loads or when step 0 is current
+        // Step 0: Draw Area - Auto-activate and initialize freehand drawing when page loads or when step 0 is current
         if (currentStep === 0 && !completedSteps.includes(0)) {
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: true });
-            }
             setIsDrawingMode(true);
+            // Auto-initialize drawing listeners so user can start drawing immediately
+            initializeFreehandDrawing();
         }
-        // Step 1: Water - Auto-activate when step 0 is completed and step 1 is current
+        // Step 1: Water - Deactivate drawing
         else if (currentStep === 1 && completedSteps.includes(0) && !completedSteps.includes(1)) {
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-                ).setDrawingMode(null);
-            }
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: false });
-            }
             setIsDrawingMode(false);
+            cleanupFreehandDrawing();
         }
-        // Step 2: Place Pump - Auto-activate when step 1 is completed and step 2 is current
+        // Step 2: Place Pump - Deactivate drawing
         else if (currentStep === 2 && completedSteps.includes(1) && !completedSteps.includes(2)) {
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-                ).setDrawingMode(null);
-            }
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: false });
-            }
             setIsDrawingMode(false);
-
-            // Pump placement points are now created immediately when water source is placed
-            // No need to create them here anymore
+            cleanupFreehandDrawing();
         }
-        // Step 3: Zones - Auto-activate when step 2 is completed and step 3 is current
+        // Step 3: Zones - Deactivate drawing
         else if (currentStep === 3 && completedSteps.includes(2) && !completedSteps.includes(3)) {
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-                ).setDrawingMode(null);
-            }
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: false });
-            }
             setIsDrawingMode(false);
+            cleanupFreehandDrawing();
 
             // Hide pump placement points when moving to zones step
             if (pumpPlacementPoints.length > 0) {
@@ -3035,19 +3002,8 @@ function FreeMap() {
         }
         // Other steps - Deactivate drawing
         else {
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as { setDrawingMode: (mode: unknown) => void }
-                ).setDrawingMode(null);
-            }
-            if (drawingManagerRef.current) {
-                (
-                    drawingManagerRef.current as {
-                        setOptions: (options: { drawingControl: boolean }) => void;
-                    }
-                ).setOptions({ drawingControl: false });
-            }
             setIsDrawingMode(false);
+            cleanupFreehandDrawing();
         }
 
     }, [
@@ -3059,6 +3015,8 @@ function FreeMap() {
         pumps.length,
         pumpPlacementPoints,
         createPumpPlacementPoints,
+        initializeFreehandDrawing,
+        cleanupFreehandDrawing,
     ]);
 
     // Function to generate unique colors for zones
@@ -6181,67 +6139,18 @@ function FreeMap() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6"
+                className="mx-auto flex h-[calc(100vh-64px)] max-w-5xl flex-col overflow-y-auto px-4 py-4 md:h-auto md:overflow-y-visible md:px-6 md:py-6"
             >
-                {/* Header Bar (title and quick chips) */}
-                <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.1 }}
-                    className="mb-4 flex items-center justify-between"
-                >
-                    <h2 className="text-lg font-bold text-white md:text-xl">
-                        {translations.irrigationSystemDesign}
-                    </h2>
-                </motion.div>
-
-                {/* Plant and Project Name Inputs */}
-                <div className="mb-4 flex gap-3">
-                    {/* Plant Selection Display - 1/4 width */}
-                    <div className="w-1/4">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={
-                                    selectedPlant
-                                        ? getTranslatedPlantName(selectedPlant.name, translations)
-                                        : ''
-                                }
-                                readOnly
-                                placeholder={translations.plant}
-                                title={
-                                    selectedPlant
-                                        ? `Water need: ${selectedPlant.waterNeed}L/day, Spacing: ${selectedPlant.plantSpacing}cm`
-                                        : translations.noPlantSelected
-                                }
-                                className="w-full cursor-not-allowed rounded-lg border border-slate-500 bg-slate-100 px-4 py-2 text-gray-900 placeholder-gray-500"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Project Name Input - 3/4 width */}
-                    <div className="w-3/4">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={projectName}
-                                onChange={handleProjectNameChange}
-                                placeholder={translations.labelNameOfProject}
-                                className="w-full rounded-lg border border-slate-500 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 shadow-md transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:shadow-lg"
-                            />
-                        </div>
-                    </div>
-                </div>
 
                 {/* Google Maps Container */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="relative mb-4 h-[350px] overflow-hidden rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg shadow-md md:h-[420px]"
+                    className="relative mb-4 flex min-h-[300px] flex-1 overflow-hidden rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg shadow-md md:mb-4 md:flex-none md:h-[420px]"
                 >
                     {/* Search Component */}
-                    <div className="absolute left-32 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
+                    <div className="absolute left-1 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
                         <div className="relative">
                             <input
                                 type="text"
@@ -6295,7 +6204,7 @@ function FreeMap() {
                         </div>
                     </div>
 
-                    <div ref={mapRef} className="h-full w-full min-h-[350px] md:min-h-[420px]" />
+                    <div ref={mapRef} className="h-full w-full" />
                     {!mapLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-slate-800/60 backdrop-blur-md">
                             <motion.div 
@@ -6325,79 +6234,79 @@ function FreeMap() {
                 </motion.div>
 
                 {/* Tools */}
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-2 md:gap-2">
                     {/* Left tools */}
-                    <div className="relative h-14 overflow-visible rounded-lg md:h-auto md:flex-col md:space-y-3 md:overflow-visible">
-                        {/* Step 1: Draw Area */}
-                        <button
-                            onClick={() => !isStepCompleted(0) && handleStepClick(0)}
-                            disabled={getButtonState(0) === 'disabled' || isStepCompleted(0)}
-                            style={{
-                                zIndex: currentStep === 0 ? 50 : currentStep > 0 ? 40 - currentStep * 10 : 0,
-                                transform: currentStep === 0 ? 'translateX(0)' : currentStep > 0 ? `translateX(${currentStep * 8}px)` : 'translateX(0)',
-                            }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
-                                currentStep === 0
-                                    ? 'w-full opacity-100'
-                                    : currentStep > 0
-                                      ? 'w-12 opacity-60'
-                                      : 'w-12 opacity-40'
-                            } ${
-                                getButtonState(0) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
-                                    : getButtonState(0) === 'active'
-                                      ? isDrawingMode
-                                          ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
-                                          : 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
-                                      : 'cursor-not-allowed bg-slate-400'
-                            }`}
-                        >
-                            <span className="whitespace-nowrap">
-                                {getButtonState(0) === 'completed'
-                                    ? translations.drawAreaCompleted
-                                    : isDrawingMode
-                                      ? translations.drawing
-                                      : translations.drawArea}
-                            </span>
-                        </button>
+                    <div className="relative h-12 overflow-visible rounded-lg md:h-auto md:flex-col md:space-y-3 md:overflow-visible">
+                        {/* Step 1: Draw Area - Show only when not completed */}
+                        {!isStepCompleted(0) && (
+                            <button
+                                onClick={() => !isStepCompleted(0) && handleStepClick(0)}
+                                disabled={getButtonState(0) === 'disabled' || isStepCompleted(0)}
+                                style={{
+                                    zIndex: currentStep === 0 ? 50 : currentStep > 0 ? 40 - currentStep * 10 : 0,
+                                    transform: currentStep === 0 ? 'translateX(0)' : currentStep > 0 ? `translateX(${currentStep * 8}px)` : 'translateX(0)',
+                                }}
+                                className={`absolute left-0 top-0 h-full rounded-lg px-6 py-2 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-6 md:w-full md:!z-auto md:!transform-none ${
+                                    currentStep === 0
+                                        ? 'w-full opacity-100'
+                                        : currentStep > 0
+                                          ? 'min-w-[160px] w-auto opacity-60'
+                                          : 'min-w-[160px] w-auto opacity-40'
+                                } ${
+                                    getButtonState(0) === 'completed'
+                                        ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
+                                        : getButtonState(0) === 'active'
+                                              ? 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
+                                          : 'cursor-not-allowed bg-slate-400'
+                                }`}
+                            >
+                                <span className="whitespace-nowrap text-sm md:text-base">
+                                    {getButtonState(0) === 'completed'
+                                        ? translations.drawAreaCompleted
+                                        : isDrawingMode
+                                          ? translations.drawing
+                                          : translations.drawArea}
+                                </span>
+                            </button>
+                        )}
 
-                        {/* Step 2: Water */}
-                        <button
-                            onClick={() => !isStepCompleted(1) && handleStepClick(1)}
-                            disabled={getButtonState(1) === 'disabled' || isStepCompleted(1)}
-                            style={{
-                                zIndex: currentStep === 1 ? 50 : currentStep > 1 ? 40 - (currentStep - 1) * 10 : currentStep < 1 ? 10 : 0,
-                                transform: currentStep === 1 ? 'translateX(0)' : currentStep > 1 ? `translateX(${(currentStep - 1) * 8}px)` : currentStep < 1 ? 'translateX(8px)' : 'translateX(0)',
-                            }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
-                                currentStep === 1
-                                    ? 'w-full opacity-100'
-                                    : currentStep !== 1
-                                      ? 'w-12 opacity-60'
-                                      : 'w-12 opacity-40'
-                            } ${
-                                getButtonState(1) === 'completed'
-                                    ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
-                                    : getButtonState(1) === 'active'
-                                      ? waterSources.length > 0
-                                          ? 'bg-green-600 hover:bg-green-700 shadow-green-500/50 hover:shadow-xl hover:shadow-green-500/50'
-                                          : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
-                                      : 'cursor-not-allowed bg-slate-400'
-                            }`}
-                            title={
-                                currentStep === 1 && waterSources.length === 0
-                                    ? translations.clickAnywhereInDrawnArea
-                                    : ''
-                            }
-                        >
-                            <span className="whitespace-nowrap">
-                                {getButtonState(1) === 'completed'
-                                    ? translations.waterCompleted
-                                    : currentStep === 1 && waterSources.length === 0
-                                      ? translations.placingWater
-                                      : translations.water}
-                            </span>
-                        </button>
+                        {/* Step 2: Water - Show when area is completed, replace Draw Area button */}
+                        {isStepCompleted(0) && (
+                            <button
+                                onClick={() => !isStepCompleted(1) && handleStepClick(1)}
+                                disabled={getButtonState(1) === 'disabled' || isStepCompleted(1)}
+                                style={{
+                                    zIndex: currentStep === 1 ? 50 : currentStep > 1 ? 40 - (currentStep - 1) * 10 : currentStep < 1 ? 10 : 0,
+                                    transform: currentStep === 1 ? 'translateX(0)' : currentStep > 1 ? `translateX(${(currentStep - 1) * 8}px)` : currentStep < 1 ? 'translateX(8px)' : 'translateX(0)',
+                                }}
+                                className={`absolute left-0 top-0 h-full rounded-lg px-6 py-2 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-6 md:w-full md:!z-auto md:!transform-none ${
+                                    currentStep === 1
+                                        ? 'w-full opacity-100'
+                                        : currentStep !== 1
+                                          ? 'min-w-[180px] w-auto opacity-60'
+                                          : 'min-w-[180px] w-auto opacity-40'
+                                } ${
+                                    getButtonState(1) === 'completed'
+                                        ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
+                                        : getButtonState(1) === 'active'
+                                          ? 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
+                                          : 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
+                                }`}
+                                title={
+                                    currentStep === 1 && waterSources.length === 0
+                                        ? translations.clickAnywhereInDrawnArea
+                                        : ''
+                                }
+                            >
+                                <span className="whitespace-nowrap text-sm md:text-base">
+                                    {getButtonState(1) === 'completed'
+                                        ? translations.waterCompleted
+                                        : currentStep === 1 && waterSources.length === 0
+                                          ? translations.placingWater
+                                          : translations.water}
+                                </span>
+                            </button>
+                        )}
 
                         {/* Step 3: Place Pump */}
                         <button
@@ -6407,7 +6316,7 @@ function FreeMap() {
                                 zIndex: currentStep === 2 ? 50 : currentStep > 2 ? 40 - (currentStep - 2) * 10 : currentStep < 2 ? 20 : 0,
                                 transform: currentStep === 2 ? 'translateX(0)' : currentStep > 2 ? `translateX(${(currentStep - 2) * 8}px)` : currentStep < 2 ? 'translateX(16px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-2 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 2
                                     ? 'w-full opacity-100'
                                     : currentStep !== 2
@@ -6419,7 +6328,7 @@ function FreeMap() {
                                     : getButtonState(2) === 'active'
                                       ? pumps.length > 0
                                           ? 'bg-green-600 hover:bg-green-700 shadow-green-500/50 hover:shadow-xl hover:shadow-green-500/50'
-                                          : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/50'
+                                          : 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
                                       : 'cursor-not-allowed bg-slate-400'
                             }`}
                             title={
@@ -6445,7 +6354,7 @@ function FreeMap() {
                                 zIndex: currentStep === 3 ? 50 : currentStep > 3 ? 40 - (currentStep - 3) * 10 : currentStep < 3 ? 30 : 0,
                                 transform: currentStep === 3 ? 'translateX(0)' : currentStep > 3 ? `translateX(${(currentStep - 3) * 8}px)` : currentStep < 3 ? 'translateX(24px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-2 text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 3
                                     ? 'w-full opacity-100'
                                     : currentStep !== 3
@@ -6483,7 +6392,7 @@ function FreeMap() {
                                 zIndex: currentStep === 4 ? 50 : currentStep < 4 ? 40 : 0,
                                 transform: currentStep === 4 ? 'translateX(0)' : currentStep < 4 ? 'translateX(32px)' : 'translateX(0)',
                             }}
-                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-3 font-medium text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
+                            className={`absolute left-0 top-0 h-full rounded-lg px-2 py-2 font-medium text-white transition-all duration-300 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] md:relative md:left-auto md:top-auto md:h-auto md:px-4 md:w-full md:!z-auto md:!transform-none ${
                                 currentStep === 4
                                     ? 'w-full opacity-100'
                                     : currentStep < 4
@@ -6509,23 +6418,23 @@ function FreeMap() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 }}
-                    className="mt-6 flex gap-3"
+                    className="mt-3 flex gap-3 pb-4 md:pb-0"
                 >
                     <button
                         onClick={handleBack}
-                        className="flex-1 rounded-lg bg-slate-600 px-4 py-3 text-white shadow-md transition-all duration-300 hover:bg-slate-500 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                        className="flex-1 rounded-lg bg-slate-600 px-4 py-2 text-white shadow-md transition-all duration-300 hover:bg-slate-500 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {translations.back}
                     </button>
                     <button
                         onClick={handleReset}
-                        className="flex-1 rounded-lg bg-amber-600 px-4 py-3 text-white shadow-md shadow-amber-500/50 transition-all duration-300 hover:bg-amber-700 hover:shadow-lg hover:shadow-amber-500/50 hover:scale-[1.02] active:scale-[0.98]"
+                        className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-white shadow-md shadow-amber-500/50 transition-all duration-300 hover:bg-amber-700 hover:shadow-lg hover:shadow-amber-500/50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {translations.reset}
                     </button>
                     <button
                         onClick={handleNext}
-                        className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98]"
+                        className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                         {translations.next}
                     </button>

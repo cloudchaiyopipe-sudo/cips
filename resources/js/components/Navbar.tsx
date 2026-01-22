@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import UserAvatar from './UserAvatar';
@@ -13,7 +13,14 @@ const Navbar: React.FC = () => {
     const { t } = useLanguage();
     const page = usePage();
     const auth = (page.props as any).auth;
+    const currentUrl = page.url;
+    const isLandingPage = currentUrl === '/' || currentUrl === '/landing';
+    const isNotLoggedIn = !auth?.user;
     const [showFloatingAiChat, setShowFloatingAiChat] = useState(false);
+
+    const handleGetStarted = () => {
+        router.visit('/new-home');
+    };
     const [isAiChatMinimized, setIsAiChatMinimized] = useState(false);
 
     // State for token system
@@ -262,8 +269,8 @@ const Navbar: React.FC = () => {
 
                         {/* Right side - Language Switcher and User Avatar */}
                         <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
-                            {/* Super User Dashboard Link */}
-                            {auth?.user?.is_super_user && (
+                            {/* Super User Dashboard Link - Hide on landing page */}
+                            {auth?.user?.is_super_user && !isLandingPage && (
                                 <Link
                                     href="/super/dashboard"
                                     className="hidden items-center rounded-lg bg-yellow-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-yellow-700 sm:flex sm:px-3 sm:text-sm"
@@ -274,15 +281,42 @@ const Navbar: React.FC = () => {
                             )}
 
                             <div className="flex items-center gap-0.5 sm:gap-1 md:gap-3">
-                                {/* Help Programs Button */}
-                                <button
-                                    onClick={() => setShowHelpProgramsModal(true)}
-                                    className="hidden items-center rounded-lg bg-purple-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-purple-700 sm:flex sm:px-3 sm:text-sm"
-                                    title={t('โปรแกรมช่วยเหลือ')}
-                                >
-                                    <span className="text-sm sm:text-lg">💡</span>
-                                    <span className="hidden sm:inline">{t('โปรแกรมช่วยเหลือ')}</span>
-                                </button>
+                                {/* Get Started Button - Show on landing page only when NOT logged in */}
+                                {(isLandingPage && isNotLoggedIn) && (
+                                    <button
+                                        onClick={handleGetStarted}
+                                        className="group flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-green-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/60 sm:px-4 sm:py-2 sm:text-sm"
+                                        title="เริ่มต้นใช้งาน"
+                                    >
+                                        <span className="hidden sm:inline">เริ่มต้นใช้งาน</span>
+                                        <span className="sm:hidden">เริ่ม</span>
+                                        <svg
+                                            className="h-3 w-3 transition-transform group-hover:translate-x-1 sm:h-4 sm:w-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M9 5l7 7-7 7"
+                                            />
+                                        </svg>
+                                    </button>
+                                )}
+
+                                {/* Help Programs Button - Hide on landing page */}
+                                {!isLandingPage && (
+                                    <button
+                                        onClick={() => setShowHelpProgramsModal(true)}
+                                        className="hidden items-center rounded-lg bg-purple-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-purple-700 sm:flex sm:px-3 sm:text-sm"
+                                        title={t('โปรแกรมช่วยเหลือ')}
+                                    >
+                                        <span className="text-sm sm:text-lg">💡</span>
+                                        <span className="hidden sm:inline">{t('โปรแกรมช่วยเหลือ')}</span>
+                                    </button>
+                                )}
 
                                 {/* AI Chat Button */}
                                 {/* <button
@@ -300,50 +334,24 @@ const Navbar: React.FC = () => {
                                     onMinimize={() => setIsAiChatMinimized(!isAiChatMinimized)}
                                     isMinimized={isAiChatMinimized}
                                 /> */}
-                                {auth?.user?.is_super_user && (
-                                    <button
-                                        onClick={() => (window.location.href = '/equipment-crud')}
-                                        className="hidden rounded-lg bg-gray-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-700 sm:block sm:px-4 sm:py-2 sm:text-sm"
-                                    >
-                                        <span className="sm:hidden">⚙️</span>
-                                        <span className="hidden sm:inline">
-                                            ⚙️ {t('จัดการอุปกรณ์')}
-                                        </span>
-                                    </button>
-                                )}
+                                {/* Equipment Management Button - Show always (even when not logged in) */}
+                                <button
+                                    onClick={() => (window.location.href = '/equipment-crud')}
+                                    className="flex items-center rounded-lg bg-gray-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-700 sm:px-4 sm:py-2 sm:text-sm"
+                                    title={t('สินค้าของเรา')}
+                                >
+                                    <span className="sm:hidden">⚙️</span>
+                                    <span className="hidden sm:inline">
+                                        ⚙️ {t('สินค้าของเรา')}
+                                    </span>
+                                </button>
                             </div>
 
-                            {/* Token Display for Non-Admin Users */}
-                            {auth?.user && !auth.user.is_super_user && (
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                    {loadingTokens ? (
-                                        <div className="flex items-center gap-1 rounded-lg bg-gray-700 px-2 py-1 text-xs text-white sm:gap-2 sm:px-3 sm:text-sm">
-                                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent sm:h-4 sm:w-4"></div>
-                                            <span className="hidden sm:inline">Loading...</span>
-                                        </div>
-                                    ) : tokenStatus ? (
-                                        <div className="flex items-center gap-1 sm:gap-2">
-                                            <button
-                                                onClick={() => setShowTokenPricingModal(true)}
-                                                className="flex cursor-pointer items-center gap-1 rounded-lg bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 sm:px-3 sm:text-sm"
-                                                title="Click to view token pricing and usage"
-                                            >
-                                                <span className="text-sm sm:text-lg">🪙</span>
-                                                <span>{tokenStatus.current_tokens}</span>
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-1 rounded-lg bg-gray-600 px-2 py-1 text-xs text-white sm:px-3 sm:text-sm">
-                                            <span className="text-sm sm:text-lg">🪙</span>
-                                            <span>--</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <LanguageSwitcher />
+                            {/* Language Switcher - Hide on landing page */}
+                            {!isLandingPage && <LanguageSwitcher />}
 
-                            {/* User Avatar - Only show if authenticated */}
-                            {auth?.user && (
+                            {/* User Avatar - Only show if authenticated and not on landing page */}
+                            {auth?.user && !isLandingPage && (
                                 <UserAvatar
                                     user={auth.user}
                                     size="sm"

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { getTranslations } from './utils/language';
-import { getPlantImagePath } from './utils/freeCrop';
+import { GardenPlant, getPlantImagePath } from './utils/freeCrop';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // 2. Component
@@ -62,13 +62,16 @@ function FreeSummary() {
     const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
     const [showFlowRateModal, setShowFlowRateModal] = useState(false);
     const [flowRateConfig, setFlowRateConfig] = useState({
-        flowRatePerMin: 2.5, // LPM per sprinkler
+        flowRatePerMin: 3, // LPM per sprinkler
         sprinklersPerPlant: 1, // จำนวนสปริงเกลอร์ต่อต้น
         waterPressure: 2.0,
         radius: 4.0,
     });
     const [translations, setTranslations] = useState(getTranslations());
-    
+    const [projectName, setProjectName] = useState('');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [selectedPlant, setSelectedPlant] = useState<GardenPlant | null>(null);
+
     // Toast notifications
     interface Toast {
         id: number;
@@ -76,7 +79,7 @@ function FreeSummary() {
         type: 'success' | 'error' | 'info';
     }
     const [toasts, setToasts] = useState<Toast[]>([]);
-    
+
     const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
         const id = Date.now();
         setToasts((prev) => [...prev, { id, message, type }]);
@@ -106,6 +109,53 @@ function FreeSummary() {
             window.removeEventListener('focus', handleLanguageChange);
         };
     }, []);
+
+    // Load project name and selected plant from localStorage
+    useEffect(() => {
+        const savedProjectName = localStorage.getItem('projectName');
+        if (savedProjectName) {
+            setProjectName(savedProjectName);
+        }
+
+        const savedPlantData = localStorage.getItem('selectedPlantData');
+        if (savedPlantData) {
+            try {
+                const plantData = JSON.parse(savedPlantData) as GardenPlant;
+                setSelectedPlant(plantData);
+            } catch (error) {
+                console.error('Error parsing saved plant data:', error);
+            }
+        }
+    }, []);
+
+    // Handle project name change
+    const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newName = e.target.value.trim();
+        const oldName = projectName; // Store old name before updating
+
+        setProjectName(newName);
+        // Save project name to localStorage
+        localStorage.setItem('projectName', newName);
+
+        // Update saved project name if it exists and oldName is not empty
+        if (oldName && oldName.trim() && newName) {
+            try {
+                const savedProjects = localStorage.getItem('freePlanProjects');
+                if (savedProjects) {
+                    const projects = JSON.parse(savedProjects);
+                    const projectIndex = projects.findIndex(
+                        (p: { projectName: string }) => p.projectName === oldName.trim()
+                    );
+                    if (projectIndex >= 0) {
+                        projects[projectIndex].projectName = newName;
+                        localStorage.setItem('freePlanProjects', JSON.stringify(projects));
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating saved project name:', error);
+            }
+        }
+    };
 
     // Toggle zone expansion
     const toggleZone = (zoneId: number) => {
@@ -328,15 +378,15 @@ function FreeSummary() {
         setSummaryData((prev) =>
             prev
                 ? {
-                      ...prev,
-                      flowRate: {
-                          totalLPM,
-                          flowRatePerMin,
-                          waterPressure: flowRateConfig.waterPressure,
-                          radius: flowRateConfig.radius,
-                          byZone: flowRateByZone,
-                      },
-                  }
+                    ...prev,
+                    flowRate: {
+                        totalLPM,
+                        flowRatePerMin,
+                        waterPressure: flowRateConfig.waterPressure,
+                        radius: flowRateConfig.radius,
+                        byZone: flowRateByZone,
+                    },
+                }
                 : null
         );
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,12 +516,12 @@ function FreeSummary() {
                             // Check if this is a custom plant
                             const isCustomPlant = localStorage.getItem('isCustomPlant') === 'true';
                             let markerIcon;
-                            
+
                             if (isCustomPlant) {
                                 // Use green circle for custom plants
                                 markerIcon = {
                                     path: window.google.maps.SymbolPath.CIRCLE,
-                                    scale: 8,
+                                    scale: 4,
                                     fillColor: '#22c55e', // green-500
                                     fillOpacity: 1,
                                     strokeColor: '#ffffff',
@@ -482,11 +532,11 @@ function FreeSummary() {
                                 const plantImagePath = plantData ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                                 markerIcon = {
                                     url: plantImagePath,
-                                    scaledSize: new window.google.maps.Size(24, 24),
-                                    anchor: new window.google.maps.Point(12, 12),
+                                    scaledSize: new window.google.maps.Size(12, 12),
+                                    anchor: new window.google.maps.Point(6, 6),
                                 };
                             }
-                            
+
                             new window.google.maps.Marker({
                                 position: point.position,
                                 map,
@@ -522,7 +572,7 @@ function FreeSummary() {
                                     url:
                                         'data:image/svg+xml;charset=UTF-8,' +
                                         encodeURIComponent(`
-                                            <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                            <svg width="36" height="36" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                                                 <!-- Outer circle background -->
                                                 <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
                                                 <!-- Water drop shape -->
@@ -531,8 +581,8 @@ function FreeSummary() {
                                                 <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                                             </svg>
                                         `),
-                                    scaledSize: new window.google.maps.Size(48, 48),
-                                    anchor: new window.google.maps.Point(24, 24),
+                                    scaledSize: new window.google.maps.Size(36, 36),
+                                    anchor: new window.google.maps.Point(18, 18),
                                 },
                             });
                             bounds.extend(
@@ -558,8 +608,8 @@ function FreeSummary() {
                                 title: translations.waterPump,
                                 icon: {
                                     url: '/images/water-pump.png',
-                                    scaledSize: new window.google.maps.Size(32, 32),
-                                    anchor: new window.google.maps.Point(16, 16),
+                                    scaledSize: new window.google.maps.Size(24, 24),
+                                    anchor: new window.google.maps.Point(12, 12),
                                 },
                             });
                             bounds.extend(
@@ -850,9 +900,9 @@ function FreeSummary() {
                 // Summary data
                 freePlanSummary: summaryData
                     ? {
-                          ...summaryData,
-                          savedAt: new Date().toISOString(),
-                      }
+                        ...summaryData,
+                        savedAt: new Date().toISOString(),
+                    }
                     : null,
             };
 
@@ -948,15 +998,15 @@ function FreeSummary() {
                 setSummaryData((prev) =>
                     prev
                         ? {
-                              ...prev,
-                              flowRate: {
-                                  totalLPM,
-                                  flowRatePerMin: flowRateConfig.flowRatePerMin,
-                                  waterPressure: flowRateConfig.waterPressure,
-                                  radius: flowRateConfig.radius,
-                                  byZone: flowRateByZone,
-                              },
-                          }
+                            ...prev,
+                            flowRate: {
+                                totalLPM,
+                                flowRatePerMin: flowRateConfig.flowRatePerMin,
+                                waterPressure: flowRateConfig.waterPressure,
+                                radius: flowRateConfig.radius,
+                                byZone: flowRateByZone,
+                            },
+                        }
                         : null
                 );
             } catch (error) {
@@ -991,11 +1041,10 @@ function FreeSummary() {
                             animate={{ opacity: 1, x: 0, scale: 1 }}
                             exit={{ opacity: 0, x: 20, scale: 0.9 }}
                             transition={{ duration: 0.3 }}
-                            className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-md max-w-md ${
-                                toast.type === 'success' ? 'border-green-500/20 bg-green-900/80 text-green-100' :
+                            className={`pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-md max-w-md ${toast.type === 'success' ? 'border-green-500/20 bg-green-900/80 text-green-100' :
                                 toast.type === 'error' ? 'border-red-500/20 bg-red-900/80 text-red-100' :
-                                'border-blue-500/20 bg-blue-900/80 text-blue-100'
-                            }`}
+                                    'border-blue-500/20 bg-blue-900/80 text-blue-100'
+                                }`}
                         >
                             <span className="text-sm font-medium whitespace-pre-line">{toast.message}</span>
                         </motion.div>
@@ -1007,14 +1056,14 @@ function FreeSummary() {
             <FreeNav />
 
             {/* Header */}
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
                 className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6"
             >
                 <div className="mb-4 flex items-center justify-between">
-                    <motion.h2 
+                    <motion.h2
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, delay: 0.1 }}
@@ -1022,7 +1071,7 @@ function FreeSummary() {
                     >
                         {translations.irrigationSummary}
                     </motion.h2>
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, delay: 0.2 }}
@@ -1044,7 +1093,7 @@ function FreeSummary() {
                 </div>
 
                 {/* Interactive Google Map (read-only). Fallback to image if map can't load */}
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.3 }}
@@ -1060,56 +1109,70 @@ function FreeSummary() {
                     )}
                 </motion.div>
 
+                {/* Plant and Project Name Inputs */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.35 }}
+                    className="mb-4 flex"
+                >
+                    {/* Project Name Input - 3/4 width */}
+                    <div className="w-full">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={projectName}
+                                onChange={handleProjectNameChange}
+                                placeholder={translations.labelNameOfProject}
+                                className="w-full rounded-lg border border-slate-500 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 shadow-md transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:shadow-lg"
+                            />
+                        </div>
+                    </div>
+                </motion.div>
+
                 {/* Data Summary */}
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 }}
-                    className="rounded-lg border border-slate-700 bg-slate-800 p-4 shadow-lg"
+                    className="rounded-lg shadow-lg"
                 >
-                    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                        <motion.div 
+                    <div className="mb-4 grid grid-cols-3 gap-1 md:grid-cols-4">
+                        <motion.div
                             whileHover={{ scale: 1.05, y: -2 }}
                             className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-center text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:border-slate-600"
                         >
-                            <div className="mb-1 text-sm font-medium text-slate-300 leading-relaxed">{translations.area}</div>
-                            <div className="text-2xl font-bold text-white">
-                                {summaryData ? summaryData.area.totalRai.toFixed(2) : '0.00'} <span className="text-base font-semibold text-slate-400">Rai</span>
+                            <div className="mb-1 text-sm font-medium text-white leading-relaxed">{translations.area}</div>
+                            <div className="text-sm font-bold text-white">
+                                {summaryData ? summaryData.area.totalRai.toFixed(1) : '0.00'} <span className="text-base font-semibold text-white">ไร่</span>
                             </div>
                         </motion.div>
-                        <motion.div 
+                        <motion.div
                             whileHover={{ scale: 1.05, y: -2 }}
                             className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-center text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:border-slate-600"
                         >
-                            <div className="mb-1 text-sm font-medium text-slate-300 leading-relaxed">{translations.zone}</div>
-                            <div className="text-2xl font-bold text-emerald-400">{summaryData?.zones || 0}</div>
-                        </motion.div>
-                        <motion.div 
-                            whileHover={{ scale: 1.05, y: -2 }}
-                            className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-center text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:border-slate-600"
-                        >
-                            <div className="mb-1 text-sm font-medium text-slate-300 leading-relaxed">{translations.plants}</div>
-                            <div className="text-2xl font-bold text-green-400">
+                            <div className="mb-1 text-sm font-medium text-white leading-relaxed">{translations.plants}</div>
+                            <div className="text-sm font-bold text-white">
                                 {summaryData?.plants.total || 0}
                             </div>
                         </motion.div>
-                        <motion.div 
+                        <motion.div
                             whileHover={{ scale: 1.05, y: -2 }}
                             className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-center text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:border-slate-600"
                         >
-                            <div className="mb-1 text-sm font-medium text-slate-300 leading-relaxed">{translations.flow}</div>
-                            <div className="text-2xl font-bold text-blue-400">
+                            <div className="mb-1 text-sm font-medium text-white leading-relaxed">{translations.flow}</div>
+                            <div className="text-sm font-bold text-white">
                                 {summaryData?.flowRate?.totalLPM
                                     ? Math.round(summaryData.flowRate.totalLPM)
                                     : 0}{' '}
-                                <span className="text-base font-semibold text-slate-400">LPM</span>
+                                <span className="text-base font-semibold text-white">LPM</span>
                             </div>
                         </motion.div>
                     </div>
 
                     {/* Selected Plant Information */}
                     {summaryData?.selectedPlant && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.4, delay: 0.5 }}
@@ -1143,13 +1206,7 @@ function FreeSummary() {
                                     <div className="flex items-center justify-between rounded-lg bg-slate-700/50 px-3 py-2">
                                         <span className="font-medium text-slate-300">{translations.plantSpacing}</span>
                                         <span className="font-bold text-green-400">
-                                            {summaryData.selectedPlant.plantSpacing} <span className="text-xs font-normal text-slate-400">cm</span>
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between rounded-lg bg-slate-700/50 px-3 py-2">
-                                        <span className="font-medium text-slate-300">{translations.rowSpacing}</span>
-                                        <span className="font-bold text-green-400">
-                                            {summaryData.selectedPlant.rowSpacing} <span className="text-xs font-normal text-slate-400">cm</span>
+                                            {(summaryData.selectedPlant.plantSpacing) / 100} x {(summaryData.selectedPlant.rowSpacing) / 100} <span className="text-xs font-normal text-slate-400">เมตร</span>
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between rounded-lg bg-cyan-900/30 border border-cyan-700/50 px-3 py-2">
@@ -1157,9 +1214,9 @@ function FreeSummary() {
                                         <span className="font-bold text-cyan-400">
                                             {Math.round(
                                                 summaryData.selectedPlant.waterNeed *
-                                                    (summaryData?.plants?.total || 0)
+                                                (summaryData?.plants?.total || 0)
                                             )}{' '}
-                                            <span className="text-xs font-normal text-slate-400">L/day</span>
+                                            <span className="text-xs font-normal text-slate-400">ลิตร/วัน</span>
                                         </span>
                                     </div>
                                 </div>
@@ -1168,66 +1225,70 @@ function FreeSummary() {
                     )}
 
                     {/* Flow Rate Summary */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.6 }}
                         className="mb-3 text-white"
                     >
                         <h3 className="mb-2 text-base font-semibold">
-                            {translations.flowRateSummary}
+                            หัวฉีด
                         </h3>
-                        <div className="space-y-3 text-sm leading-relaxed">
-                            <motion.div 
+                        <div className="space-y-2 text-sm leading-relaxed">
+                            {/* Flow Rate per min Card - Display on top */}
+                            <motion.div
                                 whileHover={{ scale: 1.02, x: 4 }}
-                                className="rounded-lg border border-blue-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-blue-600"
+                                className="rounded-lg border border-blue-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-blue-600"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <span className="h-4 w-4 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50"></span>
-                                        <span className="font-semibold text-slate-200">{translations.totalFlowRate}</span>
+                                        <span className="font-medium text-slate-200">{translations.flowRatePerMin}</span>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-2xl font-bold text-blue-400">
-                                            {summaryData?.flowRate?.totalLPM
-                                                ? Math.round(summaryData.flowRate.totalLPM)
-                                                : 0}{' '}
+                                        <div className="text-sm font-bold text-blue-400">
+                                            {summaryData?.flowRate?.flowRatePerMin ||
+                                                flowRateConfig.flowRatePerMin}{' '}
                                             <span className="text-base font-semibold text-slate-400">LPM</span>
                                         </div>
                                     </div>
                                 </div>
                             </motion.div>
-                            <motion.div 
+                            {/* Water Pressure and Sprinkler Radius Cards - Display side by side */}
+                            <motion.div
                                 whileHover={{ scale: 1.02, x: 4 }}
-                                className="rounded-lg border border-yellow-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-yellow-600"
+                                className=""
                             >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <span className="h-4 w-4 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/50"></span>
-                                        <span className="font-semibold text-slate-200">{translations.waterPressure}</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-2xl font-bold text-yellow-400">
-                                            {summaryData?.flowRate?.waterPressure ||
-                                                flowRateConfig.waterPressure}{' '}
-                                            <span className="text-base font-semibold text-slate-400">Bar</span>
+                                <div className="flex flex-row gap-2 items-stretch">
+                                    {/* Water Pressure Card */}
+                                    <div className="flex-1 flex flex-col justify-between rounded-lg border bg-slate-800 border-yellow-700/50 px-2 py-2 mr-0.5">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="h-4 w-4 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/50"></span>
+                                                <span className="font-medium text-slate-200">{translations.waterPressure}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-sm font-bold text-yellow-400">
+                                                    {summaryData?.flowRate?.waterPressure ||
+                                                        flowRateConfig.waterPressure}{' '}
+                                                    <span className="text-base font-semibold text-slate-400">Bar</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                            <motion.div 
-                                whileHover={{ scale: 1.02, x: 4 }}
-                                className="rounded-lg border border-gray-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-gray-600"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <span className="h-4 w-4 rounded-full bg-gray-500 shadow-lg shadow-gray-500/50"></span>
-                                        <span className="font-semibold text-slate-200">{translations.sprinklerRadius}</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-2xl font-bold text-gray-300">
-                                            {summaryData?.flowRate?.radius || flowRateConfig.radius}{' '}
-                                            <span className="text-base font-semibold text-slate-400">m</span>
+                                    {/* Sprinkler Radius Card */}
+                                    <div className="flex-1 flex flex-col justify-between rounded-lg border bg-slate-800 border-gray-500/50 px-2 py-2 ml-0.5">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="h-4 w-4 rounded-full bg-gray-500 shadow-lg shadow-gray-500/50"></span>
+                                                <span className="font-medium text-slate-200">{translations.sprinklerRadius}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-sm font-bold text-gray-300">
+                                                    {summaryData?.flowRate?.radius || flowRateConfig.radius}{' '}
+                                                    <span className="text-base font-semibold text-slate-400">m</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1236,7 +1297,7 @@ function FreeSummary() {
                     </motion.div>
 
                     {/* Pipe System Summary */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.7 }}
@@ -1245,106 +1306,117 @@ function FreeSummary() {
                         <h3 className="mb-2 text-base font-semibold">
                             {translations.pipeSystemSummary}
                         </h3>
-                        <div className="space-y-3 text-sm leading-relaxed">
-                            <motion.div 
+                        <div className="space-y-2 text-sm leading-relaxed">
+                            <motion.div
                                 whileHover={{ scale: 1.02, x: 4 }}
-                                className="rounded-lg border border-red-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-red-600"
+                                className="rounded-lg border border-red-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-red-600"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <span className="h-4 w-4 rounded-full bg-red-500 shadow-lg shadow-red-500/50"></span>
                                         <div>
-                                            <span className="font-semibold text-slate-200">{translations.mainPipe}</span>
-                                            <span className="ml-2 text-sm font-medium text-slate-400">({summaryData?.zones || 0})</span>
+                                            <span className="font-medium text-slate-200">{translations.mainPipe}</span>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="mb-1">
-                                            <span className="text-sm font-medium text-slate-400">{translations.length}: </span>
-                                            <span className="text-2xl font-bold text-red-400">
+                                    <div className="flex flex-row items-center gap-4 text-right">
+                                        {summaryData?.pipes.mainOutlets !== undefined && (
+                                            <div className="text-sm font-medium text-slate-400 flex flex-row items-center gap-2 mb-0">
+                                                <span>{translations.outlets}:</span>
+                                                <span className="font-semibold text-red-300">{summaryData.pipes.mainOutlets}</span>
+                                            </div>
+                                        )} |
+                                        <div className="text-sm font-medium text-slate-400 flex flex-row items-center gap-2 mb-0">
+                                            <span>{translations.length}:</span>
+                                            <span className="text-sm font-bold text-red-400">
                                                 {summaryData
                                                     ? summaryData.pipes.mainMeters.toFixed(1)
-                                                    : '0.0'}{' '}
-                                                <span className="text-base font-semibold text-slate-400">m</span>
+                                                    : '0.0'}
                                             </span>
+                                            <span className="text-base font-semibold text-slate-400">m</span>
                                         </div>
-                                        {summaryData?.pipes.mainOutlets !== undefined && (
-                                            <div className="text-sm font-medium text-slate-400">
-                                                {translations.outlets}: <span className="font-semibold text-red-300">{summaryData.pipes.mainOutlets}</span> {translations.subMainPipe.toLowerCase()}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </motion.div>
-                            <motion.div 
+                            <motion.div
                                 whileHover={{ scale: 1.02, x: 4 }}
-                                className="rounded-lg border border-purple-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-purple-600"
+                                className="rounded-lg border border-purple-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-purple-600"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <span className="h-4 w-4 rounded-full bg-purple-500 shadow-lg shadow-purple-500/50"></span>
                                         <div>
-                                            <span className="font-semibold text-slate-200">{translations.subMainPipe}</span>
-                                            <span className="ml-2 text-sm font-medium text-slate-400">({summaryData?.zones || 0})</span>
+                                            <span className="font-medium text-slate-200">{translations.subMainPipe}</span>
                                         </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex flex-row items-center gap-4 text-right">
+                                        {summaryData?.pipes.subMainOutlets !== undefined && (
+                                            <div className="text-sm font-medium text-slate-400">
+                                                {translations.outlets}: <span className="font-semibold text-purple-300">{summaryData.pipes.subMainOutlets}</span>
+                                            </div>
+                                        )} |
                                         <div className="mb-1">
                                             <span className="text-sm font-medium text-slate-400">{translations.length}: </span>
-                                            <span className="text-2xl font-bold text-purple-400">
+                                            <span className="text-sm font-bold text-purple-400">
                                                 {summaryData
                                                     ? summaryData.pipes.subMainMeters.toFixed(1)
                                                     : '0.0'}{' '}
                                                 <span className="text-base font-semibold text-slate-400">m</span>
                                             </span>
                                         </div>
-                                        {summaryData?.pipes.subMainOutlets !== undefined && (
-                                            <div className="text-sm font-medium text-slate-400">
-                                                {translations.outlets}: <span className="font-semibold text-purple-300">{summaryData.pipes.subMainOutlets}</span> {translations.lateralPipe.toLowerCase()}
-                                            </div>
-                                        )}
+
                                     </div>
                                 </div>
                             </motion.div>
-                            <motion.div 
+                            <motion.div
                                 whileHover={{ scale: 1.02, x: 4 }}
-                                className="rounded-lg border border-yellow-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-yellow-600"
+                                className="rounded-lg border border-yellow-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-yellow-600"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <span className="h-4 w-4 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/50"></span>
                                         <div>
-                                            <span className="font-semibold text-slate-200">{translations.lateralPipe}</span>
-                                            <span className="ml-2 text-sm font-medium text-slate-400">({summaryData?.pipes.subMainOutlets || 0})</span>
+                                            <span className="font-medium text-slate-200">{translations.lateralPipe}</span>
                                         </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex flex-row items-center gap-4 text-right">
+                                        {summaryData?.pipes.lateralOutlets !== undefined && (
+                                            <div className="text-sm font-medium text-slate-400">
+                                                {translations.outlets}: <span className="font-semibold text-yellow-300">{summaryData.pipes.lateralOutlets}</span>
+                                            </div>
+                                        )} |
                                         <div className="mb-1">
                                             <span className="text-sm font-medium text-slate-400">{translations.length}: </span>
-                                            <span className="text-2xl font-bold text-yellow-400">
+                                            <span className="text-sm font-bold text-yellow-400">
                                                 {summaryData
                                                     ? summaryData.pipes.lateralMeters.toFixed(1)
                                                     : '0.0'}{' '}
                                                 <span className="text-base font-semibold text-slate-400">m</span>
                                             </span>
                                         </div>
-                                        {summaryData?.pipes.lateralOutlets !== undefined && (
-                                            <div className="text-sm font-medium text-slate-400">
-                                                {translations.outlets}: <span className="font-semibold text-yellow-300">{summaryData.pipes.lateralOutlets}</span> {translations.plants.toLowerCase()}
-                                            </div>
-                                        )}
+
                                     </div>
                                 </div>
                             </motion.div>
                         </div>
                     </motion.div>
 
-                    {/* Zones */}
-                    <motion.div 
+                    {/* Zone Summary */}
+                    <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.8 }}
-                        className="space-y-3"
+                        className="space-y-2"
+                    >
+                        <h3 className="mb-2 text-base font-semibold text-white">
+                           ดูข้อมูลแต่ละโซน
+                        </h3>
+                    </motion.div>
+                    {/* Zones */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.8 }}
+                        className="space-y-2"
                     >
                         {summaryData && summaryData.pipes.byZone.length > 0 ? (
                             summaryData.pipes.byZone.map((zone, index) => {
@@ -1366,7 +1438,7 @@ function FreeSummary() {
                                     >
                                         <button
                                             onClick={() => toggleZone(zone.zoneId)}
-                                            className="flex w-full items-center justify-between p-4 transition-all duration-300 hover:bg-slate-700/50"
+                                            className="flex w-full items-center justify-between p-2 transition-all duration-300 hover:bg-slate-700/50"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <span
@@ -1380,196 +1452,177 @@ function FreeSummary() {
                                                 {zoneArea && (
                                                     <span className="flex items-center gap-1">
                                                         <span className="text-emerald-400 font-semibold">{zoneArea.areaRai.toFixed(2)}</span>
-                                                        <span className="text-slate-400">Rai</span>
+                                                        <span className="text-slate-400">ไร่</span>
                                                     </span>
                                                 )}
                                                 <span className="flex items-center gap-1">
                                                     <span className="text-green-400 font-semibold">{zonePlants?.plants || 0}</span>
-                                                    <span className="text-slate-400">{translations.plantsLabel}</span>
+                                                    <span className="text-slate-400">ต้น</span>
                                                 </span>
                                             </div>
                                         </button>
 
                                         <AnimatePresence>
                                             {isExpanded && (
-                                                <motion.div 
+                                                <motion.div
                                                     initial={{ opacity: 0, height: 0 }}
                                                     animate={{ opacity: 1, height: 'auto' }}
                                                     exit={{ opacity: 0, height: 0 }}
                                                     transition={{ duration: 0.3 }}
                                                     className="space-y-4 border-t border-slate-700 px-4 pb-4 pt-4"
                                                 >
-                                                {/* Flow Rate and Water Need Grid */}
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    {/* Flow Rate for this zone */}
-                                                    <div className="rounded-lg border border-blue-700/50 bg-slate-700/50 p-3">
-                                                        <div className="mb-2 flex items-center gap-2">
-                                                            <span className="h-3 w-3 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50"></span>
-                                                            <span className="text-sm font-semibold text-slate-200">{translations.flowRate}</span>
+                                                    {/* Flow Rate and Water Need Grid */}
+                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                                        {/* Flow Rate for this zone */}
+                                                        <div className="rounded-lg border border-blue-700/50 bg-slate-700/50 p-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <span className="h-3 w-3 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50"></span>
+                                                                    <span className="text-sm font-semibold text-slate-200">{translations.flowRate}</span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <span className="text-sm font-bold text-blue-400">
+                                                                        {summaryData?.flowRate?.byZone?.find(
+                                                                            (z) => z.zoneId === zone.zoneId
+                                                                        )?.lpm
+                                                                            ? Math.round(
+                                                                                summaryData.flowRate.byZone.find(
+                                                                                    (z) =>
+                                                                                        z.zoneId ===
+                                                                                        zone.zoneId
+                                                                                )!.lpm
+                                                                            )
+                                                                            : Math.round(
+                                                                                (zonePlants?.plants || 0) *
+                                                                                (flowRateConfig.sprinklersPerPlant || 1) *
+                                                                                flowRateConfig.flowRatePerMin
+                                                                            )}
+                                                                        <span className="text-base font-semibold text-slate-400"> LPM</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="text-2xl font-bold text-blue-400">
-                                                            {summaryData?.flowRate?.byZone?.find(
-                                                                (z) => z.zoneId === zone.zoneId
-                                                            )?.lpm
-                                                                ? Math.round(
-                                                                      summaryData.flowRate.byZone.find(
-                                                                          (z) =>
-                                                                              z.zoneId ===
-                                                                              zone.zoneId
-                                                                      )!.lpm
-                                                                  )
-                                                                : Math.round(
-                                                                      (zonePlants?.plants || 0) *
-                                                                          (flowRateConfig.sprinklersPerPlant || 1) *
-                                                                          flowRateConfig.flowRatePerMin
-                                                                  )}{' '}
-                                                            <span className="text-base font-semibold text-slate-400">LPM</span>
-                                                        </div>
-                                                    </div>
 
-                                                    {/* Water Need per Session for this zone */}
-                                                    {summaryData?.selectedPlant && (
-                                                        <div className="rounded-lg border border-cyan-700/50 bg-slate-700/50 p-3">
-                                                            <div className="mb-2 flex items-center gap-2">
-                                                                <span className="h-3 w-3 rounded-full bg-cyan-500 shadow-lg shadow-cyan-500/50"></span>
-                                                                <span className="text-sm font-semibold text-slate-200">{translations.waterNeedPerSession}</span>
-                                                            </div>
-                                                            <div className="text-2xl font-bold text-cyan-400">
-                                                                {Math.round(
-                                                                    (zonePlants?.plants || 0) *
-                                                                        summaryData.selectedPlant
-                                                                            .waterNeed
-                                                                )}{' '}
-                                                                <span className="text-base font-semibold text-slate-400">{translations.lPerSession}</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Pipe Information */}
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                                    {/* Main Pipe */}
-                                                    <div className="rounded-lg border border-red-700/50 bg-slate-700/50 p-3">
-                                                        <div className="mb-2 flex items-center gap-2">
-                                                            <span className="h-3 w-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50"></span>
-                                                            <span className="text-sm font-semibold text-slate-200">
-                                                                {translations.mainPipe}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mb-2">
-                                                            <div className="text-2xl font-bold text-red-400">
-                                                                {zone.mainMeters.toFixed(1)}{' '}
-                                                                <span className="text-base font-semibold text-slate-400">m</span>
-                                                            </div>
-                                                            {(() => {
-                                                                const longestPipes =
-                                                                    calculateLongestPipes();
-                                                                const longestMain =
-                                                                    longestPipes[
-                                                                        zone.zoneId
-                                                                    ]?.longestMain || 0;
-                                                                // Only show longest if it's different from total length
-                                                                return (
-                                                                    longestMain > 0 && 
-                                                                    Math.abs(longestMain - zone.mainMeters) > 0.1 && (
-                                                                        <div className="mt-1 text-sm font-medium text-red-300">
-                                                                            {translations.longest}: {longestMain.toFixed(1)} m
-                                                                        </div>
-                                                                    )
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                        {zone.mainOutlets !== undefined && (
-                                                            <div className="text-sm font-medium text-slate-400">
-                                                                {translations.outlets}: <span className="font-semibold text-red-300">{zone.mainOutlets}</span>
+                                                        {/* Water Need per Session for this zone */}
+                                                        {summaryData?.selectedPlant && (
+                                                            <div className="rounded-lg border border-cyan-700/50 bg-slate-700/50 p-2 flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="h-3 w-3 rounded-full bg-cyan-500 shadow-lg shadow-cyan-500/50"></span>
+                                                                    <span className="text-sm font-semibold text-slate-200">{translations.waterNeedPerSession}</span>
+                                                                </div>
+                                                                <div className="text-sm font-bold text-cyan-400 flex items-center gap-1">
+                                                                    <span>
+                                                                        {Math.round(
+                                                                            (zonePlants?.plants || 0) *
+                                                                            summaryData.selectedPlant.waterNeed
+                                                                        )}
+                                                                    </span>
+                                                                    <span className="text-base font-semibold text-slate-400">{translations.lPerSession}</span>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
 
-                                                    {/* Sub Main Pipe */}
-                                                    <div className="rounded-lg border border-purple-700/50 bg-slate-700/50 p-3">
-                                                        <div className="mb-2 flex items-center gap-2">
-                                                            <span className="h-3 w-3 rounded-full bg-purple-500 shadow-lg shadow-purple-500/50"></span>
-                                                            <span className="text-sm font-semibold text-slate-200">
-                                                                {translations.subMainPipe}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mb-2">
-                                                            <div className="text-2xl font-bold text-purple-400">
-                                                                {zone.subMainMeters.toFixed(1)}{' '}
-                                                                <span className="text-base font-semibold text-slate-400">m</span>
-                                                            </div>
-                                                            {(() => {
-                                                                const longestPipes =
-                                                                    calculateLongestPipes();
-                                                                const longestSubMain =
-                                                                    longestPipes[
-                                                                        zone.zoneId
-                                                                    ]?.longestSubMain || 0;
-                                                                // Only show longest if it's different from total length
-                                                                return (
-                                                                    longestSubMain > 0 && 
-                                                                    Math.abs(longestSubMain - zone.subMainMeters) > 0.1 && (
-                                                                        <div className="mt-1 text-sm font-medium text-purple-300">
-                                                                            {translations.longest}: {longestSubMain.toFixed(1)} m
+                                                    {/* Pipe Information */}
+                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                                        {/* Main Pipe */}
+                                                        <div className="rounded-lg border border-red-700/50 bg-slate-700/50 p-2">
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                {/* Group 1: Main Pipe Title */}
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="h-3 w-3 rounded-full bg-red-500 shadow-lg shadow-red-500/50"></span>
+                                                                    <span className="text-sm font-semibold text-slate-200">
+                                                                        {translations.mainPipe}
+                                                                    </span>
+                                                                </div>
+                                                                {/* Group 2: Details (Outlets + Length + Longest) */}
+                                                                <div className="flex items-center gap-4 flex-wrap">
+                                                                    {zone.mainOutlets !== undefined && (
+                                                                        <div className="text-sm font-medium text-slate-400 flex items-center gap-1">
+                                                                            {translations.outlets}: <span className="font-semibold text-red-300">{zone.mainOutlets}</span>
                                                                         </div>
-                                                                    )
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                        {zone.subMainOutlets !== undefined && (
-                                                            <div className="text-sm font-medium text-slate-400">
-                                                                {translations.outlets}: <span className="font-semibold text-purple-300">{zone.subMainOutlets}</span>
+                                                                    )} | 
+                                                                    <div className="text-sm font-bold text-red-400 flex items-center gap-1">
+                                                                        {zone.mainMeters.toFixed(1)}
+                                                                        <span className="text-base font-semibold text-slate-400">m</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                        </div>
 
-                                                    {/* Lateral Pipe */}
-                                                    <div className="rounded-lg border border-yellow-700/50 bg-slate-700/50 p-3">
-                                                        <div className="mb-2 flex items-center gap-2">
-                                                            <span className="h-3 w-3 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/50"></span>
-                                                            <span className="text-sm font-semibold text-slate-200">
-                                                                {translations.lateralPipe}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mb-2">
-                                                            <div className="text-2xl font-bold text-yellow-400">
-                                                                {zone.lateralMeters.toFixed(1)}{' '}
-                                                                <span className="text-base font-semibold text-slate-400">m</span>
-                                                            </div>
-                                                            {(() => {
-                                                                const longestPipes =
-                                                                    calculateLongestPipes();
-                                                                const longestLateral =
-                                                                    longestPipes[
-                                                                        zone.zoneId
-                                                                    ]?.longestLateral || 0;
-                                                                // Only show longest if it's different from total length
-                                                                return (
-                                                                    longestLateral > 0 && 
-                                                                    Math.abs(longestLateral - zone.lateralMeters) > 0.1 && (
-                                                                        <div className="mt-1 text-sm font-medium text-yellow-300">
-                                                                            {translations.longest}: {longestLateral.toFixed(1)} m
+                                                        {/* Sub Main Pipe */}
+                                                        <div className="rounded-lg border border-purple-700/50 bg-slate-700/50 p-2">
+                                                            <div className="flex items-center justify-between gap-4 mb-2">
+                                                                {/* Title group */}
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="h-3 w-3 rounded-full bg-purple-500 shadow-lg shadow-purple-500/50"></span>
+                                                                    <span className="text-sm font-semibold text-slate-200">
+                                                                        {translations.subMainPipe}
+                                                                    </span>
+                                                                </div>
+                                                                {/* Outlets group */}
+                                                                <div className="flex items-center gap-4 flex-wrap">
+                                                                    {zone.subMainOutlets !== undefined && (
+                                                                        <div className="text-sm font-medium text-slate-400 flex items-center gap-1">
+                                                                            {translations.outlets}: <span className="font-semibold text-purple-300">{zone.subMainOutlets}</span>
                                                                         </div>
-                                                                    )
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                        {zone.lateralOutlets !== undefined && (
-                                                            <div className="text-sm font-medium text-slate-400">
-                                                                {translations.outlets}: <span className="font-semibold text-yellow-300">{zone.lateralOutlets}</span>
+                                                                    )} | 
+                                                                    {/* Meters group */}
+                                                                    <div className="text-sm font-bold text-purple-400 flex items-center gap-1">
+                                                                        {zone.subMainMeters.toFixed(1)}{' '}
+                                                                        <span className="text-base font-semibold text-slate-400">m</span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        )}
+                                                        </div>
+
+                                                        {/* Lateral Pipe */}
+                                                        <div className="rounded-lg border border-yellow-700/50 bg-slate-700/50 p-2">
+                                                            <div className="flex items-center justify-between gap-4 mb-2">
+                                                               <div className="flex items-center gap-2">
+                                                               <span className="h-3 w-3 rounded-full bg-yellow-500 shadow-lg shadow-yellow-500/50"></span>
+                                                                <span className="text-sm font-semibold text-slate-200">
+                                                                    {translations.lateralPipe}
+                                                                </span>
+                                                               </div>
+                                                                <div className="flex items-center gap-4 flex-wrap">
+                                                                {zone.lateralOutlets !== undefined && (
+                                                                    <div className="text-sm font-medium text-slate-400 flex items-center gap-1">
+                                                                        {translations.outlets}: <span className="font-semibold text-yellow-300">{zone.lateralOutlets}</span>
+                                                                    </div>
+                                                                )} | 
+                                                                <div className="text-sm font-bold text-yellow-400 flex items-center gap-1">
+                                                                    {zone.lateralMeters.toFixed(1)}
+                                                                    <span className="text-base font-semibold text-slate-400">m</span>
+                                                                </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center justify-end gap-4 mb-2">
+                                                                {(() => {
+                                                                    const longestPipes = calculateLongestPipes();
+                                                                    const longestLateral = longestPipes[zone.zoneId]?.longestLateral || 0;
+                                                                    // Only show longest if it's different from total length
+                                                                    return (
+                                                                        longestLateral > 0 &&
+                                                                        Math.abs(longestLateral - zone.lateralMeters) > 0.1 && (
+                                                                            <div className="text-sm font-medium text-yellow-300 flex items-center gap-1">
+                                                                                {translations.longest}: {longestLateral.toFixed(1)} m
+                                                                            </div>
+                                                                        )
+                                                                    );
+                                                                })()}
+                                                                
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
+                                                </motion.div>
+                                            )}
                                         </AnimatePresence>
                                     </motion.div>
                                 );
                             })
                         ) : (
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-center text-slate-400 shadow-lg"
@@ -1580,7 +1633,7 @@ function FreeSummary() {
                     </motion.div>
 
                     {/* Equipment Calculation button */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 1.0 }}
@@ -1607,14 +1660,14 @@ function FreeSummary() {
             {/* Flow Rate Config Modal */}
             <AnimatePresence>
                 {showFlowRateModal && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={handleFlowRateCancel}
                         className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
                     >
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -1622,261 +1675,261 @@ function FreeSummary() {
                             onClick={(e) => e.stopPropagation()}
                             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg p-4 text-white shadow-xl sm:p-6"
                         >
-                        {/* Header */}
-                        <div className="mb-6">
-                            <h3 className="text-xl font-bold">{translations.flowRateConfig}</h3>
-                        </div>
+                            {/* Header */}
+                            <div className="mb-6">
+                                <h3 className="text-xl font-bold">{translations.flowRateConfig}</h3>
+                            </div>
 
-                        {/* Flow Rate Setting Section */}
-                        <div className="mb-6">
-                            <h4 className="mb-2 text-lg font-semibold">
-                                {translations.flowRateSetting}
-                            </h4>
-                            <p className="mb-4 text-sm text-slate-300">
-                                {translations.determineFlowRateProperties} (
-                                {summaryData?.plants.total || 0} {translations.plants.toLowerCase()}
-                                )
-                            </p>
+                            {/* Flow Rate Setting Section */}
+                            <div className="mb-6">
+                                <h4 className="mb-2 text-lg font-semibold">
+                                    {translations.flowRateSetting}
+                                </h4>
+                                <p className="mb-4 text-sm text-slate-300">
+                                    {translations.determineFlowRateProperties} (
+                                    {summaryData?.plants.total || 0} {translations.plants.toLowerCase()}
+                                    )
+                                </p>
 
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {/* Sprinklers per plant */}
-                                <motion.div 
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg"
-                                >
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500 sm:h-8 sm:w-8">
-                                            <span className="text-xs sm:text-sm">🌿</span>
+                                    {/* Sprinklers per plant */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02, y: -2 }}
+                                        className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg"
+                                    >
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500 sm:h-8 sm:w-8">
+                                                <span className="text-xs sm:text-sm">🌿</span>
+                                            </div>
+                                            <span className="text-xs font-medium sm:text-sm">
+                                                {translations.sprinklersPerPlant}
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-medium sm:text-sm">
-                                            {translations.sprinklersPerPlant}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            step="1"
-                                            min="1"
-                                            value={flowRateConfig.sprinklersPerPlant || 1}
-                                            onChange={(e) =>
-                                                handleFlowRateChange(
-                                                    'sprinklersPerPlant',
-                                                    parseInt(e.target.value) || 1
-                                                )
-                                            }
-                                            className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 sm:px-3 sm:py-2"
-                                        />
-                                        <span className="text-xs text-slate-300 sm:text-sm">
-                                            {translations.perPlant}
-                                        </span>
-                                    </div>
-                                </motion.div>
-
-                                {/* Flow Rate per min (per sprinkler) */}
-                                <motion.div 
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg"
-                                >
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 sm:h-8 sm:w-8">
-                                            <span className="text-xs sm:text-sm">💧</span>
-                                        </div>
-                                        <span className="text-xs font-medium sm:text-sm">
-                                            {translations.flowRatePerMin} ({translations.perSprinkler})
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={flowRateConfig.flowRatePerMin}
-                                            onChange={(e) =>
-                                                handleFlowRateChange(
-                                                    'flowRatePerMin',
-                                                    parseFloat(e.target.value) || 0
-                                                )
-                                            }
-                                            className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
-                                        />
-                                        <span className="text-xs text-slate-300 sm:text-sm">
-                                            LPM
-                                        </span>
-                                    </div>
-                                </motion.div>
-
-                                {/* Water Pressure */}
-                                <motion.div 
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg"
-                                >
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 sm:h-8 sm:w-8">
-                                            <span className="text-xs sm:text-sm">⚡</span>
-                                        </div>
-                                        <span className="text-xs font-medium sm:text-sm">
-                                            {translations.waterPressure}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={flowRateConfig.waterPressure}
-                                            onChange={(e) =>
-                                                handleFlowRateChange(
-                                                    'waterPressure',
-                                                    parseFloat(e.target.value) || 0
-                                                )
-                                            }
-                                            className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
-                                        />
-                                        <span className="text-xs text-slate-300 sm:text-sm">
-                                            Bar
-                                        </span>
-                                    </div>
-                                </motion.div>
-
-                                {/* Radius */}
-                                <motion.div 
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg sm:col-span-2 lg:col-span-1"
-                                >
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-500 sm:h-8 sm:w-8">
-                                            <span className="text-xs sm:text-sm">📏</span>
-                                        </div>
-                                        <span className="text-xs font-medium sm:text-sm">
-                                            {translations.sprinklerRadius}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={flowRateConfig.radius}
-                                            onChange={(e) =>
-                                                handleFlowRateChange(
-                                                    'radius',
-                                                    parseFloat(e.target.value) || 0
-                                                )
-                                            }
-                                            className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
-                                        />
-                                        <span className="text-xs text-slate-300 sm:text-sm">m</span>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        </div>
-
-                        {/* Real-time Statistics */}
-                        <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, delay: 0.2 }}
-                            className="mb-6 rounded-lg border border-blue-500/20 bg-blue-600/20 backdrop-blur-sm p-3 shadow-md sm:p-4"
-                        >
-                            <div className="mb-3 flex items-center gap-2 sm:mb-4">
-                                <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 sm:h-6 sm:w-6">
-                                    <span className="text-xs">📊</span>
-                                </div>
-                                <h4 className="text-base font-semibold sm:text-lg">
-                                    {translations.realTimeStatistics}
-                                </h4>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-                                {/* Total plants */}
-                                <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
-                                    <div className="mb-1 flex justify-center">
-                                        {summaryData?.selectedPlant ? (
-                                            <img
-                                                src={getPlantImagePath(summaryData.selectedPlant.name)}
-                                                alt={summaryData.selectedPlant.name}
-                                                className="h-6 w-6 object-contain sm:h-8 sm:w-8"
-                                                onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.style.display = 'none';
-                                                }}
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                step="1"
+                                                min="1"
+                                                value={flowRateConfig.sprinklersPerPlant || 1}
+                                                onChange={(e) =>
+                                                    handleFlowRateChange(
+                                                        'sprinklersPerPlant',
+                                                        parseInt(e.target.value) || 1
+                                                    )
+                                                }
+                                                className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-500 sm:px-3 sm:py-2"
                                             />
-                                        ) : (
-                                            <span className="text-sm sm:text-lg">🌱</span>
-                                        )}
+                                            <span className="text-xs text-slate-300 sm:text-sm">
+                                                {translations.perPlant}
+                                            </span>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Flow Rate per min (per sprinkler) */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02, y: -2 }}
+                                        className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg"
+                                    >
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 sm:h-8 sm:w-8">
+                                                <span className="text-xs sm:text-sm">💧</span>
+                                            </div>
+                                            <span className="text-xs font-medium sm:text-sm">
+                                                {translations.flowRatePerMin} ({translations.perSprinkler})
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={flowRateConfig.flowRatePerMin}
+                                                onChange={(e) =>
+                                                    handleFlowRateChange(
+                                                        'flowRatePerMin',
+                                                        parseFloat(e.target.value) || 0
+                                                    )
+                                                }
+                                                className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
+                                            />
+                                            <span className="text-xs text-slate-300 sm:text-sm">
+                                                LPM
+                                            </span>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Water Pressure */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02, y: -2 }}
+                                        className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg"
+                                    >
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 sm:h-8 sm:w-8">
+                                                <span className="text-xs sm:text-sm">⚡</span>
+                                            </div>
+                                            <span className="text-xs font-medium sm:text-sm">
+                                                {translations.waterPressure}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={flowRateConfig.waterPressure}
+                                                onChange={(e) =>
+                                                    handleFlowRateChange(
+                                                        'waterPressure',
+                                                        parseFloat(e.target.value) || 0
+                                                    )
+                                                }
+                                                className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
+                                            />
+                                            <span className="text-xs text-slate-300 sm:text-sm">
+                                                Bar
+                                            </span>
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Radius */}
+                                    <motion.div
+                                        whileHover={{ scale: 1.02, y: -2 }}
+                                        className="rounded-lg border border-slate-400/20 bg-slate-700/50 backdrop-blur-sm p-3 shadow-md transition-all duration-300 hover:shadow-lg sm:col-span-2 lg:col-span-1"
+                                    >
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-500 sm:h-8 sm:w-8">
+                                                <span className="text-xs sm:text-sm">📏</span>
+                                            </div>
+                                            <span className="text-xs font-medium sm:text-sm">
+                                                {translations.sprinklerRadius}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={flowRateConfig.radius}
+                                                onChange={(e) =>
+                                                    handleFlowRateChange(
+                                                        'radius',
+                                                        parseFloat(e.target.value) || 0
+                                                    )
+                                                }
+                                                className="w-full rounded bg-slate-600 px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 sm:px-3 sm:py-2"
+                                            />
+                                            <span className="text-xs text-slate-300 sm:text-sm">m</span>
+                                        </div>
+                                    </motion.div>
+                                </div>
+                            </div>
+
+                            {/* Real-time Statistics */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.2 }}
+                                className="mb-6 rounded-lg border border-blue-500/20 bg-blue-600/20 backdrop-blur-sm p-3 shadow-md sm:p-4"
+                            >
+                                <div className="mb-3 flex items-center gap-2 sm:mb-4">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 sm:h-6 sm:w-6">
+                                        <span className="text-xs">📊</span>
                                     </div>
-                                    <div className="text-sm font-bold sm:text-lg">
-                                        {summaryData?.plants.total || 0}
-                                    </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">
-                                        {translations.totalPlants}
-                                    </div>
+                                    <h4 className="text-base font-semibold sm:text-lg">
+                                        {translations.realTimeStatistics}
+                                    </h4>
                                 </div>
 
-                                {/* LPM per sprinkler */}
-                                <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
-                                    <div className="mb-1 flex justify-center">
-                                        <span className="text-sm sm:text-lg">💧</span>
+                                <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
+                                    {/* Total plants */}
+                                    <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
+                                        <div className="mb-1 flex justify-center">
+                                            {summaryData?.selectedPlant ? (
+                                                <img
+                                                    src={getPlantImagePath(summaryData.selectedPlant.name)}
+                                                    alt={summaryData.selectedPlant.name}
+                                                    className="h-6 w-6 object-contain sm:h-8 sm:w-8"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span className="text-sm sm:text-lg">🌱</span>
+                                            )}
+                                        </div>
+                                        <div className="text-sm font-bold sm:text-lg">
+                                            {summaryData?.plants.total || 0}
+                                        </div>
+                                        <div className="text-[10px] text-slate-300 sm:text-xs">
+                                            {translations.totalPlants}
+                                        </div>
                                     </div>
-                                    <div className="text-sm font-bold sm:text-lg">
-                                        {flowRateConfig.flowRatePerMin}
-                                    </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">
-                                        {translations.lpmPerSprinkler}
-                                    </div>
-                                </div>
 
-                                {/* LPM Total */}
-                                <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
-                                    <div className="mb-1 flex justify-center">
-                                        <span className="text-sm sm:text-lg">🚿</span>
+                                    {/* LPM per sprinkler */}
+                                    <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
+                                        <div className="mb-1 flex justify-center">
+                                            <span className="text-sm sm:text-lg">💧</span>
+                                        </div>
+                                        <div className="text-sm font-bold sm:text-lg">
+                                            {flowRateConfig.flowRatePerMin}
+                                        </div>
+                                        <div className="text-[10px] text-slate-300 sm:text-xs">
+                                            {translations.lpmPerSprinkler}
+                                        </div>
                                     </div>
-                                    <div className="text-sm font-bold sm:text-lg">
-                                        {(
-                                            (summaryData?.plants.total || 0) *
-                                            (flowRateConfig.sprinklersPerPlant || 1) *
-                                            flowRateConfig.flowRatePerMin
-                                        ).toFixed(0)}
-                                    </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">
-                                        {translations.lpmTotal}
-                                    </div>
-                                </div>
 
-                                {/* LPHr Total */}
-                                <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
-                                    <div className="mb-1 flex justify-center">
-                                        <span className="text-sm sm:text-lg">⏰</span>
+                                    {/* LPM Total */}
+                                    <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
+                                        <div className="mb-1 flex justify-center">
+                                            <span className="text-sm sm:text-lg">🚿</span>
+                                        </div>
+                                        <div className="text-sm font-bold sm:text-lg">
+                                            {(
+                                                (summaryData?.plants.total || 0) *
+                                                (flowRateConfig.sprinklersPerPlant || 1) *
+                                                flowRateConfig.flowRatePerMin
+                                            ).toFixed(0)}
+                                        </div>
+                                        <div className="text-[10px] text-slate-300 sm:text-xs">
+                                            {translations.lpmTotal}
+                                        </div>
                                     </div>
-                                    <div className="text-sm font-bold sm:text-lg">
-                                        {(
-                                            (summaryData?.plants.total || 0) *
-                                            (flowRateConfig.sprinklersPerPlant || 1) *
-                                            flowRateConfig.flowRatePerMin *
-                                            60
-                                        ).toFixed(0)}
-                                    </div>
-                                    <div className="text-[10px] text-slate-300 sm:text-xs">
-                                        {translations.lphrTotal}
+
+                                    {/* LPHr Total */}
+                                    <div className="rounded-lg bg-slate-700/50 p-2 text-center sm:p-3">
+                                        <div className="mb-1 flex justify-center">
+                                            <span className="text-sm sm:text-lg">⏰</span>
+                                        </div>
+                                        <div className="text-sm font-bold sm:text-lg">
+                                            {(
+                                                (summaryData?.plants.total || 0) *
+                                                (flowRateConfig.sprinklersPerPlant || 1) *
+                                                flowRateConfig.flowRatePerMin *
+                                                60
+                                            ).toFixed(0)}
+                                        </div>
+                                        <div className="text-[10px] text-slate-300 sm:text-xs">
+                                            {translations.lphrTotal}
+                                        </div>
                                     </div>
                                 </div>
+                            </motion.div>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
+                                <button
+                                    onClick={handleFlowRateCancel}
+                                    className="rounded-lg border border-slate-500 bg-white px-4 py-2 text-sm text-slate-700 shadow-md transition-all duration-300 hover:bg-slate-100 hover:shadow-lg hover:scale-105 active:scale-95 sm:px-6"
+                                >
+                                    {translations.cancel}
+                                </button>
+                                <button
+                                    onClick={handleFlowRateApply}
+                                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 active:scale-95 sm:px-6"
+                                >
+                                    {translations.applySetting}
+                                </button>
                             </div>
                         </motion.div>
-
-                        {/* Action Buttons */}
-                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
-                            <button
-                                onClick={handleFlowRateCancel}
-                                className="rounded-lg border border-slate-500 bg-white px-4 py-2 text-sm text-slate-700 shadow-md transition-all duration-300 hover:bg-slate-100 hover:shadow-lg hover:scale-105 active:scale-95 sm:px-6"
-                            >
-                                {translations.cancel}
-                            </button>
-                            <button
-                                onClick={handleFlowRateApply}
-                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 active:scale-95 sm:px-6"
-                            >
-                                {translations.applySetting}
-                            </button>
-                        </div>
                     </motion.div>
-                </motion.div>
                 )}
             </AnimatePresence>
         </div>

@@ -279,15 +279,29 @@ function FreeProduct() {
                 mainOutlets?: number; // จำนวน subMain ที่เชื่อมกับ main ที่ยาวที่สุด
             }
         ) => {
+            // Validation: ตรวจสอบว่า flow rate และ outlets ถูกต้อง
+            if (lateralFlowRatePerSprinkler <= 0) {
+                console.warn('Invalid lateralFlowRatePerSprinkler:', lateralFlowRatePerSprinkler);
+                return {
+                    lateralLongestFlowRate: 0,
+                    subMainLongestFlowRate: 0,
+                    mainLongestFlowRate: 0,
+                };
+            }
+
+            // ใช้ Math.max เพื่อให้แน่ใจว่า outlets >= 1
+            const lateralOutlets = Math.max(zoneData.lateralOutlets || 1, 1);
+            const subMainOutlets = Math.max(zoneData.subMainOutlets || 1, 1);
+            const mainOutlets = Math.max(zoneData.mainOutlets || 1, 1);
+
             // 1. Lateral ที่ยาวที่สุด: รับ flow rate จาก sprinklers ใน lateral line นั้น
-            const lateralLongestFlowRate =
-                lateralFlowRatePerSprinkler * (zoneData.lateralOutlets || 1);
+            const lateralLongestFlowRate = lateralFlowRatePerSprinkler * lateralOutlets;
 
             // 2. SubMain ที่ยาวที่สุด: รับ flow rate รวมจาก lateral ทั้งหมดที่เชื่อมกับมัน
-            const subMainLongestFlowRate = lateralLongestFlowRate * (zoneData.subMainOutlets || 1);
+            const subMainLongestFlowRate = lateralLongestFlowRate * subMainOutlets;
 
             // 3. Main ที่ยาวที่สุด: รับ flow rate รวมจาก subMain ทั้งหมดที่เชื่อมกับมัน
-            const mainLongestFlowRate = subMainLongestFlowRate * (zoneData.mainOutlets || 1);
+            const mainLongestFlowRate = subMainLongestFlowRate * mainOutlets;
 
             return {
                 lateralLongestFlowRate,
@@ -1018,7 +1032,7 @@ function FreeProduct() {
                                 // Use green circle for custom plants
                                 markerIcon = {
                                     path: window.google.maps.SymbolPath.CIRCLE,
-                                    scale: 8,
+                                    scale: 4,
                                     fillColor: '#22c55e', // green-500
                                     fillOpacity: 1,
                                     strokeColor: '#ffffff',
@@ -1029,8 +1043,8 @@ function FreeProduct() {
                                 const plantImagePath = plantData && plantData.name ? getPlantImagePath(plantData.name) : '/freePlanImg/fruits/coconut.png';
                                 markerIcon = {
                                     url: plantImagePath,
-                                    scaledSize: new window.google.maps.Size(24, 24),
-                                    anchor: new window.google.maps.Point(12, 12),
+                                    scaledSize: new window.google.maps.Size(12, 12),
+                                    anchor: new window.google.maps.Point(6, 6),
                                 };
                             }
                             
@@ -1069,7 +1083,7 @@ function FreeProduct() {
                                     url:
                                         'data:image/svg+xml;charset=UTF-8,' +
                                         encodeURIComponent(`
-                                            <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                            <svg width="36" height="36" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                                                 <!-- Outer circle background -->
                                                 <circle cx="24" cy="24" r="22" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
                                                 <!-- Water drop shape -->
@@ -1078,8 +1092,8 @@ function FreeProduct() {
                                                 <ellipse cx="22" cy="16" rx="3" ry="4" fill="#FFFFFF" opacity="0.6"/>
                                             </svg>
                                         `),
-                                    scaledSize: new window.google.maps.Size(48, 48),
-                                    anchor: new window.google.maps.Point(24, 24),
+                                    scaledSize: new window.google.maps.Size(36, 36),
+                                    anchor: new window.google.maps.Point(18, 18),
                                 },
                             });
                             bounds.extend(
@@ -1105,8 +1119,8 @@ function FreeProduct() {
                                 title: translations.waterPump,
                                 icon: {
                                     url: '/images/water-pump.png',
-                                    scaledSize: new window.google.maps.Size(32, 32),
-                                    anchor: new window.google.maps.Point(16, 16),
+                                    scaledSize: new window.google.maps.Size(24, 24),
+                                    anchor: new window.google.maps.Point(12, 12),
                                 },
                             });
                             bounds.extend(
@@ -1378,18 +1392,18 @@ function FreeProduct() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6"
+                className="mx-auto max-w-5xl px-2 py-2 md:px-4 md:py-4"
             >
                 {/* Top layout */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-5 md:gap-3">
                     {/* Map preview */}
                     <motion.div 
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, delay: 0.1 }}
-                        className="rounded-lg border border-slate-700 bg-slate-800 p-4 shadow-lg md:col-span-3"
+                        className="rounded-lg border border-slate-700 bg-slate-800 p-2 shadow-lg md:col-span-3 md:p-3"
                     >
-                        <div className="h-[380px] overflow-hidden rounded bg-slate-800">
+                        <div className="h-[280px] md:h-[380px] overflow-hidden rounded bg-slate-800">
                             <div ref={mapRef} className="h-full w-full" />
                             {!window.google && imageUrl && (
                                 <img
@@ -1406,10 +1420,10 @@ function FreeProduct() {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, delay: 0.2 }}
-                        className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-white shadow-lg md:col-span-2"
+                        className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-white shadow-lg md:col-span-2 md:p-3"
                     >
-                        <div className="mb-2 flex items-center justify-between">
-                            <h2 className="text-lg font-bold">
+                        <div className="mb-1.5 flex items-center justify-between md:mb-2">
+                            <h2 className="text-base font-bold md:text-lg">
                                 {selectedZoneId
                                     ? zones.find((z) => z.id === selectedZoneId)?.name ||
                                       translations.selectZone
@@ -1420,15 +1434,15 @@ function FreeProduct() {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => setShowZoneDropdown(!showZoneDropdown)}
-                                    className="flex items-center gap-1 rounded bg-slate-700 px-3 py-1.5 transition-all duration-300 hover:bg-slate-600 hover:shadow-md"
+                                    className="flex items-center gap-1 rounded bg-slate-700 px-2 py-1 text-xs transition-all duration-300 hover:bg-slate-600 hover:shadow-md md:px-3 md:py-1.5 md:text-sm"
                                 >
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium md:text-sm">
                                         {selectedZoneId
                                             ? zones.find((z) => z.id === selectedZoneId)?.name ||
                                               translations.selectZone
                                             : translations.selectZone}
                                     </span>
-                                    <span>{showZoneDropdown ? '▴' : '▾'}</span>
+                                    <span className="text-xs">{showZoneDropdown ? '▴' : '▾'}</span>
                                 </motion.button>
                                 <AnimatePresence>
                                 {showZoneDropdown && (
@@ -1437,7 +1451,7 @@ function FreeProduct() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-slate-700 bg-slate-800 shadow-xl"
+                                            className="absolute right-0 top-7 z-10 w-40 rounded-lg border border-slate-700 bg-slate-800 shadow-xl md:top-8 md:w-48"
                                         >
                                         {zones.map((zone) => (
                                                 <motion.button
@@ -1448,11 +1462,11 @@ function FreeProduct() {
                                                     setSelectedZoneId(zone.id);
                                                     setShowZoneDropdown(false);
                                                 }}
-                                                    className={`w-full px-3 py-2 text-left text-sm transition-all duration-300 hover:bg-slate-600/50 ${
+                                                    className={`w-full px-2 py-1.5 text-left text-xs transition-all duration-300 hover:bg-slate-600/50 md:px-3 md:py-2 md:text-sm ${
                                                         selectedZoneId === zone.id ? 'bg-slate-600/50' : ''
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5 md:gap-2">
                                                     <div
                                                         className="h-3 w-3 rounded-full"
                                                         style={{ backgroundColor: zone.color }}
@@ -1476,52 +1490,55 @@ function FreeProduct() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3 }}
-                                        className="space-y-3 text-sm leading-relaxed"
+                                        className="space-y-1.5 text-xs leading-relaxed md:space-y-2 md:text-sm"
                                     >
-                                        <div className="rounded-lg border border-green-700/50 bg-slate-700/50 p-3">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.area}</span>
-                                                <span className="text-lg font-bold text-green-400">
-                                                    {selectedZone.area?.toFixed(2) || '0.00'} <span className="text-sm font-semibold text-slate-400">Rai</span>
-                                                </span>
+                                        <div className="grid grid-cols-2 gap-1.5 md:gap-2">
+                                            <div className="rounded-lg border border-green-700/50 bg-slate-700/50 p-1.5 md:p-2 mb-1.5 md:mb-2">
+                                                <div className="flex flex-col items-center text-center">
+                                                    <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.area}</span>
+                                                    <span className="text-sm font-bold text-green-400 md:text-base mt-1">
+                                                        {selectedZone.area?.toFixed(2) || '0.00'} <span className="text-xs font-semibold text-slate-400 md:text-sm">Rai</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg border border-emerald-700/50 bg-slate-700/50 p-1.5 md:p-2 mb-1.5 md:mb-2">
+                                                <div className="flex flex-col items-center text-center">
+                                                    <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.plants}</span>
+                                                    <span className="text-sm font-bold text-emerald-400 md:text-base mt-1">
+                                                        {selectedZone.plants || 0}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg border border-cyan-700/50 bg-slate-700/50 p-1.5 md:p-2 mb-1.5 md:mb-2">
+                                                <div className="flex flex-col items-center text-center">
+                                                    <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.waterNeedPerSessionLabel}:</span>
+                                                    <span className="text-sm font-bold text-cyan-400 md:text-base mt-1">
+                                                        {summaryData?.selectedPlant
+                                                            ? Math.round(
+                                                                (selectedZone.plants || 0) *
+                                                                    summaryData.selectedPlant.waterNeed
+                                                            )
+                                                            : Math.round((selectedZone.lpm || 0) * 30)}{' '}
+                                                        <span className="text-xs font-semibold text-slate-400 md:text-sm">L/session</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg border border-blue-700/50 bg-slate-700/50 p-1.5 md:p-2 mb-1.5 md:mb-2">
+                                                <div className="flex flex-col items-center text-center">
+                                                    <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.flowRate}</span>
+                                                    <span className="text-sm font-bold text-blue-400 md:text-base mt-1">
+                                                        {Math.round(selectedZone.lpm || 0)} <span className="text-xs font-semibold text-slate-400 md:text-sm">LPM</span>
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="rounded-lg border border-emerald-700/50 bg-slate-700/50 p-3">
+                                        
+                                        <div className="rounded-lg border border-red-700/50 bg-slate-700/50 p-1.5 md:p-2">
                                             <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.plants}</span>
-                                                <span className="text-lg font-bold text-emerald-400">
-                                                    {selectedZone.plants || 0}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-blue-700/50 bg-slate-700/50 p-3">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.flowRate}</span>
-                                                <span className="text-lg font-bold text-blue-400">
-                                                    {Math.round(selectedZone.lpm || 0)} <span className="text-sm font-semibold text-slate-400">LPM</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-cyan-700/50 bg-slate-700/50 p-3">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.waterNeedPerSessionLabel}:</span>
-                                                <span className="text-lg font-bold text-cyan-400">
-                                                    {summaryData?.selectedPlant
-                                                        ? Math.round(
-                                                              (selectedZone.plants || 0) *
-                                                                  summaryData.selectedPlant.waterNeed
-                                                          )
-                                                        : Math.round((selectedZone.lpm || 0) * 30)}{' '}
-                                                    <span className="text-sm font-semibold text-slate-400">L/session</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg border border-red-700/50 bg-slate-700/50 p-3">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.mainPipe}</span>
+                                                <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.mainPipe}</span>
                                                 <div className="text-right">
-                                                    <div className="text-lg font-bold text-red-400">
-                                                        {selectedZone.mainMeters?.toFixed(1) || '0.0'} <span className="text-sm font-semibold text-slate-400">m</span>
+                                                    <div className="text-sm font-bold text-red-400 md:text-base">
+                                                        {selectedZone.mainMeters?.toFixed(1) || '0.0'} <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
                                                     </div>
                                                     {(() => {
                                                         const longestMain = longestPipes[selectedZoneId]?.longestMain || 0;
@@ -1530,7 +1547,7 @@ function FreeProduct() {
                                                         return (
                                                             longestMain > 0 && 
                                                             Math.abs(longestMain - mainMeters) > 0.1 && (
-                                                                <div className="text-sm font-medium text-red-300 mt-1">
+                                                                <div className="text-xs font-medium text-red-300 mt-0.5 md:mt-1 md:text-sm">
                                                                     {translations.longestPipe}: {longestMain.toFixed(1)} m
                                                                 </div>
                                                             )
@@ -1538,21 +1555,21 @@ function FreeProduct() {
                                                     })()}
                                                     {selectedZone.mainOutlets !== undefined &&
                                                         selectedZone.mainOutlets > 0 && (
-                                                            <div className="text-sm font-medium text-red-300 mt-1">
+                                                            <div className="text-xs font-medium text-red-300 mt-0.5 md:mt-1 md:text-sm">
                                                                 {selectedZone.mainOutlets} {translations.outlets}
                                                             </div>
                                                         )}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="rounded-lg border border-purple-700/50 bg-slate-700/50 p-3">
+                                        <div className="rounded-lg border border-purple-700/50 bg-slate-700/50 p-1.5 md:p-2">
                                             <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.subMainPipe}</span>
+                                                <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.subMainPipe}</span>
                                                 <div className="text-right">
-                                                    <div className="text-lg font-bold text-purple-400">
+                                                    <div className="text-sm font-bold text-purple-400 md:text-base">
                                                         {selectedZone.subMainMeters?.toFixed(1) ||
                                                             '0.0'}{' '}
-                                                        <span className="text-sm font-semibold text-slate-400">m</span>
+                                                        <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
                                                     </div>
                                                     {(() => {
                                                         const longestSubMain = longestPipes[selectedZoneId]?.longestSubMain || 0;
@@ -1561,7 +1578,7 @@ function FreeProduct() {
                                                         return (
                                                             longestSubMain > 0 && 
                                                             Math.abs(longestSubMain - subMainMeters) > 0.1 && (
-                                                                <div className="text-sm font-medium text-purple-300 mt-1">
+                                                                <div className="text-xs font-medium text-purple-300 mt-0.5 md:mt-1 md:text-sm">
                                                                     {translations.longestPipe}: {longestSubMain.toFixed(1)} m
                                                                 </div>
                                                             )
@@ -1569,21 +1586,21 @@ function FreeProduct() {
                                                     })()}
                                                     {selectedZone.subMainOutlets !== undefined &&
                                                         selectedZone.subMainOutlets > 0 && (
-                                                            <div className="text-sm font-medium text-purple-300 mt-1">
+                                                            <div className="text-xs font-medium text-purple-300 mt-0.5 md:mt-1 md:text-sm">
                                                                 {selectedZone.subMainOutlets} {translations.outlets}
                                                             </div>
                                                         )}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="rounded-lg border border-yellow-700/50 bg-slate-700/50 p-3">
+                                        <div className="rounded-lg border border-yellow-700/50 bg-slate-700/50 p-1.5 md:p-2">
                                             <div className="flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">{translations.lateralPipe}</span>
+                                                <span className="font-medium text-slate-300 text-xs md:text-sm">{translations.lateralPipe}</span>
                                                 <div className="text-right">
-                                                    <div className="text-lg font-bold text-yellow-400">
+                                                    <div className="text-sm font-bold text-yellow-400 md:text-base">
                                                         {selectedZone.lateralMeters?.toFixed(1) ||
                                                             '0.0'}{' '}
-                                                        <span className="text-sm font-semibold text-slate-400">m</span>
+                                                        <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
                                                     </div>
                                                     {(() => {
                                                         const longestLateral = longestPipes[selectedZoneId]?.longestLateral || 0;
@@ -1592,7 +1609,7 @@ function FreeProduct() {
                                                         return (
                                                             longestLateral > 0 && 
                                                             Math.abs(longestLateral - lateralMeters) > 0.1 && (
-                                                                <div className="text-sm font-medium text-yellow-300 mt-1">
+                                                                <div className="text-xs font-medium text-yellow-300 mt-0.5 md:mt-1 md:text-sm">
                                                                     {translations.longestPipe}: {longestLateral.toFixed(1)} m
                                                                 </div>
                                                             )
@@ -1600,7 +1617,7 @@ function FreeProduct() {
                                                     })()}
                                                     {selectedZone.lateralOutlets !== undefined &&
                                                         selectedZone.lateralOutlets > 0 && (
-                                                            <div className="text-sm font-medium text-yellow-300 mt-1">
+                                                            <div className="text-xs font-medium text-yellow-300 mt-0.5 md:mt-1 md:text-sm">
                                                                 {selectedZone.lateralOutlets} {translations.outlets}
                                                             </div>
                                                         )}
@@ -1614,7 +1631,7 @@ function FreeProduct() {
                 </div>
 
                 {/* Selectors */}
-                <div className="mt-4 space-y-3">
+                <div className="mt-2 space-y-2 md:mt-3 md:space-y-3">
                     {/* Sprinkler Specifications (Calculated Only) */}
                     {calculatedSprinklerSpecs ? (
                         <motion.div 
@@ -1622,38 +1639,38 @@ function FreeProduct() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.3 }}
                             whileHover={{ scale: 1.01, y: -2 }}
-                            className="rounded-lg border border-emerald-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-emerald-600"
+                            className="rounded-lg border border-emerald-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-emerald-600 md:p-3"
                         >
-                            <div className="mb-3">
-                                <div className="font-semibold text-white">
+                            <div className="mb-1.5 md:mb-2">
+                                <div className="text-sm font-semibold text-white md:text-base">
                                     {translations.sprinklerSelector}
                                 </div>
                             </div>
-                            <div className="rounded-lg border border-emerald-700/30 bg-slate-700/50 p-4 text-sm leading-relaxed">
+                            <div className="rounded-lg border border-emerald-700/30 bg-slate-700/50 p-2 text-xs leading-relaxed md:p-3 md:text-sm">
                                 {/* Calculated Specifications */}
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-3">
-                                        <div className="mb-1 text-xs font-medium text-emerald-300">
+                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-3">
+                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                        <div className="mb-0.5 text-xs font-medium text-emerald-300 md:mb-1">
                                             {translations.flowRateProduct}:
                                         </div>
-                                        <div className="text-xl font-bold text-emerald-400">
-                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} <span className="text-sm font-semibold text-slate-400">LPM</span>
+                                        <div className="text-base font-bold text-emerald-400 md:text-lg">
+                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} <span className="text-xs font-semibold text-slate-400 md:text-sm">LPM</span>
                                         </div>
                                     </div>
-                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-3">
-                                        <div className="mb-1 text-xs font-medium text-emerald-300">
+                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                        <div className="mb-0.5 text-xs font-medium text-emerald-300 md:mb-1">
                                             {translations.pressureProduct}:
                                         </div>
-                                        <div className="text-xl font-bold text-emerald-400">
-                                            {calculatedSprinklerSpecs.waterPressure} <span className="text-sm font-semibold text-slate-400">Bar</span>
+                                        <div className="text-base font-bold text-emerald-400 md:text-lg">
+                                            {calculatedSprinklerSpecs.waterPressure} <span className="text-xs font-semibold text-slate-400 md:text-sm">Bar</span>
                                         </div>
                                     </div>
-                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-3">
-                                        <div className="mb-1 text-xs font-medium text-emerald-300">
+                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                        <div className="mb-0.5 text-xs font-medium text-emerald-300 md:mb-1">
                                             {translations.radiusProduct}:
                                         </div>
-                                        <div className="text-xl font-bold text-emerald-400">
-                                            {calculatedSprinklerSpecs.radius} <span className="text-sm font-semibold text-slate-400">m</span>
+                                        <div className="text-base font-bold text-emerald-400 md:text-lg">
+                                            {calculatedSprinklerSpecs.radius} <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1664,14 +1681,14 @@ function FreeProduct() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.3 }}
-                            className="rounded-lg border border-emerald-500/20 bg-emerald-900/30 backdrop-blur-lg p-3 shadow-md"
+                            className="rounded-lg border border-emerald-500/20 bg-emerald-900/30 backdrop-blur-lg p-2 shadow-md md:p-3"
                         >
-                            <div className="mb-3">
-                                <div className="font-semibold text-white">
+                            <div className="mb-1.5 md:mb-2">
+                                <div className="text-sm font-semibold text-white md:text-base">
                                     {translations.sprinklerSelector}
                                 </div>
                             </div>
-                            <div className="rounded bg-emerald-900/40 p-3 text-sm text-slate-200">
+                            <div className="rounded bg-emerald-900/40 p-2 text-xs text-slate-200 md:p-2.5 md:text-sm">
                                 {translations.loadingSprinklerSpecs}
                             </div>
                         </motion.div>
@@ -1682,10 +1699,10 @@ function FreeProduct() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.4 }}
                         whileHover={{ scale: 1.01, y: -2 }}
-                        className="rounded-lg border border-rose-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-rose-600"
+                        className="rounded-lg border border-rose-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-rose-600 md:p-3"
                     >
-                        <div className="mb-3 flex items-center justify-between">
-                            <div className="font-semibold text-white">
+                        <div className="mb-1.5 flex items-center justify-between md:mb-2">
+                            <div className="text-sm font-semibold text-white md:text-base">
                                 {translations.mainPipeSelection}
                             </div>
                             <div className="relative">
@@ -1693,15 +1710,15 @@ function FreeProduct() {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => setShowPipeZoneDropdown(!showPipeZoneDropdown)}
-                                    className="flex items-center gap-1 rounded bg-rose-700 px-3 py-1.5 transition-all duration-300 hover:bg-rose-600 hover:shadow-md"
+                                    className="flex items-center gap-1 rounded bg-rose-700 px-2 py-1 text-xs transition-all duration-300 hover:bg-rose-600 hover:shadow-md md:px-3 md:py-1.5 md:text-sm"
                                 >
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium md:text-sm">
                                         {selectedPipeZoneId
                                             ? zones.find((z) => z.id === selectedPipeZoneId)
                                                   ?.name || translations.selectZone
                                             : translations.selectZone}
                                     </span>
-                                    <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
+                                    <span className="text-xs">{showPipeZoneDropdown ? '▴' : '▾'}</span>
                                 </motion.button>
                                 <AnimatePresence>
                                 {showPipeZoneDropdown && (
@@ -1710,7 +1727,7 @@ function FreeProduct() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-rose-700 bg-rose-800 shadow-xl"
+                                            className="absolute right-0 top-7 z-10 w-40 rounded-lg border border-rose-700 bg-rose-800 shadow-xl md:top-8 md:w-48"
                                         >
                                         {zones.map((zone) => (
                                                 <motion.button
@@ -1721,13 +1738,13 @@ function FreeProduct() {
                                                     setSelectedPipeZoneId(zone.id);
                                                     setShowPipeZoneDropdown(false);
                                                 }}
-                                                    className={`w-full px-3 py-2 text-left text-sm transition-all duration-300 hover:bg-rose-700/50 ${
+                                                    className={`w-full px-2 py-1.5 text-left text-xs transition-all duration-300 hover:bg-rose-700/50 md:px-3 md:py-2 md:text-sm ${
                                                     selectedPipeZoneId === zone.id
                                                             ? 'bg-rose-700/50'
                                                         : ''
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5 md:gap-2">
                                                     <div
                                                         className="h-3 w-3 rounded-full"
                                                         style={{ backgroundColor: zone.color }}
@@ -1751,13 +1768,13 @@ function FreeProduct() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3 }}
-                                        className="space-y-3 rounded-lg border border-rose-700/50 bg-slate-700/50 p-4 text-sm text-slate-200 shadow-lg leading-relaxed"
+                                        className="space-y-1.5 rounded-lg border border-rose-700/50 bg-slate-700/50 p-2 text-xs text-slate-200 shadow-lg leading-relaxed md:space-y-2 md:p-3 md:text-sm"
                                     >
-                                        <div className="rounded-lg border border-rose-700/30 bg-slate-800/50 p-3">
-                                            <div className="mb-1 text-xs font-medium text-rose-300">
+                                        <div className="rounded-lg border border-rose-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                            <div className="mb-0.5 text-xs font-medium text-rose-300 md:mb-1">
                                                 {translations.recommendedSize}:
                                             </div>
-                                            <div className="text-xl font-bold text-rose-400">
+                                            <div className="text-base font-bold text-rose-400 md:text-lg">
                                                 {pipeRecommendations?.main.sizeMM?.toFixed(2)}mm ({pipeRecommendations?.main.sizeInch})
                                             </div>
                                         </div>
@@ -2006,10 +2023,10 @@ function FreeProduct() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.5 }}
                         whileHover={{ scale: 1.01, y: -2 }}
-                        className="rounded-lg border border-violet-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-violet-600"
+                        className="rounded-lg border border-violet-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-violet-600 md:p-3"
                     >
-                        <div className="mb-3 flex items-center justify-between">
-                            <div className="font-semibold text-white">
+                        <div className="mb-1.5 flex items-center justify-between md:mb-2">
+                            <div className="text-sm font-semibold text-white md:text-base">
                                 {translations.subMainPipeSelection}
                             </div>
                             <div className="relative">
@@ -2017,15 +2034,15 @@ function FreeProduct() {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => setShowPipeZoneDropdown(!showPipeZoneDropdown)}
-                                    className="flex items-center gap-1 rounded bg-violet-700 px-3 py-1.5 transition-all duration-300 hover:bg-violet-600 hover:shadow-md"
+                                    className="flex items-center gap-1 rounded bg-violet-700 px-2 py-1 text-xs transition-all duration-300 hover:bg-violet-600 hover:shadow-md md:px-3 md:py-1.5 md:text-sm"
                                 >
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium md:text-sm">
                                         {selectedPipeZoneId
                                             ? zones.find((z) => z.id === selectedPipeZoneId)
                                                   ?.name || translations.selectZone
                                             : translations.selectZone}
                                     </span>
-                                    <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
+                                    <span className="text-xs">{showPipeZoneDropdown ? '▴' : '▾'}</span>
                                 </motion.button>
                                 <AnimatePresence>
                                 {showPipeZoneDropdown && (
@@ -2034,7 +2051,7 @@ function FreeProduct() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-violet-700 bg-violet-800 shadow-xl"
+                                            className="absolute right-0 top-7 z-10 w-40 rounded-lg border border-violet-700 bg-violet-800 shadow-xl md:top-8 md:w-48"
                                         >
                                         {zones.map((zone) => (
                                                 <motion.button
@@ -2045,13 +2062,13 @@ function FreeProduct() {
                                                     setSelectedPipeZoneId(zone.id);
                                                     setShowPipeZoneDropdown(false);
                                                 }}
-                                                    className={`w-full px-3 py-2 text-left text-sm transition-all duration-300 hover:bg-violet-700/50 ${
+                                                    className={`w-full px-2 py-1.5 text-left text-xs transition-all duration-300 hover:bg-violet-700/50 md:px-3 md:py-2 md:text-sm ${
                                                     selectedPipeZoneId === zone.id
                                                             ? 'bg-violet-700/50'
                                                         : ''
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5 md:gap-2">
                                                     <div
                                                         className="h-3 w-3 rounded-full"
                                                         style={{ backgroundColor: zone.color }}
@@ -2075,13 +2092,13 @@ function FreeProduct() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3 }}
-                                        className="space-y-3 rounded-lg border border-violet-700/50 bg-slate-700/50 p-4 text-sm text-slate-200 shadow-lg leading-relaxed"
+                                        className="space-y-1.5 rounded-lg border border-violet-700/50 bg-slate-700/50 p-2 text-xs text-slate-200 shadow-lg leading-relaxed md:space-y-2 md:p-3 md:text-sm"
                                     >
-                                        <div className="rounded-lg border border-violet-700/30 bg-slate-800/50 p-3">
-                                            <div className="mb-1 text-xs font-medium text-violet-300">
+                                        <div className="rounded-lg border border-violet-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                            <div className="mb-0.5 text-xs font-medium text-violet-300 md:mb-1">
                                                 {translations.recommendedSize}:
                                             </div>
-                                            <div className="text-xl font-bold text-violet-400">
+                                            <div className="text-base font-bold text-violet-400 md:text-lg">
                                                 {pipeRecommendations?.subMain.sizeMM?.toFixed(2)}mm ({pipeRecommendations?.subMain.sizeInch})
                                             </div>
                                         </div>
@@ -2331,10 +2348,10 @@ function FreeProduct() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.6 }}
                         whileHover={{ scale: 1.01, y: -2 }}
-                        className="rounded-lg border border-amber-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-amber-600"
+                        className="rounded-lg border border-amber-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-amber-600 md:p-3"
                     >
-                        <div className="mb-3 flex items-center justify-between">
-                            <div className="font-semibold text-white">
+                        <div className="mb-1.5 flex items-center justify-between md:mb-2">
+                            <div className="text-sm font-semibold text-white md:text-base">
                                 {translations.lateralPipeSelection}
                             </div>
                             <div className="relative">
@@ -2342,15 +2359,15 @@ function FreeProduct() {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => setShowPipeZoneDropdown(!showPipeZoneDropdown)}
-                                    className="flex items-center gap-1 rounded bg-amber-700 px-3 py-1.5 transition-all duration-300 hover:bg-amber-600 hover:shadow-md"
+                                    className="flex items-center gap-1 rounded bg-amber-700 px-2 py-1 text-xs transition-all duration-300 hover:bg-amber-600 hover:shadow-md md:px-3 md:py-1.5 md:text-sm"
                                 >
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium md:text-sm">
                                         {selectedPipeZoneId
                                             ? zones.find((z) => z.id === selectedPipeZoneId)
                                                   ?.name || translations.selectZone
                                             : translations.selectZone}
                                     </span>
-                                    <span>{showPipeZoneDropdown ? '▴' : '▾'}</span>
+                                    <span className="text-xs">{showPipeZoneDropdown ? '▴' : '▾'}</span>
                                 </motion.button>
                                 <AnimatePresence>
                                 {showPipeZoneDropdown && (
@@ -2359,7 +2376,7 @@ function FreeProduct() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-amber-700 bg-amber-800 shadow-xl"
+                                            className="absolute right-0 top-7 z-10 w-40 rounded-lg border border-amber-700 bg-amber-800 shadow-xl md:top-8 md:w-48"
                                         >
                                         {zones.map((zone) => (
                                                 <motion.button
@@ -2370,13 +2387,13 @@ function FreeProduct() {
                                                     setSelectedPipeZoneId(zone.id);
                                                     setShowPipeZoneDropdown(false);
                                                 }}
-                                                    className={`w-full px-3 py-2 text-left text-sm transition-all duration-300 hover:bg-amber-700/50 ${
+                                                    className={`w-full px-2 py-1.5 text-left text-xs transition-all duration-300 hover:bg-amber-700/50 md:px-3 md:py-2 md:text-sm ${
                                                     selectedPipeZoneId === zone.id
                                                             ? 'bg-amber-700/50'
                                                         : ''
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5 md:gap-2">
                                                     <div
                                                         className="h-3 w-3 rounded-full"
                                                         style={{ backgroundColor: zone.color }}
@@ -2400,13 +2417,13 @@ function FreeProduct() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3 }}
-                                        className="space-y-3 rounded-lg border border-amber-700/50 bg-slate-700/50 p-4 text-sm text-slate-200 shadow-lg leading-relaxed"
+                                        className="space-y-1.5 rounded-lg border border-amber-700/50 bg-slate-700/50 p-2 text-xs text-slate-200 shadow-lg leading-relaxed md:space-y-2 md:p-3 md:text-sm"
                                     >
-                                        <div className="rounded-lg border border-amber-700/30 bg-slate-800/50 p-3">
-                                            <div className="mb-1 text-xs font-medium text-amber-300">
+                                        <div className="rounded-lg border border-amber-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                            <div className="mb-0.5 text-xs font-medium text-amber-300 md:mb-1">
                                                 {translations.recommendedSize}:
                                             </div>
-                                            <div className="text-xl font-bold text-amber-400">
+                                            <div className="text-base font-bold text-amber-400 md:text-lg">
                                                 {pipeRecommendations?.lateral.sizeMM?.toFixed(2)}mm ({pipeRecommendations?.lateral.sizeInch})
                                             </div>
                                         </div>
@@ -2664,10 +2681,10 @@ function FreeProduct() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.7 }}
                         whileHover={{ scale: 1.01, y: -2 }}
-                        className="rounded-lg border border-sky-700/50 bg-slate-800 p-4 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-sky-600"
+                        className="rounded-lg border border-sky-700/50 bg-slate-800 p-2 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-sky-600 md:p-3"
                     >
-                        <div className="mb-3 flex items-center justify-between">
-                            <div className="font-semibold text-white">
+                        <div className="mb-1.5 flex items-center justify-between md:mb-2">
+                            <div className="text-sm font-semibold text-white md:text-base">
                                 {translations.pumpSelection}
                             </div>
                             <div className="relative">
@@ -2675,16 +2692,16 @@ function FreeProduct() {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => setShowPumpZoneDropdown(!showPumpZoneDropdown)}
-                                    className="flex items-center gap-1 rounded bg-sky-700 px-3 py-1.5 transition-all duration-300 hover:bg-sky-600 hover:shadow-md"
+                                    className="flex items-center gap-1 rounded bg-sky-700 px-2 py-1 text-xs transition-all duration-300 hover:bg-sky-600 hover:shadow-md md:px-3 md:py-1.5 md:text-sm"
                                 >
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium md:text-sm">
                                         {selectedPumpZoneId === 'all'
                                             ? translations.allZones
                                             : selectedPumpZoneId === 'single'
                                               ? translations.singleZoneHighestFlow
                                               : translations.selectZone}
                                     </span>
-                                    <span>{showPumpZoneDropdown ? '▴' : '▾'}</span>
+                                    <span className="text-xs">{showPumpZoneDropdown ? '▴' : '▾'}</span>
                                 </motion.button>
                                 <AnimatePresence>
                                 {showPumpZoneDropdown && (
@@ -2693,7 +2710,7 @@ function FreeProduct() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -10 }}
                                             transition={{ duration: 0.2 }}
-                                            className="absolute right-0 top-8 z-10 w-56 rounded-lg border border-sky-700 bg-sky-800 shadow-xl"
+                                            className="absolute right-0 top-7 z-10 w-44 rounded-lg border border-sky-700 bg-sky-800 shadow-xl md:top-8 md:w-56"
                                         >
                                             <motion.button
                                                 whileHover={{ scale: 1.02, x: 4 }}
@@ -2702,11 +2719,11 @@ function FreeProduct() {
                                                 setSelectedPumpZoneId('all');
                                                 setShowPumpZoneDropdown(false);
                                             }}
-                                                className={`w-full px-3 py-2 text-left text-sm transition-all duration-300 hover:bg-sky-700/50 ${
+                                                className={`w-full px-2 py-1.5 text-left text-xs transition-all duration-300 hover:bg-sky-700/50 md:px-3 md:py-2 md:text-sm ${
                                                     selectedPumpZoneId === 'all' ? 'bg-sky-700/50' : ''
                                             }`}
                                         >
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5 md:gap-2">
                                                 <div className="h-3 w-3 rounded-full bg-sky-400"></div>
                                                 {translations.allZones}
                                             </div>
@@ -2718,11 +2735,11 @@ function FreeProduct() {
                                                 setSelectedPumpZoneId('single');
                                                 setShowPumpZoneDropdown(false);
                                             }}
-                                                className={`w-full px-3 py-2 text-left text-sm transition-all duration-300 hover:bg-sky-700/50 ${
+                                                className={`w-full px-2 py-1.5 text-left text-xs transition-all duration-300 hover:bg-sky-700/50 md:px-3 md:py-2 md:text-sm ${
                                                     selectedPumpZoneId === 'single' ? 'bg-sky-700/50' : ''
                                             }`}
                                         >
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5 md:gap-2">
                                                 <div className="h-3 w-3 rounded-full bg-orange-400"></div>
                                                 {translations.singleZoneHighestFlow}
                                             </div>
@@ -2744,29 +2761,29 @@ function FreeProduct() {
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3 }}
-                                        className="space-y-3 rounded-lg border border-sky-700/50 bg-slate-700/50 p-4 text-sm text-slate-200 shadow-lg leading-relaxed"
+                                        className="space-y-1.5 rounded-lg border border-sky-700/50 bg-slate-700/50 p-2 text-xs text-slate-200 shadow-lg leading-relaxed md:space-y-2 md:p-3 md:text-sm"
                                     >
                                         {isAllZones ? (
                                             // All Zones View
                                             <>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-3">
-                                                        <div className="mb-1 text-xs font-medium text-sky-300">
+                                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-3">
+                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                                        <div className="mb-0.5 text-xs font-medium text-sky-300 md:mb-1">
                                                             {translations.flowRateProduct}:
                                                         </div>
-                                                        <div className="text-xl font-bold text-sky-400">
-                                                            {pumpRecommendations?.flowRate} <span className="text-sm font-semibold text-slate-400">LPM</span>
+                                                        <div className="text-base font-bold text-sky-400 md:text-lg">
+                                                            {pumpRecommendations?.flowRate} <span className="text-xs font-semibold text-slate-400 md:text-sm">LPM</span>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-3">
-                                                        <div className="mb-1 text-xs font-medium text-sky-300">
+                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                                        <div className="mb-0.5 text-xs font-medium text-sky-300 md:mb-1">
                                                             {translations.headProduct}:
                                                         </div>
-                                                        <div className="text-xl font-bold text-sky-400">
-                                                            {pumpRecommendations?.head} <span className="text-sm font-semibold text-slate-400">m</span>
+                                                        <div className="text-base font-bold text-sky-400 md:text-lg">
+                                                            {pumpRecommendations?.head} <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-3">
+                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
                                                         <div className="mb-1 text-xs font-medium text-sky-300">
                                                             {translations.powerProduct}:
                                                         </div>
@@ -3826,7 +3843,7 @@ function FreeProduct() {
                             onClick={handleCheckout}
                             className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/50"
                         >
-                            {translations.checkout}
+                            สรุป
                         </motion.button>
                     </div>
                 </motion.div>

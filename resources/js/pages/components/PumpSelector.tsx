@@ -1642,8 +1642,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const sortedPumps = useMemo(() => getFilteredPumps(), [getFilteredPumps]);
 
     useEffect(() => {
-        if (analyzedPumps.length > 0 && sortedPumps.length > 0 && !hasAutoSelected) {
-            // Auto-select แค่ครั้งแรกเท่านั้น
+        // ✅ ตรวจสอบว่าผู้ใช้ได้เลือกปั๊มเองหรือยัง (selectedPump จาก props)
+        // ถ้าผู้ใช้เลือกเองแล้ว ไม่ต้อง auto-select ใหม่
+        const userHasSelectedPump = selectedPump && selectedPump.id;
+        
+        if (analyzedPumps.length > 0 && sortedPumps.length > 0 && !hasAutoSelected && !userHasSelectedPump) {
+            // Auto-select แค่ครั้งแรกเท่านั้น และเฉพาะเมื่อผู้ใช้ยังไม่ได้เลือกปั๊มเอง
             // หาปั๊มที่มีทั้ง flow และ head เพียงพอก่อน
             const fullyAdequatePump = sortedPumps.find((pump) => {
                 const adequacy = checkPumpAdequacy(pump);
@@ -1662,12 +1666,17 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             // ตั้งค่า flag ว่าได้ auto-select แล้ว
             setHasAutoSelected(true);
         }
-    }, [analyzedPumps, sortedPumps, hasAutoSelected, onPumpChange, checkPumpAdequacy]);
+    }, [analyzedPumps, sortedPumps, hasAutoSelected, onPumpChange, checkPumpAdequacy, selectedPump]);
 
-    // Reset auto-select flag เมื่อ analyzedPumps เปลี่ยน (เช่น เมื่อเปลี่ยนโซน)
+    // ✅ Reset auto-select flag เมื่อ analyzedPumps เปลี่ยน (เช่น เมื่อเปลี่ยนโซน)
+    // แต่ต้องไม่ reset ถ้าผู้ใช้ได้เลือกปั๊มเองแล้ว
     useEffect(() => {
-        setHasAutoSelected(false);
-    }, [analyzedPumps]);
+        const userHasSelectedPump = selectedPump && selectedPump.id;
+        // Reset เฉพาะเมื่อผู้ใช้ยังไม่ได้เลือกปั๊มเอง
+        if (!userHasSelectedPump) {
+            setHasAutoSelected(false);
+        }
+    }, [analyzedPumps, selectedPump]);
 
     // ใช้ useRef เพื่อเก็บค่า pump id ก่อนหน้า
     const prevPumpIdRef = useRef<number | undefined>(undefined);

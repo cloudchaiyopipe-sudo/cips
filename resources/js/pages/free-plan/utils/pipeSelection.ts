@@ -93,11 +93,12 @@ function calculateOptimalPipeSize(
     pipeTypeName: string, // สำหรับแสดงผล เช่น 'PE LDPE PN 6.3'
     maxPressureLoss: number = 20 // กำหนดค่าสูงสุดเป็น 20m (ประมาณ 2 bar)
 ): PipeRecommendation | null {
-    if (flowRate <= 0 || length <= 0) {
+    // Validation: ตรวจสอบข้อมูลนำเข้าที่ไม่ถูกต้อง
+    if (flowRate <= 0 || length <= 0 || outlets <= 0) {
         return {
             sizeMM: 0,
             sizeInch: '0"',
-            reason: 'Invalid input data',
+            reason: 'Invalid input data: flowRate, length, and outlets must be > 0',
             pressureLoss: 0,
         };
     }
@@ -632,13 +633,23 @@ export const calculatePipeRecommendationsWithTypes = (
         mainLongestFlowRate?: number;
     }
 ): PipeTypeRecommendations => {
+    // Validation: ตรวจสอบข้อมูลนำเข้าที่ไม่ถูกต้อง
+    if (zoneFlowRate <= 0 || lateralFlowRate <= 0 || waterPressure <= 0) {
+        console.error('Invalid input parameters: flowRate and waterPressure must be > 0');
+        return {
+            main: {},
+            subMain: {},
+            lateral: {},
+        };
+    }
+
     // ใช้ความยาวท่อที่ยาวที่สุดของแต่ละชนิด
-    const mainLongestLength = zoneData?.mainLongestLength || 50;
-    const subMainLongestLength = zoneData?.subMainLongestLength || 30;
-    const lateralLongestLength = zoneData?.lateralLongestLength || 20;
-    const mainOutlets = zoneData?.mainOutlets || 1;
-    const subMainOutlets = zoneData?.subMainOutlets || 1;
-    const lateralOutlets = zoneData?.lateralOutlets || 1;
+    const mainLongestLength = Math.max(zoneData?.mainLongestLength || 50, 0);
+    const subMainLongestLength = Math.max(zoneData?.subMainLongestLength || 30, 0);
+    const lateralLongestLength = Math.max(zoneData?.lateralLongestLength || 20, 0);
+    const mainOutlets = Math.max(zoneData?.mainOutlets || 1, 1);
+    const subMainOutlets = Math.max(zoneData?.subMainOutlets || 1, 1);
+    const lateralOutlets = Math.max(zoneData?.lateralOutlets || 1, 1);
 
     // คำนวณ flow rate สำหรับท่อที่ยาวที่สุดแต่ละประเภท
     const lateralLongestFlowRate =
@@ -662,8 +673,9 @@ export const calculatePipeRecommendationsWithTypes = (
     const lateralLossPE = lateralResult.pe?.pressureLoss || 0;
     const lateralLossPVC = lateralResult.pvc?.pressureLoss || 0;
 
-    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ budget สำหรับ subMain
-    let lateralLossForCalculation = Math.min(lateralLossPE, lateralLossPVC);
+    // ใช้ค่า loss ที่มากที่สุด (worst-case) ในการคำนวณ budget สำหรับ subMain
+    // เพื่อให้แน่ใจว่าขนาดท่อที่คำนวณได้จะปลอดภัยไม่ว่าผู้ใช้จะเลือก PE หรือ PVC
+    let lateralLossForCalculation = Math.max(lateralLossPE, lateralLossPVC);
 
     // --- ขั้นตอนที่ 2: คำนวณ SubMain ---
     // รวม loss ของ lateral เพื่อตรวจสอบว่า "Total Loss" เกินโควต้าหรือไม่
@@ -681,8 +693,9 @@ export const calculatePipeRecommendationsWithTypes = (
     const subMainLossSelfPE = subMainResult.pe?.pressureLoss || 0;
     const subMainLossSelfPVC = subMainResult.pvc?.pressureLoss || 0;
 
-    // ใช้ค่า loss ที่น้อยกว่า (best-case) ในการคำนวณ budget สำหรับ main
-    const subMainLossSelfForCalculation = Math.min(subMainLossSelfPE, subMainLossSelfPVC);
+    // ใช้ค่า loss ที่มากที่สุด (worst-case) ในการคำนวณ budget สำหรับ main
+    // เพื่อให้แน่ใจว่าขนาดท่อที่คำนวณได้จะปลอดภัยไม่ว่าผู้ใช้จะเลือก PE หรือ PVC
+    const subMainLossSelfForCalculation = Math.max(subMainLossSelfPE, subMainLossSelfPVC);
 
     // ตรวจสอบเงื่อนไข: lateralLoss > subMainLossSelf (ไม่จำเป็นต้องเปลี่ยน logic หลัก แต่คงไว้ตามเดิม)
     if (
@@ -697,7 +710,8 @@ export const calculatePipeRecommendationsWithTypes = (
     const subMainCumulativeLossPE = subMainLossSelfPE + lateralLossPE;
     const subMainCumulativeLossPVC = subMainLossSelfPVC + lateralLossPVC;
 
-    const subMainCumulativeLossForCalculation = Math.min(subMainCumulativeLossPE, subMainCumulativeLossPVC);
+    // ใช้ค่า loss ที่มากที่สุด (worst-case) เพื่อให้แน่ใจว่าขนาดท่อ main จะปลอดภัย
+    const subMainCumulativeLossForCalculation = Math.max(subMainCumulativeLossPE, subMainCumulativeLossPVC);
 
     // --- ขั้นตอนที่ 3: คำนวณ Main ---
     const mainResult = calculatePipeSizeForType(

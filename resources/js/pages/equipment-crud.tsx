@@ -36,6 +36,7 @@ import {
     ImageIcon,
     Camera,
 } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -3499,7 +3500,8 @@ const EquipmentDetailModal: React.FC<{
     onImageClick?: (src: string, alt: string) => void;
     updatedAccessories?: PumpAccessory[];
     promotions?: Array<{ equipment_id: number; originalPrice: number }>;
-}> = ({ equipment, onClose, onEdit, onImageClick, updatedAccessories, promotions = [] }) => {
+    isAdmin?: boolean;
+}> = ({ equipment, onClose, onEdit, onImageClick, updatedAccessories, promotions = [], isAdmin = false }) => {
     const { t } = useLanguage();
     const [showAccessoriesModal, setShowAccessoriesModal] = useState(false);
     const [originalPrice, setOriginalPrice] = useState<number | null>(null);
@@ -4337,13 +4339,15 @@ const EquipmentDetailModal: React.FC<{
                     <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3">
                         <h2 className="text-xl sm:text-2xl font-bold">{t('รายละเอียดสินค้า')}</h2>
                         <div className="flex gap-2 w-full sm:w-auto">
-                            <button
-                                onClick={onEdit}
-                                className="flex-1 sm:flex-none flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 sm:px-4 text-sm sm:text-base text-white transition-colors hover:bg-blue-700"
-                            >
-                                <Edit2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                                {t('แก้ไข')}
-                            </button>
+                            {isAdmin && (
+                                <button
+                                    onClick={onEdit}
+                                    className="flex-1 sm:flex-none flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 sm:px-4 text-sm sm:text-base text-white transition-colors hover:bg-blue-700"
+                                >
+                                    <Edit2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                                    {t('แก้ไข')}
+                                </button>
+                            )}
                             <button
                                 onClick={onClose}
                                 className="p-2 text-gray-400 transition-colors hover:text-white"
@@ -4783,6 +4787,10 @@ const ImageModal: React.FC<{
 
 const EquipmentCRUD: React.FC = () => {
     const { t } = useLanguage();
+    const page = usePage();
+    const auth = (page.props as any).auth;
+    const isAdmin = auth?.user?.is_super_user || auth?.user?.role === 'super_user' || auth?.user?.is_admin || false;
+    
     const [categories, setCategories] = useState<EquipmentCategory[]>([]);
     const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -5415,43 +5423,45 @@ const EquipmentCRUD: React.FC = () => {
 
                         <StatsDashboard stats={stats} categories={categories} />
 
-                        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                            <button
-                                onClick={() => {
-                                    setEditingCategory(undefined);
-                                    setShowCategoryForm(true);
-                                }}
-                                className="flex items-center justify-center rounded-lg bg-green-600 px-3 py-2 text-sm sm:px-4 text-white shadow-lg transition-colors hover:bg-green-700"
-                            >
-                                <Tag className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                                <span className="hidden sm:inline">{t('เพิ่มหมวดหมู่')}</span>
-                                <span className="sm:hidden">{t('หมวดหมู่')}</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setEditingEquipmentSet(undefined);
-                                    setShowEquipmentSetForm(true);
-                                }}
-                                className="flex items-center justify-center rounded-lg bg-purple-600 px-3 py-2 text-sm sm:px-4 text-white shadow-lg transition-colors hover:bg-purple-700"
-                            >
-                                <Package className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                                <span className="hidden sm:inline">{t('เพิ่มเซ็ต')}</span>
-                                <span className="sm:hidden">{t('เซ็ต')}</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setEditingEquipment(undefined);
-                                    setShowEquipmentForm(true);
-                                    setFormAccessories([]);
-                                }}
-                                disabled={saving}
-                                className="flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm sm:px-4 text-white shadow-lg transition-colors hover:bg-blue-700 disabled:opacity-50"
-                            >
-                                <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                                <span className="hidden sm:inline">{t('เพิ่มสินค้า')}</span>
-                                <span className="sm:hidden">{t('สินค้า')}</span>
-                            </button>
-                        </div>
+                        {isAdmin && (
+                            <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                                <button
+                                    onClick={() => {
+                                        setEditingCategory(undefined);
+                                        setShowCategoryForm(true);
+                                    }}
+                                    className="flex items-center justify-center rounded-lg bg-green-600 px-3 py-2 text-sm sm:px-4 text-white shadow-lg transition-colors hover:bg-green-700"
+                                >
+                                    <Tag className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                                    <span className="hidden sm:inline">{t('เพิ่มหมวดหมู่')}</span>
+                                    <span className="sm:hidden">{t('หมวดหมู่')}</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditingEquipmentSet(undefined);
+                                        setShowEquipmentSetForm(true);
+                                    }}
+                                    className="flex items-center justify-center rounded-lg bg-purple-600 px-3 py-2 text-sm sm:px-4 text-white shadow-lg transition-colors hover:bg-purple-700"
+                                >
+                                    <Package className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                                    <span className="hidden sm:inline">{t('เพิ่มเซ็ต')}</span>
+                                    <span className="sm:hidden">{t('เซ็ต')}</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditingEquipment(undefined);
+                                        setShowEquipmentForm(true);
+                                        setFormAccessories([]);
+                                    }}
+                                    disabled={saving}
+                                    className="flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm sm:px-4 text-white shadow-lg transition-colors hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                                    <span className="hidden sm:inline">{t('เพิ่มสินค้า')}</span>
+                                    <span className="sm:hidden">{t('สินค้า')}</span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* Equipment Sets Section */}
                         {equipmentSets.length > 0 && (
@@ -5498,39 +5508,41 @@ const EquipmentCRUD: React.FC = () => {
                                                             {equipmentSet.name}
                                                         </h3>
                                                     </div>
-                                                    <div className="flex gap-1 flex-shrink-0">
-                                                        <button
-                                                            onClick={() =>
-                                                                handleEditEquipmentSet(equipmentSet)
-                                                            }
-                                                            className="rounded p-1 text-blue-400 hover:bg-blue-600/20"
-                                                            title={t('แก้ไข')}
-                                                        >
-                                                            <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDuplicateEquipmentSet(
-                                                                    equipmentSet
-                                                                )
-                                                            }
-                                                            className="rounded p-1 text-green-400 hover:bg-green-600/20"
-                                                            title={t('คัดลอก')}
-                                                        >
-                                                            <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() =>
-                                                                handleDeleteEquipmentSet(
-                                                                    equipmentSet
-                                                                )
-                                                            }
-                                                            className="rounded p-1 text-red-400 hover:bg-red-600/20"
-                                                            title={t('ลบ')}
-                                                        >
-                                                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                        </button>
-                                                    </div>
+                                                    {isAdmin && (
+                                                        <div className="flex gap-1 flex-shrink-0">
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleEditEquipmentSet(equipmentSet)
+                                                                }
+                                                                className="rounded p-1 text-blue-400 hover:bg-blue-600/20"
+                                                                title={t('แก้ไข')}
+                                                            >
+                                                                <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleDuplicateEquipmentSet(
+                                                                        equipmentSet
+                                                                    )
+                                                                }
+                                                                className="rounded p-1 text-green-400 hover:bg-green-600/20"
+                                                                title={t('คัดลอก')}
+                                                            >
+                                                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() =>
+                                                                    handleDeleteEquipmentSet(
+                                                                        equipmentSet
+                                                                    )
+                                                                }
+                                                                className="rounded p-1 text-red-400 hover:bg-red-600/20"
+                                                                title={t('ลบ')}
+                                                            >
+                                                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="mb-2 sm:mb-3 space-y-1.5 sm:space-y-2">
@@ -5717,7 +5729,7 @@ const EquipmentCRUD: React.FC = () => {
                                 </div>
                             </div>
 
-                            {selectedItems.length > 0 && (
+                            {selectedItems.length > 0 && isAdmin && (
                                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 rounded-lg bg-blue-900 p-3 sm:p-4 shadow-lg">
                                     <span className="text-sm sm:text-base text-blue-200 w-full sm:w-auto">
                                         {t('เลือก')} {selectedItems.length} {t('รายการ')}
@@ -5755,7 +5767,7 @@ const EquipmentCRUD: React.FC = () => {
                                     {combinedItems.length} {t('รายการ')}
                                 </div>
 
-                                {viewMode === 'table' && (
+                                {viewMode === 'table' && isAdmin && (
                                     <label className="flex cursor-pointer items-center gap-2">
                                         <input
                                             type="checkbox"
@@ -5867,34 +5879,36 @@ const EquipmentCRUD: React.FC = () => {
                                                             </p>
                                                         )}
                                                     </div>
-                                                    <div className="flex gap-1 opacity-100 sm:opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setEditingEquipment(equipment);
-                                                                setShowEquipmentForm(true);
-                                                                setFormAccessories(
-                                                                    equipment.pumpAccessories ||
-                                                                    equipment.pumpAccessory ||
-                                                                    []
-                                                                );
-                                                            }}
-                                                            className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-900"
-                                                            title={t('แก้ไข')}
-                                                        >
-                                                            <Edit2 className="h-3 w-3 sm:h-3 sm:w-3" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeleteEquipment(equipment);
-                                                            }}
-                                                            className="rounded p-1 text-red-400 transition-colors hover:bg-red-900"
-                                                            title={t('ลบ')}
-                                                        >
-                                                            <Trash2 className="h-3 w-3 sm:h-3 sm:w-3" />
-                                                        </button>
-                                                    </div>
+                                                    {isAdmin && (
+                                                        <div className="flex gap-1 opacity-100 sm:opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingEquipment(equipment);
+                                                                    setShowEquipmentForm(true);
+                                                                    setFormAccessories(
+                                                                        equipment.pumpAccessories ||
+                                                                        equipment.pumpAccessory ||
+                                                                        []
+                                                                    );
+                                                                }}
+                                                                className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-900"
+                                                                title={t('แก้ไข')}
+                                                            >
+                                                                <Edit2 className="h-3 w-3 sm:h-3 sm:w-3" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteEquipment(equipment);
+                                                                }}
+                                                                className="rounded p-1 text-red-400 transition-colors hover:bg-red-900"
+                                                                title={t('ลบ')}
+                                                            >
+                                                                <Trash2 className="h-3 w-3 sm:h-3 sm:w-3" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {equipment.image ? (
@@ -6086,18 +6100,20 @@ const EquipmentCRUD: React.FC = () => {
                                     <table className="w-full text-left text-xs sm:text-sm text-gray-300 min-w-[800px]">
                                         <thead className="bg-gray-600 text-xs sm:text-sm uppercase text-gray-400">
                                             <tr>
-                                                <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={
-                                                            selectedItems.length ===
-                                                            paginatedItems.filter(item => item.type === 'equipment').length &&
-                                                            paginatedItems.filter(item => item.type === 'equipment').length > 0
-                                                        }
-                                                        onChange={toggleSelectAll}
-                                                        className="h-3 w-3 sm:h-4 sm:w-4"
-                                                    />
-                                                </th>
+                                                {isAdmin && (
+                                                    <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={
+                                                                selectedItems.length ===
+                                                                paginatedItems.filter(item => item.type === 'equipment').length &&
+                                                                paginatedItems.filter(item => item.type === 'equipment').length > 0
+                                                            }
+                                                            onChange={toggleSelectAll}
+                                                            className="h-3 w-3 sm:h-4 sm:w-4"
+                                                        />
+                                                    </th>
+                                                )}
                                                 <th className="px-2 sm:px-4 md:px-6 py-2 sm:py-3 text-center hidden sm:table-cell">
                                                     {t('รูปภาพ')}
                                                 </th>
@@ -6213,21 +6229,23 @@ const EquipmentCRUD: React.FC = () => {
                                                             }`}
                                                         onClick={() => handleViewEquipment(equipment)}
                                                     >
-                                                        <td
-                                                            className="px-2 sm:px-3 text-center"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedItems.includes(
-                                                                    equipment.id
-                                                                )}
-                                                                onChange={() =>
-                                                                    toggleItemSelection(equipment.id)
-                                                                }
-                                                                className="h-3 w-3 sm:h-4 sm:w-4"
-                                                            />
-                                                        </td>
+                                                        {isAdmin && (
+                                                            <td
+                                                                className="px-2 sm:px-3 text-center"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedItems.includes(
+                                                                        equipment.id
+                                                                    )}
+                                                                    onChange={() =>
+                                                                        toggleItemSelection(equipment.id)
+                                                                    }
+                                                                    className="h-3 w-3 sm:h-4 sm:w-4"
+                                                                />
+                                                            </td>
+                                                        )}
                                                         <td className="px-2 sm:px-3 text-center align-middle hidden sm:table-cell">
                                                             <div className="flex items-center justify-center">
                                                                 {equipment.image ? (
@@ -6394,30 +6412,34 @@ const EquipmentCRUD: React.FC = () => {
                                                                 >
                                                                     <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                                                                 </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setEditingEquipment(equipment);
-                                                                        setShowEquipmentForm(true);
-                                                                        setFormAccessories(
-                                                                            equipment.pumpAccessories ||
-                                                                            equipment.pumpAccessory ||
-                                                                            []
-                                                                        );
-                                                                    }}
-                                                                    className="rounded p-1.5 sm:p-2 text-green-400 shadow-sm transition-colors hover:bg-green-900"
-                                                                    title={t('แก้ไข')}
-                                                                >
-                                                                    <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        handleDeleteEquipment(equipment)
-                                                                    }
-                                                                    className="rounded p-1.5 sm:p-2 text-red-400 shadow-sm transition-colors hover:bg-red-900"
-                                                                    title={t('ลบ')}
-                                                                >
-                                                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                                </button>
+                                                                {isAdmin && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setEditingEquipment(equipment);
+                                                                                setShowEquipmentForm(true);
+                                                                                setFormAccessories(
+                                                                                    equipment.pumpAccessories ||
+                                                                                    equipment.pumpAccessory ||
+                                                                                    []
+                                                                                );
+                                                                            }}
+                                                                            className="rounded p-1.5 sm:p-2 text-green-400 shadow-sm transition-colors hover:bg-green-900"
+                                                                            title={t('แก้ไข')}
+                                                                        >
+                                                                            <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                handleDeleteEquipment(equipment)
+                                                                            }
+                                                                            className="rounded p-1.5 sm:p-2 text-red-400 shadow-sm transition-colors hover:bg-red-900"
+                                                                            title={t('ลบ')}
+                                                                        >
+                                                                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                                        </button>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -6483,6 +6505,7 @@ const EquipmentCRUD: React.FC = () => {
                     promotions={promotions}
                     equipment={selectedEquipment}
                     updatedAccessories={formAccessories.length > 0 ? formAccessories : undefined}
+                    isAdmin={isAdmin}
                     onClose={() => {
                         setShowEquipmentDetail(false);
                         setSelectedEquipment(undefined);

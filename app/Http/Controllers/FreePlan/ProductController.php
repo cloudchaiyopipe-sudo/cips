@@ -274,4 +274,64 @@ class ProductController extends Controller
         
         return response()->json(['promotions' => $promotions]);
     }
+
+    // API endpoint สำหรับ landing page - ดึงสินค้าใหม่, โปรโมชั่น, และแนะนำ (ไม่ต้อง auth)
+    public function getLandingProducts()
+    {
+        try {
+            $products = Product::whereIn('category', ['new', 'promotion', 'recommended'])
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get()
+                ->map(function ($product) {
+                    $displayPrice = (float) $product->price;
+                    $originalPrice = $product->original_price ? (float) $product->original_price : null;
+                    $discount = $product->discount && $product->discount > 0 ? $product->discount : null;
+
+                    if ($product->equipment_id) {
+                        $equipment = Equipment::find($product->equipment_id);
+                        if ($equipment) {
+                            $existingPromotion = Product::where('equipment_id', $product->equipment_id)
+                                ->where('category', 'promotion')
+                                ->where('id', '!=', $product->id)
+                                ->first();
+
+                            if ($existingPromotion && $existingPromotion->original_price) {
+                                $displayPrice = (float) $equipment->price;
+                                $originalPrice = (float) $existingPromotion->original_price;
+                                $discount = $existingPromotion->discount && $existingPromotion->discount > 0 
+                                    ? $existingPromotion->discount 
+                                    : null;
+                            } else {
+                                $displayPrice = (float) $equipment->price;
+                            }
+                        }
+                    }
+
+                    return [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'description' => $product->description,
+                        'price' => $displayPrice,
+                        'originalPrice' => $originalPrice,
+                        'image_url' => $product->image_url ?? '/images/no-image.jpg',
+                        'video_url' => $product->video_url ?? null,
+                        'category' => $product->category,
+                        'discount' => $discount,
+                        'equipment_id' => $product->equipment_id,
+                        'isNew' => $product->category === 'new',
+                        'isPromotion' => $product->category === 'promotion',
+                        'isRecommended' => $product->category === 'recommended',
+                    ];
+                });
+
+            return response()->json(['products' => $products]);
+        } catch (Exception $e) {
+            Log::error('ProductController::getLandingProducts error', [
+                'message' => $e->getMessage(),
+            ]);
+            
+            return response()->json(['products' => []], 500);
+        }
+    }
 }

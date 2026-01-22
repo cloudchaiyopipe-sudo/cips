@@ -27,11 +27,23 @@ use Illuminate\Auth\Events\Verified;
 |
 */
 
+// Landing page - accessible without authentication
+Route::get('/landing', function () {
+    return Inertia::render('landing');
+})->name('landing');
+
 Route::get('/', function () {
-    // Always render new-home for all authenticated users
-    // (Previously redirected sales users to equipment-crud)
+    // If user is authenticated, show new-home, otherwise show landing
+    if (auth()->check()) {
+        return Inertia::render('new-home');
+    }
+    return Inertia::render('landing');
+})->name('home');
+
+// New-home route - requires authentication, redirects to login if not authenticated
+Route::get('/new-home', function () {
     return Inertia::render('new-home');
-})->middleware(['auth'])->name('home');
+})->middleware(['auth'])->name('new-home');
 
 // Route for home.tsx (field management page)
 // Accessible via "Try Advanced For Free" button in new-home
@@ -897,6 +909,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/free-plan/products', [ProductController::class, 'index'])->name('free.products');
     Route::get('/free-plan/products/{id}', [ProductController::class, 'show'])->name('free.product.show')->where('id', '[0-9]+');
     Route::get('/api/promotions', [ProductController::class, 'getPromotions'])->name('api.promotions');
+});
+
+// Public API routes (no auth required)
+Route::get('/api/landing-products', [ProductController::class, 'getLandingProducts'])->name('api.landing-products');
+
+Route::middleware(['auth'])->group(function () {
 
     // Free Plan Routes - Sales users cannot access
     Route::get('/free-plan', function () {
