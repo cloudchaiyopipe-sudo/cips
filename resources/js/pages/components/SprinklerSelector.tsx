@@ -320,7 +320,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         `${projectMode}_defaultSprinkler`
                     );
 
-                    if (!selectedSprinkler) {
+                    // ✅ Only auto-select if selectedSprinkler is truly null/undefined (not just falsy)
+                    // This prevents auto-selecting when loading from database where selectedSprinkler already has a value
+                    if (!selectedSprinkler || (typeof selectedSprinkler === 'object' && Object.keys(selectedSprinkler).length === 0)) {
                         let defaultSprinkler = bestSprinkler;
                         
                         // Try to find the saved default sprinkler from SprinklerConfigModal
@@ -952,10 +954,17 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 })()}
 
             <SearchableDropdown
-                value={selectedSprinkler?.productCode || selectedSprinkler?.id || ''}
+                value={(() => {
+                    // Try productCode first, then product_code, then id
+                    if (selectedSprinkler) {
+                        return selectedSprinkler.productCode || selectedSprinkler.product_code || selectedSprinkler.id || '';
+                    }
+                    return '';
+                })()}
                 onChange={(value) => {
+                    // Find by productCode, product_code, or id
                     const selected = analyzedSprinklers.find(
-                        (s) => s.id === value || s.productCode === value
+                        (s) => s.id === value || s.productCode === value || (s as any).product_code === value
                     );
 
                     if (
@@ -973,22 +982,62 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     onSprinklerChange(selected);
                 }}
                 options={(() => {
+                    // ✅ Ensure selected sprinkler is always in options
+                    const selectedInOptions = selectedSprinkler && sortedSprinklers.find(
+                        (s) => s.id === selectedSprinkler.id || 
+                               s.productCode === selectedSprinkler.productCode ||
+                               (s as any).product_code === selectedSprinkler.productCode ||
+                               s.productCode === selectedSprinkler.product_code ||
+                               (s as any).product_code === selectedSprinkler.product_code
+                    );
+                    const selectedNotInOptions = selectedSprinkler && !selectedInOptions;
+                    
+                    // ✅ If selected sprinkler is not in filtered options, add it from analyzedSprinklers
+                    const selectedFromAnalyzed = selectedNotInOptions 
+                        ? analyzedSprinklers.find(
+                            (s) => s.id === selectedSprinkler.id || 
+                                   s.productCode === selectedSprinkler.productCode ||
+                                   (s as any).product_code === selectedSprinkler.productCode ||
+                                   s.productCode === selectedSprinkler.product_code ||
+                                   (s as any).product_code === selectedSprinkler.product_code
+                          )
+                        : null;
+                    
                     const options = [
                         {
                             value: '',
                             label: `-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name.split(' (')[0]}` : ''} --`,
                         },
-                        ...sortedSprinklers.map((sprinkler) => ({
-                            value: sprinkler.productCode || sprinkler.id,
-                            label: `${sprinkler.productCode || ''} - ${sprinkler.name} - ${sprinkler.price} ${t('บาท')} | ${sprinkler.brand || sprinkler.brand_name || '-'}`,
-                            searchableText: `${sprinkler.productCode || ''} ${sprinkler.name || ''} ${sprinkler.brand || sprinkler.brand_name || ''} ${formatRangeValue(sprinkler.radiusMeters || '')} รัศมี`,
-                            image: sprinkler.image,
-                            productCode: sprinkler.productCode || (sprinkler as any).product_code,
-                            name: sprinkler.name,
-                            brand: sprinkler.brand || sprinkler.brand_name,
-                            price: sprinkler.price,
+                        // ✅ Add selected sprinkler first if it's not in filtered list
+                        ...(selectedFromAnalyzed ? [{
+                            value: selectedFromAnalyzed.productCode || (selectedFromAnalyzed as any).product_code || selectedFromAnalyzed.id,
+                            label: `${selectedFromAnalyzed.productCode || (selectedFromAnalyzed as any).product_code || selectedFromAnalyzed.id || ''} - ${selectedFromAnalyzed.name} - ${selectedFromAnalyzed.price} ${t('บาท')} | ${selectedFromAnalyzed.brand || selectedFromAnalyzed.brand_name || '-'}`,
+                            searchableText: `${selectedFromAnalyzed.productCode || (selectedFromAnalyzed as any).product_code || selectedFromAnalyzed.id || ''} ${selectedFromAnalyzed.name || ''} ${selectedFromAnalyzed.brand || selectedFromAnalyzed.brand_name || ''} ${formatRangeValue(selectedFromAnalyzed.radiusMeters || '')} รัศมี`,
+                            image: selectedFromAnalyzed.image,
+                            productCode: selectedFromAnalyzed.productCode || (selectedFromAnalyzed as any).product_code || selectedFromAnalyzed.id,
+                            name: selectedFromAnalyzed.name,
+                            brand: selectedFromAnalyzed.brand || selectedFromAnalyzed.brand_name,
+                            price: selectedFromAnalyzed.price,
                             unit: t('บาท'),
-                        })),
+                        }] : []),
+                        ...sortedSprinklers.map((sprinkler) => {
+                            // ✅ Normalize productCode - use productCode, product_code, or id
+                            const productCode = sprinkler.productCode || (sprinkler as any).product_code || sprinkler.id;
+                            const option = {
+                                value: productCode,
+                                label: `${productCode || ''} - ${sprinkler.name} - ${sprinkler.price} ${t('บาท')} | ${sprinkler.brand || sprinkler.brand_name || '-'}`,
+                                searchableText: `${productCode || ''} ${sprinkler.name || ''} ${sprinkler.brand || sprinkler.brand_name || ''} ${formatRangeValue(sprinkler.radiusMeters || '')} รัศมี`,
+                                image: sprinkler.image,
+                                productCode: productCode,
+                                name: sprinkler.name,
+                                brand: sprinkler.brand || sprinkler.brand_name,
+                                price: sprinkler.price,
+                                unit: t('บาท'),
+                            };
+                            
+                            
+                            return option;
+                        }),
                     ];
                     return options;
                 })()}

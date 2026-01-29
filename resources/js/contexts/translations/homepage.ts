@@ -360,7 +360,7 @@ export const homepageTranslations = {
         sub_folders: 'Sub-folders',
         parent_folder: 'Parent Folder',
         uncategorized_fields: 'Uncategorized Fields',
-        create_sub_folder: 'Create Sub-folder in',
+        create_sub_folder: 'Create Sub-folder',
         
         // Project actions
         select_action: 'Select an action',
@@ -547,7 +547,7 @@ export const homepageTranslations = {
         sub_folders: 'โฟลเดอร์ย่อย',
         parent_folder: 'โฟลเดอร์หลัก',
         uncategorized_fields: 'แปลงที่ไม่ได้จัดหมวดหมู่',
-        create_sub_folder: 'สร้างโฟลเดอร์ย่อยใน',
+        create_sub_folder: 'สร้างโฟลเดอร์ย่อย',
         back: 'กลับ',
         
         // Project actions

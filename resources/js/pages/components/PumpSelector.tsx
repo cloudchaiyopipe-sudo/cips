@@ -1958,15 +1958,36 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
             <div className="mb-4">
                 <SearchableDropdown
-                    value={currentPump?.id || ''}
+                    value={(() => {
+                        // ✅ Options use pump.id as value, so we need to match by id
+                        if (currentPump) {
+                            // If currentPump has id, use it directly
+                            if (currentPump.id) {
+                                return currentPump.id;
+                            }
+                            // If no id, find pump by productCode/product_code and use its id
+                            const matchingPump = analyzedPumps.find(
+                                (p) => p.productCode === currentPump.productCode || 
+                                       (p as any).product_code === currentPump.productCode ||
+                                       p.productCode === currentPump.product_code ||
+                                       (p as any).product_code === currentPump.product_code
+                            );
+                            const finalValue = matchingPump?.id || currentPump.productCode || currentPump.product_code || '';
+                            return finalValue;
+                        }
+                        return '';
+                    })()}
                     onChange={(value) => {
                         if (value === '') {
                             // ถ้าเลือก "-- ใช้การเลือกอัตโนมัติ --" ให้ใช้ autoSelectedPump
                             onPumpChange(autoSelectedPump || null);
                         } else {
+                            // ✅ Find by id (options use id as value)
                             const selected = analyzedPumps.find(
                                 (p) => p.id === parseInt(value.toString())
                             );
+                            
+                            
                             onPumpChange(selected || null);
                         }
                     }}

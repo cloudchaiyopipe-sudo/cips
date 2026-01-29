@@ -49,6 +49,8 @@ interface PipeSelectorProps {
     selectedSprinkler?: any;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     selectedPipeSizes?: SelectedPipeSizes;
+    selectedPipeMaterial?: 'PE' | 'PVC';
+    onPipeMaterialChange?: (material: 'PE' | 'PVC') => void;
 }
 
 const PipeSelector: React.FC<PipeSelectorProps> = ({
@@ -65,12 +67,18 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     selectedSprinkler,
     projectMode = 'horticulture',
     selectedPipeSizes = {},
+    selectedPipeMaterial,
+    onPipeMaterialChange,
 }) => {
     const { t } = useLanguage();
 
-    const [selectedPipeType, setSelectedPipeType] = useState<string>(() => {
-        // ท่อย่อย (branch) และท่อย่อยแยก (emitter) ใช้ PVC เป็น default, ท่ออื่นๆ ใช้ PE
+    // ✅ Use prop selectedPipeMaterial if provided, otherwise use default based on pipeType
+    const getDefaultPipeMaterial = () => {
         return pipeType === 'branch' || pipeType === 'emitter' ? 'PVC' : 'PE';
+    };
+
+    const [selectedPipeType, setSelectedPipeType] = useState<string>(() => {
+        return selectedPipeMaterial || getDefaultPipeMaterial();
     });
     const [availablePipes, setAvailablePipes] = useState<any[]>([]);
     const [calculation, setCalculation] = useState<PipeCalculationResult | null>(null);
@@ -487,15 +495,49 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         if (activeZoneId) {
             const zoneKey = `${activeZoneId}_${pipeType}`;
             const wasManuallySelected = zoneManualSelections[zoneKey] || false;
-            setIsManuallySelected(wasManuallySelected);
+            const hasSelectedPipe = selectedPipe && typeof selectedPipe === 'object' && Object.keys(selectedPipe).length > 0;
+            // ✅ แสดงปุ่ม "กลับไปใช้การเลือกอัตโนมัติ" เฉพาะเมื่อผู้ใช้เลือกท่อที่ต่างจากตัวที่ดีที่สุด
+            // ถ้าท่อที่เลือกตรงกับตัวที่ดีที่สุด (รวมถึงการเลือกอัตโนมัติครั้งแรก) ไม่ต้องแสดงปุ่ม
+            const normId = (p: any) =>
+                p ? String(p.id ?? p.productCode ?? (p as any).product_code ?? '').trim() : '';
+            const normSize = (p: any) => (p && p.sizeMM != null ? Number(p.sizeMM) : 0);
+            // โซน horticulture: bestPipes จาก horticultureSystemData = findBest*InZone() มีแค่ id/length/count ไม่มี productCode/product_code → ถ้าไม่มี catalog id ให้ไม่แสดงปุ่ม
+            const bestHasCatalogIdentity = (p: any) =>
+                !!(p && ((p.productCode != null && p.productCode !== '') || ((p as any).product_code != null && (p as any).product_code !== '')));
+            const isSameAsBest =
+                hasSelectedPipe &&
+                currentZoneBestPipe &&
+                (() => {
+                    const sid = normId(selectedPipe);
+                    const bid = normId(currentZoneBestPipe);
+                    if (sid && bid && sid === bid) return true;
+                    if (!bestHasCatalogIdentity(currentZoneBestPipe)) return true; // best เป็น design data (ไม่มี productCode) → ถือว่าเลือกอัตโนมัติ ไม่แสดงปุ่ม
+                    const sameSize = normSize(selectedPipe) === normSize(currentZoneBestPipe) && normSize(selectedPipe) > 0;
+                    if (sameSize && (!sid || !bid)) return true;
+                    return (
+                        selectedPipe.id === currentZoneBestPipe.id ||
+                        selectedPipe.productCode === currentZoneBestPipe.productCode ||
+                        (selectedPipe as any).product_code === (currentZoneBestPipe as any).product_code
+                    );
+                })();
+            const manuallyDifferent = hasSelectedPipe && currentZoneBestPipe && !isSameAsBest;
+            // โหมด horticulture: แสดงปุ่ม "กลับไปใช้การเลือกอัตโนมัติ" เฉพาะเมื่อผู้ใช้กดเลือกท่อเอง (wasManuallySelected) ไม่ใช้การเทียบ selected vs best เพราะ best จาก design data ไม่มี productCode
+            const showAsManuallySelected =
+                projectMode === 'horticulture' ? wasManuallySelected : wasManuallySelected || manuallyDifferent;
+            setIsManuallySelected(showAsManuallySelected);
         }
-    }, [activeZoneId, pipeType, zoneManualSelections]);
+    }, [activeZoneId, pipeType, zoneManualSelections, selectedPipe, currentZoneBestPipe]);
 
-    // อัปเดต selectedPipeType เมื่อ pipeType เปลี่ยน
+    // ✅ Sync selectedPipeType with selectedPipeMaterial prop
     useEffect(() => {
-        const newPipeType = pipeType === 'branch' || pipeType === 'emitter' ? 'PVC' : 'PE';
-        setSelectedPipeType(newPipeType);
-    }, [pipeType]);
+        if (selectedPipeMaterial) {
+            setSelectedPipeType(selectedPipeMaterial);
+        } else {
+            // Only use default if no prop is provided
+            const defaultMaterial = getDefaultPipeMaterial();
+            setSelectedPipeType(defaultMaterial);
+        }
+    }, [selectedPipeMaterial, pipeType]);
 
     const getPipeTypeName = useCallback(
         (pipeType: PipeType) => {
@@ -633,13 +675,18 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         const zoneKey = activeZoneId ? `${activeZoneId}_${pipeType}` : '';
         const wasManuallySelectedInThisZone = zoneKey ? zoneManualSelections[zoneKey] : false;
 
+        // ✅ Only auto-select if selectedPipe is truly null/undefined (not just falsy)
+        // This prevents auto-selecting when loading from database where selectedPipe already has a value
+        const hasSelectedPipe = selectedPipe && typeof selectedPipe === 'object' && Object.keys(selectedPipe).length > 0;
+
         if (
             availablePipes.length > 0 &&
             currentZoneBestPipe &&
             sprinklerPressure &&
             !isManuallySelected &&
-            !wasManuallySelectedInThisZone && // ไม่เคยเลือกด้วยตนเองในโซนนี้
-            activeZoneId // ตรวจสอบว่ามี activeZoneId
+            !wasManuallySelectedInThisZone &&
+            !hasSelectedPipe &&
+            activeZoneId
         ) {
             const hierarchyFilteredPipes = getFilteredPipesByHierarchy(availablePipes);
 
@@ -803,6 +850,39 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     }
                 }
             }
+        } else if (
+            projectMode === 'horticulture' &&
+            availablePipes.length > 0 &&
+            currentZoneBestPipe &&
+            sprinklerPressure &&
+            !wasManuallySelectedInThisZone &&
+            hasSelectedPipe &&
+            activeZoneId
+        ) {
+            // โหมด horticulture: ถ้ามี selectedPipe จาก parent แต่ยังไม่เคยกดเลือกเอง → แก้เป็นตัวที่เหมาะสม (เหมือนตอนกดปุ่ม "กลับไปใช้การเลือกอัตโนมัติ")
+            const hierarchyFilteredPipes = getFilteredPipesByHierarchy(availablePipes);
+            if (hierarchyFilteredPipes.length > 0) {
+                const bestPipe = selectBestPipeByHeadLoss(
+                    hierarchyFilteredPipes,
+                    pipeType,
+                    currentZoneBestPipe,
+                    selectedPipeType,
+                    selectedPipeSizes,
+                    sprinklerPressure.head20PercentM
+                );
+                if (bestPipe) {
+                    const normId = (p: any) =>
+                        p ? String(p.id ?? p.productCode ?? (p as any).product_code ?? '').trim() : '';
+                    const samePipe =
+                        normId(selectedPipe) === normId(bestPipe) ||
+                        (selectedPipe.id === bestPipe.id ||
+                            selectedPipe.productCode === bestPipe.productCode ||
+                            (selectedPipe as any).product_code === (bestPipe as any).product_code);
+                    if (!samePipe) {
+                        onPipeChange(bestPipe);
+                    }
+                }
+            }
         }
     }, [
         availablePipes,
@@ -818,6 +898,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         activeZoneId,
         getFilteredPipesByHierarchy,
         getPipeTypeName,
+        projectMode,
     ]);
 
     useEffect(() => {
@@ -919,8 +1000,61 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         { value: 'PVC', label: 'PVC' },
     ];
 
-    const pipeOptions = availablePipes
+    // ✅ Ensure selected pipe is always in availablePipes
+    const selectedPipeInAvailable = selectedPipe && availablePipes.find(
+        (p) => p.id === selectedPipe.id || 
+               p.productCode === selectedPipe.productCode ||
+               (p as any).product_code === selectedPipe.productCode ||
+               p.productCode === selectedPipe.product_code ||
+               (p as any).product_code === selectedPipe.product_code
+    );
+    const selectedPipeNotInAvailable = selectedPipe && !selectedPipeInAvailable;
+    
+    // ✅ If selected pipe is not in availablePipes, try to find it in results.allPipes
+    const allPipes = results?.allPipes || [];
+    const selectedFromAllPipes = selectedPipeNotInAvailable && allPipes.length > 0
+        ? allPipes.find(
+            (p) => p.id === selectedPipe.id || 
+                   p.productCode === selectedPipe.productCode ||
+                   (p as any).product_code === selectedPipe.productCode ||
+                   p.productCode === selectedPipe.product_code ||
+                   (p as any).product_code === selectedPipe.product_code
+          )
+        : null;
+    
+    // ✅ Fallback: If not found in allPipes, use selectedPipe directly (even if incomplete)
+    const pipeToAdd = selectedPipeNotInAvailable 
+        ? (selectedFromAllPipes || selectedPipe)
+        : null;
+    
+    // ✅ Combine: selected pipe (if not in available) + available pipes (avoid duplicates)
+    const pipesToUse = [
+        ...(pipeToAdd ? [pipeToAdd] : []),
+        ...availablePipes.filter((p) => {
+            // Skip if it's the same as pipeToAdd
+            if (pipeToAdd) {
+                return p.id !== pipeToAdd.id;
+            }
+            return true;
+        }),
+    ];
+    
+    
+    const pipeOptions = pipesToUse
         .filter((pipe) => {
+            // ✅ Always include selected pipe, even if it doesn't pass validation
+            const isSelectedPipe = selectedPipe && (
+                pipe.id === selectedPipe.id ||
+                pipe.productCode === selectedPipe.productCode ||
+                (pipe as any).product_code === selectedPipe.productCode ||
+                pipe.productCode === selectedPipe.product_code ||
+                (pipe as any).product_code === selectedPipe.product_code
+            );
+            
+            if (isSelectedPipe) {
+                return true;
+            }
+            
             const tempValidation = (candidatePipe: any): boolean => {
                 const candidateSize = candidatePipe.sizeMM;
 
@@ -1024,11 +1158,23 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 }
             })();
 
-            return {
-                value: pipe.id,
-                label: `${isHierarchyCompliant ? '✅' : '⛔'} ${pipe.name || pipe.productCode} - ${pipe.sizeMM}mm (PN${pipe.pn}) | HL: ${headLoss.toFixed(3)}ม.`,
+            // ✅ Normalize productCode - use productCode, product_code, or id
+            const productCode = pipe.productCode || (pipe as any).product_code || pipe.id;
+            // ✅ Check if this is the selected pipe
+            const isSelectedPipe = selectedPipe && (
+                pipe.id === selectedPipe.id ||
+                String(pipe.id) === String(selectedPipe.id) ||
+                productCode === selectedPipe.productCode ||
+                productCode === selectedPipe.product_code ||
+                (selectedPipe.productCode && productCode === selectedPipe.productCode) ||
+                (selectedPipe.product_code && productCode === selectedPipe.product_code)
+            );
+            
+            const option = {
+                value: pipe.id || productCode, // ✅ Use id first, fallback to productCode
+                label: `${isHierarchyCompliant ? '✅' : '⛔'} ${pipe.name || productCode} - ${pipe.sizeMM}mm (PN${pipe.pn}) | HL: ${headLoss.toFixed(3)}ม.`,
                 image: pipe.image,
-                productCode: pipe.productCode,
+                productCode: productCode,
                 name: pipe.name,
                 brand: pipe.brand,
                 price: pipe.price,
@@ -1040,13 +1186,42 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 isRecommended: isHierarchyCompliant && diffFromTarget <= 0.5,
                 isGoodChoice: isHierarchyCompliant && diffFromTarget <= 1.0,
                 isUsable: isHierarchyCompliant,
+                isSelected: isSelectedPipe, // ✅ Mark selected pipe for easier sorting
             };
+            
+            // ✅ Debug: Log selected pipe and first few options to check values
+            const pipeIndexInPipesToUse = pipesToUse.indexOf(pipe);
+            
+            
+            return option;
         })
         .sort((a, b) => {
+            // ✅ Selected pipe should ALWAYS be at the top (highest priority)
+            // Use isSelected flag from option object for more reliable matching
+            const aIsSelected = a.isSelected || (selectedPipe && (
+                a.value === selectedPipe.id ||
+                String(a.value) === String(selectedPipe.id) ||
+                a.productCode === selectedPipe.productCode ||
+                a.productCode === selectedPipe.product_code
+            ));
+            const bIsSelected = b.isSelected || (selectedPipe && (
+                b.value === selectedPipe.id ||
+                String(b.value) === String(selectedPipe.id) ||
+                b.productCode === selectedPipe.productCode ||
+                b.productCode === selectedPipe.product_code
+            ));
+            
+            
+            // ✅ Priority 1: Selected pipe always goes first
+            if (aIsSelected && !bIsSelected) return -1;
+            if (!aIsSelected && bIsSelected) return 1;
+            
+            // ✅ Priority 2: If both are selected or both are not selected, sort by hierarchy compliance
             if (a.isHierarchyCompliant !== b.isHierarchyCompliant) {
                 return a.isHierarchyCompliant ? -1 : 1;
             }
 
+            // ✅ Priority 3: Finally sort by diffFromTarget
             return a.diffFromTarget - b.diffFromTarget;
         });
 
@@ -1094,7 +1269,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         <SearchableDropdown
                             options={pipeTypeOptions}
                             value={selectedPipeType}
-                            onChange={(value) => setSelectedPipeType(value.toString())}
+                            onChange={(value) => {
+                                const material = value.toString() as 'PE' | 'PVC';
+                                setSelectedPipeType(material);
+                                // ✅ Notify parent component about material change
+                                if (onPipeMaterialChange) {
+                                    onPipeMaterialChange(material);
+                                }
+                            }}
                             placeholder="เลือกประเภทท่อ"
                         />
                     </div>
@@ -1409,9 +1591,30 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <div className="flex-1">
                                 <SearchableDropdown
                                     options={pipeOptions}
-                                    value={selectedPipe?.id || ''}
+                                    value={(() => {
+                                        // ✅ Try id first (because options use id), then productCode, then product_code
+                                        if (selectedPipe) {
+                                            // ✅ Options use pipe.id as value, so we need to match by id
+                                            // But if selectedPipe doesn't have id, try to find pipe by productCode/product_code
+                                            if (selectedPipe.id) {
+                                                return selectedPipe.id;
+                                            }
+                                            // If no id, find pipe by productCode/product_code and use its id
+                                            const matchingPipe = availablePipes.find(
+                                                (p) => p.productCode === selectedPipe.productCode || 
+                                                       (p as any).product_code === selectedPipe.productCode ||
+                                                       p.productCode === selectedPipe.product_code ||
+                                                       (p as any).product_code === selectedPipe.product_code
+                                            );
+                                            const finalValue = matchingPipe?.id || selectedPipe.productCode || selectedPipe.product_code || '';
+                                            return finalValue;
+                                        }
+                                        return '';
+                                    })()}
                                     onChange={(value) => {
+                                        // ✅ Find by id (options use id as value)
                                         const pipe = availablePipes.find((p) => p.id === value);
+                                        
                                         if (pipe) {
                                             setIsManuallySelected(true);
                                             // บันทึกการเลือกด้วยตนเองในโซนนี้

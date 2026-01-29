@@ -583,11 +583,28 @@ const calculateSystemComplexity = (input: IrrigationInput, projectMode?: string)
     return 'simple';
 };
 
+/** ค่า head สูงสุดที่อนุญาตต่อประเภทท่อ (ให้ตรงกับ PipeSelector: 20% ของ head หัวฉีด) */
+const getMaxHeadLossForPipeType = (pipeType: string, head20PercentM: number): number => {
+    switch (pipeType) {
+        case 'main':
+            return head20PercentM;
+        case 'secondary':
+            return head20PercentM;
+        case 'branch':
+        case 'emitter':
+            return head20PercentM * 0.4;
+        default:
+            return head20PercentM * 0.4;
+    }
+};
+
 const autoSelectBestPipe = (
     analyzedPipes: any[],
     pipeType: string,
     flowLPM: number,
-    projectMode?: string
+    projectMode?: string,
+    /** โหมด horticulture: 20% ของ head หัวฉีด (ม.) — ใช้กรองท่อที่ head loss เกินเกณฑ์ */
+    head20PercentM?: number
 ): any => {
     if (!analyzedPipes || analyzedPipes.length === 0) return null;
 
@@ -609,42 +626,44 @@ const autoSelectBestPipe = (
         minPressure = 6;
     }
 
+    const maxHeadM = head20PercentM != null ? getMaxHeadLossForPipeType(pipeType, head20PercentM) : null;
+
     const suitablePipes = analyzedPipes.filter((pipe) => {
         const isVelocityOK = pipe.velocity >= velocityMin && pipe.velocity <= velocityMax;
         const isPressureOK = pipe.pn >= minPressure;
-        const isHeadLossOK = (pipe.headLoss / pipe.lengthM) * 100 <= 20;
+        const isHeadLossOK =
+            maxHeadM != null
+                ? pipe.headLoss <= maxHeadM
+                : (pipe.headLoss / (pipe.lengthM || 1)) * 100 <= 20;
         return isVelocityOK && isPressureOK && isHeadLossOK;
     });
 
-    if (suitablePipes.length === 0) {
-        return analyzedPipes.sort((a, b) => {
-            if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
-            if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
-            return a.price - b.price;
-        })[0];
+    let candidates = suitablePipes.length > 0 ? suitablePipes : analyzedPipes;
+    if (maxHeadM != null && suitablePipes.length === 0) {
+        const underLimit = analyzedPipes.filter((p) => p.headLoss <= maxHeadM);
+        candidates = underLimit.length > 0 ? underLimit : analyzedPipes;
     }
 
-    return suitablePipes.sort((a, b) => {
+    return candidates.sort((a, b) => {
         if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
         if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
-
+        if (maxHeadM != null) {
+            const aOk = a.headLoss <= maxHeadM ? 1 : 0;
+            const bOk = b.headLoss <= maxHeadM ? 1 : 0;
+            if (aOk !== bOk) return bOk - aOk;
+            return a.headLoss - b.headLoss;
+        }
         const aHeadLossPer100m = (a.headLoss / Math.max(a.lengthM || 50, 1)) * 100;
         const bHeadLossPer100m = (b.headLoss / Math.max(b.lengthM || 50, 1)) * 100;
         if (Math.abs(aHeadLossPer100m - bHeadLossPer100m) > 3) {
             return aHeadLossPer100m - bHeadLossPer100m;
         }
-
         let optimalVelocity = 1.4;
-        if (projectMode === 'field-crop') {
-            optimalVelocity = 1.6;
-        } else if (projectMode === 'greenhouse') {
-            optimalVelocity = 1.2;
-        }
-
+        if (projectMode === 'field-crop') optimalVelocity = 1.6;
+        else if (projectMode === 'greenhouse') optimalVelocity = 1.2;
         const aVelScore = Math.abs(optimalVelocity - a.velocity);
         const bVelScore = Math.abs(optimalVelocity - b.velocity);
         if (Math.abs(aVelScore - bVelScore) > 0.2) return aVelScore - bVelScore;
-
         return a.price - b.price;
     })[0];
 };
@@ -1043,6 +1062,11 @@ export const useCalculations = (
         const flowData = calculateFlowRequirements(sanitizedInput, selectedSprinkler, projectMode);
         const systemComplexity = calculateSystemComplexity(sanitizedInput, projectMode);
 
+        const head20PercentM =
+            projectMode === 'horticulture' && selectedSprinkler
+                ? calculateSprinklerPressure(selectedSprinkler, 2.5, projectMode) * 0.2
+                : undefined;
+
         const hasValidSecondaryPipe =
             sanitizedInput.longestSecondaryPipeM > 0 && sanitizedInput.totalSecondaryPipeM > 0;
         const hasValidMainPipe =
@@ -1114,7 +1138,8 @@ export const useCalculations = (
             analyzedBranchPipes,
             'branch',
             flowData.branchFlowLPM,
-            projectMode
+            projectMode,
+            head20PercentM
         );
 
         const analyzedSecondaryPipes = hasValidSecondaryPipe
@@ -1141,7 +1166,8 @@ export const useCalculations = (
                   analyzedSecondaryPipes,
                   'secondary',
                   flowData.secondaryFlowLPM,
-                  projectMode
+                  projectMode,
+                  head20PercentM
               )
             : null;
 
@@ -1165,7 +1191,13 @@ export const useCalculations = (
             : [];
 
         const autoSelectedMainPipe = hasValidMainPipe
-            ? autoSelectBestPipe(analyzedMainPipes, 'main', flowData.mainFlowLPM, projectMode)
+            ? autoSelectBestPipe(
+                  analyzedMainPipes,
+                  'main',
+                  flowData.mainFlowLPM,
+                  projectMode,
+                  head20PercentM
+              )
             : null;
 
         const hasValidEmitterPipe =
@@ -1198,7 +1230,8 @@ export const useCalculations = (
                   analyzedEmitterPipes,
                   'emitter',
                   flowData.emitterFlowLPM,
-                  projectMode
+                  projectMode,
+                  head20PercentM
               )
             : null;
 

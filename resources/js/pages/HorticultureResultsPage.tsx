@@ -410,7 +410,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                 map,
                 zone.coordinates,
                 `${zone.name} (${zone.plants.length} ต้น)`,
-                zone.color
+                zoneColor
             );
             overlaysRef.current.overlays.set(
                 `irrigation-zone-label-${zone.id}`,
@@ -1931,6 +1931,10 @@ function EnhancedHorticultureResultsPageContent() {
                                       const areaInSquareMeters =
                                           zone.area || calculatePolygonArea(zone.coordinates);
 
+                                      // ใช้ getZoneColor ตาม index แทน zone.color
+                                      const zoneIndex = irrigationZones.findIndex((z) => z.id === zone.id);
+                                      const zoneColor = zoneIndex >= 0 ? getZoneColor(zoneIndex) : getZoneColor(0);
+
                                       return {
                                           id: zone.id,
                                           name: zone.name,
@@ -1939,7 +1943,7 @@ function EnhancedHorticultureResultsPageContent() {
                                           waterPerTree: waterPerTree,
                                           waterNeedPerMinute: waterNeedPerMinute,
                                           area: areaInSquareMeters,
-                                          color: zone.color,
+                                          color: zoneColor,
                                           pipes: zoneData
                                               ? {
                                                     mainPipes: {
@@ -3049,7 +3053,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                       className="h-4 w-4 rounded"
                                                                       style={{
                                                                           backgroundColor:
-                                                                              zone.color,
+                                                                              getZoneColor(index),
                                                                       }}
                                                                   />
                                                                   <span className="text-sm text-gray-400">
@@ -3637,10 +3641,14 @@ function EnhancedHorticultureResultsPageContent() {
                                                       zone.zoneId
                                                   );
 
-                                                  const zoneColor = projectData.useZones
-                                                      ? projectData.zones.find(
-                                                            (z) => z.id === zone.zoneId
-                                                        )?.color
+                                                  // ใช้ getZoneColor ตาม index แทน zone.color
+                                                  const zoneColor = projectData.useZones && projectData.zones
+                                                      ? (() => {
+                                                            const zoneIndex = projectData.zones.findIndex(
+                                                                (z) => z.id === zone.zoneId
+                                                            );
+                                                            return zoneIndex >= 0 ? getZoneColor(zoneIndex) : null;
+                                                        })()
                                                       : null;
 
                                                   return (

@@ -34,6 +34,10 @@ interface InputFormProps {
         zoneName: string;
         areaInRai: number;
         coordinates?: { lat: number; lng: number }[];
+        /** จำนวนต้นไม้ (ตรงกับ HorticultureResultsPage) */
+        plantCount?: number;
+        /** ความต้องการน้ำ ลิตร/นาที (ตรงกับ HorticultureResultsPage) */
+        waterNeedPerMinute?: number;
     };
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
@@ -243,6 +247,47 @@ const InputForm: React.FC<InputFormProps> = ({
 
         return 0;
     };
+
+    // โหมด horticulture: ใช้ค่าจาก zoneAreaData ให้ตรงกับ HorticultureResultsPage
+    const effectiveAreaInRai =
+        projectMode === 'horticulture' && zoneAreaData && getZoneAreaInRai() > 0
+            ? getZoneAreaInRai()
+            : input.farmSizeRai;
+    const effectivePlantCount =
+        projectMode === 'horticulture' && zoneAreaData?.plantCount != null
+            ? zoneAreaData.plantCount
+            : input.totalTrees;
+    const effectiveWaterNeedPerMinute =
+        projectMode === 'horticulture' && zoneAreaData?.waterNeedPerMinute != null
+            ? zoneAreaData.waterNeedPerMinute
+            : input.waterPerTreeLiters;
+
+    // Sync ข้อมูลจาก zoneAreaData ไป parent เมื่อโหมด horticulture เพื่อให้ input ตรงกับ Results
+    useEffect(() => {
+        if (
+            projectMode !== 'horticulture' ||
+            !zoneAreaData ||
+            !onInputChangeRef.current
+        ) {
+            return;
+        }
+        const areaInRai = getZoneAreaInRai();
+        const plantCount = zoneAreaData.plantCount;
+        const waterNeed = zoneAreaData.waterNeedPerMinute;
+        const cur = inputRef.current;
+        const needArea = areaInRai > 0 && Math.abs((cur.farmSizeRai || 0) - areaInRai) > 0.001;
+        const needPlants = plantCount != null && cur.totalTrees !== plantCount;
+        const needWater = waterNeed != null && Math.abs((cur.waterPerTreeLiters || 0) - waterNeed) > 0.01;
+        if (needArea || needPlants || needWater) {
+            onInputChangeRef.current({
+                ...cur,
+                farmSizeRai: areaInRai > 0 ? areaInRai : cur.farmSizeRai,
+                totalTrees: plantCount != null ? plantCount : cur.totalTrees,
+                waterPerTreeLiters: waterNeed != null ? waterNeed : cur.waterPerTreeLiters,
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectMode, zoneAreaData?.zoneId, zoneAreaData?.areaInRai, zoneAreaData?.plantCount, zoneAreaData?.waterNeedPerMinute]);
 
     useEffect(() => {
         const fetchPipeData = async () => {
@@ -791,7 +836,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                defaultValue={input.farmSizeRai.toFixed(2)}
+                                value={effectiveAreaInRai > 0 ? effectiveAreaInRai.toFixed(2) : (input.farmSizeRai?.toFixed(2) ?? '0')}
                                 onChange={(e) => {
                                     const value = parseFloat(e.target.value) || 0;
                                     updateInput('farmSizeRai', value);
@@ -799,7 +844,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 onBlur={(e) => {
                                     const value = e.target.value;
                                     if (value === '' || isNaN(parseFloat(value))) {
-                                        e.target.value = input.farmSizeRai.toFixed(2);
+                                        updateInput('farmSizeRai', effectiveAreaInRai || 0);
                                     }
                                 }}
                                 step="0.1"
@@ -808,7 +853,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             />
                             <p className="mt-1 text-xs text-gray-400">
                                 (
-                                {(input.farmSizeRai * 1600).toLocaleString(undefined, {
+                                {(effectiveAreaInRai * 1600).toLocaleString(undefined, {
                                     minimumFractionDigits: 0,
                                     maximumFractionDigits: 2,
                                 })}{' '}
@@ -822,15 +867,15 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                defaultValue={input.totalTrees}
+                                value={effectivePlantCount}
                                 onChange={(e) => {
-                                    const value = parseInt(e.target.value);
+                                    const value = parseInt(e.target.value, 10);
                                     if (!isNaN(value)) {
                                         updateInput('totalTrees', value);
                                     }
                                 }}
                                 onBlur={(e) => updateInputOnBlur('totalTrees', e.target.value)}
-                                min="1"
+                                min="0"
                                 step="1"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
@@ -852,7 +897,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 const systemData =
                                                     JSON.parse(greenhouseSystemDataStr);
                                                 const plotPipeData = systemData.plotPipeData || [];
-                                                // ใช้ utility function ที่ยืดหยุ่น
                                                 const currentPlotPipeData = findMatchingPlotData(
                                                     activeZone.id,
                                                     plotPipeData
@@ -862,7 +906,6 @@ const InputForm: React.FC<InputFormProps> = ({
                                                     currentPlotPipeData &&
                                                     currentPlotPipeData.totalFlowRate
                                                 ) {
-                                                    // ใช้ค่าเดียวกับที่แสดงใน Flow Rate Section ของแต่ละโซน
                                                     return currentPlotPipeData.totalFlowRate;
                                                 }
                                             }
@@ -873,7 +916,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                             );
                                         }
                                     }
-                                    return input.waterPerTreeLiters;
+                                    return effectiveWaterNeedPerMinute;
                                 })()}
                                 onChange={(e) => {
                                     const value = e.target.value;
@@ -890,7 +933,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     updateInputOnBlur('waterPerTreeLiters', e.target.value)
                                 }
                                 step="0.1"
-                                min="0.1"
+                                min="0"
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
                         </div>

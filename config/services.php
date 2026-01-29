@@ -44,4 +44,11 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    /*
+     * Google Sheet Web App URL for suggestions/feedback (คำแนะนำ).
+     * Deploy a Google Apps Script as "Web app" and paste the URL here.
+     * See docs/GOOGLE_SHEET_SUGGESTIONS_SETUP.md for setup.
+     */
+    'google_sheet_suggestions_url' => env('GOOGLE_SHEET_SUGGESTIONS_WEB_APP_URL', ''),
+
 ];

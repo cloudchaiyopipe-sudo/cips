@@ -1206,7 +1206,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
                     {showPump && (
                         <div className="text-center">
-                            <p className="text-purple-50">{t('Pump Head')}</p>
+                            <p className="text-purple-50">{t('TDH')}</p>
                             <p className="text-xl font-bold text-orange-300">
                                 {(() => {
                                     // ใช้ actualPumpHead + 10% (ค่าตามโซนที่เลือก - สลับไปมา)

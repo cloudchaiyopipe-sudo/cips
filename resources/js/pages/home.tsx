@@ -229,9 +229,6 @@ const FieldCard = ({
     onSelect,
     onDelete,
     onStatusChange,
-    onDragStart,
-    onDragEnd,
-    isDragging,
     onRename,
     onMove,
     onCopy,
@@ -243,9 +240,6 @@ const FieldCard = ({
     onSelect: (field: Field) => void;
     onDelete: (fieldId: string) => void;
     onStatusChange?: (fieldId: string, status: string, isCompleted: boolean) => void;
-    onDragStart?: (field: Field) => void;
-    onDragEnd?: () => void;
-    isDragging?: boolean;
     onRename?: (field: Field) => void;
     onMove?: (field: Field) => void;
     onCopy?: (field: Field) => void;
@@ -280,11 +274,7 @@ const FieldCard = ({
 
     return (
         <div
-            className={`group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-6 py-4 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10 ${isDragging ? 'scale-95 opacity-50' : ''
-                }`}
-            draggable
-            onDragStart={() => onDragStart?.(field)}
-            onDragEnd={() => onDragEnd?.()}
+            className="group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 px-6 py-4 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10"
         >
 
 
@@ -625,6 +615,21 @@ const FieldCard = ({
                                     }
                                 }
 
+                                // ✅ ถ้ามี projectImage ที่บันทึกไว้ → แสดงรูปภาพนั้น (รูปที่บันทึกจาก Results)
+                                if (parsedData?.projectImage && parsedData.projectImage.startsWith('data:image/')) {
+                                    return (
+                                        <div className="mb-3">
+                                            <img
+                                                src={parsedData.projectImage}
+                                                alt="แผนผังโครงการ"
+                                                className="w-full rounded-lg border border-gray-600 object-cover"
+                                                style={{ height: '180px' }}
+                                            />
+                                        </div>
+                                    );
+                                }
+
+                                // ถ้าไม่มี projectImage → ใช้ HorticultureMapPreview (วาดแผนที่)
                                 // Check if mainArea exists and has data
                                 if (!parsedData?.mainArea || parsedData.mainArea.length === 0) {
                                     return null;
@@ -873,7 +878,6 @@ const FolderCard = ({
     onSelect,
     onEdit,
     onDelete,
-    onDrop,
     isSelected,
     t,
 }: {
@@ -882,7 +886,6 @@ const FolderCard = ({
     onSelect: (folder: Folder) => void;
     onEdit: (folder: Folder) => void;
     onDelete: (folder: Folder) => void;
-    onDrop?: (folderId: string | null) => void;
     isSelected: boolean;
     t: (key: string) => string;
 }) => {
@@ -919,18 +922,6 @@ const FolderCard = ({
             className={`cursor-pointer rounded-lg border p-4 transition-all hover:scale-105 ${isSelected ? 'ring-2 ring-blue-400' : ''
                 } ${getFolderColor()}`}
             onClick={() => onSelect(folder)}
-            onDragOver={(e) => {
-                e.preventDefault();
-                e.currentTarget.classList.add('border-blue-400', 'bg-blue-900/20');
-            }}
-            onDragLeave={(e) => {
-                e.currentTarget.classList.remove('border-blue-400', 'bg-blue-900/20');
-            }}
-            onDrop={(e) => {
-                e.preventDefault();
-                e.currentTarget.classList.remove('border-blue-400', 'bg-blue-900/20');
-                onDrop?.(folder.id);
-            }}
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1337,6 +1328,8 @@ const FolderSelectionModal = ({
                                             // Pass folder directly to handleSelectHere to avoid async state issue
                                             handleSelectHere(folder);
                                         } else {
+                                            // Allow navigation into folders even if it's the current folder
+                                            // This allows moving projects from main folder to subfolders
                                             handleFolderClick(folder);
                                         }
                                     }}
@@ -1346,20 +1339,24 @@ const FolderSelectionModal = ({
                                             handleSelectHere(folder);
                                         }
                                     }}
-                                    disabled={folder.id === currentFolderId}
                                     className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                                         folder.id === currentFolderId
-                                            ? 'cursor-not-allowed border-gray-600 bg-gray-800 opacity-50'
+                                            ? 'border-gray-600 bg-gray-800 opacity-70 cursor-pointer'
                                             : showAllFolders
                                             ? 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10 cursor-pointer'
-                                            : 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10'
+                                            : 'border-gray-700 bg-gray-800 hover:border-blue-500 hover:bg-blue-900/10 cursor-pointer'
                                     }`}
                                 >
                                     <span className="text-2xl">
                                         {folder.icon || (folder.type === 'customer' ? '👤' : folder.type === 'category' ? '📁' : '📂')}
                                     </span>
                                     <div className="flex-1">
-                                        <h3 className="font-semibold text-white">{folder.name}</h3>
+                                        <h3 className="font-semibold text-white">
+                                            {folder.name}
+                                            {folder.id === currentFolderId && (
+                                                <span className="ml-2 text-xs text-yellow-400">(โฟลเดอร์ปัจจุบัน)</span>
+                                            )}
+                                        </h3>
                                         <p className="text-xs text-gray-400">
                                             {showAllFolders && folder.parent_id ? (
                                                 <>
@@ -1368,6 +1365,9 @@ const FolderSelectionModal = ({
                                             ) : (
                                                 <>
                                                     {folders.filter(f => f.parent_id === folder.id).length} {t('sub_folders')}
+                                                    {folder.id === currentFolderId && folders.filter(f => f.parent_id === folder.id).length > 0 && (
+                                                        <span className="ml-1 text-blue-400"> - คลิกเพื่อดูโฟลเดอร์ย่อย</span>
+                                                    )}
                                                 </>
                                             )}
                                         </p>
@@ -1410,9 +1410,18 @@ const FolderSelectionModal = ({
                     </button>
                     <button
                         onClick={() => {
+                            // Prevent selecting the current folder (where the project already is)
+                            if (selectedFolder?.id === currentFolderId) {
+                                return;
+                            }
                             handleSelectHere();
                         }}
-                        className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                        disabled={selectedFolder?.id === currentFolderId}
+                        className={`rounded px-4 py-2 text-white transition-colors ${
+                            selectedFolder?.id === currentFolderId
+                                ? 'cursor-not-allowed bg-gray-600 opacity-50'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
                     >
                         {action === 'move' ? t('move_here') : t('copy_here')}
                     </button>
@@ -1720,10 +1729,7 @@ export default function Home() {
     const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
     const [showFolderDeleteConfirm, setShowFolderDeleteConfirm] = useState(false);
-    const [draggedField, setDraggedField] = useState<Field | null>(null);
-    const [draggedFolder, setDraggedFolder] = useState<Folder | null>(null);
     const [parentFolderForModal, setParentFolderForModal] = useState<Folder | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
     
     // New states for move/copy/share/rename functionality
     const [showRenameModal, setShowRenameModal] = useState(false);
@@ -1776,15 +1782,15 @@ export default function Home() {
     const getCurrentFields = () => {
         if (!selectedFolder) return fields;
 
-        // Check by folder name since system folders are created in the backend
-        if (selectedFolder.name === t('finished') || selectedFolder.name === 'Finished') {
+        // Check by folder type instead of name for better reliability
+        if (selectedFolder.type === 'finished') {
             return fields.filter(
                 (field) =>
                     (field.status === 'finished' || field.isCompleted) &&
                     String(field.folderId) === String(selectedFolder.id)
             );
         }
-        if (selectedFolder.name === t('unfinished') || selectedFolder.name === 'Unfinished') {
+        if (selectedFolder.type === 'unfinished') {
             // Show fields that are unfinished AND are assigned to this specific folder (not unassigned ones)
             return fields.filter(
                 (field) =>
@@ -1799,8 +1805,8 @@ export default function Home() {
 
     // Get field count for a specific folder
     const getFieldCountForFolder = (folder: Folder) => {
-        // Check by folder name since system folders are created in the backend
-        if (folder.name === t('finished') || folder.name === 'Finished') {
+        // Check by folder type instead of name for better reliability
+        if (folder.type === 'finished') {
             const count = fields.filter(
                 (field) =>
                     (field.status === 'finished' || field.isCompleted) &&
@@ -1809,7 +1815,7 @@ export default function Home() {
             
             return count;
         }
-        if (folder.name === t('unfinished') || folder.name === 'Unfinished') {
+        if (folder.type === 'unfinished') {
             // Count fields that are unfinished AND are assigned to this specific folder (not unassigned ones)
             const count = fields.filter(
                 (field) =>
@@ -1885,8 +1891,8 @@ export default function Home() {
     };
 
     const createMockField = () => {
-        // Find the "Unfinished" folder
-        const unfinishedFolder = folders.find((f) => f.name === 'Unfinished');
+        // Find the "Unfinished" folder by type instead of name
+        const unfinishedFolder = folders.find((f) => f.type === 'unfinished');
         const folderId = unfinishedFolder ? unfinishedFolder.id : undefined;
 
         const mockField: Field = {
@@ -2238,59 +2244,6 @@ export default function Home() {
         setFolderToDelete(null);
     };
 
-    // Drag and drop functions
-    const handleFieldDragStart = (field: Field) => {
-        setDraggedField(field);
-        setIsDragging(true);
-    };
-
-    const handleFieldDragEnd = () => {
-        setDraggedField(null);
-        setIsDragging(false);
-    };
-
-    const handleFolderDrop = async (targetFolderId: string | null) => {
-        if (!draggedField) return;
-
-        // If targetFolderId is null or "unassigned", remove the field from its current folder
-        const newFolderId =
-            targetFolderId === null || targetFolderId === 'unassigned' ? null : targetFolderId;
-
-        if (draggedField.folderId !== newFolderId) {
-            try {
-                // Update field in backend
-                const response = await axios.put(`/api/fields/${draggedField.id}/folder`, {
-                    folder_id: newFolderId ? parseInt(newFolderId) : null,
-                });
-
-                if (response.data.success) {
-                    // Update field in frontend
-                    setFields((prev) =>
-                        prev.map((f) =>
-                            f.id === draggedField.id ? { ...f, folderId: newFolderId } : f
-                        )
-                    );
-                }
-            } catch (error: any) {
-                console.error('Error moving field to folder:', error);
-                console.error('Error details:', error.response?.data);
-
-                // For mock fields, still update the frontend state even if backend fails
-                const draggedFieldId = String(draggedField.id);
-                if (draggedFieldId.startsWith('mock-')) {
-                    setFields((prev) =>
-                        prev.map((f) =>
-                            f.id === draggedField.id ? { ...f, folderId: newFolderId } : f
-                        )
-                    );
-                } else {
-                    alert(
-                        `Error moving field to folder: ${error.response?.data?.message || error.message}`
-                    );
-                }
-            }
-        }
-    };
 
     const handleFolderSelect = (folder: Folder) => {
         setSelectedFolder(folder);
@@ -2380,7 +2333,7 @@ export default function Home() {
                 <div className="p-6">
                     <div className="mx-auto max-w-7xl">
                         {/* Main Content Header */}
-                        <div className="mb-8">
+                        <div className="mb-6">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <h1 className="text-3xl font-bold text-white">
@@ -2423,102 +2376,57 @@ export default function Home() {
                         </div>
 
                         {/* Folder Navigation */}
-                        <div className="mb-6">
+                        <div className="mb-4">
                             {selectedFolder && (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        className="flex items-center gap-2 text-blue-400 hover:underline"
-                                        onClick={handleGoBack}
-                                    >
-                                        <FaArrowLeft />
-                                        {folderHistory.length > 0 ? t('back') : t('all_folders')}
-                                    </button>
-
-                                    {/* Breadcrumb */}
-                                    {folderHistory.length > 0 && (
-                                        <div
-                                            className={`flex items-center gap-2 text-gray-400 ${isDragging
-                                                    ? 'rounded border-2 border-dashed border-blue-500 bg-blue-500/10 p-2'
-                                                    : ''
-                                                }`}
-                                            onDragOver={(e) => {
-                                                e.preventDefault();
-                                                e.currentTarget.classList.add(
-                                                    'border-2',
-                                                    'border-dashed',
-                                                    'border-blue-500',
-                                                    'bg-blue-500/10',
-                                                    'rounded',
-                                                    'p-2'
-                                                );
-                                            }}
-                                            onDragLeave={(e) => {
-                                                e.currentTarget.classList.remove(
-                                                    'border-2',
-                                                    'border-dashed',
-                                                    'border-blue-500',
-                                                    'bg-blue-500/10',
-                                                    'rounded',
-                                                    'p-2'
-                                                );
-                                            }}
-                                            onDrop={(e) => {
-                                                e.preventDefault();
-                                                e.currentTarget.classList.remove(
-                                                    'border-2',
-                                                    'border-dashed',
-                                                    'border-blue-500',
-                                                    'bg-blue-500/10',
-                                                    'rounded',
-                                                    'p-2'
-                                                );
-                                                // Move field to parent folder, or make unassigned if at root level
-                                                const parentFolder =
-                                                    folderHistory.length > 1
-                                                        ? folderHistory[folderHistory.length - 2]
-                                                        : null;
-                                                if (parentFolder) {
-                                                    handleFolderDrop(parentFolder.id);
-                                                } else {
-                                                    // At root level, make field unassigned
-                                                    handleFolderDrop(null);
-                                                }
-                                            }}
+                                <div className="flex items-center gap-2 justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            className="flex items-center gap-2 text-blue-400 hover:underline"
+                                            onClick={handleGoBack}
                                         >
-                                            {isDragging && (
-                                                <span className="mr-2 text-xs text-blue-400">
-                                                    {folderHistory.length > 1
-                                                        ? 'Drop here to move to parent folder'
-                                                        : 'Drop here to make unassigned'}
-                                                </span>
-                                            )}
-
-                                            <span>/</span>
-                                            {folderHistory.map((folder, index) => (
-                                                <div
-                                                    key={folder.id}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <button
-                                                        className="hover:text-white hover:underline"
-                                                        onClick={() => {
-                                                            const newHistory = folderHistory.slice(
-                                                                0,
-                                                                index + 1
-                                                            );
-                                                            setFolderHistory(newHistory);
-                                                            setSelectedFolder(folder);
-                                                        }}
+                                            <FaArrowLeft />
+                                            {folderHistory.length > 0 ? t('back') : t('all_folders')}
+                                        </button>
+                                        {/* Breadcrumb */}
+                                        {folderHistory.length > 0 && (
+                                            <div className="flex items-center gap-2 text-gray-400">
+                                                <span>/</span>
+                                                {folderHistory.map((folder, index) => (
+                                                    <div
+                                                        key={folder.id}
+                                                        className="flex items-center gap-2"
                                                     >
-                                                        {folder.name}
-                                                    </button>
-                                                    {index < folderHistory.length - 1 && (
-                                                        <span>/</span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                        <button
+                                                            className="hover:text-white hover:underline"
+                                                            onClick={() => {
+                                                                const newHistory = folderHistory.slice(
+                                                                    0,
+                                                                    index + 1
+                                                                );
+                                                                setFolderHistory(newHistory);
+                                                                setSelectedFolder(folder);
+                                                            }}
+                                                        >
+                                                            {folder.name}
+                                                        </button>
+                                                        {index < folderHistory.length - 1 && (
+                                                            <span>/</span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Create Sub-folder Button */}
+                                    <div className="flex-shrink-0">
+                                        <button
+                                            onClick={() => handleCreateSubFolder(selectedFolder)}
+                                            className="flex items-center gap-2 rounded-lg bg-yellow-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-yellow-700"
+                                        >
+                                            <FaPlus className="h-4 w-4" />
+                                            {t('create_sub_folder')}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -2545,7 +2453,6 @@ export default function Home() {
                                                     ? () => { }
                                                     : handleDeleteFolder
                                             }
-                                            onDrop={handleFolderDrop}
                                             isSelected={false}
                                             t={t}
                                         />
@@ -2570,12 +2477,6 @@ export default function Home() {
                                                         onSelect={handleFieldSelect}
                                                         onDelete={handleFieldDelete}
                                                         onStatusChange={handleFieldStatusChange}
-                                                        onDragStart={handleFieldDragStart}
-                                                        onDragEnd={handleFieldDragEnd}
-                                                        isDragging={
-                                                            isDragging &&
-                                                            draggedField?.id === field.id
-                                                        }
                                                         onRename={handleRenameProject}
                                                         onMove={handleMoveProject}
                                                         onCopy={handleCopyProject}
@@ -2614,7 +2515,6 @@ export default function Home() {
                                                         onSelect={handleFolderSelect}
                                                         onEdit={handleEditFolder}
                                                         onDelete={handleDeleteFolder}
-                                                        onDrop={handleFolderDrop}
                                                         isSelected={false}
                                                         t={t}
                                                     />
@@ -2681,17 +2581,6 @@ export default function Home() {
                                                                         onStatusChange={
                                                                             handleFieldStatusChange
                                                                         }
-                                                                        onDragStart={
-                                                                            handleFieldDragStart
-                                                                        }
-                                                                        onDragEnd={
-                                                                            handleFieldDragEnd
-                                                                        }
-                                                                        isDragging={
-                                                                            isDragging &&
-                                                                            draggedField?.id ===
-                                                                            field.id
-                                                                        }
                                                                         onRename={handleRenameProject}
                                                                         onMove={handleMoveProject}
                                                                         onCopy={handleCopyProject}
@@ -2745,12 +2634,6 @@ export default function Home() {
                                                         onSelect={handleFieldSelect}
                                                         onDelete={handleFieldDelete}
                                                         onStatusChange={handleFieldStatusChange}
-                                                        onDragStart={handleFieldDragStart}
-                                                        onDragEnd={handleFieldDragEnd}
-                                                        isDragging={
-                                                            isDragging &&
-                                                            draggedField?.id === field.id
-                                                        }
                                                         onRename={handleRenameProject}
                                                         onMove={handleMoveProject}
                                                         onCopy={handleCopyProject}
@@ -2764,16 +2647,7 @@ export default function Home() {
                                     ) : null;
                                 })()}
 
-                                {/* Create Sub-folder Button */}
-                                <div className="mt-6">
-                                    <button
-                                        onClick={() => handleCreateSubFolder(selectedFolder)}
-                                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors duration-200 hover:bg-blue-700"
-                                    >
-                                        <FaPlus className="h-4 w-4" />
-                                        {t('create_sub_folder')} "{selectedFolder.name}"
-                                    </button>
-                                </div>
+                                
                             </div>
                         )}
                     </div>
@@ -2820,12 +2694,14 @@ export default function Home() {
                             });
                             
                             if (response.data.success) {
+                                // Ensure folderId is string or null to match Field type
+                                const updatedFolderId = folderId ? String(folderId) : null;
                                 setFields(prev => prev.map(f => 
-                                    f.id === fieldToMoveOrCopy.id ? { ...f, folderId } : f
+                                    f.id === fieldToMoveOrCopy.id ? { ...f, folderId: updatedFolderId } : f
                                 ));
                                 alert(t('move_project_success'));
-                                // Reload fields to reflect the change
-                                window.location.reload();
+                                setShowFolderSelectionModal(false);
+                                setFieldToMoveOrCopy(null);
                             }
                         } else {
                             // Copy project
@@ -2834,10 +2710,18 @@ export default function Home() {
                             });
                             
                             if (response.data.success && response.data.field) {
-                                setFields(prev => [...prev, response.data.field]);
+                                // Backend sends field with folder_id (snake_case) or folderId (camelCase)
+                                // Convert to string or null to match Field type
+                                const rawFolderId = response.data.field.folder_id ?? response.data.field.folderId;
+                                const copiedField = {
+                                    ...response.data.field,
+                                    id: String(response.data.field.id), // Ensure id is string
+                                    folderId: rawFolderId ? String(rawFolderId) : null
+                                };
+                                setFields(prev => [...prev, copiedField]);
                                 alert(t('copy_project_success'));
-                                // Reload fields to reflect the change
-                                window.location.reload();
+                                setShowFolderSelectionModal(false);
+                                setFieldToMoveOrCopy(null);
                             }
                         }
                     } catch (error: any) {
@@ -2903,15 +2787,9 @@ export default function Home() {
                             
                             if (response.data.success) {
                                 // Show detailed success message
-                                const message = `โครงการ "${fieldToShare.name}" ถูกแชร์ไปยัง "${selectedUserForShare.name}" สำเร็จแล้ว\n\n` +
-                                    `Field ID: ${response.data.field?.id}\n` +
-                                    `User ID: ${response.data.debug?.target_user_id}\n` +
-                                    `Folder ID: ${response.data.debug?.folder_id || 'Unfinished'}\n\n` +
+                                const message = `สำเร็จแล้ว✅ \nโครงการ "${fieldToShare.name}" ถูกแชร์ไปยัง "${selectedUserForShare.name}" \n` +
                                     `ผู้ใช้ที่รับแชร์จะเห็นโครงการนี้เมื่อ refresh หน้า`;
                                 alert(message);
-                                
-                                // Reload fields to show the shared project
-                                window.location.reload();
                             } else {
                                 console.error('❌ [DEBUG] Share failed:', response.data);
                                 alert(`Error sharing project: ${response.data.message || 'Unknown error'}`);

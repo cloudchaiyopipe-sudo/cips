@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\SprinklerController;
 use App\Http\Controllers\Api\EquipmentCategoryController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\TokenController;
+use App\Http\Controllers\Api\SuggestionController;
 use App\Http\Controllers\ProfilePhotoController;
 
 /*
@@ -36,6 +37,9 @@ Route::middleware(['web', 'auth'])->get('/test-auth', function (Request $request
         'auth_check' => Auth::check()
     ]);
 });
+
+// Suggestions/feedback (คำแนะนำ) - forwards to Google Sheet via Web App URL
+Route::post('/suggestions', [SuggestionController::class, 'store']);
 
 // ==================================================
 // 📢 ADVERTISEMENT ROUTES

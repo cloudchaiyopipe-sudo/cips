@@ -6139,7 +6139,7 @@ function FreeMap() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="mx-auto flex h-[calc(100vh-64px)] max-w-5xl flex-col overflow-y-auto px-4 py-4 md:h-auto md:overflow-y-visible md:px-6 md:py-6"
+                className="mx-auto flex h-[calc(100vh-64px)] max-w-5xl flex-col overflow-y-auto px-2 py-2 md:h-auto md:overflow-y-visible md:px-6 md:py-6"
             >
 
                 {/* Google Maps Container */}
@@ -6147,7 +6147,7 @@ function FreeMap() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="relative mb-4 flex min-h-[300px] flex-1 overflow-hidden rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg shadow-md md:mb-4 md:flex-none md:h-[420px]"
+                    className="relative mb-2 flex min-h-[300px] flex-1 overflow-hidden rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg shadow-md md:mb-4 md:flex-none md:h-[420px]"
                 >
                     {/* Search Component */}
                     <div className="absolute left-1 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
@@ -6418,7 +6418,7 @@ function FreeMap() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 }}
-                    className="mt-3 flex gap-3 pb-4 md:pb-0"
+                    className="mt-2 flex gap-3 md:pb-0"
                 >
                     <button
                         onClick={handleBack}

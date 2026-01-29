@@ -681,23 +681,54 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
             });
         } else if (
+            projectMode === 'horticulture' ||
             (projectData?.useZones && projectData.zones.length > 1) ||
             Object.keys(zoneInputs).length > 1 ||
             Object.keys(zoneSprinklers).length > 1
         ) {
-            // ใช้ zoneInputs และ zoneSprinklers โดยตรงเพื่อให้ครอบคลุมทุกโซน
+            // โหมด horticulture: ใช้ zone ids จาก zoneInputs/zoneSprinklers/selectedPipes เพื่อให้
+            // เปิดจากโฟลเดอร์ (โหลดจาก DB) แสดงท่อ/สปริงเกอร์ทุกโซนที่บันทึกไว้โดยไม่ต้องเปิดแต่ละโซน
+            const allZoneIds =
+                projectMode === 'horticulture'
+                    ? Array.from(
+                          new Set([
+                              ...Object.keys(zoneInputs),
+                              ...Object.keys(zoneSprinklers),
+                              ...Object.keys(selectedPipes),
+                          ])
+                      ).filter((id) => id && id !== 'unknown')
+                    : (projectData?.useZones && projectData.zones.length > 1
+                          ? projectData.zones.map((z: any) => z.id)
+                          : Object.keys(zoneInputs).length > 0
+                            ? Object.keys(zoneInputs)
+                            : Object.keys(zoneSprinklers));
+
             const zonesToProcess =
-                projectData?.useZones && projectData.zones.length > 1
-                    ? projectData.zones
-                    : Object.keys(zoneInputs).length > 0
-                      ? Object.keys(zoneInputs).map((zoneId) => ({
-                            id: zoneId,
-                            plantCount: zoneInputs[zoneId]?.totalTrees || 0,
-                        }))
-                      : Object.keys(zoneSprinklers).map((zoneId) => ({
-                            id: zoneId,
-                            plantCount: 0,
-                        }));
+                projectMode === 'horticulture'
+                    ? allZoneIds.map((zoneId) => ({
+                          id: zoneId,
+                          plantCount:
+                              zoneInputs[zoneId]?.totalTrees ??
+                              (projectData?.zones as any[])?.find((z: any) => z.id === zoneId)?.plantCount ??
+                              (projectData?.zones as any[])?.find((z: any) => z.id === zoneId)?.plants?.length ??
+                              0,
+                      }))
+                    : (projectData?.useZones && projectData.zones.length > 1
+                          ? projectData.zones
+                          : allZoneIds.map((zoneId) => ({
+                                id: zoneId,
+                                plantCount: zoneInputs[zoneId]?.totalTrees || 0,
+                            })));
+
+            // โหมด horticulture ออกแบบครั้งแรก: ใช้ results.autoSelected* เป็น fallback เมื่อโซนยังไม่ได้เลือกท่อ
+            const effectiveBranchPipe = (zonePipes: typeof selectedPipes[string]) =>
+                zonePipes?.branch ?? results.autoSelectedBranchPipe;
+            const effectiveSecondaryPipe = (zonePipes: typeof selectedPipes[string]) =>
+                zonePipes?.secondary ?? results.autoSelectedSecondaryPipe;
+            const effectiveMainPipe = (zonePipes: typeof selectedPipes[string]) =>
+                zonePipes?.main ?? results.autoSelectedMainPipe;
+            const effectiveEmitterPipe = (zonePipes: typeof selectedPipes[string]) =>
+                zonePipes?.emitter ?? results.autoSelectedEmitterPipe;
 
             zonesToProcess.forEach((zone: any) => {
                 const zoneSprinkler = zoneSprinklers[zone.id];
@@ -727,6 +758,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     sprinklerSummary[key].quantity += sprinklerQuantity;
                     sprinklerSummary[key].zones.push(getZoneName(zone.id));
                     sprinklerSummary[key].totalCost += sprinklerCost;
+                } else if (projectMode === 'horticulture' && zoneInput && (zoneInput.totalTrees ?? zone.plantCount) > 0) {
+                    // ออกแบบครั้งแรก: โซนมี zoneInput แต่ยังไม่มี zoneSprinkler ให้รวมจำนวนต้นไว้ (จะแสดงใน totalSprinklers ผ่าน results)
+                    // ไม่เพิ่ม cost เพราะยังไม่มีสินค้าสปริงเกอร์ที่เลือก
                 }
 
                 if (zoneInput) {
@@ -739,8 +773,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     }
                     processExtraPipe(zone.id, zoneInput, sprinklerCount);
 
-                    // ✅ ใช้เฉพาะท่อที่เลือกไว้สำหรับโซนนี้เท่านั้น (ไม่ใช้ fallback จาก results.autoSelected*)
-                    const branchPipe = zonePipes.branch;
+                    // โหมด horticulture ออกแบบครั้งแรก: ใช้ท่อที่เลือกหรือ fallback เป็น results.autoSelected* เพื่อให้รายการครบทุกโซน
+                    const branchPipe = projectMode === 'horticulture' ? effectiveBranchPipe(zonePipes) : zonePipes.branch;
                     if (branchPipe && zoneInput.totalBranchPipeM > 0) {
                         const key = `${branchPipe.id}`;
                         if (!pipeSummary.branch[key]) {
@@ -756,7 +790,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         pipeSummary.branch[key].zones.push(getZoneName(zone.id));
                     }
 
-                    const secondaryPipe = zonePipes.secondary;
+                    const secondaryPipe = projectMode === 'horticulture' ? effectiveSecondaryPipe(zonePipes) : zonePipes.secondary;
                     if (secondaryPipe && zoneInput.totalSecondaryPipeM > 0) {
                         const key = `${secondaryPipe.id}`;
                         if (!pipeSummary.secondary[key]) {
@@ -772,7 +806,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         pipeSummary.secondary[key].zones.push(getZoneName(zone.id));
                     }
 
-                    const mainPipe = zonePipes.main;
+                    const mainPipe = projectMode === 'horticulture' ? effectiveMainPipe(zonePipes) : zonePipes.main;
                     if (mainPipe && zoneInput.totalMainPipeM > 0) {
                         const key = `${mainPipe.id}`;
                         if (!pipeSummary.main[key]) {
@@ -788,7 +822,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         pipeSummary.main[key].zones.push(getZoneName(zone.id));
                     }
 
-                    const emitterPipe = zonePipes.emitter;
+                    const emitterPipe = projectMode === 'horticulture' ? effectiveEmitterPipe(zonePipes) : zonePipes.emitter;
                     if (
                         emitterPipe &&
                         zoneInput.totalEmitterPipeM &&
@@ -816,12 +850,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 const zoneInput = zoneInputs[zoneId];
 
                 if (zoneSprinkler && zoneInput) {
-                    let sprinklerQuantity = zoneInput.totalTrees || results.totalSprinklers || 0;
-                    if (projectMode === 'horticulture') {
-                        const config = loadSprinklerConfig();
-                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                        sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
-                    }
+                    const sprinklerQuantity = zoneInput.totalTrees || results.totalSprinklers || 0;
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
@@ -840,12 +869,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    let sprinklerCount = zoneInput.totalTrees || results.totalSprinklers || 0;
-                    if (projectMode === 'horticulture') {
-                        const config = loadSprinklerConfig();
-                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                        sprinklerCount = sprinklerCount * sprinklersPerTree;
-                    }
+                    const sprinklerCount = zoneInput.totalTrees || results.totalSprinklers || 0;
                     processExtraPipe(zoneId, zoneInput, sprinklerCount);
 
                     // ✅ ใช้เฉพาะท่อที่เลือกไว้สำหรับโซนนี้เท่านั้น (ไม่ใช้ fallback จาก results.autoSelected*)
@@ -2152,7 +2176,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     className="rounded bg-gradient-to-r from-blue-500 to-purple-600 px-8 py-3 text-lg font-bold text-white hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={(costs.totalCost || 0) === 0}
                 >
-                    📋 {t('ออกใบเสนอราคา')}
+                    📋 {t('ดูรายการสินค้า')}
                 </button>
                 {(costs.totalCost || 0) === 0 && (
                     <p className="mt-2 text-sm text-red-400">

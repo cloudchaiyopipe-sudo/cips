@@ -2399,6 +2399,7 @@ const ZonePlantSelectionModal = ({
     onSave,
     onCreateCustomPlant,
     onEditPlant,
+    irrigationZones,
     t,
 }: {
     isOpen: boolean;
@@ -2408,6 +2409,7 @@ const ZonePlantSelectionModal = ({
     onSave: (zoneId: string, plantData: PlantData) => void;
     onCreateCustomPlant: () => void;
     onEditPlant: (plantData: PlantData) => void;
+    irrigationZones?: any[];
     t: (key: string) => string;
 }) => {
     const [selectedPlant, setSelectedPlant] = useState<PlantData | null>(zone?.plantData || null);
@@ -2443,6 +2445,10 @@ const ZonePlantSelectionModal = ({
 
     if (!isOpen || !zone) return null;
 
+    // Find zone index from irrigationZones for color
+    const zoneIndex = irrigationZones ? irrigationZones.findIndex((z: any) => z.id === zone.id) : -1;
+    const zoneColor = zoneIndex >= 0 ? getZoneColor(zoneIndex) : getZoneColor(0);
+
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
             <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-gray-900 p-6 shadow-2xl">
@@ -2459,7 +2465,7 @@ const ZonePlantSelectionModal = ({
                         <span className="text-gray-300">• {t('สี')}: </span>
                         <span
                             className="ml-2 inline-block h-4 w-4 rounded"
-                            style={{ backgroundColor: zone.color }}
+                            style={{ backgroundColor: zoneColor }}
                         ></span>
                     </div>
                 </div>
@@ -3808,7 +3814,8 @@ const ManualZoneDrawingManager: React.FC<{
     currentZoneIndex?: number;
     totalZones?: number;
     manualZones?: ManualIrrigationZone[];
-}> = ({ onCancel, t, currentZoneIndex = 0, totalZones = 0, manualZones = [] }) => {
+    irrigationZonesCount?: number;
+}> = ({ onCancel, t, currentZoneIndex = 0, totalZones = 0, manualZones = [], irrigationZonesCount = 0 }) => {
     return (
         <div className="fixed right-2 top-[190px] z-[9999] w-80 rounded-lg border border-gray-600 bg-gray-900 p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
@@ -3831,7 +3838,7 @@ const ManualZoneDrawingManager: React.FC<{
                 {/* แสดงโซนที่วาดแล้ว */}
                 {manualZones.length > 0 && (
                     <div className="mt-2 space-y-1">
-                        {manualZones.map((zone) => {
+                        {manualZones.map((zone, manualZoneIndex) => {
                             const plantSummary: Record<
                                 string,
                                 { count: number; totalWater: number }
@@ -3850,17 +3857,17 @@ const ManualZoneDrawingManager: React.FC<{
                                 totalWaterNeed += waterNeed;
                             });
 
+                            const zoneColor = getZoneColor(irrigationZonesCount + manualZoneIndex);
+
                             return (
                                 <div key={zone.id} className="flex flex-col text-xs">
                                     <div className="mb-1 flex items-center justify-between space-x-2 rounded-lg bg-gray-800 p-2">
                                         <div className="flex items-center space-x-2">
                                             <div
                                                 className="h-3 w-3 rounded"
-                                                style={{ backgroundColor: zone.color }}
+                                                style={{ backgroundColor: zoneColor }}
                                             ></div>
-                                            <span
-                                                className={`text-${zone.color}-700 font-semibold`}
-                                            >
+                                            <span className="font-semibold text-blue-700">
                                                 {zone.name}
                                             </span>
                                         </div>
@@ -4782,7 +4789,7 @@ const AutoZoneDebugModal = ({
                             {t('รายละเอียดแต่ละโซน')}
                         </h4>
                         <div className="space-y-2">
-                            {zones.map((zone) => (
+                            {zones.map((zone, zoneIndex) => (
                                 <div
                                     key={zone.id}
                                     className="flex items-center justify-between rounded bg-green-800 p-2 text-sm"
@@ -4790,7 +4797,7 @@ const AutoZoneDebugModal = ({
                                     <div className="flex items-center space-x-3">
                                         <div
                                             className="h-4 w-4 rounded"
-                                            style={{ backgroundColor: zone.color }}
+                                            style={{ backgroundColor: getZoneColor(zoneIndex) }}
                                         ></div>
                                         <span className="text-green-100">{zone.name}</span>
                                     </div>
@@ -14800,7 +14807,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                         / {numberOfManualZones}
                                                                     </p>
                                                                     <div className="mt-2 space-y-1">
-                                                                        {manualZones.map((zone) => {
+                                                                        {manualZones.map((zone, manualZoneIndex) => {
                                                                             const plantSummary: Record<
                                                                                 string,
                                                                                 {
@@ -14862,7 +14869,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                                 className="h-3 w-3 rounded"
                                                                                                 style={{
                                                                                                     backgroundColor:
-                                                                                                        zone.color,
+                                                                                                        getZoneColor(history.present.irrigationZones.length + manualZoneIndex),
                                                                                                 }}
                                                                                             ></div>
                                                                                             <span className="font-semibold text-blue-700">
@@ -15013,7 +15020,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         <>
                                                             <div className="mt-3 max-h-32 space-y-2 overflow-y-auto">
                                                                 {history.present.irrigationZones.map(
-                                                                    (zone) => (
+                                                                    (zone, zoneIndex) => (
                                                                         <div
                                                                             key={zone.id}
                                                                             className="rounded border bg-gray-900 p-2 text-xs"
@@ -15024,7 +15031,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                         className="h-3 w-3 rounded"
                                                                                         style={{
                                                                                             backgroundColor:
-                                                                                                zone.color,
+                                                                                                getZoneColor(zoneIndex),
                                                                                         }}
                                                                                     ></div>
                                                                                     <span className="font-medium text-white">
@@ -16671,6 +16678,7 @@ export default function EnhancedHorticulturePlannerPage() {
                 onEditPlant={(plantData: PlantData) => {
                     handleCreateCustomPlant(plantData);
                 }}
+                irrigationZones={history.present.irrigationZones}
                 t={t}
             />
 
@@ -16920,6 +16928,7 @@ export default function EnhancedHorticulturePlannerPage() {
                     currentZoneIndex={currentManualZoneIndex}
                     totalZones={numberOfManualZones}
                     manualZones={manualZones}
+                    irrigationZonesCount={history.present.irrigationZones.length}
                     t={t}
                 />
             )}

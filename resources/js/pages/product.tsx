@@ -96,7 +96,8 @@ import {
 import type { TourStep } from '../utils/onboardingTourUtils';
 
 import { router } from '@inertiajs/react';
-import { loadSprinklerConfig } from '../utils/sprinklerUtils';
+import { loadSprinklerConfig, calculateTotalFlowRate } from '../utils/sprinklerUtils';
+import { getZoneColor } from '../utils/horticultureUtils';
 
 type ProjectMode = 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
 
@@ -221,6 +222,15 @@ export default function Product() {
             emitter?: any;
         };
     }>({});
+    // ✅ Store pipe material type (PE/PVC) for each zone and pipe type
+    const [selectedPipeMaterials, setSelectedPipeMaterials] = useState<{
+        [zoneId: string]: {
+            branch?: 'PE' | 'PVC';
+            secondary?: 'PE' | 'PVC';
+            main?: 'PE' | 'PVC';
+            emitter?: 'PE' | 'PVC';
+        };
+    }>({});
     const [selectedPump, setSelectedPump] = useState<any>(null);
     const [showPumpOption, setShowPumpOption] = useState(true);
 
@@ -230,6 +240,9 @@ export default function Product() {
     const [connectionEquipments, setConnectionEquipments] = useState<{ [zoneId: string]: any[] }>(
         {}
     );
+
+    // ✅ Track if initial data load has completed
+    const initialDataLoadRef = useRef(false);
 
     // Tab system state
     const [activeTab, setActiveTab] = useState<number>(1); // 1 = InputForm, 2 = SprinklerSelector, 3 = PipeSelector, 4 = PumpSelector, 5 = CostSummary
@@ -260,11 +273,18 @@ export default function Product() {
         }
     }, [showPumpOption, activeTab]);
 
-    // Clear connection equipment selections on initial mount
+    // Clear connection equipment selections on initial mount (only if not loading from database)
     useEffect(() => {
-        // Reset connection equipment selections when entering product page
-        localStorage.removeItem('connectionPointEquipmentSelections');
-        console.log('🔄 Reset connection equipment selections');
+        const currentFieldId = localStorage.getItem('currentFieldId');
+        const isLoadingFromDatabase = currentFieldId && !currentFieldId.startsWith('mock-');
+        
+        // Only reset if not loading from database (new project)
+        if (!isLoadingFromDatabase) {
+            localStorage.removeItem('connectionPointEquipmentSelections');
+            // Reset connection equipment selections for new project
+        } else {
+            // Keep connection equipment selections when loading from database
+        }
     }, []); // Run only once on mount
 
     // Load sprinklerEquipmentSets from localStorage on mount and listen for updates
@@ -431,6 +451,20 @@ export default function Product() {
         setImageLoading(false);
     }, [projectMode]);
 
+    // เมื่อมาจาก Results หรือโหลด horticultureSystemData จาก localStorage → อัปเดตรูปแผนผังจาก localStorage (รูปที่ Results บันทึก)
+    useEffect(() => {
+        if (projectMode !== 'horticulture') return;
+        const fromResults =
+            typeof sessionStorage !== 'undefined' &&
+            sessionStorage.getItem('fromHorticultureResults') === 'true';
+        if (!fromResults && !horticultureSystemData) return;
+        const image = getStoredProjectImage('horticulture');
+        if (image && validateImageData(image)) {
+            setProjectImage(image);
+            setImageLoadError(null);
+        }
+    }, [projectMode, horticultureSystemData]);
+
     useEffect(() => {
         if (projectImage && projectMode) {
             const isValid = validateImageData(projectImage);
@@ -470,14 +504,12 @@ export default function Product() {
     useEffect(() => {
         setTourSteps(getProductTourSteps(t));
         
-        // เช็คว่ามาจากหน้า HorticultureResultsPage หรือไม่
+        // เช็คว่ามาจากหน้า HorticultureResultsPage หรือไม่ (ไม่ลบ flag ที่นี่ — ใช้ใน apply auto-selected effect)
         const fromResults = sessionStorage.getItem('fromHorticultureResults') === 'true';
         
         // ถ้ามาจากหน้า results ให้แสดง tour ทุกครั้ง
         // ถ้าไม่ใช่ ให้เช็คว่าเคยเลือก "อย่าแสดงอีก" หรือไม่
         if (fromResults) {
-            // ลบ flag หลังจากใช้แล้ว
-            sessionStorage.removeItem('fromHorticultureResults');
             // Use requestAnimationFrame to ensure DOM is ready
             requestAnimationFrame(() => {
                 setShowOnboardingTour(true);
@@ -1336,6 +1368,143 @@ export default function Product() {
         } else {
             setProjectMode('horticulture');
             localStorage.removeItem('garden_defaultSprinkler');
+            
+            // ✅ Prevent multiple loads
+            if (initialDataLoadRef.current) {
+                return;
+            }
+            initialDataLoadRef.current = true;
+
+            // ✅ Check if loading from database (currentFieldId exists)
+            const currentFieldId = localStorage.getItem('currentFieldId');
+            const isLoadingFromDatabase = currentFieldId && !currentFieldId.startsWith('mock-');
+
+            // ✅ First, try to load from localStorage (set by home.tsx)
+            // Check for zoneInputs, connectionEquipments, etc. from localStorage
+            const savedZoneInputsStr = localStorage.getItem('zoneInputs') || localStorage.getItem('horticultureZoneInputs');
+            const savedConnectionEquipmentsStr = localStorage.getItem('connectionEquipments') || localStorage.getItem('horticultureConnectionEquipments');
+            
+            // ✅ If loading from database, skip loading equipment from localStorage (will load from API instead)
+            // This prevents old localStorage data from overriding new database data
+            let savedSelectedPipesStr: string | null = null;
+            let savedSprinklerEquipmentSetsStr: string | null = null;
+            let savedZoneSprinklersStr: string | null = null;
+            let savedSelectedPumpStr: string | null = null;
+            
+            if (!isLoadingFromDatabase) {
+                // Only load equipment from localStorage if NOT loading from database
+                savedSelectedPipesStr = localStorage.getItem('selectedPipes') || localStorage.getItem('horticultureSelectedPipes');
+                savedSprinklerEquipmentSetsStr = localStorage.getItem('sprinklerEquipmentSets') || localStorage.getItem('horticultureSprinklerEquipmentSets');
+                savedZoneSprinklersStr = localStorage.getItem('zoneSprinklers') || localStorage.getItem('horticultureZoneSprinklers');
+                savedSelectedPumpStr = localStorage.getItem('selectedPump') || localStorage.getItem('horticultureSelectedPump');
+            } else {
+                // Skip localStorage load - will load from API instead
+            }
+
+            // Load saved data from localStorage if available
+            if (savedZoneInputsStr) {
+                try {
+                    const parsed = JSON.parse(savedZoneInputsStr);
+                    if (parsed && Object.keys(parsed).length > 0) {
+                        setZoneInputs(parsed);
+                        localStorage.setItem('horticultureZoneInputs', JSON.stringify(parsed));
+                    }
+                } catch (e) {
+                    console.error('Error loading zoneInputs from localStorage:', e);
+                }
+            }
+
+            if (savedConnectionEquipmentsStr) {
+                try {
+                    const parsed = JSON.parse(savedConnectionEquipmentsStr);
+                    if (parsed && Object.keys(parsed).length > 0) {
+                        setConnectionEquipments(parsed);
+                        localStorage.setItem('horticultureConnectionEquipments', JSON.stringify(parsed));
+                        // Also save to connectionPointEquipmentSelections for ConnectionEquipmentsSelector (format: zoneId-connectionType)
+                        const connectionSelections: any = {};
+                        Object.entries(parsed).forEach(([zoneId, equipments]: [string, any]) => {
+                            if (Array.isArray(equipments)) {
+                                equipments.forEach((eq: any) => {
+                                    if (eq.equipment && eq.connectionType) {
+                                        const key = `${zoneId}-${eq.connectionType}`;
+                                        connectionSelections[key] = {
+                                            equipment: eq.equipment,
+                                            category: eq.category,
+                                        };
+                                    }
+                                });
+                            }
+                        });
+                        if (Object.keys(connectionSelections).length > 0) {
+                            localStorage.setItem('connectionPointEquipmentSelections', JSON.stringify(connectionSelections));
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error loading connectionEquipments from localStorage:', e);
+                }
+            }
+
+            // ✅ Only load equipment from localStorage if NOT loading from database
+            if (!isLoadingFromDatabase) {
+                if (savedSelectedPipesStr) {
+                    try {
+                        const parsed = JSON.parse(savedSelectedPipesStr);
+                        if (parsed && Object.keys(parsed).length > 0) {
+                            setSelectedPipes(parsed);
+                            localStorage.setItem('horticultureSelectedPipes', JSON.stringify(parsed));
+                        }
+                        
+                        // ✅ Load selectedPipeMaterials from localStorage
+                        try {
+                            const materialsStr = localStorage.getItem('horticultureSelectedPipeMaterials');
+                            if (materialsStr) {
+                                const parsed = JSON.parse(materialsStr);
+                                setSelectedPipeMaterials(parsed);
+                            }
+                        } catch (e) {
+                            // Ignore parse errors
+                        }
+                    } catch (e) {
+                        console.error('Error loading selectedPipes from localStorage:', e);
+                    }
+                }
+
+                if (savedSprinklerEquipmentSetsStr) {
+                    try {
+                        const parsed = JSON.parse(savedSprinklerEquipmentSetsStr);
+                        if (parsed && Object.keys(parsed).length > 0) {
+                            setSprinklerEquipmentSets(parsed);
+                            localStorage.setItem('horticultureSprinklerEquipmentSets', JSON.stringify(parsed));
+                        }
+                    } catch (e) {
+                        console.error('Error loading sprinklerEquipmentSets from localStorage:', e);
+                    }
+                }
+
+                if (savedZoneSprinklersStr) {
+                    try {
+                        const parsed = JSON.parse(savedZoneSprinklersStr);
+                        if (parsed && Object.keys(parsed).length > 0) {
+                            setZoneSprinklers(parsed);
+                            localStorage.setItem('horticultureZoneSprinklers', JSON.stringify(parsed));
+                        }
+                    } catch (e) {
+                        console.error('Error loading zoneSprinklers from localStorage:', e);
+                    }
+                }
+
+                if (savedSelectedPumpStr) {
+                    try {
+                        const parsed = JSON.parse(savedSelectedPumpStr);
+                        if (parsed) {
+                            setSelectedPump(parsed);
+                            localStorage.setItem('horticultureSelectedPump', JSON.stringify(parsed));
+                        }
+                    } catch (e) {
+                        console.error('Error loading selectedPump from localStorage:', e);
+                    }
+                }
+            }
 
             const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
             let horticultureSystemData: any = null;
@@ -1354,13 +1523,26 @@ export default function Product() {
                 console.error('No horticulture system data found in localStorage');
             }
 
-            const currentProjectDataStr = localStorage.getItem('currentHorticultureProject');
+            // ✅ Try to load from horticultureProjectData (set by home.tsx)
+            const horticultureProjectDataStr = localStorage.getItem('horticultureProjectData');
             let data: HorticultureProject | null = null;
-            if (currentProjectDataStr) {
+            if (horticultureProjectDataStr) {
                 try {
-                    data = JSON.parse(currentProjectDataStr);
+                    data = JSON.parse(horticultureProjectDataStr);
                 } catch (error) {
-                    console.error('Error parsing current project data:', error);
+                    console.error('Error parsing horticultureProjectData:', error);
+                }
+            }
+
+            // ✅ Fallback to currentHorticultureProject if no data loaded yet
+            if (!data) {
+                const currentProjectDataStr = localStorage.getItem('currentHorticultureProject');
+                if (currentProjectDataStr) {
+                    try {
+                        data = JSON.parse(currentProjectDataStr);
+                    } catch (error) {
+                        console.error('Error parsing current project data:', error);
+                    }
                 }
             }
 
@@ -1408,27 +1590,110 @@ export default function Product() {
                 };
             }
 
-            if (data && stats) {
+            // ✅ Set projectData even if stats is null (stats can be loaded later)
+            // ✅ If no data at all, create minimal data immediately to prevent infinite loading
+            if (!data && !horticultureSystemData) {
+                const minimalData: HorticultureProject = {
+                    projectName: 'โครงการใหม่',
+                    totalArea: 1600,
+                    zones: [],
+                    plants: [],
+                    useZones: false,
+                    irrigationZones: [],
+                };
+                setProjectData(minimalData);
+                setProjectStats({
+                    totalAreaInRai: 1,
+                    totalPlants: 0,
+                    zoneDetails: [],
+                });
+                // Create default zoneInputs for minimal data
+                const defaultInput: IrrigationInput = {
+                    farmSizeRai: 1,
+                    totalTrees: 100,
+                    waterPerTreeLiters: 50,
+                    numberOfZones: 1,
+                    sprinklersPerTree: 1,
+                    irrigationTimeMinutes: 20,
+                    staticHeadM: 0,
+                    pressureHeadM: 20,
+                    pipeAgeYears: 0,
+                    sprinklersPerBranch: 4,
+                    branchesPerSecondary: 5,
+                    simultaneousZones: 1,
+                    sprinklersPerLongestBranch: 4,
+                    branchesPerLongestSecondary: 5,
+                    secondariesPerLongestMain: 1,
+                    longestBranchPipeM: 30,
+                    totalBranchPipeM: 100,
+                    longestSecondaryPipeM: 0,
+                    totalSecondaryPipeM: 0,
+                    longestMainPipeM: 0,
+                    totalMainPipeM: 0,
+                    longestEmitterPipeM: 0,
+                    totalEmitterPipeM: 0,
+                };
+                setZoneInputs({ 'main-area': defaultInput });
+                setSelectedPipes({
+                    'main-area': {
+                        branch: undefined,
+                        secondary: undefined,
+                        main: undefined,
+                        emitter: undefined,
+                    },
+                });
+                setActiveZoneId('main-area');
+            } else if (data) {
                 setProjectData(data);
-                setProjectStats(stats);
+                if (stats) {
+                    setProjectStats(stats);
+                } else {
+                    // Create basic stats if data exists but stats doesn't
+                    const basicStats = {
+                        totalAreaInRai: data.totalArea / 1600,
+                        totalPlants: data.plants?.length || 0,
+                        zoneDetails: data.zones?.map((zone: Zone) => ({
+                            zoneId: zone.id,
+                            zoneName: zone.name,
+                            areaInRai: zone.area / 1600,
+                            plantCount: zone.plantCount || 0,
+                        })) || [],
+                    };
+                    setProjectStats(basicStats);
+                }
 
-                if (
-                    horticultureSystemData &&
-                    horticultureSystemData.isMultipleZones &&
-                    horticultureSystemData.zones.length > 0
-                ) {
-                    const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
-                    const initialSelectedPipes: {
-                        [zoneId: string]: {
-                            branch?: any;
-                            secondary?: any;
-                            main?: any;
-                            emitter?: any;
-                        };
-                    } = {};
+                // ✅ Check if zoneInputs are already loaded (from database/localStorage)
+                // Use a flag to prevent multiple setState calls
+                const existingZoneInputsStr = localStorage.getItem('zoneInputs') || localStorage.getItem('horticultureZoneInputs');
+                let hasExistingZoneInputs = false;
+                try {
+                    if (existingZoneInputsStr) {
+                        const existingZoneInputs = JSON.parse(existingZoneInputsStr);
+                        hasExistingZoneInputs = existingZoneInputs && Object.keys(existingZoneInputs).length > 0;
+                    }
+                } catch (e) {
+                    // Ignore parse errors
+                }
+                
+                // ✅ Only create default zoneInputs if not already loaded
+                if (!hasExistingZoneInputs) {
+                    if (
+                        horticultureSystemData &&
+                        horticultureSystemData.isMultipleZones &&
+                        horticultureSystemData.zones.length > 0
+                    ) {
+                        const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
+                        const initialSelectedPipes: {
+                            [zoneId: string]: {
+                                branch?: any;
+                                secondary?: any;
+                                main?: any;
+                                emitter?: any;
+                            };
+                        } = {};
 
-                    horticultureSystemData.zones.forEach((zone: any) => {
-                        initialZoneInputs[zone.id] = {
+                        horticultureSystemData.zones.forEach((zone: any) => {
+                            initialZoneInputs[zone.id] = {
                             farmSizeRai: formatNumber((zone.area || 0) / 1600, 3),
                             totalTrees: zone.plantCount || 0,
                             waterPerTreeLiters: formatNumber(zone.waterNeedPerMinute || 50, 3),
@@ -1465,23 +1730,23 @@ export default function Product() {
                         };
                     });
 
-                    setZoneInputs(initialZoneInputs);
-                    setSelectedPipes(initialSelectedPipes);
-                    setActiveZoneId(horticultureSystemData.zones[0].id);
-                    handleZoneOperationModeChange('sequential');
-                } else if (data && data.useZones && data.zones.length > 0) {
-                    const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
-                    const initialSelectedPipes: {
-                        [zoneId: string]: {
-                            branch?: any;
-                            secondary?: any;
-                            main?: any;
-                            emitter?: any;
-                        };
-                    } = {};
+                        setZoneInputs(initialZoneInputs);
+                        setSelectedPipes(initialSelectedPipes);
+                        setActiveZoneId(horticultureSystemData.zones[0].id);
+                        handleZoneOperationModeChange('sequential');
+                    } else if (data && data.useZones && data.zones.length > 0) {
+                        const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
+                        const initialSelectedPipes: {
+                            [zoneId: string]: {
+                                branch?: any;
+                                secondary?: any;
+                                main?: any;
+                                emitter?: any;
+                            };
+                        } = {};
 
-                    data.zones.forEach((zone) => {
-                        initialZoneInputs[zone.id] = {
+                        data.zones.forEach((zone) => {
+                            initialZoneInputs[zone.id] = {
                             farmSizeRai: formatNumber((zone.area || 0) / 1600, 3),
                             totalTrees: zone.plantCount || 100,
                             waterPerTreeLiters: formatNumber(50, 3),
@@ -1518,13 +1783,13 @@ export default function Product() {
                         };
                     });
 
-                    setZoneInputs(initialZoneInputs);
-                    setSelectedPipes(initialSelectedPipes);
-                    setActiveZoneId(data.zones[0].id);
+                        setZoneInputs(initialZoneInputs);
+                        setSelectedPipes(initialSelectedPipes);
+                        setActiveZoneId(data.zones[0].id);
 
-                    handleZoneOperationModeChange('sequential');
-                } else {
-                    const singleInput: IrrigationInput = {
+                        handleZoneOperationModeChange('sequential');
+                    } else {
+                        const singleInput: IrrigationInput = {
                         farmSizeRai: formatNumber(
                             (horticultureSystemData?.zones?.[0]?.area || data?.totalArea || 1600) /
                                 1600,
@@ -1570,18 +1835,27 @@ export default function Product() {
                             horticultureSystemData?.zones?.[0]?.pipes?.emitterPipes?.totalLength ||
                             0,
                     };
-                    setZoneInputs({ 'main-area': singleInput });
-                    setSelectedPipes({
-                        'main-area': {
-                            branch: undefined,
-                            secondary: undefined,
-                            main: undefined,
-                            emitter: undefined,
-                        },
-                    });
-                    setActiveZoneId('main-area');
+                        setZoneInputs({ 'main-area': singleInput });
+                        setSelectedPipes({
+                            'main-area': {
+                                branch: undefined,
+                                secondary: undefined,
+                                main: undefined,
+                                emitter: undefined,
+                            },
+                        });
+                        setActiveZoneId('main-area');
+                    }
+                } else {
+                    // ✅ zoneInputs already loaded, just set active zone if needed
+                    const zoneIds = Object.keys(zoneInputs);
+                    if (zoneIds.length > 0 && !activeZoneId) {
+                        setActiveZoneId(zoneIds[0]);
+                        handleZoneOperationModeChange('sequential');
+                    }
                 }
             } else {
+                // ✅ If we don't have data, create minimal projectData to allow page to render
                 const defaultInput: IrrigationInput = {
                     farmSizeRai: 1,
                     totalTrees: 100,
@@ -1619,11 +1893,196 @@ export default function Product() {
                 });
                 setActiveZoneId('main-area');
             }
+            
         }
-    }, []);
+        
+        // Reset ref when component unmounts (for navigation)
+        return () => {
+            initialDataLoadRef.current = false;
+        };
+    }, [projectMode]); // Run when projectMode changes
+
+    // ✅ Auto-set activeZoneId when zoneInputs are loaded but activeZoneId is not set or invalid
+    useEffect(() => {
+        if (projectMode !== 'horticulture') return;
+        const zoneIds = Object.keys(zoneInputs);
+        if (zoneIds.length === 0) return;
+        const firstZoneId = zoneIds[0];
+        const needSetActive = !activeZoneId || !zoneInputs[activeZoneId];
+        if (needSetActive && firstZoneId) {
+            setActiveZoneId(firstZoneId);
+            handleZoneOperationModeChange('sequential');
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zoneInputs, activeZoneId, projectMode]);
+
+    // ✅ Load project stats from database if needed (separate useEffect to avoid blocking)
+    // ✅ Always load equipment from API when loading from database to ensure latest saved selections
+    useEffect(() => {
+        const currentFieldId = localStorage.getItem('currentFieldId');
+        const isLoadingFromDatabase = currentFieldId && !currentFieldId.startsWith('mock-');
+        
+        // ✅ Always load from API if loading from database (to ensure we have latest saved equipment)
+        // This ensures that equipment selections are always loaded from database, not from localStorage
+        // Even if localStorage has data, we should load from database to get the latest saved selections
+        if (isLoadingFromDatabase && currentFieldId && projectMode === 'horticulture') {
+            // Always load equipment data from API when loading from database
+            
+            // ✅ Load equipment data from API even if we have some data in localStorage
+            // This ensures we always get the latest saved selections from database
+            let isMounted = true;
+            
+            (async () => {
+                try {
+                    const response = await fetch(`/api/fields/${currentFieldId}`);
+                    if (response.ok && isMounted) {
+                        const fieldData = await response.json();
+                        if (fieldData.success && fieldData.field && isMounted) {
+                            // Load project_stats
+                            const projectStats = fieldData.field.projectStats || fieldData.field.project_stats;
+                            if (projectStats && isMounted) {
+                                const databaseProjectStats = typeof projectStats === 'string' 
+                                    ? JSON.parse(projectStats) 
+                                    : projectStats;
+                                
+                                // Restore all saved data
+                                if (databaseProjectStats.zoneInputs && isMounted) {
+                                    setZoneInputs(databaseProjectStats.zoneInputs);
+                                    localStorage.setItem('horticultureZoneInputs', JSON.stringify(databaseProjectStats.zoneInputs));
+                                    // ✅ Ensure a zone is active when loading from DB (fix: zone not auto-selected on open)
+                                    const loadedZoneIds = Object.keys(databaseProjectStats.zoneInputs);
+                                    if (loadedZoneIds.length > 0) {
+                                        setActiveZoneId(loadedZoneIds[0]);
+                                    }
+                                }
+                                
+                                if (databaseProjectStats.connectionEquipments && isMounted) {
+                                    setConnectionEquipments(databaseProjectStats.connectionEquipments);
+                                    localStorage.setItem('horticultureConnectionEquipments', JSON.stringify(databaseProjectStats.connectionEquipments));
+                                    // Also save to connectionPointEquipmentSelections (format: zoneId-connectionType)
+                                    const connectionSelections: any = {};
+                                    Object.entries(databaseProjectStats.connectionEquipments).forEach(([zoneId, equipments]: [string, any]) => {
+                                        if (Array.isArray(equipments)) {
+                                            equipments.forEach((eq: any) => {
+                                                if (eq.equipment && eq.connectionType) {
+                                                    const key = `${zoneId}-${eq.connectionType}`;
+                                                    connectionSelections[key] = {
+                                                        equipment: eq.equipment,
+                                                        category: eq.category,
+                                                    };
+                                                }
+                                            });
+                                        }
+                                    });
+                                    if (Object.keys(connectionSelections).length > 0) {
+                                        localStorage.setItem('connectionPointEquipmentSelections', JSON.stringify(connectionSelections));
+                                    }
+                                }
+                                
+                                if (databaseProjectStats.selectedPipes && isMounted) {
+                                    setSelectedPipes(databaseProjectStats.selectedPipes);
+                                    localStorage.setItem('horticultureSelectedPipes', JSON.stringify(databaseProjectStats.selectedPipes));
+                                }
+                                
+                                if (databaseProjectStats.sprinklerEquipmentSets && isMounted) {
+                                    setSprinklerEquipmentSets(databaseProjectStats.sprinklerEquipmentSets);
+                                    localStorage.setItem('horticultureSprinklerEquipmentSets', JSON.stringify(databaseProjectStats.sprinklerEquipmentSets));
+                                }
+                                
+                                if (databaseProjectStats.zoneSprinklers && isMounted) {
+                                    // ✅ Normalize productCode/product_code for each zone sprinkler
+                                    const normalizedZoneSprinklers: any = {};
+                                    Object.entries(databaseProjectStats.zoneSprinklers).forEach(([zoneId, sprinkler]: [string, any]) => {
+                                        if (sprinkler) {
+                                            normalizedZoneSprinklers[zoneId] = {
+                                                ...sprinkler,
+                                                // ✅ Ensure productCode exists (use product_code if productCode doesn't exist)
+                                                productCode: sprinkler.productCode || sprinkler.product_code || sprinkler.id,
+                                                product_code: sprinkler.product_code || sprinkler.productCode || sprinkler.id,
+                                            };
+                                        }
+                                    });
+                                    setZoneSprinklers(normalizedZoneSprinklers);
+                                    localStorage.setItem('horticultureZoneSprinklers', JSON.stringify(normalizedZoneSprinklers));
+                                }
+                                
+                                if (databaseProjectStats.selectedPipes && isMounted) {
+                                    // ✅ Normalize selectedPipes to ensure id exists for each pipe
+                                    const normalizedSelectedPipes: any = {};
+                                    Object.entries(databaseProjectStats.selectedPipes).forEach(([zoneId, pipes]: [string, any]) => {
+                                        if (pipes) {
+                                            normalizedSelectedPipes[zoneId] = {};
+                                            ['branch', 'secondary', 'main', 'emitter'].forEach((pipeType) => {
+                                                if (pipes[pipeType]) {
+                                                    const originalPipe = pipes[pipeType];
+                                                    normalizedSelectedPipes[zoneId][pipeType] = {
+                                                        ...originalPipe,
+                                                        // ✅ Ensure id exists (use productCode or product_code if id doesn't exist)
+                                                        id: originalPipe.id || originalPipe.productCode || originalPipe.product_code,
+                                                        productCode: originalPipe.productCode || originalPipe.product_code || originalPipe.id,
+                                                        product_code: originalPipe.product_code || originalPipe.productCode || originalPipe.id,
+                                                    };
+                                                }
+                                            });
+                                        }
+                                    });
+                                    setSelectedPipes(normalizedSelectedPipes);
+                                    localStorage.setItem('horticultureSelectedPipes', JSON.stringify(normalizedSelectedPipes));
+                                }
+                                
+                                // ✅ Load selectedPipeMaterials from database
+                                if (databaseProjectStats.selectedPipeMaterials && isMounted) {
+                                    setSelectedPipeMaterials(databaseProjectStats.selectedPipeMaterials);
+                                    localStorage.setItem('horticultureSelectedPipeMaterials', JSON.stringify(databaseProjectStats.selectedPipeMaterials));
+                                }
+                                
+                                if (databaseProjectStats.selectedPump && isMounted) {
+                                    // ✅ Normalize selectedPump to ensure productCode exists
+                                    const normalizedSelectedPump = {
+                                        ...databaseProjectStats.selectedPump,
+                                        // ✅ Ensure productCode exists (use product_code if productCode doesn't exist)
+                                        productCode: databaseProjectStats.selectedPump.productCode || databaseProjectStats.selectedPump.product_code || databaseProjectStats.selectedPump.id,
+                                        product_code: databaseProjectStats.selectedPump.product_code || databaseProjectStats.selectedPump.productCode || databaseProjectStats.selectedPump.id,
+                                    };
+                                    setSelectedPump(normalizedSelectedPump);
+                                    localStorage.setItem('horticultureSelectedPump', JSON.stringify(normalizedSelectedPump));
+                                }
+                                
+                                if (databaseProjectStats.results && isMounted) {
+                                    localStorage.setItem('horticultureResults', JSON.stringify(databaseProjectStats.results));
+                                }
+                                
+                                if (isMounted) {
+                                    setProjectStats(databaseProjectStats);
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    if (isMounted) {
+                        console.error('❌ Error loading project from database:', error);
+                    }
+                }
+            })();
+            
+            return () => {
+                isMounted = false;
+            };
+        }
+    }, [projectMode]); // Run when projectMode changes or on mount if loading from database
 
     // โหลด sprinkler และอุปกรณ์สำหรับทุกโซนโดยอัตโนมัติเมื่อโหลดข้อมูลครั้งแรก
+    // ✅ แต่ไม่โหลดถ้ามีข้อมูลจากฐานข้อมูลแล้ว (เพื่อไม่ให้ override ข้อมูลที่บันทึกไว้)
     useEffect(() => {
+        const currentFieldId = localStorage.getItem('currentFieldId');
+        const isLoadingFromDatabase = currentFieldId && !currentFieldId.startsWith('mock-');
+        
+        // ถ้ากำลังโหลดจากฐานข้อมูล ให้ไม่โหลด default sprinkler (รอให้ข้อมูลจากฐานข้อมูลโหลดก่อน)
+        if (isLoadingFromDatabase) {
+            // Skip auto-load sprinkler when loading from database
+            return;
+        }
+        
         // ตรวจสอบว่ามี zoneInputs และยังไม่มี zoneSprinklers สำหรับบางโซน
         const allZoneIds: string[] = [];
         
@@ -1683,24 +2142,55 @@ export default function Product() {
     }, [showPumpOption, activeTab]);
 
     const currentSprinkler = zoneSprinklers[activeZoneId] || null;
+    
 
     const handleSprinklerChange = (sprinkler: any) => {
         if (activeZoneId && sprinkler) {
+            // ✅ Normalize sprinkler to ensure productCode and product_code are always present
+            const normalizedSprinkler = {
+                ...sprinkler,
+                productCode: sprinkler.productCode || sprinkler.product_code || sprinkler.id,
+                product_code: sprinkler.product_code || sprinkler.productCode || sprinkler.id,
+            };
+            
             setZoneSprinklers((prev) => ({
                 ...prev,
-                [activeZoneId]: sprinkler,
+                [activeZoneId]: normalizedSprinkler,
             }));
         }
     };
 
     const handlePipeChange = useCallback(
         (pipeType: 'branch' | 'secondary' | 'main' | 'emitter', pipe: any) => {
-            if (activeZoneId) {
+            if (activeZoneId && pipe) {
+                // ✅ Normalize pipe to ensure productCode and product_code are always present
+                const normalizedPipe = {
+                    ...pipe,
+                    productCode: pipe.productCode || pipe.product_code || pipe.id,
+                    product_code: pipe.product_code || pipe.productCode || pipe.id,
+                };
+                
                 setSelectedPipes((prev) => ({
                     ...prev,
                     [activeZoneId]: {
                         ...prev[activeZoneId],
-                        [pipeType]: pipe,
+                        [pipeType]: normalizedPipe,
+                    },
+                }));
+            }
+        },
+        [activeZoneId]
+    );
+
+    // ✅ Handle pipe material type change (PE/PVC)
+    const handlePipeMaterialChange = useCallback(
+        (pipeType: 'branch' | 'secondary' | 'main' | 'emitter', material: 'PE' | 'PVC') => {
+            if (activeZoneId) {
+                setSelectedPipeMaterials((prev) => ({
+                    ...prev,
+                    [activeZoneId]: {
+                        ...prev[activeZoneId],
+                        [pipeType]: material,
                     },
                 }));
             }
@@ -1715,11 +2205,25 @@ export default function Product() {
         [handlePipeChange]
     );
 
+    const handleBranchPipeMaterialChange = useCallback(
+        (material: 'PE' | 'PVC') => {
+            handlePipeMaterialChange('branch', material);
+        },
+        [handlePipeMaterialChange]
+    );
+
     const handleSecondaryPipeChange = useCallback(
         (pipe: any) => {
             handlePipeChange('secondary', pipe);
         },
         [handlePipeChange]
+    );
+
+    const handleSecondaryPipeMaterialChange = useCallback(
+        (material: 'PE' | 'PVC') => {
+            handlePipeMaterialChange('secondary', material);
+        },
+        [handlePipeMaterialChange]
     );
 
     const handleMainPipeChange = useCallback(
@@ -1729,6 +2233,13 @@ export default function Product() {
         [handlePipeChange]
     );
 
+    const handleMainPipeMaterialChange = useCallback(
+        (material: 'PE' | 'PVC') => {
+            handlePipeMaterialChange('main', material);
+        },
+        [handlePipeMaterialChange]
+    );
+
     const handleEmitterPipeChange = useCallback(
         (pipe: any) => {
             handlePipeChange('emitter', pipe);
@@ -1736,8 +2247,25 @@ export default function Product() {
         [handlePipeChange]
     );
 
+    const handleEmitterPipeMaterialChange = useCallback(
+        (material: 'PE' | 'PVC') => {
+            handlePipeMaterialChange('emitter', material);
+        },
+        [handlePipeMaterialChange]
+    );
+
     const handlePumpChange = (pump: any) => {
-        setSelectedPump(pump);
+        if (pump) {
+            // ✅ Normalize pump to ensure productCode and product_code are always present
+            const normalizedPump = {
+                ...pump,
+                productCode: pump.productCode || pump.product_code || pump.id,
+                product_code: pump.product_code || pump.productCode || pump.id,
+            };
+            setSelectedPump(normalizedPump);
+        } else {
+            setSelectedPump(null);
+        }
     };
 
     const allZoneData = useMemo(() => {
@@ -1757,6 +2285,93 @@ export default function Product() {
     const shouldShowSecondaryPipe =
         projectMode === 'garden' || projectMode === 'greenhouse' ? false : hasValidSubmainPipeData;
     const shouldShowMainPipe = projectMode === 'garden' ? false : hasValidMainPipeData;
+
+    // ✅ การคำนวณครั้งแรก: ตั้งท่อและปั๊มที่ดีที่สุดจาก results ลง state (results ใช้เกณฑ์ 20% head แล้ว)
+    const hasAppliedAutoSelectedRef = useRef(false);
+    useEffect(() => {
+        if (projectMode !== 'horticulture' || !results) return;
+        const currentFieldId = localStorage.getItem('currentFieldId');
+        const isLoadingFromDatabase = currentFieldId && !currentFieldId.startsWith('mock-');
+        if (isLoadingFromDatabase) return;
+
+        const hasAutoPipes =
+            results.autoSelectedBranchPipe ||
+            results.autoSelectedSecondaryPipe ||
+            results.autoSelectedMainPipe ||
+            results.autoSelectedEmitterPipe;
+        const hasAutoPump = results.autoSelectedPump;
+        if (!hasAutoPipes && !hasAutoPump) return;
+
+        const zoneIds = Object.keys(zoneInputs);
+        if (zoneIds.length === 0) return;
+
+        // เมื่อมาจาก HorticultureResults, pipeData โหลดแบบ async → PipeSelector อาจเลือกท่อไปก่อน
+        // ให้ overwrite ทุก zone ด้วย results.autoSelected* เมื่อ results พร้อม (ไม่เช็ค needPipes)
+        const fromHorticultureResults =
+            typeof sessionStorage !== 'undefined' &&
+            sessionStorage.getItem('fromHorticultureResults') === 'true';
+
+        const needPipes = zoneIds.some(
+            (zoneId) =>
+                !selectedPipes[zoneId]?.branch &&
+                !selectedPipes[zoneId]?.secondary &&
+                !selectedPipes[zoneId]?.main &&
+                !selectedPipes[zoneId]?.emitter
+        );
+        const needPump = !selectedPump;
+        const shouldApplyPipes = fromHorticultureResults ? hasAutoPipes : needPipes && hasAutoPipes;
+        const shouldApplyPump = fromHorticultureResults ? hasAutoPump : needPump && hasAutoPump;
+        if (!shouldApplyPipes && !shouldApplyPump) return;
+        if (hasAppliedAutoSelectedRef.current) return;
+
+        hasAppliedAutoSelectedRef.current = true;
+        if (fromHorticultureResults && typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('fromHorticultureResults');
+        }
+
+        const normalizePipe = (p: any) =>
+            p
+                ? {
+                      ...p,
+                      productCode: p.productCode || p.product_code || p.id,
+                      product_code: p.product_code || p.productCode || p.id,
+                  }
+                : undefined;
+
+        if (shouldApplyPipes && hasAutoPipes) {
+            setSelectedPipes((prev) => {
+                const next = { ...prev };
+                zoneIds.forEach((zoneId) => {
+                    const cur = prev[zoneId] || {};
+                    // จาก Results: overwrite ทุก zone; ไม่จาก Results: เฉพาะ zone ที่ยังไม่มีท่อ
+                    if (fromHorticultureResults || !(cur.branch || cur.secondary || cur.main || cur.emitter)) {
+                        next[zoneId] = {
+                            branch: normalizePipe(results!.autoSelectedBranchPipe) ?? cur.branch,
+                            secondary: normalizePipe(results!.autoSelectedSecondaryPipe) ?? cur.secondary,
+                            main: normalizePipe(results!.autoSelectedMainPipe) ?? cur.main,
+                            emitter: normalizePipe(results!.autoSelectedEmitterPipe) ?? cur.emitter,
+                        };
+                    }
+                });
+                return next;
+            });
+        }
+
+        if (shouldApplyPump && hasAutoPump) {
+            const pump = results.autoSelectedPump as any;
+            setSelectedPump({
+                ...pump,
+                productCode: pump.productCode || pump.product_code || pump.id,
+                product_code: pump.product_code || pump.productCode || pump.id,
+            });
+        }
+    }, [
+        projectMode,
+        results,
+        zoneInputs,
+        selectedPipes,
+        selectedPump,
+    ]);
 
     const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [showQuotation, setShowQuotation] = useState(false);
@@ -1928,13 +2543,15 @@ export default function Product() {
     const getEffectiveEquipment = () => {
         const currentZonePipes = selectedPipes[activeZoneId] || {};
 
-        return {
+        const effective = {
             branchPipe: currentZonePipes.branch || results?.autoSelectedBranchPipe,
             secondaryPipe: currentZonePipes.secondary || results?.autoSelectedSecondaryPipe,
             mainPipe: currentZonePipes.main || results?.autoSelectedMainPipe,
             emitterPipe: currentZonePipes.emitter || results?.autoSelectedEmitterPipe,
             pump: selectedPump || results?.autoSelectedPump,
         };
+        
+        return effective;
     };
 
     const getZonesData = () => {
@@ -2138,15 +2755,51 @@ export default function Product() {
         return projectData?.zones.find((z) => z.id === activeZoneId);
     };
 
+    // คำนวณพื้นที่โซนจาก coordinates ให้ตรงกับ HorticultureResultsPage
+    const calculatePolygonAreaForZone = (coords: { lat: number; lng: number }[]): number => {
+        if (!coords || coords.length < 3) return 0;
+        let area = 0;
+        for (let i = 0; i < coords.length; i++) {
+            const j = (i + 1) % coords.length;
+            area += coords[i].lat * coords[j].lng;
+            area -= coords[j].lat * coords[i].lng;
+        }
+        area = Math.abs(area) / 2;
+        const metersPerDegree = 111320;
+        return area * metersPerDegree * metersPerDegree;
+    };
+
     const getZoneAreaData = ():
         | {
               zoneId: string;
               zoneName: string;
               areaInRai: number;
               coordinates?: { lat: number; lng: number }[];
+              plantCount?: number;
+              waterNeedPerMinute?: number;
           }
         | undefined => {
         if (!activeZoneId) return undefined;
+
+        const sprinklerConfig = loadSprinklerConfig();
+        const flowRatePerPlant = sprinklerConfig?.flowRatePerMinute ?? 2.5;
+        const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree ?? 1;
+
+        const buildResult = (
+            zoneId: string,
+            zoneName: string,
+            areaInRai: number,
+            coordinates?: { lat: number; lng: number }[],
+            plantCount?: number,
+            waterNeedPerMinute?: number
+        ) => ({
+            zoneId,
+            zoneName,
+            areaInRai,
+            coordinates,
+            plantCount: plantCount ?? 0,
+            waterNeedPerMinute: waterNeedPerMinute ?? (plantCount != null ? calculateTotalFlowRate(plantCount, flowRatePerPlant, sprinklersPerTree) : undefined),
+        });
 
         if (horticultureSystemData && horticultureSystemData.zones) {
             const zoneFromHorticultureData = horticultureSystemData.zones.find(
@@ -2154,56 +2807,126 @@ export default function Product() {
             );
 
             if (zoneFromHorticultureData) {
-                if (zoneFromHorticultureData.area && zoneFromHorticultureData.area > 0) {
-                    return {
-                        zoneId: zoneFromHorticultureData.id as string,
-                        zoneName: zoneFromHorticultureData.name as string,
-                        areaInRai: zoneFromHorticultureData.area / 1600,
-                        coordinates: undefined,
-                    };
-                }
-
                 const originalZone = projectData?.zones?.find(
                     (z: any) => z.id === activeZoneId
                 ) as any;
-                if (originalZone?.coordinates && originalZone.coordinates.length > 0) {
-                    return {
-                        zoneId: zoneFromHorticultureData.id as string,
-                        zoneName: zoneFromHorticultureData.name as string,
-                        areaInRai: 0,
-                        coordinates: originalZone.coordinates,
-                    };
+                const plantCount = originalZone?.plants?.length ?? zoneFromHorticultureData?.plantCount ?? 0;
+                const waterNeedPerMinute = plantCount > 0 ? calculateTotalFlowRate(plantCount, flowRatePerPlant, sprinklersPerTree) : 0;
+
+                if (zoneFromHorticultureData.area && zoneFromHorticultureData.area > 0) {
+                    return buildResult(
+                        zoneFromHorticultureData.id as string,
+                        zoneFromHorticultureData.name as string,
+                        zoneFromHorticultureData.area / 1600,
+                        undefined,
+                        plantCount,
+                        waterNeedPerMinute
+                    );
                 }
 
-                return {
-                    zoneId: zoneFromHorticultureData.id as string,
-                    zoneName: zoneFromHorticultureData.name as string,
-                    areaInRai: 0,
-                    coordinates: undefined,
-                };
+                if (originalZone?.coordinates && originalZone.coordinates.length >= 3) {
+                    const areaInSquareMeters = originalZone.area || calculatePolygonAreaForZone(originalZone.coordinates);
+                    const areaInRai = areaInSquareMeters / 1600;
+                    return buildResult(
+                        zoneFromHorticultureData.id as string,
+                        zoneFromHorticultureData.name as string,
+                        areaInRai,
+                        originalZone.coordinates,
+                        plantCount,
+                        waterNeedPerMinute
+                    );
+                }
+
+                return buildResult(
+                    zoneFromHorticultureData.id as string,
+                    zoneFromHorticultureData.name as string,
+                    0,
+                    undefined,
+                    plantCount,
+                    waterNeedPerMinute
+                );
             }
         }
 
-        const activeZone = getActiveZone();
-        if (activeZone && activeZone.area) {
-            return {
-                zoneId: activeZone.id as string,
-                zoneName: (activeZone.name || `โซน ${activeZone.id}`) as string,
-                areaInRai: activeZone.area / 1600,
-                coordinates: undefined,
-            };
+        const activeZone = getActiveZone() as any;
+        if (activeZone) {
+            const plantCount = activeZone.plants?.length ?? activeZone.plantCount ?? 0;
+            const areaInSquareMeters = activeZone.area || (activeZone.coordinates?.length >= 3 ? calculatePolygonAreaForZone(activeZone.coordinates) : 0);
+            const areaInRai = areaInSquareMeters / 1600;
+            const waterNeedPerMinute = plantCount > 0 ? calculateTotalFlowRate(plantCount, flowRatePerPlant, sprinklersPerTree) : 0;
+            return buildResult(
+                activeZone.id as string,
+                (activeZone.name || `โซน ${activeZone.id}`) as string,
+                areaInRai,
+                activeZone.coordinates,
+                plantCount,
+                waterNeedPerMinute
+            );
         }
 
         return undefined;
     };
 
-    const hasEssentialData =
-        (projectMode === 'horticulture' && projectData && projectStats) ||
-        (projectMode === 'garden' && gardenData && gardenStats) ||
-        (projectMode === 'field-crop' && fieldCropData) ||
-        (projectMode === 'greenhouse' && greenhouseData);
+    // ✅ For horticulture mode, allow loading even without projectStats (it can be loaded later)
+    // ✅ Always ensure we have at least minimal data for horticulture mode (only if really needed)
+    const fallbackInitializedRef = useRef(false);
+    useEffect(() => {
+        // Only create fallback data once, and only if we're in horticulture mode with no data
+        // AND initial data load has completed (to avoid race condition)
+        if (
+            projectMode === 'horticulture' && 
+            !projectData && 
+            !horticultureSystemData && 
+            !fallbackInitializedRef.current &&
+            initialDataLoadRef.current // Wait for initial load to complete
+        ) {
+            // Wait a bit more to see if async data loading will complete
+            const timeoutId = setTimeout(() => {
+                // Double check that we still don't have data
+                if (!projectData && !horticultureSystemData && !fallbackInitializedRef.current) {
+                    const minimalData: HorticultureProject = {
+                        projectName: 'โครงการใหม่',
+                        totalArea: 1600,
+                        zones: [],
+                        plants: [],
+                        useZones: false,
+                        irrigationZones: [],
+                    };
+                    setProjectData(minimalData);
+                    setProjectStats({
+                        totalAreaInRai: 1,
+                        totalPlants: 0,
+                        zoneDetails: [],
+                    });
+                    fallbackInitializedRef.current = true;
+                }
+            }, 1000); // Wait 1 second for async data loading to complete
+            
+            return () => clearTimeout(timeoutId);
+        }
+        
+        // Mark as initialized if we have data
+        if (projectData || horticultureSystemData) {
+            fallbackInitializedRef.current = true;
+        }
+    }, [projectMode, projectData, horticultureSystemData]);
 
-    if (!hasEssentialData) {
+    // ✅ Use useMemo to calculate hasEssentialData to ensure it updates when state changes
+    const hasEssentialData = useMemo(() => {
+        const result = Boolean(
+            (projectMode === 'horticulture' && (projectData || horticultureSystemData)) ||
+            (projectMode === 'garden' && gardenData && gardenStats) ||
+            (projectMode === 'field-crop' && fieldCropData) ||
+            (projectMode === 'greenhouse' && greenhouseData)
+        );
+        
+        
+        return result;
+    }, [projectMode, projectData, horticultureSystemData, gardenData, gardenStats, fieldCropData, greenhouseData]);
+
+    const shouldShowLoading = !hasEssentialData;
+    
+    if (shouldShowLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6 text-white">
                 <div className="text-center">
@@ -2225,7 +2948,7 @@ export default function Product() {
                                 ? 'Chaiyo Greenhouse Irrigation'
                                 : 'Chaiyo Irrigation System'}
                     </h1>
-                    <p className="mb-6 text-gray-300">{t('ไม่พบข้อมูลโครงการ')}</p>
+                    <p className="mb-6 text-gray-300">{t('กำลังโหลดข้อมูล...')}</p>
                     <button
                         onClick={() =>
                             router.visit(
@@ -2247,12 +2970,57 @@ export default function Product() {
         );
     }
 
-    if (!results || !currentInput) {
+    // ✅ Only show loading screen if we don't have essential data
+    if (!hasEssentialData) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6 text-white">
                 <div className="text-center">
                     <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-400"></div>
                     <p className="text-gray-300">{t('กำลังโหลดข้อมูล...')}</p>
+                </div>
+            </div>
+        );
+    }
+    
+    // ✅ If we have essential data but no results/currentInput yet, check if zoneInputs are being loaded
+    // Don't block if zoneInputs are empty but we're loading from database
+    const isLoadingFromDatabase = localStorage.getItem('currentFieldId') && !localStorage.getItem('currentFieldId')?.startsWith('mock-');
+    const hasZoneInputs = Object.keys(zoneInputs).length > 0;
+    
+    if (!results || !currentInput) {
+        
+        // If loading from database and zoneInputs are empty, wait a bit more
+        if (isLoadingFromDatabase && !hasZoneInputs) {
+            return (
+                <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6 text-white">
+                    <div className="text-center">
+                        <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-400"></div>
+                        <p className="text-gray-300">{t('กำลังโหลดข้อมูล...')}</p>
+                    </div>
+                </div>
+            );
+        }
+        
+        // If we have zoneInputs but no currentInput, it means activeZoneId is not set yet
+        // The useEffect above should set it, but we need to wait for it
+        if (hasZoneInputs && !activeZoneId) {
+            // Show loading while waiting for activeZoneId to be set by useEffect
+            return (
+                <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6 text-white">
+                    <div className="text-center">
+                        <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-400"></div>
+                        <p className="text-gray-300">{t('กำลังโหลดข้อมูล...')}</p>
+                    </div>
+                </div>
+            );
+        }
+        
+        // Show a brief message while calculations are running
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-900 p-6 text-white">
+                <div className="text-center">
+                    <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-blue-400"></div>
+                    <p className="text-gray-300">{t('กำลังคำนวณข้อมูล...')}</p>
                 </div>
             </div>
         );
@@ -2336,12 +3104,12 @@ export default function Product() {
                 return;
             }
 
-            // ตรวจสอบว่ากำลังแก้ไขโครงการเดิมหรือไม่
+            // ตรวจสอบว่ากำลังแก้ไขโครงการเดิมหรือไม่ (เคยบันทึกแล้ว และไม่ใช่ mock id)
             const existingFieldId = localStorage.getItem('currentFieldId');
             const existingFieldName = localStorage.getItem('currentFieldName');
             const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-');
 
-            // ถ้ามี draft หรือโครงการเดิม → เด้ง modal ให้ยืนยันชื่อ
+            // ถ้าเคยบันทึกแล้ว (เปิดโครงการเดิมมาแก้) → เด้ง modal ให้ยืนยันชื่อ แล้วบันทึกทับ
             if (isEditingExisting) {
                 setSaveProjectName(existingFieldName || projectData?.projectName || 'โครงการใหม่');
                 setSaveAsNewProject(false);
@@ -2349,16 +3117,15 @@ export default function Product() {
                 return;
             }
 
-            // ถ้าไม่มี draft → ให้ตั้งชื่อใหม่
-            if (!projectData?.projectName || projectData.projectName === 'โครงการใหม่') {
-                setSaveProjectName('โครงการใหม่');
-                setSaveAsNewProject(true);
-                setShowSaveProjectModal(true);
-                return;
-            }
-
-            // ถ้ามีชื่อโครงการแล้ว → บันทึกเลย
-            await performSaveProject(null, false);
+            // ถ้าไม่เคยบันทึก (โปรเจกต์ใหม่ หรือมาจาก Results) → เด้ง modal ให้ตั้งชื่อเสมอ ไม่ข้ามไปบันทึกเลย
+            // (เดิมมีทาง "ถ้ามีชื่อโครงการแล้ว → บันทึกเลย" ทำให้ใช้ currentFieldId/ชื่อเก่าจาก localStorage แล้วบันทึกทับโครงการอื่น)
+            setSaveProjectName(
+                projectData?.projectName && projectData.projectName !== 'โครงการใหม่'
+                    ? projectData.projectName
+                    : 'โครงการใหม่'
+            );
+            setSaveAsNewProject(true);
+            setShowSaveProjectModal(true);
         } catch (error) {
             console.error('Error in handleSaveProject:', error);
             alert(t('เกิดข้อผิดพลาดในการบันทึกโครงการ กรุณาลองใหม่อีกครั้ง'));
@@ -2370,6 +3137,7 @@ export default function Product() {
         try {
             const existingFieldId = localStorage.getItem('currentFieldId');
             const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-') && !forceSaveAsNew;
+            
 
             // ✅ Step 1: ประกาศและโหลด enhancedProjectData ก่อนทุกอย่าง
             let enhancedProjectData: any = projectData || {};
@@ -2393,7 +3161,6 @@ export default function Product() {
                                         ...projectData,
                                         ...parsedApiData,
                                     };
-                                    console.log('✅ Loaded project_data from API for field:', existingFieldId);
                                 }
                             }
                         }
@@ -2409,21 +3176,12 @@ export default function Product() {
                             ...projectData,
                             ...parsedData,
                         };
-                        console.log('✅ Loaded project_data from localStorage (new project)');
                     }
                 }
             } catch (error) {
                 console.error('❌ Error loading project data:', error);
             }
 
-            console.log('📊 [DEBUG] performSaveProject data:', {
-                projectDataExists: !!enhancedProjectData,
-                selectedPlantType: enhancedProjectData?.selectedPlantType,
-                plants: enhancedProjectData?.plants?.length || 0,
-                irrigationZones: enhancedProjectData?.irrigationZones?.length || 0,
-                mainArea: enhancedProjectData?.mainArea?.length || 0,
-                totalArea: enhancedProjectData?.totalArea,
-            });
 
             // ✅ Step 2: หลังจากโหลด enhancedProjectData แล้ว ค่อยสร้างตัวแปรอื่นๆ
             const defaultCoordinates = [
@@ -2437,11 +3195,6 @@ export default function Product() {
                     ? enhancedProjectData.mainArea
                     : defaultCoordinates;
             
-            console.log('🔍 [DEBUG] mainAreaCoordinates source:', {
-                from_enhancedProjectData: enhancedProjectData?.mainArea?.length || 0,
-                from_projectData: projectData?.mainArea?.length || 0,
-                final_mainAreaCoordinates: mainAreaCoordinates.length,
-            });
 
             // Load sprinklerConfig สำหรับ horticulture mode
             let sprinklerConfig = null;
@@ -2509,20 +3262,11 @@ export default function Product() {
             
             let totalAreaInRai = 0;
             
-            console.log('🔍 [DEBUG] Area calculation inputs:', {
-                mainAreaCoordinates_length: mainAreaCoordinates?.length || 0,
-                irrigationZones_count: enhancedProjectData?.irrigationZones?.length || 0,
-                totalArea_from_enhancedProjectData: enhancedProjectData?.totalArea,
-            });
             
             // ✅ Priority 1: คำนวณจาก mainArea coordinates (แม่นยำที่สุด)
             if (mainAreaCoordinates && mainAreaCoordinates.length >= 3) {
                 const areaInSqM = calculateAreaFromCoordinates(mainAreaCoordinates);
                 totalAreaInRai = areaInSqM / 1600; // Convert to ไร่
-                console.log('✅ [Priority 1] Calculated from mainArea coordinates:', {
-                    areaInSqM: areaInSqM.toFixed(2),
-                    totalAreaInRai: totalAreaInRai.toFixed(2),
-                });
             }
             
             // ✅ Priority 2: ถ้ายังเป็น 0 ให้รวมจาก irrigationZones
@@ -2533,10 +3277,6 @@ export default function Product() {
                 );
                 if (totalAreaInSqM > 0) {
                     totalAreaInRai = totalAreaInSqM / 1600; // Convert to ไร่
-                    console.log('✅ [Priority 2] Calculated from irrigationZones:', {
-                        totalAreaInSqM: totalAreaInSqM.toFixed(2),
-                        totalAreaInRai: totalAreaInRai.toFixed(2),
-                    });
                 }
             }
             
@@ -2544,20 +3284,11 @@ export default function Product() {
             if (totalAreaInRai === 0 && enhancedProjectData?.totalArea) {
                 if (enhancedProjectData.totalArea > 1000) {
                     totalAreaInRai = enhancedProjectData.totalArea / 1600;
-                    console.log('✅ [Priority 3] From enhancedProjectData.totalArea (>1000):', {
-                        totalArea: enhancedProjectData.totalArea.toFixed(2),
-                        totalAreaInRai: totalAreaInRai.toFixed(2),
-                    });
                 } else {
                     totalAreaInRai = enhancedProjectData.totalArea;
-                    console.log('✅ [Priority 3] From enhancedProjectData.totalArea (<=1000):', {
-                        totalArea: enhancedProjectData.totalArea.toFixed(2),
-                        totalAreaInRai: totalAreaInRai.toFixed(2),
-                    });
                 }
             }
             
-            console.log('📊 [FINAL] Total area in rai:', totalAreaInRai.toFixed(2));
 
             // Get plant_type_id - use default (1) if custom plant (id > 10)
             let plantTypeId = 1; // Default plant type
@@ -2571,9 +3302,142 @@ export default function Product() {
 
             const finalProjectName = customProjectName || enhancedProjectData?.projectName || 'โครงการใหม่';
             
-            // ✅ ใช้ totalCost ที่ CostSummary.tsx คำนวณและบันทึกไว้ใน localStorage
-            const storedTotalCost = localStorage.getItem('calculatedTotalCost');
-            const totalCost = storedTotalCost ? parseFloat(storedTotalCost) : 0;
+            // ✅ คำนวณ totalCost ใหม่จากข้อมูลปัจจุบัน (ไม่ใช้ localStorage เพื่อความแม่นยำ)
+            const calculateTotalCostForSave = () => {
+                let totalCost = 0;
+                
+                // 1. คำนวณราคาสปริงเกอร์
+                Object.entries(zoneSprinklers).forEach(([zoneId, sprinkler]) => {
+                    if (sprinkler && zoneInputs[zoneId]) {
+                        let quantity = zoneInputs[zoneId].totalTrees || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            quantity = quantity * sprinklersPerTree;
+                        }
+                        totalCost += (sprinkler.price || 0) * quantity;
+                    }
+                });
+                
+                // 2. คำนวณราคาท่อ
+                Object.entries(selectedPipes).forEach(([zoneId, pipes]) => {
+                    const zoneInput = zoneInputs[zoneId];
+                    if (!zoneInput) return;
+                    
+                    // Branch pipe
+                    if (pipes.branch && zoneInput.totalBranchPipeM > 0) {
+                        const rolls = calculatePipeRolls(zoneInput.totalBranchPipeM, pipes.branch.lengthM || 100);
+                        totalCost += (pipes.branch.price || 0) * rolls;
+                    }
+                    
+                    // Secondary pipe
+                    if (pipes.secondary && zoneInput.totalSecondaryPipeM > 0) {
+                        const rolls = calculatePipeRolls(zoneInput.totalSecondaryPipeM, pipes.secondary.lengthM || 100);
+                        totalCost += (pipes.secondary.price || 0) * rolls;
+                    }
+                    
+                    // Main pipe
+                    if (pipes.main && zoneInput.totalMainPipeM > 0) {
+                        const rolls = calculatePipeRolls(zoneInput.totalMainPipeM, pipes.main.lengthM || 100);
+                        totalCost += (pipes.main.price || 0) * rolls;
+                    }
+                    
+                    // Emitter pipe
+                    if (pipes.emitter && zoneInput.totalEmitterPipeM) {
+                        const emitterLength = zoneInput.totalEmitterPipeM;
+                        if (emitterLength > 0) {
+                            const rolls = calculatePipeRolls(emitterLength, pipes.emitter.lengthM || 100);
+                            totalCost += (pipes.emitter.price || 0) * rolls;
+                        }
+                    }
+                });
+                
+                // 3. คำนวณราคาปั๊ม
+                if (selectedPump) {
+                    totalCost += selectedPump.price || 0;
+                    
+                    // Pump accessories
+                    if (selectedPump.pumpAccessories) {
+                        // Get selectedGroupId from localStorage
+                        const getStoredSelectedGroupId = (pumpId: number | undefined): number | string | null => {
+                            if (!pumpId) return null;
+                            try {
+                                const stored = localStorage.getItem(`pump_${pumpId}_selectedGroupId`);
+                                return stored ? (isNaN(Number(stored)) ? stored : Number(stored)) : null;
+                            } catch {
+                                return null;
+                            }
+                        };
+                        
+                        const selectedGroupId = getStoredSelectedGroupId(selectedPump.id);
+                        
+                        selectedPump.pumpAccessories.forEach((accessory: any) => {
+                            if (accessory.group_id && accessory.group_items) {
+                                if (selectedGroupId && accessory.group_id !== selectedGroupId) {
+                                    return; // Skip non-selected groups
+                                }
+                                accessory.group_items.forEach((item: any) => {
+                                    const itemPrice = Number(item.unit_price || item.total_price || item.equipment?.price || 0);
+                                    const itemQuantity = Number(item.quantity || 1);
+                                    if (itemPrice > 0 || !accessory.is_included) {
+                                        totalCost += itemPrice * itemQuantity;
+                                    }
+                                });
+                            } else if (!accessory.is_included || (accessory.price && accessory.price > 0)) {
+                                totalCost += (accessory.price || 0) * (accessory.quantity || 1);
+                            }
+                        });
+                    }
+                }
+                
+                // 4. คำนวณราคา sprinkler equipment sets
+                Object.entries(sprinklerEquipmentSets).forEach(([zoneId, equipmentSet]: [string, any]) => {
+                    if (!equipmentSet || !equipmentSet.selectedGroupId) return;
+                    
+                    let totalSprinklers = 0;
+                    const zoneInput = zoneInputs[zoneId];
+                    if (zoneInput) {
+                        totalSprinklers = zoneInput.totalTrees || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            totalSprinklers = totalSprinklers * sprinklersPerTree;
+                        }
+                    }
+                    
+                    if (equipmentSet.selectedItems) {
+                        equipmentSet.selectedItems.forEach((item: any) => {
+                            if (item.equipment) {
+                                const categoryName = item.equipment.category?.name?.toLowerCase();
+                                const isPipe = categoryName === 'pipe' || categoryName?.includes('pipe');
+                                if (!isPipe) {
+                                    const quantityPerHead = item.quantity || 0;
+                                    const totalQuantity = quantityPerHead * totalSprinklers;
+                                    if (totalQuantity > 0) {
+                                        totalCost += (item.unit_price || item.equipment?.price || 0) * totalQuantity;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+                
+                // 5. คำนวณราคา connection equipments
+                Object.values(connectionEquipments).forEach((equipments: any[]) => {
+                    if (equipments && equipments.length > 0) {
+                        equipments.forEach((equipment: any) => {
+                            if (equipment.equipment && equipment.count > 0) {
+                                totalCost += (equipment.equipment?.price || 0) * equipment.count;
+                            }
+                        });
+                    }
+                });
+                
+                return totalCost;
+            };
+            
+            // ✅ ใช้ totalCost ที่คำนวณใหม่จากข้อมูลปัจจุบัน
+            const totalCost = calculateTotalCostForSave();
 
             // ฟังก์ชันลดขนาดข้อมูลเพื่อป้องกัน MySQL packet size error
             const compressProjectData = (data: any) => {
@@ -2757,16 +3621,6 @@ export default function Product() {
                         // ใช้ plant.id + timestamp + random string
                         const uniquePointId = `${plant.id}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
                         
-                        // Debug log สำหรับต้นแรกเท่านั้น
-                        if (index === 0) {
-                            console.log('🔍 [DEBUG] Sample planting_point:', {
-                                original_point_id: plant.id,
-                                unique_point_id: uniquePointId,
-                                original_zoneId: plant.zoneId,
-                                converted_zoneId: zoneId,
-                                type: typeof zoneId,
-                            });
-                        }
                         
                         return {
                             lat: plant.position.lat,
@@ -2800,8 +3654,47 @@ export default function Product() {
                 field_crop_data: fieldCropData,
                 project_stats: {
                     zoneInputs: zoneInputs,
-                    zoneSprinklers: zoneSprinklers,
-                    selectedPipes: selectedPipes,
+                    // ✅ Normalize zoneSprinklers to ensure productCode is always saved
+                    zoneSprinklers: Object.entries(zoneSprinklers).reduce((acc, [zoneId, sprinkler]) => {
+                        if (sprinkler) {
+                            acc[zoneId] = {
+                                ...sprinkler,
+                                productCode: sprinkler.productCode || sprinkler.product_code || sprinkler.id,
+                                product_code: sprinkler.product_code || sprinkler.productCode || sprinkler.id,
+                            };
+                        }
+                        return acc;
+                    }, {} as { [zoneId: string]: any }),
+                    // ✅ Normalize selectedPipes to ensure productCode is always saved
+                    selectedPipes: Object.entries(selectedPipes).reduce((acc, [zoneId, pipes]) => {
+                        if (pipes) {
+                            acc[zoneId] = {
+                                branch: pipes.branch ? {
+                                    ...pipes.branch,
+                                    productCode: pipes.branch.productCode || pipes.branch.product_code || pipes.branch.id,
+                                    product_code: pipes.branch.product_code || pipes.branch.productCode || pipes.branch.id,
+                                } : undefined,
+                                secondary: pipes.secondary ? {
+                                    ...pipes.secondary,
+                                    productCode: pipes.secondary.productCode || pipes.secondary.product_code || pipes.secondary.id,
+                                    product_code: pipes.secondary.product_code || pipes.secondary.productCode || pipes.secondary.id,
+                                } : undefined,
+                                main: pipes.main ? {
+                                    ...pipes.main,
+                                    productCode: pipes.main.productCode || pipes.main.product_code || pipes.main.id,
+                                    product_code: pipes.main.product_code || pipes.main.productCode || pipes.main.id,
+                                } : undefined,
+                                emitter: pipes.emitter ? {
+                                    ...pipes.emitter,
+                                    productCode: pipes.emitter.productCode || pipes.emitter.product_code || pipes.emitter.id,
+                                    product_code: pipes.emitter.product_code || pipes.emitter.productCode || pipes.emitter.id,
+                                } : undefined,
+                            };
+                        }
+                        return acc;
+                    }, {} as { [zoneId: string]: any }),
+                    // ✅ Save pipe material types (PE/PVC) for each zone and pipe type
+                    selectedPipeMaterials: selectedPipeMaterials,
                     selectedPump: selectedPump ? {
                         id: selectedPump.id,
                         name: selectedPump.name,
@@ -2860,7 +3753,6 @@ export default function Product() {
 
             // Log ขนาดข้อมูลเพื่อ debug
             const dataSize = new Blob([JSON.stringify(projectDataToSave)]).size;
-            console.log(`📊 Project data size: ${(dataSize / 1024).toFixed(2)} KB`);
             
             if (dataSize > 15 * 1024 * 1024) { // ถ้าเกิน 15MB
                 console.warn('⚠️ Data size is very large. This might cause MySQL packet size error.');
@@ -2869,18 +3761,12 @@ export default function Product() {
             }
 
             // Use PUT if editing existing project, POST if creating new
+            // ✅ Use /data endpoint for updating existing projects to save project_stats and project_data
             const endpoint = isEditingExisting
-                ? `/api/fields/${existingFieldId}`
+                ? `/api/fields/${existingFieldId}/data`
                 : '/api/save-field';
             const method = isEditingExisting ? 'PUT' : 'POST';
 
-            console.log('🔍 [DEBUG] API Request:', {
-                endpoint,
-                method,
-                isEditingExisting,
-                existingFieldId,
-                forceSaveAsNew,
-            });
 
             const response = await fetch(endpoint, {
                 method: method,
@@ -2893,7 +3779,9 @@ export default function Product() {
                 },
                 body: JSON.stringify(projectDataToSave),
             });
+            
             const responseData = await response.json();
+            
             if (response.ok) {
                 if (responseData.success) {
                     const message = isEditingExisting
@@ -2905,24 +3793,29 @@ export default function Product() {
                     if (!isEditingExisting && responseData.field && responseData.field.id) {
                         localStorage.setItem('currentFieldId', responseData.field.id.toString());
                         localStorage.setItem('currentFieldName', finalProjectName);
-                    } else if (isEditingExisting && customProjectName) {
-                        localStorage.setItem('currentFieldName', finalProjectName);
+                    } else if (isEditingExisting) {
+                        // ✅ อัปเดต currentFieldName เมื่อบันทึกทับโครงการเดิม
+                        // ใช้ชื่อจาก responseData.field.name หรือ finalProjectName
+                        const fieldNameToSave = responseData.field?.name || finalProjectName;
+                        if (fieldNameToSave) {
+                            localStorage.setItem('currentFieldName', fieldNameToSave);
+                        }
                     }
                     
                     // กลับไปหน้า home
                     router.visit('/');
                 } else {
-                    throw new Error(responseData.message || 'Failed to save project');
+                    const errorMsg = responseData.message || 'Failed to save project';
+                    console.error('Save failed:', errorMsg);
+                    throw new Error(errorMsg);
                 }
             } else {
-                throw new Error(
-                    `Server error: ${response.status} - ${responseData.message || 'Unknown error'}`
-                );
+                const errorMsg = `Server error: ${response.status} - ${responseData.message || 'Unknown error'}`;
+                console.error('Save failed:', errorMsg);
+                throw new Error(errorMsg);
             }
         } catch (error: any) {
-            console.error('❌ Error in performSaveProject:', error);
-            console.error('❌ Error message:', error?.message);
-            console.error('❌ Error stack:', error?.stack);
+            console.error('Error in performSaveProject:', error);
             
             // แสดง error message ที่ชัดเจนกว่า
             const errorMessage = error?.message || error?.toString() || 'Unknown error';
@@ -3003,6 +3896,13 @@ export default function Product() {
                     localStorage.setItem(
                         'horticultureSelectedPipes',
                         JSON.stringify(selectedPipes)
+                    );
+                }
+                // ✅ Save selectedPipeMaterials to localStorage
+                if (selectedPipeMaterials) {
+                    localStorage.setItem(
+                        'horticultureSelectedPipeMaterials',
+                        JSON.stringify(selectedPipeMaterials)
                     );
                 }
                 if (sprinklerEquipmentSets) {
@@ -3256,35 +4156,16 @@ export default function Product() {
                             </div>
                             {zones.length > 1 && (
                                 <div className="mb-4 mt-4 flex flex-wrap gap-2" data-tour="zone-selection">
-                                    {zones.map((zone) => {
+                                    {zones.map((zone, zoneIndex) => {
                                         const isActive = activeZoneId === zone.id;
-                                        const hasSprinkler = !!zoneSprinklers[zone.id];
 
-                                        let zoneColor: string | null = null;
-                                        if (
-                                            projectMode === 'field-crop' &&
-                                            fieldCropData?.zones?.info
-                                        ) {
-                                            const systemZone = fieldCropData.zones.info.find(
-                                                (fz: any) => fz.id === zone.id
-                                            );
-                                            zoneColor = (systemZone as any)?.color || null;
-                                        } else if (
-                                            horticultureSystemData &&
-                                            horticultureSystemData.zones
-                                        ) {
-                                            const systemZone = horticultureSystemData.zones.find(
-                                                (hz: any) => hz.id === zone.id
-                                            );
-                                            zoneColor = systemZone?.color;
-                                        }
+                                        // Use getZoneColor based on zone index instead of stored zone.color
+                                        const zoneColor = getZoneColor(zoneIndex);
 
-                                        const buttonStyle = zoneColor
-                                            ? {
-                                                  backgroundColor: zoneColor,
-                                                  color: 'black',
-                                              }
-                                            : {};
+                                        const buttonStyle = {
+                                            backgroundColor: zoneColor,
+                                            color: 'black',
+                                        };
 
                                         return (
                                             <button
@@ -3299,11 +4180,10 @@ export default function Product() {
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <span>{zone.name}</span>
-                                                    {hasSprinkler && (
-                                                        <span className="text-xs text-green-700">
-                                                            ✓
-                                                        </span>
-                                                    )}
+                                                    {/* แสดงติ๊กถูกทุกโซนตั้งแต่แรก = โซนที่เปิดแล้ว */}
+                                                    <span className="text-xs text-green-700">
+                                                        ✓
+                                                    </span>
                                                 </div>
                                             </button>
                                         );
@@ -3792,6 +4672,8 @@ export default function Product() {
                                         selectedSprinkler={currentSprinkler}
                                         projectMode={projectMode}
                                         selectedPipeSizes={selectedPipeSizes}
+                                        selectedPipeMaterial={selectedPipeMaterials[activeZoneId]?.branch}
+                                        onPipeMaterialChange={handleBranchPipeMaterialChange}
                                     />
 
                                     {shouldShowSecondaryPipe ? (
@@ -3809,6 +4691,8 @@ export default function Product() {
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
                                             selectedPipeSizes={selectedPipeSizes}
+                                            selectedPipeMaterial={selectedPipeMaterials[activeZoneId]?.secondary}
+                                            onPipeMaterialChange={handleSecondaryPipeMaterialChange}
                                         />
                                     ) : null}
 
@@ -3827,6 +4711,8 @@ export default function Product() {
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
                                             selectedPipeSizes={selectedPipeSizes}
+                                            selectedPipeMaterial={selectedPipeMaterials[activeZoneId]?.main}
+                                            onPipeMaterialChange={handleMainPipeMaterialChange}
                                         />
                                     )}
 
@@ -3846,6 +4732,8 @@ export default function Product() {
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
                                             selectedPipeSizes={selectedPipeSizes}
+                                            selectedPipeMaterial={selectedPipeMaterials[activeZoneId]?.emitter}
+                                            onPipeMaterialChange={handleEmitterPipeMaterialChange}
                                         />
                                     ) : projectMode === 'horticulture' ? null : null}
 
