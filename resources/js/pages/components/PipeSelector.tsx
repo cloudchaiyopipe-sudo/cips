@@ -1010,10 +1010,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     );
     const selectedPipeNotInAvailable = selectedPipe && !selectedPipeInAvailable;
     
-    // ✅ If selected pipe is not in availablePipes, try to find it in results.allPipes
-    const allPipes = results?.allPipes || [];
-    const selectedFromAllPipes = selectedPipeNotInAvailable && allPipes.length > 0
-        ? allPipes.find(
+    // ✅ If selected pipe is not in availablePipes, try to find it in results recommended pipes
+    const allPipesFromResults = [
+        ...(results?.recommendedBranchPipe || []),
+        ...(results?.recommendedSecondaryPipe || []),
+        ...(results?.recommendedMainPipe || []),
+        ...(results?.recommendedEmitterPipe || []),
+    ];
+    const selectedFromAllPipes = selectedPipeNotInAvailable && allPipesFromResults.length > 0
+        ? allPipesFromResults.find(
             (p) => p.id === selectedPipe.id || 
                    p.productCode === selectedPipe.productCode ||
                    (p as any).product_code === selectedPipe.productCode ||
