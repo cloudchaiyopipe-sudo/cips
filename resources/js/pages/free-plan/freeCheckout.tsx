@@ -1,27 +1,16 @@
 // 1. Import
-import { useState, useEffect, useRef } from 'react';
-import { Head, router, usePage } from '@inertiajs/react';
-import QRCodeSVG from 'react-qr-code';
+import { useState, useEffect } from 'react';
+import { Head, router } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
 import { getTranslations } from './utils/language';
-import { motion, AnimatePresence } from 'framer-motion';
-import { SharedData } from '@/types';
-
+import { motion } from 'framer-motion';
 // 2. Component
 function FreeCheckout() {
-    // Get user data from Inertia page props
-    const page = usePage<SharedData>();
-    const user = page.props.auth?.user;
-    const isAdmin = user?.is_admin || false;
-    // LINE Official Account ID - Load from localStorage or use default
-    const [lineId, setLineId] = useState<string>('@fang.nitipoom');
-    const [showLineIdModal, setShowLineIdModal] = useState(false);
-    const [lineIdInput, setLineIdInput] = useState<string>('');
-
-    const LINE_FRIEND_URL = `https://line.me/R/ti/p/${lineId}`;
-
     const [translations, setTranslations] = useState(getTranslations());
-    const qrCodeRef = useRef<HTMLDivElement>(null);
+    // Contact modal (same as Navbar)
+    const [showContactModal, setShowContactModal] = useState(false);
+    const [contactQrProgramError, setContactQrProgramError] = useState(false);
+    const [contactQrInstallError, setContactQrInstallError] = useState(false);
     const [sprinklerSpecs, setSprinklerSpecs] = useState<{
         flowRatePerMin: number;
         waterPressure: number;
@@ -77,16 +66,11 @@ function FreeCheckout() {
 
     // Load data from localStorage (Logic preserved)
     useEffect(() => {
-        // Load LINE ID from localStorage
-        const savedLineId = localStorage.getItem('lineId');
-        if (savedLineId) {
-            setLineId(savedLineId);
-        }
-
         const savedFlowRateConfig = localStorage.getItem('flowRateConfig');
         const savedSprinklerMode = localStorage.getItem('sprinklerMode');
+        const savedSummary = localStorage.getItem('freePlanSummary');
 
-        let flowRateConfig = { flowRatePerMin: 2.5, waterPressure: 2.0, radius: 4.0 };
+        let flowRateConfig = { flowRatePerMin: 2.5, waterPressure: 2.0, radius: 4.0, sprinklersPerPlant: 1 };
         if (savedFlowRateConfig) {
             try {
                 const config = JSON.parse(savedFlowRateConfig);
@@ -94,15 +78,32 @@ function FreeCheckout() {
                     flowRatePerMin: config.flowRatePerMin || 2.5,
                     waterPressure: config.waterPressure || 2.0,
                     radius: config.radius || 4.0,
+                    sprinklersPerPlant: config.sprinklersPerPlant ?? 1,
                 };
             } catch (error) { console.error('Error loading config:', error); }
+        }
+
+        // Preset mode totalLPM: use freePlanSummary.flowRate.totalLPM so it matches summary/product
+        let presetTotalLPM = 0;
+        if (savedSummary) {
+            try {
+                const summary = JSON.parse(savedSummary);
+                presetTotalLPM = summary?.flowRate?.totalLPM ?? 0;
+                if (presetTotalLPM === 0 && summary?.plants?.total != null) {
+                    const sprinklersPerPlant = flowRateConfig.sprinklersPerPlant ?? 1;
+                    const flowRatePerMin = flowRateConfig.flowRatePerMin || 2.5;
+                    presetTotalLPM = summary.plants.total * sprinklersPerPlant * flowRatePerMin;
+                }
+            } catch {
+                // ignore
+            }
         }
 
         setSprinklerSpecs({
             flowRatePerMin: flowRateConfig.flowRatePerMin,
             waterPressure: flowRateConfig.waterPressure,
             radius: flowRateConfig.radius,
-            totalLPM: 0,
+            totalLPM: presetTotalLPM,
         });
 
         if (savedSprinklerMode) setSprinklerMode(savedSprinklerMode as 'preset' | 'calculated');
@@ -134,57 +135,6 @@ function FreeCheckout() {
 
     const handleBack = () => {
         router.visit('/free-plan/product');
-    };
-
-    const handleSaveImage = async () => {
-        if (!qrCodeRef.current) return;
-        try {
-            const { default: html2canvas } = await import('html2canvas');
-            const canvas = await html2canvas(qrCodeRef.current, {
-                backgroundColor: '#ffffff',
-                scale: 2,
-                logging: false,
-            });
-            canvas.toBlob((blob) => {
-                if (!blob) return;
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `chaiyo-line-qr.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            }, 'image/png');
-        } catch (error) {
-            console.error('Error saving image:', error);
-            alert(translations.errorSavingImage);
-        }
-    };
-
-    const handleOpenLineIdModal = () => {
-        setLineIdInput(lineId);
-        setShowLineIdModal(true);
-    };
-
-    const handleCloseLineIdModal = () => {
-        setShowLineIdModal(false);
-        setLineIdInput('');
-    };
-
-    const handleSaveLineId = () => {
-        if (!lineIdInput.trim()) {
-            alert(translations.pleaseEnterLineId);
-            return;
-        }
-        // Remove @ if user includes it
-        const cleanLineId = lineIdInput.trim().startsWith('@') 
-            ? lineIdInput.trim() 
-            : `@${lineIdInput.trim()}`;
-        
-        setLineId(cleanLineId);
-        localStorage.setItem('lineId', cleanLineId);
-        setShowLineIdModal(false);
     };
 
     const currentSpecs = sprinklerMode === 'preset' ? sprinklerSpecs : calculatedSprinklerSpecs;
@@ -370,171 +320,171 @@ function FreeCheckout() {
                         </motion.div>
                     </div>
 
-{/* Right Column: QR Code & Actions */}
-<motion.div variants={itemVariants} className="space-y-6 lg:col-span-1">
+{/* Right Column: ติดต่อ & Back */}
+                    <motion.div variants={itemVariants} className="space-y-6 lg:col-span-1">
                         <div className="relative overflow-hidden rounded-3xl border border-green-500/30 bg-gradient-to-br from-green-900/40 to-slate-900/40 p-6 shadow-xl backdrop-blur-xl">
-                            {/* Decorative Elements */}
                             <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-green-500/20 blur-3xl" />
                             <div className="absolute -left-10 -bottom-10 h-32 w-32 rounded-full bg-blue-500/20 blur-3xl" />
-
-                            <div className="relative z-10 text-center">
-                                <div className="mb-2 flex items-center justify-between">
-                                    <h3 className="text-xl font-bold text-green-400">
-                                        {translations.addFriendOnLine}
-                                    </h3>
-                                    {isAdmin && (
-                                        <motion.button
-                                            whileHover={{ scale: 1.1 }}
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={handleOpenLineIdModal}
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/20 text-green-400 transition-colors hover:bg-green-500/30"
-                                            title={translations.manageLineId}
-                                        >
-                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                        </motion.button>
-                                    )}
-                                </div>
-                                <p className="mb-6 text-sm text-slate-300">
-                                    {translations.scanQRCodeToContact}
-                                </p>
-
-                                {/* QR Code Container (White background for scanning) */}
-                                <div className="mx-auto w-fit overflow-hidden rounded-xl bg-white p-4 shadow-2xl">
-                                    <div ref={qrCodeRef} className="bg-white p-2">
-                                        <QRCodeSVG
-                                            value={LINE_FRIEND_URL}
-                                            size={200}
-                                            level="H"
-                                        />
-                                        <div className="mt-2 text-center text-xs font-bold text-slate-900">
-                                            {lineId}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 flex flex-col gap-3">
-                                    {/* --- ส่วนที่เพิ่มใหม่: ปุ่มกดแอดไลน์ --- */}
-                                    <motion.a
-                                        href={LINE_FRIEND_URL}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        className="w-full cursor-pointer rounded-xl bg-[#06C755] py-3 font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:bg-[#05b34c]"
-                                    >
-                                        <span className="flex items-center justify-center gap-2">
-                                            {/* Icon LINE (แบบเรียบง่าย) หรือ Icon เพิ่มเพื่อน */}
-                                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.51 4.14 7.23-.2.8-.75 2.06-1.54 2.84 0 0-.27.27.15.36.4.08 3.56.32 5.5-1.09 1.25.35 2.58.54 3.93.54 5.52 0 10-4.03 10-9S17.52 2 12 2z" />
-                                            </svg>
-                                            {translations.addFriendOnLineButton}
-                                        </span>
-                                    </motion.a>
-                                    {/* ------------------------------------- */}
-
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={handleSaveImage}
-                                        className="w-full rounded-xl bg-slate-700 py-3 font-semibold text-white shadow-lg transition-all hover:bg-slate-600"
-                                    >
-                                        <span className="flex items-center justify-center gap-2">
-                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                            {translations.saveQRCode}
-                                        </span>
-                                    </motion.button>
-                                    
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={handleBack}
-                                        className="w-full rounded-xl border border-slate-600 bg-slate-800/50 py-3 font-semibold text-slate-300 transition-all hover:bg-slate-700 hover:text-white"
-                                    >
-                                        {translations.back}
-                                    </motion.button>
-                                </div>
+                            <div className="relative z-10 flex flex-col gap-3">
+                                <motion.button
+                                    type="button"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setShowContactModal(true)}
+                                    className="w-full rounded-xl bg-[#06C755] py-3 font-semibold text-white shadow-lg shadow-green-900/30 transition-all hover:bg-[#05b34c]"
+                                >
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771z" />
+                                        </svg>
+                                        {translations.navContact}
+                                    </span>
+                                </motion.button>
+                                <motion.button
+                                    type="button"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={handleBack}
+                                    className="w-full rounded-xl border border-slate-600 bg-slate-800/50 py-3 font-semibold text-slate-300 transition-all hover:bg-slate-700 hover:text-white"
+                                >
+                                    {translations.back}
+                                </motion.button>
                             </div>
                         </div>
                     </motion.div>
                 </div>
             </motion.div>
 
-            {/* LINE ID Management Modal */}
-            <AnimatePresence>
-                {showLineIdModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={handleCloseLineIdModal}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            transition={{ duration: 0.3 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl"
-                        >
+            {/* Contact Modal - same as Navbar (2 sections: Program support & Water system installation) */}
+            {showContactModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-2 sm:p-4">
+                    <div className="relative z-[10000] max-h-[95vh] sm:max-h-[90vh] w-full max-w-[calc(100vw-1rem)] sm:max-w-4xl overflow-y-auto rounded-2xl bg-slate-900 p-4 sm:p-6 md:p-8 mx-2 sm:mx-0">
+                        <div className="mb-4 sm:mb-6 flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                                <h2 className="mb-1 sm:mb-2 text-xl sm:text-2xl md:text-3xl font-bold text-white">
+                                    {translations.navContact}
+                                </h2>
+                                <p className="text-xs sm:text-sm text-slate-400">
+                                    {translations.contactModalChooseChannel}
+                                </p>
+                            </div>
                             <button
-                                onClick={handleCloseLineIdModal}
-                                className="absolute right-4 top-4 text-slate-400 hover:text-white"
+                                type="button"
+                                onClick={() => {
+                                    setShowContactModal(false);
+                                    setContactQrProgramError(false);
+                                    setContactQrInstallError(false);
+                                }}
+                                className="text-slate-400 transition-colors hover:text-white flex-shrink-0"
                             >
-                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
+                        </div>
 
-                            <h2 className="mb-6 text-xl font-bold text-white">
-                                {translations.manageLineId}
-                            </h2>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium text-slate-300">
-                                        LINE ID <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={lineIdInput}
-                                        onChange={(e) => setLineIdInput(e.target.value)}
-                                        placeholder="@fang.nitipoom"
-                                        className="w-full rounded-xl border border-slate-600 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                                    />
-                                    <p className="mt-2 text-xs text-slate-400">
-                                        {translations.lineIdExampleWithAuto}
-                                    </p>
-                                </div>
-
-                                <div className="flex gap-3 pt-2">
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        type="button"
-                                        onClick={handleCloseLineIdModal}
-                                        className="flex-1 rounded-xl border border-slate-600 bg-transparent px-4 py-3 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
-                                    >
-                                        {translations.cancel}
-                                    </motion.button>
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        type="button"
-                                        onClick={handleSaveLineId}
-                                        className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg shadow-green-900/20 hover:bg-green-500"
-                                    >
-                                        {translations.save}
-                                    </motion.button>
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 sm:p-5 md:p-6">
+                                <h3 className="mb-2 text-lg font-semibold text-white">
+                                    {translations.contactModalProgram}
+                                </h3>
+                                <p className="mb-4 text-sm text-slate-400">
+                                    {translations.contactModalProgramDesc}
+                                </p>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="flex flex-col items-center">
+                                        <span className="mb-2 text-xs text-slate-500">{translations.contactModalScanQR}</span>
+                                        <div className="h-32 w-32 rounded-lg border-2 border-slate-600 bg-white p-1 flex items-center justify-center overflow-hidden">
+                                            {!contactQrProgramError ? (
+                                                <img
+                                                    src="/images/hacks.jpg"
+                                                    alt="Line QR - โปรแกรม"
+                                                    className="h-full w-full object-contain"
+                                                    onError={() => setContactQrProgramError(true)}
+                                                />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-500 text-xs text-center p-2">
+                                                    QR Code
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="w-full text-center">
+                                        <p className="mb-1 text-xs text-slate-500">{translations.contactModalLineId}</p>
+                                        <p className="mb-2 font-mono text-sm font-medium text-green-400">hackskie</p>
+                                        <a
+                                            href="https://line.me/ti/p/~hackskie"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#05b04c]"
+                                        >
+                                            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+                                            </svg>
+                                            {translations.contactModalOpenLine}
+                                        </a>
+                                    </div>
+                                    <div className="w-full border-t border-slate-700 pt-4 text-center">
+                                        <p className="mb-1 text-xs text-slate-500">{translations.contactModalPhone}</p>
+                                        <a href="tel:0981586900" className="text-base font-medium text-white hover:text-teal-400">
+                                            098-158-6900
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
+                            <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 sm:p-5 md:p-6">
+                                <h3 className="mb-2 text-lg font-semibold text-white">
+                                    {translations.contactModalWaterTeam}
+                                </h3>
+                                <p className="mb-4 text-sm text-slate-400">
+                                    {translations.contactModalWaterTeamDesc}
+                                </p>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="flex flex-col items-center">
+                                        <span className="mb-2 text-xs text-slate-500">{translations.contactModalScanQR}</span>
+                                        <div className="h-32 w-32 rounded-lg border-2 border-slate-600 bg-white p-1 flex items-center justify-center overflow-hidden">
+                                            {!contactQrInstallError ? (
+                                                <img
+                                                    src="/images/water.jpg"
+                                                    alt="Line QR - ติดตั้งระบบน้ำ"
+                                                    className="h-full w-full object-contain"
+                                                    onError={() => setContactQrInstallError(true)}
+                                                />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-500 text-xs text-center p-2">
+                                                    QR Code
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="w-full text-center">
+                                        <p className="mb-1 text-xs text-slate-500">{translations.contactModalLineId}</p>
+                                        <p className="mb-2 font-mono text-sm font-medium text-green-400">-</p>
+                                        <a
+                                            href="https://line.me/ti/p/~"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#05b04c]"
+                                        >
+                                            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+                                            </svg>
+                                            {translations.contactModalOpenLine}
+                                        </a>
+                                    </div>
+                                    <div className="w-full border-t border-slate-700 pt-4 text-center">
+                                        <p className="mb-1 text-xs text-slate-500">{translations.contactModalPhone}</p>
+                                        <a href="tel:02-451-1111" className="text-base font-medium text-white hover:text-teal-400">
+                                            02-451-1111 ต่อ 188
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

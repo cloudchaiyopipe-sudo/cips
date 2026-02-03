@@ -910,7 +910,7 @@ function FreeProduct() {
         const initializeMap = () => {
             if (!isMounted || !mapRef.current || !window.google) return;
 
-            const defaultLocation = { lat: 13.7563, lng: 100.5018 };
+            const defaultLocation = { lat: 12.8618532, lng: 102.075667 };
             const map = new window.google.maps.Map(mapRef.current, {
                 zoom: 15,
                 center: defaultLocation,
@@ -1648,30 +1648,33 @@ function FreeProduct() {
                             </div>
                             <div className="rounded-lg border border-emerald-700/30 bg-slate-700/50 p-2 text-xs leading-relaxed md:p-3 md:text-sm">
                                 {/* Calculated Specifications */}
-                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-3">
-                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5">
-                                        <div className="mb-0.5 text-xs font-medium text-emerald-300 md:mb-1">
+                                <div className="flex flex-row gap-2 md:gap-3">
+                                    <div className="flex flex-col items-start gap-1 rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5 flex-1">
+                                        <span className="text-xs font-medium text-emerald-300 md:text-sm">
                                             {translations.flowRateProduct}:
-                                        </div>
-                                        <div className="text-base font-bold text-emerald-400 md:text-lg">
-                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)} <span className="text-xs font-semibold text-slate-400 md:text-sm">LPM</span>
-                                        </div>
+                                        </span>
+                                        <span className="text-base font-bold text-emerald-400 md:text-lg">
+                                            {calculatedSprinklerSpecs.flowRatePerMin.toFixed(2)}
+                                            <span className="ml-1 text-xs font-semibold text-slate-400 md:text-sm">LPM</span>
+                                        </span>
                                     </div>
-                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5">
-                                        <div className="mb-0.5 text-xs font-medium text-emerald-300 md:mb-1">
+                                    <div className="flex flex-col items-start gap-1 rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5 flex-1">
+                                        <span className="text-xs font-medium text-emerald-300 md:text-sm">
                                             {translations.pressureProduct}:
-                                        </div>
-                                        <div className="text-base font-bold text-emerald-400 md:text-lg">
-                                            {calculatedSprinklerSpecs.waterPressure} <span className="text-xs font-semibold text-slate-400 md:text-sm">Bar</span>
-                                        </div>
+                                        </span>
+                                        <span className="text-base font-bold text-emerald-400 md:text-lg">
+                                            {calculatedSprinklerSpecs.waterPressure}
+                                            <span className="ml-1 text-xs font-semibold text-slate-400 md:text-sm">Bar</span>
+                                        </span>
                                     </div>
-                                    <div className="rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5">
-                                        <div className="mb-0.5 text-xs font-medium text-emerald-300 md:mb-1">
+                                    <div className="flex flex-col items-start gap-1 rounded-lg border border-emerald-700/30 bg-slate-800/50 p-2 md:p-2.5 flex-1">
+                                        <span className="text-xs font-medium text-emerald-300 md:text-sm">
                                             {translations.radiusProduct}:
-                                        </div>
-                                        <div className="text-base font-bold text-emerald-400 md:text-lg">
-                                            {calculatedSprinklerSpecs.radius} <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
-                                        </div>
+                                        </span>
+                                        <span className="text-base font-bold text-emerald-400 md:text-lg">
+                                            {calculatedSprinklerSpecs.radius}
+                                            <span className="ml-1 text-xs font-semibold text-slate-400 md:text-sm">m</span>
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -2766,8 +2769,8 @@ function FreeProduct() {
                                         {isAllZones ? (
                                             // All Zones View
                                             <>
-                                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-3">
-                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                                <div className="flex flex-row gap-2 md:gap-3">
+                                                    <div className="flex-1 rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
                                                         <div className="mb-0.5 text-xs font-medium text-sky-300 md:mb-1">
                                                             {translations.flowRateProduct}:
                                                         </div>
@@ -2775,7 +2778,7 @@ function FreeProduct() {
                                                             {pumpRecommendations?.flowRate} <span className="text-xs font-semibold text-slate-400 md:text-sm">LPM</span>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                                    <div className="flex-1 rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
                                                         <div className="mb-0.5 text-xs font-medium text-sky-300 md:mb-1">
                                                             {translations.headProduct}:
                                                         </div>
@@ -2783,11 +2786,11 @@ function FreeProduct() {
                                                             {pumpRecommendations?.head} <span className="text-xs font-semibold text-slate-400 md:text-sm">m</span>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
+                                                    <div className="flex-1 rounded-lg border border-sky-700/30 bg-slate-800/50 p-2 md:p-2.5">
                                                         <div className="mb-1 text-xs font-medium text-sky-300">
                                                             {translations.powerProduct}:
                                                         </div>
-                                                        <div className="text-xl font-bold text-sky-400">
+                                                        <div className="text-base font-bold text-sky-400 md:text-lg">
                                                             {pumpRecommendations?.power} <span className="text-sm font-semibold text-slate-400">HP</span>
                                                         </div>
                                                     </div>

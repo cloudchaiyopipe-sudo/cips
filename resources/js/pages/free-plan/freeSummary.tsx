@@ -306,24 +306,41 @@ function FreeSummary() {
     }, []); // Only run on mount
 
     // Load summary data from localStorage (initial load only)
+    // Read flowRateConfig from localStorage inside effect so first run uses saved config, not default state
     useEffect(() => {
         const savedSummary = localStorage.getItem('freePlanSummary');
         const savedZones = localStorage.getItem('zones');
+        const savedFlowRateConfig = localStorage.getItem('flowRateConfig');
+
+        let configToUse = flowRateConfig;
+        if (savedFlowRateConfig) {
+            try {
+                const parsed = JSON.parse(savedFlowRateConfig);
+                configToUse = {
+                    flowRatePerMin: parsed.flowRatePerMin ?? flowRateConfig.flowRatePerMin,
+                    sprinklersPerPlant: parsed.sprinklersPerPlant ?? flowRateConfig.sprinklersPerPlant,
+                    waterPressure: parsed.waterPressure ?? flowRateConfig.waterPressure,
+                    radius: parsed.radius ?? flowRateConfig.radius,
+                };
+            } catch {
+                // use state
+            }
+        }
 
         if (savedSummary) {
             try {
                 const summary = JSON.parse(savedSummary);
                 const zones = savedZones ? JSON.parse(savedZones) : [];
 
-                // Calculate flow rate data using current flowRateConfig
-                const flowRatePerMin = flowRateConfig.flowRatePerMin; // LPM per sprinkler
-                const sprinklersPerPlant = flowRateConfig.sprinklersPerPlant || 1;
+                // Calculate flow rate data using config from localStorage (or state)
+                const flowRatePerMin = configToUse.flowRatePerMin;
+                const sprinklersPerPlant = configToUse.sprinklersPerPlant || 1;
                 const totalPlants = summary.plants?.total || 0;
                 const totalLPM = totalPlants * sprinklersPerPlant * flowRatePerMin;
 
                 // Calculate flow rate by zone
                 const flowRateByZone =
-                    summary.plants?.byZone?.map((zone) => ({
+                    summary.plants?.byZone?.map((zone: { zoneId: number; name: string; plants: number }) => ({
                         zoneId: zone.zoneId,
                         name: zone.name,
                         plants: zone.plants,
@@ -342,8 +359,8 @@ function FreeSummary() {
                     flowRate: {
                         totalLPM,
                         flowRatePerMin,
-                        waterPressure: flowRateConfig.waterPressure,
-                        radius: flowRateConfig.radius,
+                        waterPressure: configToUse.waterPressure,
+                        radius: configToUse.radius,
                         byZone: flowRateByZone,
                     },
                     selectedPlant: summary.selectedPlant || undefined,
@@ -354,7 +371,7 @@ function FreeSummary() {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [flowRateConfig]); // Run when flowRateConfig is loaded
+    }, [flowRateConfig]); // Run when flowRateConfig is loaded or changed
 
     // Update summary data when flowRateConfig changes
     useEffect(() => {
@@ -399,7 +416,7 @@ function FreeSummary() {
         const initializeMap = () => {
             if (!isMounted || !mapRef.current || !window.google) return;
 
-            const defaultLocation = { lat: 13.7563, lng: 100.5018 };
+            const defaultLocation = { lat: 12.8618532, lng: 102.075667 };
             const map = new window.google.maps.Map(mapRef.current, {
                 zoom: 15,
                 center: defaultLocation,

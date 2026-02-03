@@ -141,9 +141,9 @@ function calculateOptimalPipeSize(
 
         if (hf === null || hf === undefined) continue;
 
-        // คำนวณ Pressure Loss ตามสูตรใหม่
-        // Pressure Loss = (HF / 10) × Length × F
-        const pressureLoss = (hf / 10) * length * adjustmentFactor;
+        // คำนวณ Pressure Loss ตามสูตร (HF = head loss ในหน่วย m ต่อ 100m ตามมาตรฐานตาราง)
+        // Pressure Loss (m) = (HF / 100) × Length (m) × F
+        const pressureLoss = (hf / 100) * length * adjustmentFactor;
 
         // ถ้า pressure loss ไม่เกินค่าสูงสุด นี่คือขนาดที่เล็กที่สุดที่เหมาะสม
         if (pressureLoss <= maxPressureLoss) {
@@ -214,8 +214,8 @@ function calculateOptimalPipeSize(
                 sizeInchStr = (sizeOriginal / 25.4).toFixed(1);
             }
 
-            // ใช้สูตรใหม่: (HF / 10) × Length × F
-            const pressureLoss = (hf / 10) * length * adjustmentFactor;
+            // ใช้สูตร: (HF / 100) × Length × F (HF = m ต่อ 100m)
+            const pressureLoss = (hf / 100) * length * adjustmentFactor;
 
             // ตรวจสอบว่า pressure loss เกิน maxPressureLoss หรือไม่
             // ถ้าเกิน แสดงว่า pipe type นี้ไม่เหมาะสม ต้องเปลี่ยนชนิดท่อ
@@ -660,7 +660,7 @@ export const calculatePipeRecommendationsWithTypes = (
         zoneData?.mainLongestFlowRate || subMainLongestFlowRate * mainOutlets;
 
     // --- ขั้นตอนที่ 1: คำนวณ Lateral ---
-    // สูตร: (HF/10) × longestLength × F
+    // สูตร: (HF/100) × longestLength × F (HF = head loss m ต่อ 100m)
     const lateralResult = calculatePipeSizeForType(
         lateralLongestFlowRate,
         lateralLongestLength,

@@ -1663,7 +1663,6 @@ export default function Product() {
                 }
 
                 // ✅ Check if zoneInputs are already loaded (from database/localStorage)
-                // Use a flag to prevent multiple setState calls
                 const existingZoneInputsStr = localStorage.getItem('zoneInputs') || localStorage.getItem('horticultureZoneInputs');
                 let hasExistingZoneInputs = false;
                 try {
@@ -1674,14 +1673,14 @@ export default function Product() {
                 } catch (e) {
                     // Ignore parse errors
                 }
-                
-                // ✅ Only create default zoneInputs if not already loaded
-                if (!hasExistingZoneInputs) {
-                    if (
-                        horticultureSystemData &&
-                        horticultureSystemData.isMultipleZones &&
-                        horticultureSystemData.zones.length > 0
-                    ) {
+                const fromHorticultureResults = sessionStorage.getItem('fromHorticultureResults') === 'true';
+                // เมื่อมาจาก Results ให้ใช้ความยาวท่อจาก horticultureSystemData เสมอ (ให้ตรงกับ HorticultureResultsPage)
+                const shouldBuildFromHorticultureSystem =
+                    horticultureSystemData?.zones?.length > 0 &&
+                    (fromHorticultureResults || !hasExistingZoneInputs);
+
+                if (shouldBuildFromHorticultureSystem) {
+                    if (horticultureSystemData.zones.length > 0) {
                         const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
                         const initialSelectedPipes: {
                             [zoneId: string]: {
@@ -1712,14 +1711,14 @@ export default function Product() {
                             ),
                             branchesPerLongestSecondary: 1,
                             secondariesPerLongestMain: 1,
-                            longestBranchPipeM: zone.pipes?.branchPipes?.longest || 30,
-                            totalBranchPipeM: zone.pipes?.branchPipes?.totalLength || 100,
-                            longestSecondaryPipeM: zone.pipes?.subMainPipes?.longest || 0,
-                            totalSecondaryPipeM: zone.pipes?.subMainPipes?.totalLength || 0,
-                            longestMainPipeM: zone.pipes?.mainPipes?.longest || 0,
-                            totalMainPipeM: zone.pipes?.mainPipes?.totalLength || 0,
-                            longestEmitterPipeM: zone.pipes?.emitterPipes?.longest || 0,
-                            totalEmitterPipeM: zone.pipes?.emitterPipes?.totalLength || 0,
+                            longestBranchPipeM: formatNumber(zone.pipes?.branchPipes?.longest ?? 30, 2),
+                            totalBranchPipeM: formatNumber(zone.pipes?.branchPipes?.totalLength ?? 100, 2),
+                            longestSecondaryPipeM: formatNumber(zone.pipes?.subMainPipes?.longest ?? 0, 2),
+                            totalSecondaryPipeM: formatNumber(zone.pipes?.subMainPipes?.totalLength ?? 0, 2),
+                            longestMainPipeM: formatNumber(zone.pipes?.mainPipes?.longest ?? 0, 2),
+                            totalMainPipeM: formatNumber(zone.pipes?.mainPipes?.totalLength ?? 0, 2),
+                            longestEmitterPipeM: formatNumber(zone.pipes?.emitterPipes?.longest ?? 0, 2),
+                            totalEmitterPipeM: formatNumber(zone.pipes?.emitterPipes?.totalLength ?? 0, 2),
                         };
 
                         initialSelectedPipes[zone.id] = {
@@ -1734,7 +1733,12 @@ export default function Product() {
                         setSelectedPipes(initialSelectedPipes);
                         setActiveZoneId(horticultureSystemData.zones[0].id);
                         handleZoneOperationModeChange('sequential');
-                    } else if (data && data.useZones && data.zones.length > 0) {
+                        if (fromHorticultureResults) {
+                            sessionStorage.removeItem('fromHorticultureResults');
+                        }
+                    }
+                } else if (!hasExistingZoneInputs) {
+                    if (data && data.useZones && data.zones.length > 0) {
                         const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
                         const initialSelectedPipes: {
                             [zoneId: string]: {
@@ -1815,25 +1819,38 @@ export default function Product() {
                         sprinklersPerLongestBranch: 4,
                         branchesPerLongestSecondary: 5,
                         secondariesPerLongestMain: 1,
-                        longestBranchPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.branchPipes?.longest || 30,
-                        totalBranchPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.branchPipes?.totalLength ||
-                            100,
-                        longestSecondaryPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.subMainPipes?.longest || 0,
-                        totalSecondaryPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.subMainPipes?.totalLength ||
-                            0,
-                        longestMainPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.mainPipes?.longest || 0,
-                        totalMainPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.mainPipes?.totalLength || 0,
-                        longestEmitterPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.emitterPipes?.longest || 0,
-                        totalEmitterPipeM:
-                            horticultureSystemData?.zones?.[0]?.pipes?.emitterPipes?.totalLength ||
-                            0,
+                        longestBranchPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.branchPipes?.longest ?? 30,
+                            2
+                        ),
+                        totalBranchPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.branchPipes?.totalLength ?? 100,
+                            2
+                        ),
+                        longestSecondaryPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.subMainPipes?.longest ?? 0,
+                            2
+                        ),
+                        totalSecondaryPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.subMainPipes?.totalLength ?? 0,
+                            2
+                        ),
+                        longestMainPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.mainPipes?.longest ?? 0,
+                            2
+                        ),
+                        totalMainPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.mainPipes?.totalLength ?? 0,
+                            2
+                        ),
+                        longestEmitterPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.emitterPipes?.longest ?? 0,
+                            2
+                        ),
+                        totalEmitterPipeM: formatNumber(
+                            horticultureSystemData?.zones?.[0]?.pipes?.emitterPipes?.totalLength ?? 0,
+                            2
+                        ),
                     };
                         setZoneInputs({ 'main-area': singleInput });
                         setSelectedPipes({
@@ -5133,6 +5150,7 @@ export default function Product() {
                     selectedExtraPipe={selectedExtraPipe}
                     projectImage={projectImage}
                     projectData={projectData}
+                    horticultureSystemData={horticultureSystemData}
                     gardenData={gardenData}
                     greenhouseData={greenhouseData}
                     zoneSprinklers={zoneSprinklers}
@@ -5145,6 +5163,7 @@ export default function Product() {
                     onClose={() => setShowQuotation(false)}
                     projectMode={projectMode}
                     showPump={showPumpOption}
+                    maxPumpHeadForProjectMode={finalMaxPumpHeadForProjectMode}
                 />
             )}
 

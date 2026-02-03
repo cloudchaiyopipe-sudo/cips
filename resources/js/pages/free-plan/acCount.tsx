@@ -137,7 +137,6 @@ function AcCount() {
         }
     };
 
-    const handleUpgrade = () => router.visit('/free-plan/upgradePro');
     const handleEditProfile = () => {
         setIsEditingProfile(true);
         setProfileData('name', user?.name || '');
@@ -278,16 +277,6 @@ function AcCount() {
                                             {userInitials}
                                         </div>
                                     </div>
-                                    {/* Role Badge */}
-                                    <div className="mb-4">
-                                        <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-                                            user?.tier === 'pro' 
-                                                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' 
-                                                : 'bg-slate-700 text-slate-300 border border-slate-600'
-                                        }`}>
-                                            {user?.tier ? user.tier : translations.freePlanName} {translations.plan}
-                                        </span>
-                                    </div>
                                 </div>
                             </div>
                             
@@ -426,33 +415,8 @@ function AcCount() {
                         </motion.div>
                     </div>
 
-                    {/* Right Column: Plan & Security */}
+                    {/* Right Column: Security */}
                     <div className="space-y-6">
-                        {/* Plan Card */}
-                        <motion.div variants={cardVariants} className="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/80 to-slate-900/80 p-6 shadow-xl backdrop-blur-sm">
-                            <div className="mb-4">
-                                <h3 className="text-sm font-semibold uppercase text-slate-500">{translations.subscriptionPlan}</h3>
-                                <div className="mt-2 text-2xl font-bold text-white">
-                                    {user?.tier ? user.tier.charAt(0).toUpperCase() + user.tier.slice(1) : translations.freePlanName}
-                                </div>
-                                <div className="mt-1 text-sm text-slate-400">
-                                    {user?.tier === 'pro' ? translations.advancedFeatures : translations.basicFeatures}
-                                </div>
-                            </div>
-                            
-                            {user?.tier === 'free' && (
-                                <button
-                                    onClick={handleUpgrade}
-                                    className="group w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 font-semibold text-white shadow-lg shadow-blue-900/20 transition-all hover:from-blue-500 hover:to-indigo-500 hover:shadow-blue-900/40"
-                                >
-                                    <span className="flex items-center justify-center gap-2">
-                                        {translations.upgradeToProButton}
-                                        <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                                    </span>
-                                </button>
-                            )}
-                        </motion.div>
-
                         {/* Security Card */}
                         <motion.div variants={cardVariants} className="rounded-2xl border border-white/5 bg-slate-800/40 p-6 backdrop-blur-sm">
                             <h3 className="mb-4 text-sm font-semibold uppercase text-slate-500">{translations.accountSecurity}</h3>

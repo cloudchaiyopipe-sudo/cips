@@ -418,7 +418,7 @@ function FreeProductDetail() {
     // 5. Return TSX
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-700 via-slate-600 to-slate-700">
-            <Head title={`${product.name} - Free Plan`} />
+            <Head title={product.name} />
 
             {/* Custom Navbar */}
             <FreeNav />

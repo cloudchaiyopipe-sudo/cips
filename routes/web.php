@@ -950,7 +950,12 @@ Route::middleware(['auth'])->group(function () {
     })->name('free-plan.checkout');
 
 
-    // Free Plan Account/Profile Route - Sales users cannot access
+    // Free Plan Contact Route (ติดต่อ) - content from former footer
+    Route::get('/free-plan/contact', function () {
+        return Inertia::render('free-plan/freeContact');
+    })->name('free-plan.contact');
+
+    // Free Plan Account/Profile Route - Sales users cannot access (no nav menu, used by email verification etc.)
     Route::get('/free-plan/account', function (Request $request) {
         return Inertia::render('free-plan/acCount', [
             'verified' => session('verified'),

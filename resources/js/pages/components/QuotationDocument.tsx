@@ -10,7 +10,128 @@ import {
     PumpAccessory,
 } from '../types/interfaces';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { loadSprinklerConfig } from '../../utils/sprinklerUtils';
+import { loadSprinklerConfig, calculateTotalFlowRate } from '../../utils/sprinklerUtils';
+import {
+    loadProjectData,
+    calculateProjectSummary,
+    formatWaterVolume,
+} from '../../utils/horticultureUtils';
+
+/** แปลงค่าเป็นข้อความแบบช่วง เหมือน SprinklerSelector (ให้สเปกหัวฉีดตรงกับที่เลือก) */
+const formatRangeValue = (value: any): string => {
+    if (value == null || value === '') return '-';
+    if (Array.isArray(value)) return `${value[0]}-${value[1]}`;
+    return String(value);
+};
+
+/** คำนวณพื้นที่โซนจาก coordinates (ตรงกับ product.tsx getZoneAreaData) */
+const calculatePolygonAreaForZone = (coords: { lat: number; lng: number }[]): number => {
+    if (!coords || coords.length < 3) return 0;
+    let area = 0;
+    for (let i = 0; i < coords.length; i++) {
+        const j = (i + 1) % coords.length;
+        area += coords[i].lat * coords[j].lng;
+        area -= coords[j].lat * coords[i].lng;
+    }
+    area = Math.abs(area) / 2;
+    const metersPerDegree = 111320;
+    return area * metersPerDegree * metersPerDegree;
+};
+
+type HorticultureZoneDisplayData = {
+    areaInRai: number;
+    plantCount: number;
+    waterNeedPerSession: number;
+    waterNeedPerMinute: number;
+};
+
+function buildHorticultureZoneDisplayData(zones: any[]): {
+    byId: Record<string, HorticultureZoneDisplayData>;
+    byIndex: HorticultureZoneDisplayData[];
+} {
+    const byId: Record<string, HorticultureZoneDisplayData> = {};
+    const byIndex: HorticultureZoneDisplayData[] = [];
+    if (!Array.isArray(zones) || zones.length === 0) return { byId, byIndex };
+    for (const z of zones) {
+        const id = z?.id;
+        const areaM2 = Number(z?.area);
+        const areaInRai = areaM2 > 0 ? areaM2 / 1600 : 0;
+        const plantCount = Number(z?.plantCount) || 0;
+        const waterNeedPerSession = Number(z?.totalWaterNeed) || 0;
+        const waterNeedPerMinute = Number(z?.waterNeedPerMinute) || 0;
+        const item: HorticultureZoneDisplayData = {
+            areaInRai,
+            plantCount,
+            waterNeedPerSession,
+            waterNeedPerMinute,
+        };
+        byIndex.push(item);
+        if (id) byId[id] = item;
+    }
+    return { byId, byIndex };
+}
+
+/**
+ * ดึงข้อมูลโซนจาก localStorage (ที่ Results บันทึก)
+ */
+const getHorticultureZoneDataFromSystemStorage = (): {
+    byId: Record<string, HorticultureZoneDisplayData>;
+    byIndex: HorticultureZoneDisplayData[];
+} => {
+    try {
+        const str = localStorage.getItem('horticultureSystemData');
+        if (!str) return { byId: {}, byIndex: [] };
+        const data = JSON.parse(str);
+        return buildHorticultureZoneDisplayData(data?.zones ?? []);
+    } catch {
+        return { byId: {}, byIndex: [] };
+    }
+};
+
+/**
+ * ดึงข้อมูลโซนให้ตรงกับ InputForm (ที่ได้จาก getZoneAreaData ใน product.tsx)
+ * ใช้ horticultureSystemData จาก localStorage + projectData
+ */
+const getZoneAreaDataForZone = (
+    zoneId: string,
+    projectDataRef: any
+): { areaInRai: number; plantCount: number; waterNeedPerMinute: number } | null => {
+    try {
+        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+        if (!horticultureSystemDataStr) return null;
+        const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+        if (!horticultureSystemData?.zones?.length) return null;
+        const zoneFromHorticultureData = (horticultureSystemData.zones as any[]).find(
+            (z: any) => z.id === zoneId
+        );
+        if (!zoneFromHorticultureData) return null;
+        const sprinklerConfig = loadSprinklerConfig();
+        const flowRatePerPlant = sprinklerConfig?.flowRatePerMinute ?? 2.5;
+        const sprinklersPerTree = sprinklerConfig?.sprinklersPerTree ?? 1;
+        const originalZone = (projectDataRef?.zones as any[])?.find((z: any) => z.id === zoneId);
+        const plantCount =
+            originalZone?.plants?.length ??
+            zoneFromHorticultureData?.plantCount ??
+            0;
+        const waterNeedPerMinute =
+            plantCount > 0
+                ? calculateTotalFlowRate(plantCount, flowRatePerPlant, sprinklersPerTree)
+                : 0;
+        let areaInRai = 0;
+        if (zoneFromHorticultureData.area && zoneFromHorticultureData.area > 0) {
+            areaInRai = zoneFromHorticultureData.area / 1600;
+        } else if (originalZone?.coordinates?.length >= 3) {
+            const areaInSquareMeters =
+                originalZone.area ||
+                calculatePolygonAreaForZone(originalZone.coordinates);
+            areaInRai = areaInSquareMeters / 1600;
+        }
+        return { areaInRai, plantCount, waterNeedPerMinute };
+    } catch {
+        return null;
+    }
+};
+
 import { calculatePipeRolls } from '../utils/calculations';
 
 interface QuotationItem {
@@ -56,6 +177,8 @@ interface QuotationDocumentProps {
     projectMode: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenData: any;
     projectData: any;
+    /** ข้อมูลโซนจาก Results (ส่งจาก product page) — ใช้เป็นแหล่งหลักเพื่อให้โซน 1 ปริมาณน้ำรวมถูกในรอบแรก */
+    horticultureSystemData?: any;
     greenhouseData?: any;
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
@@ -68,6 +191,8 @@ interface QuotationDocumentProps {
     gardenStats?: any;
     fieldCropData?: any;
     onClose: () => void;
+    /** ค่า TDH (ความต้องการปั๊มรวม + 10%) เดียวกับที่ส่งไป PumpSelector เพื่อให้ข้อ 5 ตรงกับ ⚡ ความต้องการปั๊ม */
+    maxPumpHeadForProjectMode?: number;
 }
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     show,
@@ -83,6 +208,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     selectedExtraPipe,
     projectImage,
     projectData,
+    horticultureSystemData,
     projectMode,
     gardenData,
     greenhouseData,
@@ -95,6 +221,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     fieldCropData,
     showPump,
     onClose,
+    maxPumpHeadForProjectMode: maxPumpHeadForProjectModeProp,
 }) => {
     const { t } = useLanguage();
     const [items, setItems] = useState<QuotationItem[]>([]);
@@ -118,6 +245,270 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     }, [projectImage]);
 
     const hasProjectImagePage = !!editableProjectImage;
+
+    const getZoneDisplayName = (zoneId: string): string => {
+        if (projectData?.zones?.length) {
+            const z = (projectData.zones as any[]).find((z: any) => z.id === zoneId);
+            if (z?.name) return z.name;
+        }
+        if (fieldCropData?.zones?.info?.length) {
+            const z = (fieldCropData.zones as any).info.find((z: any) => z.id === zoneId);
+            if (z?.name) return z.name;
+        }
+        if (greenhouseData?.plots?.length) {
+            const p = (greenhouseData.plots as any[]).find((p: any) => p.plotId === zoneId);
+            if (p?.plotName) return p.plotName;
+        }
+        if (gardenStats?.zones?.length) {
+            const z = (gardenStats.zones as any[]).find((z: any) => z.zoneId === zoneId);
+            if (z?.name) return z.name;
+        }
+        return zoneId;
+    };
+
+    /** ดึง Friction Head จาก localStorage ตามที่ CalculationSummary / PipeSystemSummary / PipeSelector บันทึก (ไม่คำนวณเอง) */
+    const getStoredPipeHeadLoss = (): {
+        branch: number;
+        secondary: number;
+        main: number;
+        emitter: number;
+        total: number;
+    } => {
+        const toNum = (x: number | { total?: number } | undefined): number =>
+            typeof x === 'number' ? x : (x && typeof (x as any).total === 'number' ? (x as any).total : 0);
+        const fallback = () => ({
+            branch: toNum((results?.headLoss as any)?.branch),
+            secondary: toNum((results?.headLoss as any)?.secondary),
+            main: toNum((results?.headLoss as any)?.main),
+            emitter: toNum((results?.headLoss as any)?.emitter),
+            total: results?.headLoss?.total ?? 0,
+        });
+        const storageKey =
+            projectMode === 'garden'
+                ? 'garden_pipe_calculations'
+                : projectMode === 'greenhouse'
+                  ? 'greenhouse_pipe_calculations'
+                  : projectMode === 'field-crop'
+                    ? 'field_crop_pipe_calculations'
+                    : 'horticulture_pipe_calculations';
+        try {
+            const str = localStorage.getItem(storageKey);
+            if (!str) return fallback();
+            const calc = JSON.parse(str);
+            const branch = calc?.branch?.headLoss ?? 0;
+            const secondary = calc?.secondary?.headLoss ?? 0;
+            const main = calc?.main?.headLoss ?? 0;
+            const emitter = calc?.emitter?.headLoss ?? 0;
+            const total =
+                projectMode === 'greenhouse'
+                    ? (main || 0) + (branch || 0)
+                    : (branch || 0) + (secondary || 0) + (main || 0) + (emitter || 0);
+            return { branch, secondary, main, emitter, total };
+        } catch {
+            return fallback();
+        }
+    };
+
+    /** โซนละ Friction Head จาก localStorage (ตรงกับ PipeSelector บันทึกต่อโซน) — ใช้สำหรับ horticulture */
+    const getStoredPipeHeadLossPerZone = (): Record<
+        string,
+        { branch: number; secondary: number; main: number; emitter: number; total: number }
+    > => {
+        if (projectMode !== 'horticulture') return {};
+        try {
+            const str = localStorage.getItem('horticulture_pipe_calculations');
+            if (!str) return {};
+            const data = JSON.parse(str);
+            const zones = data?.zones;
+            if (!zones || typeof zones !== 'object') return {};
+            const out: Record<string, { branch: number; secondary: number; main: number; emitter: number; total: number }> = {};
+            for (const [zoneId, zoneCalc] of Object.entries(zones)) {
+                const z = zoneCalc as any;
+                const branch = Number(z?.branch?.headLoss) || 0;
+                const secondary = Number(z?.secondary?.headLoss) || 0;
+                const main = Number(z?.main?.headLoss) || 0;
+                const emitter = Number(z?.emitter?.headLoss) || 0;
+                const total = branch + secondary + main + emitter;
+                out[zoneId] = { branch, secondary, main, emitter, total };
+            }
+            return out;
+        } catch {
+            return {};
+        }
+    };
+
+    /** ดึง Static Head จาก localStorage (InputForm/CalculationSummary บันทึก) หรือจาก results/zoneInputs */
+    const getStoredStaticHeadM = (): number => {
+        if (projectMode === 'horticulture') {
+            try {
+                const stored = localStorage.getItem('horticulture_elevation_diff_m');
+                if (stored !== null) {
+                    const value = parseFloat(stored);
+                    if (isFinite(value)) return value;
+                }
+            } catch {
+                // ignore
+            }
+        }
+        const firstZone = results?.allZoneResults?.[0];
+        if (firstZone != null && typeof firstZone.staticHead === 'number') return firstZone.staticHead;
+        const critical = (results?.allZoneResults || []).reduce(
+            (a: any, b: any) => ((a?.totalHead ?? 0) >= (b?.totalHead ?? 0) ? a : b),
+            null
+        );
+        if (critical != null && typeof critical.staticHead === 'number') return critical.staticHead;
+        if (zoneInputs && Object.keys(zoneInputs).length > 0) {
+            const first = (zoneInputs as any)[Object.keys(zoneInputs)[0]];
+            const v = Number(first?.staticHeadM);
+            if (isFinite(v)) return v;
+        }
+        return 0;
+    };
+
+    /** Pressure Head (แรงดันสปริงเกอร์ bar×10) — ตรงกับ Head Loss หัวฉีด ใน CalculationSummary.tsx (calculateSprinklerHeadLoss) */
+    const getPressureHeadM = (): number => {
+        const spr =
+            selectedSprinkler ||
+            (zoneSprinklers as any)?.[Object.keys(zoneSprinklers || {})[0]];
+        const pressureBarFromSprinkler = (s: any): number => {
+            if (!s) return 2.5;
+            const pb = s.pressureBar ?? s.pressure_bar;
+            if (Array.isArray(pb)) return (pb[0] + pb[1]) / 2;
+            if (typeof pb === 'string' && pb.includes('-')) {
+                const parts = pb.split('-');
+                return (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+            }
+            const n = Number(pb);
+            return isFinite(n) ? n : 2.5;
+        };
+        let sprinklerPressureBar = 2.5;
+        if (projectMode === 'horticulture') {
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                    }
+                }
+            } catch {
+                // ignore
+            }
+            if (sprinklerPressureBar === 2.5 && spr && (spr.pressureBar ?? spr.pressure_bar)) {
+                sprinklerPressureBar = pressureBarFromSprinkler(spr);
+            }
+        } else if (projectMode === 'garden') {
+            if (gardenStats?.zones?.length === 1 && gardenStats.zones[0]?.sprinklerPressure != null) {
+                sprinklerPressureBar = gardenStats.zones[0].sprinklerPressure;
+            } else if (spr && (spr.pressureBar ?? spr.pressure_bar)) {
+                sprinklerPressureBar = pressureBarFromSprinkler(spr);
+            }
+        } else if (projectMode === 'greenhouse') {
+            try {
+                const greenhouseSummaryDataStr = localStorage.getItem('greenhouseSummaryData');
+                if (greenhouseSummaryDataStr) {
+                    const greenhouseSummaryData = JSON.parse(greenhouseSummaryDataStr);
+                    if (greenhouseSummaryData?.sprinklerPressure != null) {
+                        sprinklerPressureBar = greenhouseSummaryData.sprinklerPressure;
+                    }
+                }
+            } catch {
+                // ignore
+            }
+            if (sprinklerPressureBar === 2.5 && spr && (spr.pressureBar ?? spr.pressure_bar)) {
+                sprinklerPressureBar = pressureBarFromSprinkler(spr);
+            }
+        } else {
+            if (projectMode === 'field-crop' && fieldCropData?.irrigationSettings?.sprinkler_system?.pressure != null) {
+                const bar = Number(fieldCropData.irrigationSettings.sprinkler_system.pressure);
+                if (isFinite(bar)) sprinklerPressureBar = bar;
+                else if (spr) sprinklerPressureBar = pressureBarFromSprinkler(spr);
+            } else if (spr && (spr.pressureBar ?? spr.pressure_bar)) {
+                sprinklerPressureBar = pressureBarFromSprinkler(spr);
+            }
+        }
+        return sprinklerPressureBar * 10;
+    };
+
+    /** อัตราการไหล (LPM) — ค่าเดียวกับที่ PumpSelector แสดงใน ⚡ ความต้องการปั๊ม */
+    const getDisplayFlowLPM = (): number => {
+        if (projectMode === 'garden' && gardenStats?.zones?.length) {
+            try {
+                const gardenPlannerStr = localStorage.getItem('garden_planner_data');
+                let simultaneousZones = gardenStats.zones.length;
+                if (gardenPlannerStr) {
+                    const gp = JSON.parse(gardenPlannerStr);
+                    if (gp?.zoneOperationMode === 'sequential') simultaneousZones = 1;
+                    else if (gp?.zoneOperationMode === 'group')
+                        simultaneousZones = gp.simultaneousZones || 1;
+                }
+                const zones = gardenStats.zones as any[];
+                if (simultaneousZones >= zones.length) {
+                    return zones.reduce(
+                        (sum: number, z: any) => sum + (z.sprinklerFlowRate || 0) * (z.sprinklerCount || 0),
+                        0
+                    );
+                }
+                const maxZone = Math.max(
+                    ...zones.map((z: any) => (z.sprinklerFlowRate || 0) * (z.sprinklerCount || 0))
+                );
+                return maxZone * simultaneousZones;
+            } catch {
+                // fallback
+            }
+        }
+        if (projectMode === 'field-crop') {
+            if (zoneInputs && Object.keys(zoneInputs).length > 0) {
+                const flows = Object.values(zoneInputs as any).map(
+                    (inp: any) => Number(inp?.waterPerTreeLiters) || 0
+                );
+                const maxFlow = Math.max(...flows, 0);
+                if (maxFlow > 0) return maxFlow;
+            }
+            if (fieldCropData?.zoneSummaries) {
+                const zoneFlows = Object.values(fieldCropData.zoneSummaries).map((zs: any) => {
+                    const sprinklerFlow =
+                        (zs.sprinklerCount || 0) *
+                        (fieldCropData?.irrigationSettings?.sprinkler_system?.flow || 30);
+                    const pivotFlow =
+                        (zs.pivotCount || 0) *
+                        (fieldCropData?.irrigationSettings?.pivot_system?.flow || 50);
+                    return sprinklerFlow + pivotFlow;
+                });
+                return Math.max(...zoneFlows, 0);
+            }
+        }
+        if (projectMode === 'horticulture' || projectMode === 'greenhouse') {
+            try {
+                const str = localStorage.getItem('horticultureSystemData') || localStorage.getItem('greenhouseSystemData');
+                if (str) {
+                    const data = JSON.parse(str);
+                    const zones = data?.zones;
+                    if (zones?.length) {
+                        const mode = data?.zoneOperationMode || 'sequential';
+                        if (mode === 'simultaneous') {
+                            return zones.reduce(
+                                (sum: number, z: any) => sum + (z.waterNeedPerMinute || 0),
+                                0
+                            );
+                        }
+                        return Math.max(
+                            ...zones.map((z: any) => z.waterNeedPerMinute || 0),
+                            0
+                        );
+                    }
+                }
+            } catch {
+                // fallback
+            }
+        }
+        return (
+            results?.projectSummary?.selectedGroupFlowLPM ??
+            results?.totalWaterRequiredLPM ??
+            results?.flows?.main ??
+            0
+        );
+    };
 
     const getItemsPerPage = (page: number, totalPages: number, totalItems: number) => {
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
@@ -206,7 +597,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         return 1 + additionalPages + (hasProjectImagePage ? 1 : 0);
     };
 
-    const totalPages = calculateTotalPages(items.length);
+    const hasSummaryPage = !!(results && items.length > 0);
+    const totalPagesForItems = calculateTotalPages(items.length);
+    const totalPages = totalPagesForItems + (hasSummaryPage ? 1 : 0);
 
     useEffect(() => {
         if (show) {
@@ -1394,9 +1787,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         if (hasProjectImagePage && page === 1) {
             return [];
         }
+        if (hasSummaryPage && page === totalPages) {
+            return [];
+        }
 
         const effectivePage = page - imagePageOffset;
-        const itemsPerPage = getItemsPerPage(page, totalPages, items.length);
+        const itemsPerPage = getItemsPerPage(page, totalPagesForItems, items.length);
 
         if (effectivePage === 1) {
             return items.slice(0, itemsPerPage);
@@ -1616,7 +2012,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
     const handlePrint = () => {
         const currentItems = items;
-        const currentTotalPages = calculateTotalPages(currentItems.length);
+        const currentTotalPagesForItems = calculateTotalPages(currentItems.length);
+        const currentHasSummaryPage = !!(results && currentItems.length > 0);
+        const currentTotalPages = currentTotalPagesForItems + (currentHasSummaryPage ? 1 : 0);
 
         const printContainer = document.createElement('div');
         printContainer.className = 'print-document-container';
@@ -1625,6 +2023,23 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         let allPagesHTML = '';
         for (let page = 1; page <= currentTotalPages; page++) {
             const imagePageOffset = hasProjectImagePage ? 1 : 0;
+
+            if (currentHasSummaryPage && page === currentTotalPages) {
+                const summaryPageHTML = `
+                    <div class="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
+                        <div class="print-page flex min-h-full flex-col">
+                            ${renderHeaderLogoOnly()}
+                            <div class="mt-2 flex-1 text-sm">
+                                <h3 class="mb-3 text-base font-bold">${t('สรุปผลการคำนวณ')}</h3>
+                                <p>${t('รายละเอียดตามที่แสดงในเอกสาร')}</p>
+                            </div>
+                            ${renderFooter(page)}
+                        </div>
+                    </div>
+                `;
+                allPagesHTML += summaryPageHTML;
+                continue;
+            }
 
             if (hasProjectImagePage && page === 1) {
                 const imagePageHTML = `
@@ -1652,7 +2067,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
 
             let pageItems;
-            const itemsPerPage = getItemsPerPage(page, currentTotalPages, currentItems.length);
+            const itemsPerPage = getItemsPerPage(page, currentTotalPagesForItems, currentItems.length);
 
             if (page === 1 + imagePageOffset) {
                 pageItems = currentItems.slice(0, itemsPerPage);
@@ -1778,7 +2193,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             const grandTotal = calculateTotal();
             const totalHTML =
-                page === currentTotalPages
+                page === currentTotalPagesForItems
                     ? `
                 <div class="mt-4 flex justify-end">
                     ${renderTotalTable(grandTotal, true)}
@@ -1834,6 +2249,17 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             <p>${t('15 ซ. พระยามนธาตุ แยก 10')}</p>
             <p>${t('แขวงคลองบางบอน เขตบางบอน')}</p>
             <p>${t('กรุงเทพมหานคร 10150')}</p>
+        </div>`;
+
+    const renderHeaderLogoOnly = () =>
+        `<div class="print-header mb-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <img
+                    src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                    alt="logo"
+                    class="print-logo h-10 w-10"
+                />
+            </div>
         </div>`;
 
     const renderFooter = (page: number) =>
@@ -2537,6 +2963,600 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             {renderFooter(currentPage)}
                         </div>
                     </div>
+                ) : currentPage === totalPages && hasSummaryPage ? (
+                    /* หน้าสุดท้าย: สรุปผลการคำนวณ — แสดงเฉพาะโลโก้ ไม่แสดงที่อยู่บริษัท */
+                    <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
+                        <div className="print-page flex min-h-full flex-col">
+                            <div className="print-header mb-4 flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <img
+                                        src="https://f.btwcdn.com/store-50036/store/e4c1b5ae-cf8e-5017-536b-66ecd994018d.jpg"
+                                        alt="logo"
+                                        className="print-logo h-10 w-10"
+                                    />
+                                </div>
+                            </div>
+
+                            {currentPage === totalPages && results && (
+                                <div className="mt-2 flex-1 bg-white text-black print:bg-white print:text-black">
+                                    <h3 className="mb-3 text-base font-bold">
+                                        {t('สรุปผลการคำนวณ')}
+                                    </h3>
+
+                                    {(projectData?.selectedPlantType?.name ||
+                                        projectData?.zones?.[0]?.plantData?.name ||
+                                        (zoneInputs && Object.keys(zoneInputs).length > 0)) && (
+                                        <div className="mb-3 text-sm">
+                                            <p className="font-bold">
+                                                {t('1. ข้อมูลพืชและความต้องการน้ำ')}
+                                            </p>
+                                            <p className="ml-2">
+                                                {t('ชื่อพืช')}:{' '}
+                                                {(projectData?.selectedPlantType as any)?.name ||
+                                                    (projectData?.zones as any[])?.[0]?.plantData
+                                                        ?.name ||
+                                                    (fieldCropData?.zones as any)?.info?.[0]
+                                                        ?.cropType ||
+                                                    (greenhouseData?.plots as any[])?.[0]
+                                                        ?.cropType ||
+                                                    '-'}
+                                            </p>
+                                            {((projectData?.zones as any[])?.[0]?.plantData ||
+                                                (projectData?.selectedPlantType as any)) && (
+                                                <p className="ml-2">
+                                                    {t('ระยะการปลูก')}:{' '}
+                                                    {[
+                                                        (projectData?.zones as any[])?.[0]
+                                                            ?.plantData?.plantSpacing ||
+                                                            (projectData?.selectedPlantType as any)
+                                                                ?.plantSpacing,
+                                                        (projectData?.zones as any[])?.[0]
+                                                            ?.plantData?.rowSpacing ||
+                                                            (projectData?.selectedPlantType as any)
+                                                                ?.rowSpacing,
+                                                    ]
+                                                        .filter((v) => v != null && v !== undefined)
+                                                        .join(' × ') || '-'}{' '}
+                                                    {t('ม.')}
+                                                </p>
+                                            )}
+                                            {zoneInputs &&
+                                                Object.keys(zoneInputs).length > 0 && (
+                                                    <p className="ml-2">
+                                                        {t('ความต้องการน้ำของพืชต่อการรด 1 ครั้ง')}:{' '}
+                                                        {projectMode === 'horticulture'
+                                                            ? (() => {
+                                                                  const horticultureData = loadProjectData();
+                                                                  if (horticultureData?.plants?.length) {
+                                                                      const summary = calculateProjectSummary(horticultureData);
+                                                                      return formatWaterVolume(summary.totalWaterNeedPerSession);
+                                                                  }
+                                                                  const first = (zoneInputs as any)[Object.keys(zoneInputs)[0]];
+                                                                  const w = first?.waterPerTreeLiters ?? 0;
+                                                                  const min = first?.irrigationTimeMinutes ?? 1;
+                                                                  const perIrrigation = Number(w) * Number(min);
+                                                                  return `${Number(w).toFixed(2)} ${t('ลิตร/นาที/ต้น')} × ${min} ${t('นาที')} = ${perIrrigation.toFixed(2)} ${t('ลิตร/ต้น/ครั้ง')}`;
+                                                              })()
+                                                            : (() => {
+                                                                  const first = (zoneInputs as any)[Object.keys(zoneInputs)[0]];
+                                                                  const w = first?.waterPerTreeLiters ?? 0;
+                                                                  const min = first?.irrigationTimeMinutes ?? 1;
+                                                                  const perIrrigation = Number(w) * Number(min);
+                                                                  return `${Number(w).toFixed(2)} ${t('ลิตร/นาที/ต้น')} × ${min} ${t('นาที')} = ${perIrrigation.toFixed(2)} ${t('ลิตร/ต้น/ครั้ง')}`;
+                                                              })()}
+                                                    </p>
+                                                )}
+                                        </div>
+                                    )}
+
+                                    {zoneInputs && Object.keys(zoneInputs).length > 0 && (
+                                        <div className="mb-3 text-sm">
+                                            <p className="font-bold">
+                                                {t('2. พื้นที่และโซน')}
+                                            </p>
+                                            <p className="ml-2">
+                                                {t('พื้นที่ทั้งหมด')}:{' '}
+                                                {Object.values(zoneInputs)
+                                                    .reduce(
+                                                        (sum: number, inp: any) =>
+                                                            sum + (Number(inp?.farmSizeRai) || 0),
+                                                        0
+                                                    )
+                                                    .toFixed(2)}{' '}
+                                                {t('ไร่')}
+                                            </p>
+                                            <p className="ml-2">
+                                                {t('ต้นไม้ทั้งหมด')}:{' '}
+                                                {Object.values(zoneInputs).reduce(
+                                                    (sum: number, inp: any) =>
+                                                        sum + (Number(inp?.totalTrees) || 0),
+                                                    0
+                                                )}{' '}
+                                                {t('ต้น')}
+                                            </p>
+                                            <p className="ml-2">
+                                                {t('แบ่งออกเป็น')}{' '}
+                                                {Object.keys(zoneInputs).length}{' '}
+                                                {t('โซน')}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {(() => {
+                                        const hasZoneResults = (results.allZoneResults?.length ?? 0) > 0;
+                                        const hasZoneInputs = zoneInputs && Object.keys(zoneInputs).length > 0;
+                                        const horticultureProjectData = projectMode === 'horticulture' ? loadProjectData() : null;
+                                        const horticultureSummary =
+                                            projectMode === 'horticulture' && horticultureProjectData
+                                                ? calculateProjectSummary(horticultureProjectData)
+                                                : null;
+                                        const horticultureZoneDetails = (horticultureSummary?.zoneDetails ?? []) as any[];
+                                        const { byId: horticultureSystemZonesById, byIndex: horticultureSystemZonesByIndex } =
+                                            horticultureSystemData?.zones?.length > 0
+                                                ? buildHorticultureZoneDisplayData(horticultureSystemData.zones)
+                                                : getHorticultureZoneDataFromSystemStorage();
+                                        const zoneIdsFromResults = (results.allZoneResults ?? []).map((z: any) => z.zoneId);
+                                        const zoneIdsFromSystem = Object.keys(horticultureSystemZonesById);
+                                        const zoneIdsFromProject =
+                                            horticultureProjectData?.zones?.map((z: any) => z.id) ??
+                                            (projectData?.zones as any[])?.map((z: any) => z.id) ??
+                                            [];
+                                        // โซนให้ใช้ลำดับจาก horticultureSystemData ก่อน — ให้ byIndex ตรงกับโซนจริง (แก้โซน 1 ปริมาณน้ำรวมผิด)
+                                        const zoneIdList =
+                                            zoneIdsFromSystem.length > 0
+                                                ? zoneIdsFromSystem
+                                                : zoneIdsFromResults.length > 0
+                                                  ? zoneIdsFromResults
+                                                  : zoneIdsFromProject.length > 0
+                                                    ? zoneIdsFromProject
+                                                    : hasZoneInputs
+                                                      ? Object.keys(zoneInputs!)
+                                                      : [];
+                                        const showSection3 =
+                                            zoneIdList.length > 0 &&
+                                            (hasZoneResults || results.totalWaterRequiredLPM !== undefined || hasZoneInputs);
+                                        if (!showSection3) return null;
+                                        return (
+                                            <div className="mb-3 text-sm">
+                                                <p className="font-bold">{t('3. รายละเอียดแต่ละโซน')}</p>
+                                                {zoneIdList.map((zoneId, zoneIndex) => {
+                                                    const inp = (zoneInputs as any)?.[zoneId];
+                                                    const irrigationTimeMinutes =
+                                                        Number(inp?.irrigationTimeMinutes) || 45;
+                                                    let rai: number;
+                                                    let trees: number;
+                                                    let flowLPM: number;
+                                                    let totalWaterLiters: number | null = null;
+                                                    if (projectMode === 'horticulture') {
+                                                        const zoneDetail = horticultureZoneDetails.find(
+                                                            (z: any) => z.zoneId === zoneId
+                                                        );
+                                                        const systemZone =
+                                                            horticultureSystemZonesById[zoneId] ??
+                                                            horticultureSystemZonesByIndex[zoneIndex];
+                                                        const rawTotalWater =
+                                                            systemZone?.waterNeedPerSession ?? zoneDetail?.waterNeedPerSession;
+                                                        totalWaterLiters =
+                                                            rawTotalWater != null && Number(rawTotalWater) >= 0
+                                                                ? Number(rawTotalWater)
+                                                                : null;
+                                                        rai =
+                                                            (systemZone?.areaInRai != null && systemZone.areaInRai >= 0
+                                                                ? systemZone.areaInRai
+                                                                : zoneDetail?.areaInRai != null && zoneDetail.areaInRai > 0
+                                                                  ? zoneDetail.areaInRai
+                                                                  : (() => {
+                                                                        const zoneData = getZoneAreaDataForZone(
+                                                                            zoneId,
+                                                                            projectData
+                                                                        );
+                                                                        if (zoneData?.areaInRai != null && zoneData.areaInRai >= 0)
+                                                                            return zoneData.areaInRai;
+                                                                        return Number(inp?.farmSizeRai) || 0;
+                                                                    })());
+                                                        trees =
+                                                            (systemZone?.plantCount != null
+                                                                ? systemZone.plantCount
+                                                                : zoneDetail?.plantCount != null
+                                                                  ? zoneDetail.plantCount
+                                                                  : (() => {
+                                                                        const zoneData = getZoneAreaDataForZone(
+                                                                            zoneId,
+                                                                            projectData
+                                                                        );
+                                                                        if (zoneData?.plantCount != null) return zoneData.plantCount;
+                                                                        return Number(inp?.totalTrees) || 0;
+                                                                    })());
+                                                        const zoneResultFlow = (results.allZoneResults ?? []).find(
+                                                            (z: any) => z.zoneId === zoneId
+                                                        )?.totalFlowLPM;
+                                                        flowLPM =
+                                                            typeof zoneResultFlow === 'number' && zoneResultFlow >= 0
+                                                                ? zoneResultFlow
+                                                                : (systemZone?.waterNeedPerMinute != null && systemZone.waterNeedPerMinute >= 0
+                                                                      ? systemZone.waterNeedPerMinute
+                                                                      : (() => {
+                                                                            const zoneData = getZoneAreaDataForZone(
+                                                                                zoneId,
+                                                                                projectData
+                                                                            );
+                                                                            if (
+                                                                                zoneData?.waterNeedPerMinute != null &&
+                                                                                zoneData.waterNeedPerMinute >= 0
+                                                                            )
+                                                                                return zoneData.waterNeedPerMinute;
+                                                                            return Number(inp?.waterPerTreeLiters) || 0;
+                                                                        })());
+                                                    } else {
+                                                        rai = Number(inp?.farmSizeRai) || 0;
+                                                        trees = Number(inp?.totalTrees) || 0;
+                                                        const waterPerTreeLiters = Number(inp?.waterPerTreeLiters) || 0;
+                                                        if (projectMode === 'field-crop') {
+                                                            flowLPM = trees * waterPerTreeLiters;
+                                                        } else if (
+                                                            projectMode === 'greenhouse' ||
+                                                            projectMode === 'garden'
+                                                        ) {
+                                                            flowLPM = trees * (waterPerTreeLiters / irrigationTimeMinutes);
+                                                        } else {
+                                                            flowLPM = waterPerTreeLiters;
+                                                        }
+                                                    }
+                                                    const zoneResult = (results.allZoneResults ?? []).find(
+                                                        (z: any) => z.zoneId === zoneId
+                                                    );
+                                                    const systemZoneForFlow =
+                                                        projectMode === 'horticulture'
+                                                            ? (horticultureSystemZonesById[zoneId] ??
+                                                                horticultureSystemZonesByIndex[zoneIndex])
+                                                            : null;
+                                                    const displayFlowLPM =
+                                                        systemZoneForFlow?.waterNeedPerMinute != null &&
+                                                        systemZoneForFlow.waterNeedPerMinute >= 0
+                                                            ? systemZoneForFlow.waterNeedPerMinute
+                                                            : (zoneResult?.totalFlowLPM ?? flowLPM);
+                                                    const displayTimeMinutes =
+                                                        projectMode === 'horticulture' &&
+                                                        totalWaterLiters != null &&
+                                                        totalWaterLiters >= 0 &&
+                                                        displayFlowLPM > 0
+                                                            ? totalWaterLiters / displayFlowLPM
+                                                            : null;
+                                                    const quantityLabel =
+                                                        projectMode === 'greenhouse' ||
+                                                        projectMode === 'garden' ||
+                                                        projectMode === 'field-crop'
+                                                            ? t('หัวฉีด')
+                                                            : t('ต้น');
+                                                    return (
+                                                        <p key={zoneId} className="ml-2">
+                                                            {getZoneDisplayName(zoneId)}: {rai.toFixed(2)}{' '}
+                                                            {t('ไร่')}, {trees.toLocaleString()} {quantityLabel}
+                                                            {totalWaterLiters != null && (
+                                                                <>
+                                                                    , {formatWaterVolume(totalWaterLiters)}{' '}
+                                                                    {t('ปริมาณน้ำรวม')}
+                                                                </>
+                                                            )}
+                                                            , {displayFlowLPM.toFixed(0)} {t('ลิตร/นาที')},{' '}
+                                                            {t('เวลารด')}{' '}
+                                                            {displayTimeMinutes != null
+                                                                ? `${displayTimeMinutes.toFixed(1)}`
+                                                                : irrigationTimeMinutes}{' '}
+                                                            {t('นาที')}
+                                                        </p>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {(selectedSprinkler ||
+                                        (zoneSprinklers &&
+                                            Object.keys(zoneSprinklers).length > 0)) && (
+                                        <div className="mb-3 text-sm">
+                                            <p className="font-bold">
+                                                {t('4. สเปกหัวฉีดที่เลือก')}
+                                            </p>
+                                            {(() => {
+                                                const zones = zoneSprinklers || {};
+                                                const byId = new Map<number | string, any>();
+                                                Object.values(zones).forEach((s) => {
+                                                    if (s) {
+                                                        const key =
+                                                            (s as any).id ??
+                                                            (s as any).productCode ??
+                                                            (s as any).product_code ??
+                                                            `name-${(s as any).name ?? ''}-${(s as any).brand ?? ''}`;
+                                                        if (!byId.has(key)) byId.set(key, s);
+                                                    }
+                                                });
+                                                if (byId.size === 0 && selectedSprinkler) {
+                                                    const s = selectedSprinkler;
+                                                    const key =
+                                                        (s as any).id ??
+                                                        (s as any).productCode ??
+                                                        (s as any).product_code ??
+                                                        `name-${(s as any).name ?? ''}-${(s as any).brand ?? ''}`;
+                                                    byId.set(key, s);
+                                                }
+                                                const uniqueList = Array.from(byId.values());
+                                                if (uniqueList.length === 0) return null;
+                                                return (
+                                                    <div className="ml-2 space-y-1">
+                                                        {uniqueList.map((spr: any, idx: number) => {
+                                                            const name =
+                                                                spr.name ||
+                                                                spr.productCode ||
+                                                                spr.product_code ||
+                                                                '-';
+                                                            const brand =
+                                                                spr.brand ||
+                                                                spr.brand_name ||
+                                                                '-';
+                                                            const pressureStr = formatRangeValue(
+                                                                spr.pressureBar ?? spr.pressure_bar
+                                                            );
+                                                            const flowStr = formatRangeValue(
+                                                                spr.waterVolumeLitersPerMinute ??
+                                                                spr.water_volume_liters_per_minute
+                                                            );
+                                                            const radiusStr = formatRangeValue(
+                                                                spr.radiusMeters ?? spr.radius_meters
+                                                            );
+                                                            return (
+                                                                <p key={idx}>
+                                                                    {name} ({brand}) — {t('แรงดัน')}{' '}
+                                                                    {pressureStr} {t('บาร์')}, {t('อัตราไหล')}{' '}
+                                                                    {flowStr} LPM, {t('รัศมี')} {radiusStr}{' '}
+                                                                    {t('เมตร')}
+                                                                </p>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
+
+                                    {showPump && results && (
+                                        <div className="mb-3 text-sm">
+                                            <p className="font-bold">
+                                                {t('5. การคำนวณ TDH สำหรับปั๊มน้ำ')}
+                                            </p>
+                                            {(() => {
+                                                const allZones = results.allZoneResults || [];
+                                                const criticalZoneResult =
+                                                    allZones.length > 0
+                                                        ? allZones.reduce((a: any, b: any) =>
+                                                              (a?.totalHead ?? 0) >=
+                                                              (b?.totalHead ?? 0)
+                                                                  ? a
+                                                                  : b
+                                                          )
+                                                        : null;
+                                                const maxFrictionTotal =
+                                                    allZones.length > 0
+                                                        ? Math.max(
+                                                              ...allZones.map(
+                                                                  (z: any) =>
+                                                                      z?.headLoss?.total ?? 0
+                                                              )
+                                                          )
+                                                        : 0;
+                                                const staticHeadM =
+                                                    criticalZoneResult?.staticHead != null
+                                                        ? criticalZoneResult.staticHead
+                                                        : getStoredStaticHeadM();
+                                                const pressureHeadM = getPressureHeadM();
+                                                /* TDH = ค่าเดียวกับ PumpSelector.tsx (maxPumpHeadWithSafety) ลำดับที่มา:
+                                                   1. maxPumpHeadForProjectMode (prop จาก product - เหมือนที่ส่งไป PumpSelector)
+                                                   2. max(allZoneResults.totalHead) * 1.1
+                                                   3. results.pumpHeadRequired * 1.1 (fallback) */
+                                                const tdhValue =
+                                                    maxPumpHeadForProjectModeProp !== undefined &&
+                                                    maxPumpHeadForProjectModeProp > 0
+                                                        ? maxPumpHeadForProjectModeProp
+                                                        : results.allZoneResults?.length
+                                                          ? (() => {
+                                                                const maxHead = Math.max(
+                                                                    ...results.allZoneResults!.map(
+                                                                        (z: any) => z.totalHead || 0
+                                                                    )
+                                                                );
+                                                                return maxHead > 0
+                                                                    ? maxHead + maxHead * 0.1
+                                                                    : (results.pumpHeadRequired ?? 0) * 1.1;
+                                                            })()
+                                                          : (results.pumpHeadRequired ?? 0) * 1.1;
+                                                const pumpHead = tdhValue;
+                                                const pumpFlow = getDisplayFlowLPM();
+                                                const requiredHorsepower =
+                                                    pumpFlow > 0 && pumpHead > 0
+                                                        ? Math.ceil(
+                                                              (pumpFlow * pumpHead) /
+                                                                  (4500 * 0.6)
+                                                          )
+                                                        : 0;
+                                                return (
+                                                    <>
+                                                        <p className="ml-2">
+                                                            {t('Static Head')} ({t('ความสูงจากปั๊มไปหัวฉีดที่สูงที่สุด')}):{' '}
+                                                            {staticHeadM.toFixed(2)} m
+                                                        </p>
+                                                        <p className="ml-2 font-medium">
+                                                            {t('Friction Head')} ({t('การสูญเสียจากแรงเสียดทาน')})
+                                                        </p>
+                                                        {allZones.length > 0 ? (
+                                                            (() => {
+                                                                const perZoneStored = projectMode === 'horticulture' ? getStoredPipeHeadLossPerZone() : {};
+                                                                const zoneRows = allZones.map((z: any) => {
+                                                                    const zoneId = z?.zoneId ?? '';
+                                                                    const stored = perZoneStored[zoneId];
+                                                                    const hl = z?.headLoss;
+                                                                    const branch = stored
+                                                                        ? stored.branch
+                                                                        : typeof hl?.branch === 'number'
+                                                                          ? hl.branch
+                                                                          : 0;
+                                                                    const secondary = stored
+                                                                        ? stored.secondary
+                                                                        : typeof hl?.secondary === 'number'
+                                                                          ? hl.secondary
+                                                                          : 0;
+                                                                    const main = stored
+                                                                        ? stored.main
+                                                                        : typeof hl?.main === 'number'
+                                                                          ? hl.main
+                                                                          : 0;
+                                                                    const emitter = stored
+                                                                        ? stored.emitter
+                                                                        : typeof (hl as any)?.emitter === 'number'
+                                                                          ? (hl as any).emitter
+                                                                          : 0;
+                                                                    const total = stored
+                                                                        ? stored.total
+                                                                        : typeof hl?.total === 'number'
+                                                                          ? hl.total
+                                                                          : branch + secondary + main + emitter;
+                                                                    return { z, zoneId, branch, secondary, main, emitter, total };
+                                                                });
+                                                                const maxFrictionTotalDisplay = zoneRows.length > 0
+                                                                    ? Math.max(...zoneRows.map((r) => r.total))
+                                                                    : 0;
+                                                                return zoneRows.map(({ z, zoneId, branch, secondary, main, emitter, total }) => {
+                                                                    const zoneName = getZoneDisplayName(z?.zoneId ?? '');
+                                                                    const isMaxLoss = total >= maxFrictionTotalDisplay && maxFrictionTotalDisplay > 0;
+                                                                    return (
+                                                                        <p
+                                                                            key={zoneId || zoneName}
+                                                                            className="ml-4 text-sm"
+                                                                        >
+                                                                            {zoneName}
+                                                                            {isMaxLoss && (
+                                                                                <span className="text-amber-400">
+                                                                                    {' '}
+                                                                                    ({t('โซนที่ loss สูงสุด')})
+                                                                                </span>
+                                                                            )}
+                                                                            : {t('ท่อย่อย')}{' '}
+                                                                            {branch.toFixed(2)} m,{' '}
+                                                                            {t('ท่อเมนรอง')}{' '}
+                                                                            {secondary.toFixed(2)} m,{' '}
+                                                                            {t('ท่อเมน')}{' '}
+                                                                            {main.toFixed(2)} m
+                                                                            {emitter > 0 &&
+                                                                                `, ${t('ท่ออีมิเตอร์')} ${emitter.toFixed(2)} m`}{' '}
+                                                                            — {t('รวม')}{' '}
+                                                                            {total.toFixed(2)} m
+                                                                        </p>
+                                                                    );
+                                                                });
+                                                            })()
+                                                        ) : (
+                                                            <p className="ml-4 text-sm text-gray-500">
+                                                                {t('ไม่มีข้อมูล loss ต่อโซน')} —{' '}
+                                                                {t('ท่อย่อย')}{' '}
+                                                                {getStoredPipeHeadLoss().branch.toFixed(2)} m,{' '}
+                                                                {t('ท่อเมนรอง')}{' '}
+                                                                {getStoredPipeHeadLoss().secondary.toFixed(2)} m,{' '}
+                                                                {t('ท่อเมน')}{' '}
+                                                                {getStoredPipeHeadLoss().main.toFixed(2)} m —{' '}
+                                                                {t('รวม')}{' '}
+                                                                {getStoredPipeHeadLoss().total.toFixed(2)} m (
+                                                                {t('ค่าจากการบันทึก')})
+                                                            </p>
+                                                        )}
+                                                        <p className="ml-2">
+                                                            {t('Pressure Head')} ({t('แรงดันสปริงเกอร์')} bar×10):{' '}
+                                                            {pressureHeadM.toFixed(2)} m
+                                                        </p>
+                                                        <p className="ml-2 font-bold">
+                                                            {t('TDH')} ({t('รวม')} + 10%):{' '}
+                                                            {pumpHead.toFixed(1)} {t('เมตร')}
+                                                        </p>
+                                                        <p className="ml-2 font-bold">
+                                                            {t('สรุป')}: {t('ต้องใช้ปั๊มน้ำ')} —{' '}
+                                                            {t('อัตราการไหล')}{' '}
+                                                            {Number(Number(pumpFlow).toFixed(2)).toLocaleString()} {t('LPM')},{' '}
+                                                            {t('Pump Head')} {pumpHead.toFixed(1)}{' '}
+                                                            {t('เมตร')}
+                                                            {requiredHorsepower > 0 && (
+                                                                <>
+                                                                    , {t('ต้องการปั๊มอย่างน้อย')}{' '}
+                                                                    {requiredHorsepower} {t('HP')}
+                                                                </>
+                                                            )}
+                                                        </p>
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
+
+                                    {(selectedBranchPipe ||
+                                        selectedSecondaryPipe ||
+                                        selectedMainPipe ||
+                                        results.autoSelectedBranchPipe ||
+                                        results.autoSelectedSecondaryPipe ||
+                                        results.autoSelectedMainPipe) && (
+                                        <div className="mb-3 text-sm">
+                                            <p className="font-bold">
+                                                {t('6. ท่อที่เลือก')}
+                                            </p>
+                                            {[
+                                                {
+                                                    label: t('ท่อย่อย'),
+                                                    pipe:
+                                                        selectedBranchPipe ||
+                                                        results.autoSelectedBranchPipe,
+                                                },
+                                                {
+                                                    label: t('ท่อเมนรอง'),
+                                                    pipe:
+                                                        selectedSecondaryPipe ||
+                                                        results.autoSelectedSecondaryPipe,
+                                                },
+                                                {
+                                                    label: t('ท่อเมน'),
+                                                    pipe:
+                                                        selectedMainPipe ||
+                                                        results.autoSelectedMainPipe,
+                                                },
+                                            ].map(
+                                                (item) =>
+                                                    item.pipe && (
+                                                        <p key={item.label} className="ml-2">
+                                                            {item.label}:{' '}
+                                                            {(item.pipe as any).productCode ||
+                                                                (item.pipe as any).product_code}{' '}
+                                                            {(item.pipe as any).pipeType || ''}{' '}
+                                                            {(item.pipe as any).sizeMM ||
+                                                                (item.pipe as any).size_mm ||
+                                                                ''}
+                                                            mm,{' '}
+                                                            {(item.pipe as any).lengthM ||
+                                                                (item.pipe as any).length_m ||
+                                                                ''}{' '}
+                                                            m/{t('ม้วน')}
+                                                        </p>
+                                                    )
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="print-footer-container mt-auto text-center text-xs">
+                                <hr className="print-footer-hr mb-2 border-gray-800" />
+                                <div className="print-footer">
+                                    <p>
+                                        {t('Page:')} {currentPage} / {totalPages}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 ) : (
                     <div className="mx-auto flex h-[1123px] w-[794px] flex-col bg-white p-8 text-black shadow-lg">
                         <div className="print-page flex min-h-full flex-col">
@@ -2576,51 +3596,53 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </table>
 
                             <div className="mt-4 flex justify-end">
-                                {currentPage === totalPages && (
-                                    <table className="w-[250px] border-collapse border-gray-400 text-sm">
-                                        <tbody>
-                                            <tr className="border-gray-400">
-                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    {t('Subtotal')}
-                                                </td>
-                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {calculateTotal().toFixed(2)} {t('฿')}
-                                                </td>
-                                            </tr>
-                                            <tr className="border-gray-400">
-                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    {t('Vat 7%')}
-                                                </td>
-                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {(calculateTotal() * 0.07).toFixed(2)} {t('฿')}
-                                                </td>
-                                            </tr>
-                                            <tr className="border-gray-400">
-                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    {t('Subtotal Without Discount')}
-                                                </td>
-                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {(calculateTotal() * 1.07).toFixed(2)} {t('฿')}
-                                                </td>
-                                            </tr>
-                                            <tr className="border-gray-400">
-                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    {t('Discount Subtotal')}
-                                                </td>
-                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    0.00 {t('฿')}
-                                                </td>
-                                            </tr>
-                                            <tr className="border-gray-400">
-                                                <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
-                                                    {t('Total')}
-                                                </td>
-                                                <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
-                                                    {(calculateTotal() * 1.07).toFixed(2)} {t('฿')}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                {currentPage === totalPagesForItems && (
+                                    <>
+                                        <table className="w-[250px] border-collapse border-gray-400 text-sm">
+                                            <tbody>
+                                                <tr className="border-gray-400">
+                                                    <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                        {t('Subtotal')}
+                                                    </td>
+                                                    <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                        {calculateTotal().toFixed(2)} {t('฿')}
+                                                    </td>
+                                                </tr>
+                                                <tr className="border-gray-400">
+                                                    <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                        {t('Vat 7%')}
+                                                    </td>
+                                                    <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                        {(calculateTotal() * 0.07).toFixed(2)} {t('฿')}
+                                                    </td>
+                                                </tr>
+                                                <tr className="border-gray-400">
+                                                    <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                        {t('Subtotal Without Discount')}
+                                                    </td>
+                                                    <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                        {(calculateTotal() * 1.07).toFixed(2)} {t('฿')}
+                                                    </td>
+                                                </tr>
+                                                <tr className="border-gray-400">
+                                                    <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                        {t('Discount Subtotal')}
+                                                    </td>
+                                                    <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                        0.00 {t('฿')}
+                                                    </td>
+                                                </tr>
+                                                <tr className="border-gray-400">
+                                                    <td className="border border-x-0 border-gray-400 p-1 text-left align-top font-bold">
+                                                        {t('Total')}
+                                                    </td>
+                                                    <td className="w-[100px] border border-x-0 border-gray-400 p-1 text-right align-top">
+                                                        {(calculateTotal() * 1.07).toFixed(2)} {t('฿')}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </>
                                 )}
                             </div>
 

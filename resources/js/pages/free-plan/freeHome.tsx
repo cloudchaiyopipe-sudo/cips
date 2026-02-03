@@ -1,7 +1,6 @@
 // 1. Import
 import { Head, router, usePage } from '@inertiajs/react';
 import FreeNav from './components/freeNav';
-import FreeFooter from './components/freeFooter';
 import FootNav from './components/footNav';
 import Manual from './components/manual';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -275,10 +274,6 @@ function FreeHome() {
         setEditProjectName('');
     };
 
-    const handleUpgradeToPro = () => {
-        router.visit('/free-plan/upgradePro');
-    };
-
     const handleAdClick = (linkUrl: string) => {
         window.open(linkUrl, '_blank', 'noopener,noreferrer');
     };
@@ -310,13 +305,13 @@ function FreeHome() {
         // Changed to a richer gradient background
         <div className="relative min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200 selection:bg-green-500/30">
             
-                <Head title="Welcome to Free Plan" />
+                <Head title={translations.welcomeToFreePlan || 'Welcome'} />
 
             {/* Custom Navbar */}
             <div className="sticky top-0 z-40 backdrop-blur-md bg-slate-900/50 border-b border-white/5">
                  <FreeNav />
             </div>
-            <div className="flex items-center gap-3 mt-4 mb-2 px-4">
+            <div className="flex items-center justify-between mt-4 mb-2 px-4 w-full">
                 <button
                     onClick={() => router.visit('/')}
                     className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/20 transition shadow-sm focus:outline-none"
@@ -327,6 +322,18 @@ function FreeHome() {
                     </svg>
                     <span>ย้อนกลับหน้าหลัก</span>
                 </button>
+                {/* Help/Manual Button - Glassmorphism */}
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleOpenManual}
+                    className="inline-flex items-center gap-2 rounded-full border border-blue-600 bg-blue-500 px-5 py-2 text-sm font-medium text-white backdrop-blur-sm transition-all hover:bg-blue-600 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <span>{translations.userManual}</span>
+                </motion.button>
             </div>
 
             {/* Toast Container */}
@@ -366,22 +373,11 @@ function FreeHome() {
                             </span>
                             <br />
                             <span className="bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent">
-                                {translations.freePlan}
+                                BASIC MODE
                             </span>
                         </h1>
 
-                        {/* Help/Manual Button - Glassmorphism */}
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleOpenManual}
-                            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-300 backdrop-blur-sm transition-all hover:bg-white/10 hover:text-white hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
-                            <span>{translations.userManual}</span>
-                        </motion.button>
+                        
                     </motion.div>
 
                     {/* Add Field Button - Primary Action */}
@@ -524,23 +520,8 @@ function FreeHome() {
                         </div>
                     </motion.div>
 
-                    {/* Upgrade to Pro Button */}
-                    <motion.div variants={itemVariants} className="text-center">
-                        <motion.button
-                            whileHover={{ scale: 1.02, boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.4)" }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleUpgradeToPro}
-                            className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-blue-900/20 transition-all hover:brightness-110"
-                        >
-                             👑 {translations.upgradeToPro}
-                        </motion.button>
-                    </motion.div>
                 </motion.div>
 
-                {/* Footer Information */}
-                <div className="w-full mt-auto">
-                    <FreeFooter />
-                </div>
             </div>
 
             {/* Advertisement Modal - Glassmorphism */}

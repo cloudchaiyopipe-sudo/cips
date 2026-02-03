@@ -38,7 +38,7 @@ export interface LanguageTranslations {
     navAddField: string;
     navNews: string;
     navProducts: string;
-    navAccount: string;
+    navContact: string;
 
     // UpgradePro page
     cipsPro: string;
@@ -215,6 +215,8 @@ export interface LanguageTranslations {
 
     // Search and input placeholders
     searchLocation: string;
+    drawingUndo: string;
+    drawingRedo: string;
     enterNumberOfZones: string;
     noPlantSelected: string;
     pleasePlaceWaterBeforeNext: string;
@@ -407,6 +409,16 @@ export interface LanguageTranslations {
     scanQRCodeToContact: string;
     orAddFriendAtLineId: string;
     close: string;
+    // Contact modal (same as Navbar)
+    contactModalChooseChannel: string;
+    contactModalProgram: string;
+    contactModalProgramDesc: string;
+    contactModalScanQR: string;
+    contactModalLineId: string;
+    contactModalOpenLine: string;
+    contactModalPhone: string;
+    contactModalWaterTeam: string;
+    contactModalWaterTeamDesc: string;
     savePlanImage: string;
     waterDepthResult: string;
     requiredIrrigationRate: string;
@@ -569,10 +581,10 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         selectedPlantInformationDescription7: 'Selected Plant Information Description 7',
         // FreeHome page
         welcomeTo: 'welcome to',
-        freePlan: 'Free Plan!',
+        freePlan: 'Plan!',
         addField: 'Add Field',
         yourSavedFiles: 'Your saved files',
-        upgradeToPro: 'Upgrade to Pro',
+        upgradeToPro: '',
         sponsoredContent: 'Sponsored Content',
         clickAdToVisit: 'Click the ad to visit the link',
         next: 'Next',
@@ -594,7 +606,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         navAddField: 'Add Field',
         navNews: 'News',
         navProducts: 'Products',
-        navAccount: 'Me',
+        navContact: 'Contact',
 
         // UpgradePro page
         cipsPro: 'CIPS Pro',
@@ -617,24 +629,24 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         dataSecure: 'Your data is 100% secure',
 
         // AcCount page
-        userProfileTitle: 'User Profile - Free Plan',
+        userProfileTitle: 'User Profile',
         userProfile: 'User Profile',
         manageAccountInfo: 'Manage your account information.',
         fullName: 'Full Name',
         emailAddress: 'Email Address',
         editProfile: 'Edit Profile',
         subscriptionPlan: 'Subscription Plan',
-        freePlanName: 'Free',
+        freePlanName: 'Basic',
         proPlanName: 'Pro',
         advancedPlanName: 'Advanced',
         plan: 'Plan',
         basicFeatures: 'Basic features with limited tokens.',
         advancedFeatures: 'Advanced features with more tokens.',
         premiumFeatures: 'Premium features with maximum tokens.',
-        upgradeToProButton: 'Upgrade to Pro',
+        upgradeToProButton: '',
         advertisementManagement: 'Advertisement Management',
         uploadManageAds:
-            'Upload and manage your advertisements that will be displayed on the free plan homepage.',
+            'Upload and manage your advertisements that will be displayed on the homepage.',
         manageAdvertisements: 'Manage Advertisements',
         manageArticles: 'Manage Articles',
         writeAndEditNews: 'Write and edit news articles',
@@ -666,6 +678,16 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         lineIdExample: 'Example: @username',
         currentLineId: 'Current LINE ID:',
         pleaseEnterLineId: 'Please enter LINE ID',
+
+        contactModalChooseChannel: 'Choose contact channel by consultation type',
+        contactModalProgram: 'Program support',
+        contactModalProgramDesc: 'Mainly consultation on program usage',
+        contactModalScanQR: 'Scan QR Code to add Line',
+        contactModalLineId: 'Line ID',
+        contactModalOpenLine: 'Open Line',
+        contactModalPhone: 'Phone',
+        contactModalWaterTeam: 'Water system installation team',
+        contactModalWaterTeamDesc: 'Consultation on water system installation',
 
         // ChooseCrop page
         selectCropTypes: 'Select Crop Types',
@@ -779,6 +801,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
 
         // Search and input placeholders
         searchLocation: 'Search location...',
+        drawingUndo: 'Undo',
+        drawingRedo: 'Redo',
         enterNumberOfZones: 'Enter number of zones',
         noPlantSelected: 'No plant selected',
         pleasePlaceWaterBeforeNext: 'Please place water source before proceeding to next step',
@@ -989,7 +1013,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         deleteArticle: 'Delete Article',
         confirmDeleteArticle: 'Are you sure you want to delete this article?',
         errorDeletingArticle: 'Error deleting article',
-        newsTitle: 'News - Free Plan',
+        newsTitle: 'News',
 
         // NewsArticle page
         createNewArticle: 'Create New Article',
@@ -1013,7 +1037,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         preview: 'Preview',
 
         // ProductList page
-        productListTitle: 'Product List - Free Plan',
+        productListTitle: 'Product List',
         productList: 'Product List',
         addProduct: 'Add Product',
         newProducts: 'New',
@@ -1050,7 +1074,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         saveProduct: 'Save Product',
 
         // Manual page
-        welcomeToFreePlan: 'Welcome to Free Plan',
+        welcomeToFreePlan: 'Welcome',
         manualDescription: 'Automated drip irrigation system design for farmers',
         gettingStarted: 'Getting Started',
         step1SelectCrop: 'Step 1: Select Crop',
@@ -1132,10 +1156,10 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         selectedPlantInformationDescription7: 'ข้อมูลพืชที่เลือกคำอธิบาย 7',
         // FreeHome page
         welcomeTo: 'ยินดีต้อนรับสู่',
-        freePlan: 'แผนฟรี!',
+        freePlan: 'แผน!',
         addField: 'เพิ่มแปลง',
         yourSavedFiles: 'ไฟล์ที่บันทึกไว้',
-        upgradeToPro: 'อัปเกรดเป็น Pro',
+        upgradeToPro: '',
         sponsoredContent: 'เนื้อหาโฆษณา',
         clickAdToVisit: 'คลิกโฆษณาเพื่อไปที่ลิงก์',
         next: 'ถัดไป',
@@ -1157,7 +1181,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         navAddField: 'เพิ่มแปลง',
         navNews: 'ข่าวสาร',
         navProducts: 'สินค้า',
-        navAccount: 'ฉัน',
+        navContact: 'ติดต่อ',
 
         // UpgradePro page
         cipsPro: 'CIPS Pro',
@@ -1180,23 +1204,23 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         dataSecure: 'ข้อมูลของคุณปลอดภัย 100%',
 
         // AcCount page
-        userProfileTitle: 'โปรไฟล์ผู้ใช้ - Free Plan',
+        userProfileTitle: 'โปรไฟล์ผู้ใช้',
         userProfile: 'โปรไฟล์ผู้ใช้',
         manageAccountInfo: 'จัดการข้อมูลบัญชีของคุณ',
         fullName: 'ชื่อเต็ม',
         emailAddress: 'ที่อยู่อีเมล',
         editProfile: 'แก้ไขโปรไฟล์',
         subscriptionPlan: 'แผนการสมัครสมาชิก',
-        freePlanName: 'ฟรี',
+        freePlanName: 'พื้นฐาน',
         proPlanName: 'Pro',
         advancedPlanName: 'ขั้นสูง',
         plan: 'แผน',
         basicFeatures: 'ฟีเจอร์พื้นฐานพร้อมโทเค็นจำกัด',
         advancedFeatures: 'ฟีเจอร์ขั้นสูงพร้อมโทเค็นเพิ่มเติม',
         premiumFeatures: 'ฟีเจอร์พรีเมียมพร้อมโทเค็นสูงสุด',
-        upgradeToProButton: 'อัปเกรดเป็น Pro',
+        upgradeToProButton: '',
         advertisementManagement: 'การจัดการโฆษณา',
-        uploadManageAds: 'อัปโหลดและจัดการโฆษณาของคุณที่จะแสดงในหน้าแรกของแผนฟรี',
+        uploadManageAds: 'อัปโหลดและจัดการโฆษณาของคุณที่จะแสดงในหน้าแรก',
         manageAdvertisements: 'จัดการโฆษณา',
         manageArticles: 'การจัดการบทความ',
         writeAndEditNews: 'เขียนและแก้ไขบทความข่าวสาร',
@@ -1228,6 +1252,16 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         lineIdExample: 'ตัวอย่าง: @username',
         currentLineId: 'LINE ID ปัจจุบัน:',
         pleaseEnterLineId: 'กรุณากรอก LINE ID',
+
+        contactModalChooseChannel: 'เลือกช่องทางติดต่อตามประเภทคำปรึกษา',
+        contactModalProgram: 'ติดต่อเรื่องโปรแกรม',
+        contactModalProgramDesc: 'ให้คำปรึกษาการใช้งานโปรแกรมเป็นหลัก',
+        contactModalScanQR: 'สแกน QR Code เพื่อเพิ่ม Line',
+        contactModalLineId: 'Line ID',
+        contactModalOpenLine: 'เปิด Line',
+        contactModalPhone: 'เบอร์โทร',
+        contactModalWaterTeam: 'ทีมผู้เชี่ยวชาญติดตั้งระบบน้ำ',
+        contactModalWaterTeamDesc: 'ให้คำปรึกษาเกี่ยวกับการติดตั้งระบบน้ำ',
 
         // ChooseCrop page
         selectCropTypes: 'เลือกประเภทพืช',
@@ -1336,6 +1370,8 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
 
         // Search and input placeholders
         searchLocation: 'ค้นหาสถานที่...',
+        drawingUndo: 'ย้อนกลับ',
+        drawingRedo: 'ทำซ้ำ',
         enterNumberOfZones: 'ใส่จำนวนโซน',
         noPlantSelected: 'ยังไม่ได้เลือกพืช',
         pleasePlaceWaterBeforeNext: 'กรุณาวางแหล่งน้ำก่อนไปขั้นตอนถัดไป',
@@ -1546,7 +1582,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         deleteArticle: 'ลบบทความ',
         confirmDeleteArticle: 'คุณแน่ใจหรือไม่ว่าต้องการลบบทความนี้?',
         errorDeletingArticle: 'เกิดข้อผิดพลาดในการลบบทความ',
-        newsTitle: 'ข่าวสาร - Free Plan',
+        newsTitle: 'ข่าวสาร',
 
         // NewsArticle page
         createNewArticle: 'สร้างบทความใหม่',
@@ -1570,7 +1606,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         preview: 'ตัวอย่าง',
 
         // ProductList page
-        productListTitle: 'รายการสินค้า - Free Plan',
+        productListTitle: 'รายการสินค้า',
         productList: 'รายการสินค้า',
         addProduct: 'เพิ่มสินค้า',
         newProducts: 'ใหม่',
@@ -1607,7 +1643,7 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         saveProduct: 'บันทึกสินค้า',
 
         // Manual page
-        welcomeToFreePlan: 'ยินดีต้อนรับสู่ Free Plan',
+        welcomeToFreePlan: 'ยินดีต้อนรับ',
         manualDescription: 'ระบบออกแบบระบบน้ำหยดอัตโนมัติสำหรับเกษตรกร',
         gettingStarted: 'เริ่มต้นใช้งาน',
         step1SelectCrop: 'ขั้นตอนที่ 1: เลือกพืช',

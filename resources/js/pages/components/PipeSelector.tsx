@@ -929,12 +929,21 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     const existingCalcStr = localStorage.getItem(storageKey);
                     const existingCalc = existingCalcStr ? JSON.parse(existingCalcStr) : {};
 
-                    existingCalc[pipeType] = {
+                    const pipePayload = {
                         headLoss: calc.headLoss,
                         pipeLength: calc.pipeLength,
                         flowRate: calc.flowRate,
                         calculatedAt: new Date().toISOString(),
                     };
+
+                    if (projectMode === 'horticulture' && activeZoneId) {
+                        existingCalc.zones = existingCalc.zones || {};
+                        existingCalc.zones[activeZoneId] = existingCalc.zones[activeZoneId] || {};
+                        existingCalc.zones[activeZoneId][pipeType] = pipePayload;
+                        existingCalc[pipeType] = pipePayload;
+                    } else {
+                        existingCalc[pipeType] = pipePayload;
+                    }
 
                     if (projectMode === 'greenhouse') {
                         delete existingCalc.secondary;

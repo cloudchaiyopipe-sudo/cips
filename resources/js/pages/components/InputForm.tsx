@@ -1044,7 +1044,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <input
                                     type="number"
-                                    defaultValue={input.longestBranchPipeM.toFixed(1)}
+                                    defaultValue={Number(input.longestBranchPipeM).toFixed(2)}
                                     onChange={(e) => {
                                         const value = parseFloat(e.target.value);
                                         if (!isNaN(value)) {
@@ -1054,7 +1054,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     onBlur={(e) => {
                                         const value = e.target.value;
                                         if (value === '' || isNaN(parseFloat(value))) {
-                                            e.target.value = input.longestBranchPipeM.toFixed(1);
+                                            e.target.value = Number(input.longestBranchPipeM).toFixed(2);
                                         }
                                     }}
                                     step="0.1"
@@ -1068,7 +1068,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <input
                                     type="number"
-                                    defaultValue={input.totalBranchPipeM.toFixed(1)}
+                                    defaultValue={Number(input.totalBranchPipeM).toFixed(2)}
                                     onChange={(e) => {
                                         const value = parseFloat(e.target.value);
                                         if (!isNaN(value)) {
@@ -1078,7 +1078,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     onBlur={(e) => {
                                         const value = e.target.value;
                                         if (value === '' || isNaN(parseFloat(value))) {
-                                            e.target.value = input.totalBranchPipeM.toFixed(1);
+                                            e.target.value = Number(input.totalBranchPipeM).toFixed(2);
                                         }
                                     }}
                                     step="0.1"
@@ -1102,7 +1102,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         </label>
                                         <input
                                             type="number"
-                                            defaultValue={input.longestSecondaryPipeM.toFixed(1)}
+                                            defaultValue={Number(input.longestSecondaryPipeM).toFixed(2)}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value);
                                                 if (!isNaN(value)) {
@@ -1113,7 +1113,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
                                                     e.target.value =
-                                                        input.longestSecondaryPipeM.toFixed(1);
+                                                        Number(input.longestSecondaryPipeM).toFixed(2);
                                                 }
                                             }}
                                             step="0.1"
@@ -1127,7 +1127,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         </label>
                                         <input
                                             type="number"
-                                            defaultValue={input.totalSecondaryPipeM.toFixed(1)}
+                                            defaultValue={Number(input.totalSecondaryPipeM).toFixed(2)}
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value);
                                                 if (!isNaN(value)) {
@@ -1138,7 +1138,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
                                                     e.target.value =
-                                                        input.totalSecondaryPipeM.toFixed(1);
+                                                        Number(input.totalSecondaryPipeM).toFixed(2);
                                                 }
                                             }}
                                             step="0.1"
@@ -1163,7 +1163,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </label>
                                     <input
                                         type="number"
-                                        defaultValue={input.longestMainPipeM.toFixed(1)}
+                                        defaultValue={Number(input.longestMainPipeM).toFixed(2)}
                                         onChange={(e) => {
                                             const value = parseFloat(e.target.value);
                                             if (!isNaN(value)) {
@@ -1173,7 +1173,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         onBlur={(e) => {
                                             const value = e.target.value;
                                             if (value === '' || isNaN(parseFloat(value))) {
-                                                e.target.value = input.longestMainPipeM.toFixed(1);
+                                                e.target.value = Number(input.longestMainPipeM).toFixed(2);
                                             }
                                         }}
                                         step="0.1"
@@ -1187,7 +1187,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </label>
                                     <input
                                         type="number"
-                                        defaultValue={input.totalMainPipeM.toFixed(1)}
+                                        defaultValue={Number(input.totalMainPipeM).toFixed(2)}
                                         onChange={(e) => {
                                             const value = parseFloat(e.target.value);
                                             if (!isNaN(value)) {
@@ -1197,7 +1197,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         onBlur={(e) => {
                                             const value = e.target.value;
                                             if (value === '' || isNaN(parseFloat(value))) {
-                                                e.target.value = input.totalMainPipeM.toFixed(1);
+                                                e.target.value = Number(input.totalMainPipeM).toFixed(2);
                                             }
                                         }}
                                         step="0.1"
@@ -1223,7 +1223,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         <input
                                             type="number"
                                             defaultValue={
-                                                input.longestEmitterPipeM?.toFixed(1) || '0.0'
+                                                Number(input.longestEmitterPipeM ?? 0).toFixed(2)
                                             }
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value);
@@ -1235,8 +1235,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
                                                     e.target.value =
-                                                        input.longestEmitterPipeM?.toFixed(1) ||
-                                                        '0.0';
+                                                        Number(input.longestEmitterPipeM ?? 0).toFixed(2);
                                                 }
                                             }}
                                             step="0.1"
@@ -1251,7 +1250,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         <input
                                             type="number"
                                             defaultValue={
-                                                input.totalEmitterPipeM?.toFixed(1) || '0.0'
+                                                Number(input.totalEmitterPipeM ?? 0).toFixed(2)
                                             }
                                             onChange={(e) => {
                                                 const value = parseFloat(e.target.value);
@@ -1263,8 +1262,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 const value = e.target.value;
                                                 if (value === '' || isNaN(parseFloat(value))) {
                                                     e.target.value =
-                                                        input.totalEmitterPipeM?.toFixed(1) ||
-                                                        '0.0';
+                                                        Number(input.totalEmitterPipeM ?? 0).toFixed(2);
                                                 }
                                             }}
                                             step="0.1"

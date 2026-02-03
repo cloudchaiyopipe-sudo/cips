@@ -181,6 +181,18 @@ function FreeMap() {
     const drawingListenersRef = useRef<Array<() => void>>([]);
     const handleFinishDrawingRef = useRef<(() => void) | null>(null);
     const pointMarkersRef = useRef<Array<google.maps.Marker>>([]); // Markers for each clicked point
+    const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null); // To distinguish click vs drag
+    const redoStackRef = useRef<Array<{ lat: number; lng: number }>>([]);
+    const handleDrawingUndoRef = useRef<(() => void) | null>(null);
+    const handleDrawingRedoRef = useRef<(() => void) | null>(null);
+    const setUndoRedoVersionRef = useRef<((fn: (v: number) => number) => void) | null>(null);
+    const [undoRedoVersion, setUndoRedoVersion] = useState(0);
+    // Global map history for Undo/Redo across all steps (draw area, water, pump, zones, pipes)
+    type MapHistoryEntry = { undo: () => void; redo: () => void };
+    const mapHistoryRef = useRef<MapHistoryEntry[]>([]);
+    const mapRedoStackRef = useRef<MapHistoryEntry[]>([]);
+    const [mapHistoryVersion, setMapHistoryVersion] = useState(0);
+    const setMapHistoryVersionRef = useRef<((fn: (v: number) => number) => void) | null>(null);
     const [mapInitialized, setMapInitialized] = useState(false);
     
     // Freehand drawing functions (defined outside useEffect to be accessible)
@@ -195,8 +207,11 @@ function FreeMap() {
         });
         pointMarkersRef.current = [];
         currentPathRef.current = [];
+        redoStackRef.current = [];
         isDrawingRef.current = false;
         setIsDrawingMode(false);
+        handleDrawingUndoRef.current = null;
+        handleDrawingRedoRef.current = null;
         
         // Remove all listeners
         drawingListenersRef.current.forEach(cleanup => {
@@ -206,6 +221,10 @@ function FreeMap() {
     }, []);
     // Keep track of all pipe overlays to ensure they can be cleared on reset
     const allPipeOverlaysRef = useRef<Array<google.maps.Polyline>>([]);
+    // Track drawn shape overlays (polygon/rectangle/circle) so reset always clears them even if state.overlay is null
+    const allDrawnShapeOverlaysRef = useRef<Array<google.maps.Polygon | google.maps.Rectangle | google.maps.Circle>>([]);
+    // Track plant point markers so reset always clears them even if state.marker is null
+    const allPlantPointMarkersRef = useRef<Array<google.maps.Marker>>([]);
     // Remove plant points that overlap a given position within a small radius
     const removeOverlappedPlantPoints = useCallback(
         (position: { lat: number; lng: number }, radiusMeters: number = 5) => {
@@ -279,7 +298,7 @@ function FreeMap() {
                 console.error('Error parsing step progress:', error);
             }
         } else {
-            // If no saved progress, start with step 0 (Draw Area) and auto-activate drawing
+            // If no saved progress, start with step 0 (Draw Area) - do not auto-activate drawing; user must click "Draw Area" button first
             setCurrentStep(0);
             setCompletedSteps([]);
         }
@@ -723,6 +742,46 @@ function FreeMap() {
     };
 
     useEffect(() => {
+        setUndoRedoVersionRef.current = setUndoRedoVersion;
+        return () => {
+            setUndoRedoVersionRef.current = null;
+        };
+    }, [setUndoRedoVersion]);
+
+    useEffect(() => {
+        setMapHistoryVersionRef.current = setMapHistoryVersion;
+        return () => {
+            setMapHistoryVersionRef.current = null;
+        };
+    }, [setMapHistoryVersion]);
+
+    const handleGlobalUndo = () => {
+        if (mapHistoryRef.current.length > 0) {
+            const entry = mapHistoryRef.current.pop();
+            if (entry) {
+                entry.undo();
+                mapRedoStackRef.current.push(entry);
+                setMapHistoryVersionRef.current?.(v => v + 1);
+            }
+        } else if (isDrawingMode && handleDrawingUndoRef.current) {
+            handleDrawingUndoRef.current();
+        }
+    };
+
+    const handleGlobalRedo = () => {
+        if (mapRedoStackRef.current.length > 0) {
+            const entry = mapRedoStackRef.current.pop();
+            if (entry) {
+                entry.redo();
+                mapHistoryRef.current.push(entry);
+                setMapHistoryVersionRef.current?.(v => v + 1);
+            }
+        } else if (isDrawingMode && handleDrawingRedoRef.current) {
+            handleDrawingRedoRef.current();
+        }
+    };
+
+    useEffect(() => {
         let isMounted = true;
 
         // Only initialize map once
@@ -820,10 +879,9 @@ function FreeMap() {
                 return;
             }
 
-            // Default center (Bangkok, Thailand)
             const defaultLocation = {
-                lat: 13.7563,
-                lng: 100.5018,
+                lat: 12.8618532,
+                lng: 102.075667,
             };
 
             // Restore previous map view if available
@@ -1215,6 +1273,7 @@ function FreeMap() {
                             clickable: false,
                             zIndex: 1500, // Below pipes
                         });
+                        allPlantPointMarkersRef.current.push(marker);
                         setPlantPoints((prev) =>
                             prev.map((p) => (p.id === point.id ? { ...p, marker } : p))
                         );
@@ -1407,6 +1466,7 @@ function FreeMap() {
                                 zIndex: 100, // Lower z-index to appear below zones
                             });
                             (overlay as { setMap: (map: unknown) => void }).setMap(map);
+                            allDrawnShapeOverlaysRef.current.push(overlay as google.maps.Polygon);
                         } else if (
                             shape.type === window.google.maps.drawing.OverlayType.RECTANGLE &&
                             shape.data.bounds
@@ -1427,6 +1487,7 @@ function FreeMap() {
                                 zIndex: 100, // Lower z-index to appear below zones
                             });
                             (overlay as { setMap: (map: unknown) => void }).setMap(map);
+                            allDrawnShapeOverlaysRef.current.push(overlay as google.maps.Rectangle);
                         } else if (
                             shape.type === window.google.maps.drawing.OverlayType.CIRCLE &&
                             shape.data.center &&
@@ -1446,6 +1507,7 @@ function FreeMap() {
                                 zIndex: 100, // Lower z-index to appear below zones
                             });
                             (overlay as { setMap: (map: unknown) => void }).setMap(map);
+                            allDrawnShapeOverlaysRef.current.push(overlay as google.maps.Circle);
                         }
 
                         // Update the shape with the recreated overlay
@@ -2104,15 +2166,24 @@ function FreeMap() {
         // Clear all overlays from the map first
         if (mapInstanceRef.current) {
             // FIRST: Clear all pipes from the tracking ref (includes pipes created by useEffect)
-            // This ensures we remove pipes that might not be in state yet
             allPipeOverlaysRef.current.forEach((polyline) => {
-                if (polyline) {
-                    polyline.setMap(null);
-                }
+                if (polyline) polyline.setMap(null);
             });
-            allPipeOverlaysRef.current = []; // Clear the ref
+            allPipeOverlaysRef.current = [];
 
-            // Clear all drawn shapes overlays
+            // Clear drawn shape overlays from ref (reliable even when state.overlay is null)
+            allDrawnShapeOverlaysRef.current.forEach((overlay) => {
+                if (overlay) overlay.setMap(null);
+            });
+            allDrawnShapeOverlaysRef.current = [];
+
+            // Clear plant point markers from ref (reliable even when state.marker is null)
+            allPlantPointMarkersRef.current.forEach((marker) => {
+                if (marker) marker.setMap(null);
+            });
+            allPlantPointMarkersRef.current = [];
+
+            // Also clear from state (in case ref missed any)
             drawnShapes.forEach((shape) => {
                 if (shape.overlay) {
                     (shape.overlay as { setMap: (map: unknown) => void }).setMap(null);
@@ -2218,6 +2289,9 @@ function FreeMap() {
         setSubMainPipes([]);
         setLateralPipes([]);
         setIsDrawingMode(false);
+        mapHistoryRef.current = [];
+        mapRedoStackRef.current = [];
+        setMapHistoryVersionRef.current?.(v => v + 1);
     };
     const handleNext = async () => {
         try {
@@ -2411,6 +2485,21 @@ function FreeMap() {
             });
         };
 
+        // Record pointer position on down (to distinguish click vs drag/pan)
+        const DRAG_THRESHOLD_PX = 12;
+        const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+            let clientX: number, clientY: number;
+            if (e instanceof TouchEvent) {
+                if (e.touches.length === 0) return;
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            pointerDownPosRef.current = { x: clientX, y: clientY };
+        };
+
         // Handle click/tap to add point
         const handleClick = (e: MouseEvent | TouchEvent) => {
             // Prevent default for touch events
@@ -2429,6 +2518,26 @@ function FreeMap() {
             ) {
                 return;
             }
+
+            // If user dragged (panned) the map, don't add a point
+            let currentX: number, currentY: number;
+            if (e instanceof TouchEvent) {
+                if (e.changedTouches.length === 0) return;
+                currentX = e.changedTouches[0].clientX;
+                currentY = e.changedTouches[0].clientY;
+            } else {
+                currentX = e.clientX;
+                currentY = e.clientY;
+            }
+            if (pointerDownPosRef.current) {
+                const dx = currentX - pointerDownPosRef.current.x;
+                const dy = currentY - pointerDownPosRef.current.y;
+                if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD_PX) {
+                    pointerDownPosRef.current = null;
+                    return;
+                }
+            }
+            pointerDownPosRef.current = null;
 
             const point = getLatLngFromEvent(e);
             if (!point) return;
@@ -2452,7 +2561,8 @@ function FreeMap() {
                 }
             }
 
-            // Add new point
+            // Add new point (clear redo stack when user adds a new point)
+            redoStackRef.current = [];
             const isFirst = currentPathRef.current.length === 0;
             currentPathRef.current.push(point);
 
@@ -2462,8 +2572,37 @@ function FreeMap() {
 
             // Update polyline
             updatePolyline();
+            setUndoRedoVersionRef.current?.(v => v + 1);
         };
 
+        // Undo: remove last point and push to redo stack
+        const handleDrawingUndo = () => {
+            if (currentPathRef.current.length === 0) return;
+            const point = currentPathRef.current.pop();
+            if (point) redoStackRef.current.push(point);
+            const lastMarker = pointMarkersRef.current.pop();
+            if (lastMarker) lastMarker.setMap(null);
+            updatePolyline();
+            setUndoRedoVersionRef.current?.(v => v + 1);
+        };
+        // Redo: pop from redo stack and add point back
+        const handleDrawingRedo = () => {
+            if (redoStackRef.current.length === 0) return;
+            const point = redoStackRef.current.pop();
+            if (!point) return;
+            const isFirst = currentPathRef.current.length === 0;
+            currentPathRef.current.push(point);
+            const marker = createPointMarker(point, isFirst);
+            pointMarkersRef.current.push(marker);
+            updatePolyline();
+            setUndoRedoVersionRef.current?.(v => v + 1);
+        };
+        handleDrawingUndoRef.current = handleDrawingUndo;
+        handleDrawingRedoRef.current = handleDrawingRedo;
+
+        // Pointer down (to detect drag vs click)
+        mapDiv.addEventListener('mousedown', handlePointerDown as EventListener);
+        mapDiv.addEventListener('touchstart', handlePointerDown as EventListener, { passive: true });
         // Mouse click event
         mapDiv.addEventListener('click', handleClick as EventListener);
         // Touch tap event (use touchend to avoid conflicts with map panning)
@@ -2471,12 +2610,17 @@ function FreeMap() {
 
         // Store cleanup function
         const cleanup = () => {
+            mapDiv.removeEventListener('mousedown', handlePointerDown as EventListener);
+            mapDiv.removeEventListener('touchstart', handlePointerDown as EventListener);
             mapDiv.removeEventListener('click', handleClick as EventListener);
             mapDiv.removeEventListener('touchend', handleClick as EventListener);
             mapDiv.style.cursor = '';
+            handleDrawingUndoRef.current = null;
+            handleDrawingRedoRef.current = null;
         };
 
         drawingListenersRef.current.push(cleanup);
+        setIsDrawingMode(true);
     }, [cleanupFreehandDrawing]);
     
     // Assign to the outer variable so it can be used in useEffect
@@ -2498,10 +2642,10 @@ function FreeMap() {
         // Reset step 0 completion
         setCompletedSteps((prev) => prev.filter(step => step !== 0));
         
-        // Restart drawing mode
+        // Restart drawing mode - set UI state first so button turns gray immediately, then init (init sets isDrawingMode(true) at end)
         cleanupFreehandDrawing();
         setIsDrawingMode(true);
-        initializeFreehandDrawing();
+        setTimeout(() => initializeFreehandDrawing(), 0);
     };
     
 
@@ -2560,13 +2704,49 @@ function FreeMap() {
                 });
 
                 setCurrentStep(3); // Move to step 3 (Zones)
+
+                mapRedoStackRef.current = [];
+                const waterSourcePos = waterSources[waterSources.length - 1]?.position;
+                const undo = () => {
+                    pumpMarker.setMap(null);
+                    setPumps((prev) => {
+                        const newList = prev.slice(0, -1);
+                        localStorage.setItem('pumps', JSON.stringify(newList.map((p) => ({ id: p.id, position: p.position }))));
+                        return newList;
+                    });
+                    if (waterSourcePos) setPumpPlacementPoints(createPumpPlacementPoints(waterSourcePos, map));
+                    setCompletedSteps((prev) => {
+                        const newCompleted = prev.filter((s) => s !== 2);
+                        localStorage.setItem('mapStepProgress', JSON.stringify({ currentStep: 2, completedSteps: newCompleted }));
+                        return newCompleted;
+                    });
+                    setCurrentStep(2);
+                    setMapHistoryVersionRef.current?.(v => v + 1);
+                };
+                const redo = () => {
+                    const m = createPumpMarker(position, map);
+                    if (m) {
+                        removeOverlappedPlantPoints(position, 3);
+                        setPumps((prev) => [...prev, { id: Date.now(), position, marker: m }]);
+                        pumpPlacementPoints.forEach((point) => {
+                            if (point.marker) (point.marker as { setMap: (m: unknown) => void }).setMap(null);
+                        });
+                        setPumpPlacementPoints([]);
+                        setCompletedSteps((prev) => (prev.includes(2) ? prev : [...prev, 2]));
+                        setCurrentStep(3);
+                    }
+                    setMapHistoryVersionRef.current?.(v => v + 1);
+                };
+                mapHistoryRef.current.push({ undo, redo });
             } else {
                 console.error('❌ Failed to create pump marker');
             }
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- createPumpPlacementPoints defined later, used in redo closure
         [
             pumps,
             pumpPlacementPoints,
+            waterSources,
             setPumps,
             setPumpPlacementPoints,
             setCompletedSteps,
@@ -2749,6 +2929,7 @@ function FreeMap() {
         });
 
         polygon.setMap(map);
+        allDrawnShapeOverlaysRef.current.push(polygon);
 
         // Extract data for storage
         const overlayData = {
@@ -2844,6 +3025,36 @@ function FreeMap() {
                             map
                         );
                         setPumpPlacementPoints(placementPoints);
+
+                        mapRedoStackRef.current = [];
+                        const pos = { lat: clickedLat, lng: clickedLng };
+                        const undo = () => {
+                            waterMarker.setMap(null);
+                            setWaterSources((prev) => {
+                                const newList = prev.slice(0, -1);
+                                localStorage.setItem('waterSources', JSON.stringify(newList.map((ws) => ({ id: ws.id, position: ws.position }))));
+                                return newList;
+                            });
+                            setPumpPlacementPoints([]);
+                            setCompletedSteps((prev) => {
+                                const newCompleted = prev.filter((s) => s !== 1);
+                                localStorage.setItem('mapStepProgress', JSON.stringify({ currentStep: 1, completedSteps: newCompleted }));
+                                return newCompleted;
+                            });
+                            setCurrentStep(1);
+                            setMapHistoryVersionRef.current?.(v => v + 1);
+                        };
+                        const redo = () => {
+                            const m = createWaterSourceMarkerSimple(pos, map);
+                            if (m) {
+                                setWaterSources((prev) => [...prev, { id: Date.now(), position: pos, marker: m }]);
+                                setCompletedSteps((prev) => (prev.includes(1) ? prev : [...prev, 1]));
+                                setCurrentStep(2);
+                                setPumpPlacementPoints(createPumpPlacementPoints(pos, map));
+                            }
+                            setMapHistoryVersionRef.current?.(v => v + 1);
+                        };
+                        mapHistoryRef.current.push({ undo, redo });
                     }
                 }
             }
@@ -2852,6 +3063,9 @@ function FreeMap() {
         // Create plant points after drawing area
         const newPlantPoints = createPlantPoints(map, overlayData, window.google.maps.drawing.OverlayType.POLYGON);
         if (newPlantPoints) {
+            newPlantPoints.forEach((p) => {
+                if (p.marker) allPlantPointMarkersRef.current.push(p.marker as google.maps.Marker);
+            });
             setPlantPoints(newPlantPoints);
         }
 
@@ -2872,6 +3086,71 @@ function FreeMap() {
             }
             return prev;
         });
+
+        // Push undo/redo for "finish drawing"
+        mapRedoStackRef.current = [];
+        const pathForRedo = [...(overlayData.path || [])];
+        const undo = () => {
+            (newShape.overlay as google.maps.Polygon).setMap(null);
+            setDrawnShapes([]);
+            newPlantPoints?.forEach((p) => {
+                if (p.marker) (p.marker as { setMap: (m: unknown) => void }).setMap(null);
+            });
+            setPlantPoints([]);
+            setCompletedSteps((prev) => prev.filter((s) => s !== 0));
+            setCurrentStep(0);
+            localStorage.removeItem('drawnShapes');
+            setMapHistoryVersionRef.current?.(v => v + 1);
+        };
+        const redo = () => {
+            if (!pathForRedo.length) return;
+            const closedPath = [...pathForRedo, pathForRedo[0]];
+            const polygon = new window.google.maps.Polygon({
+                paths: closedPath,
+                fillColor: '#10b981',
+                fillOpacity: 0.2,
+                strokeColor: '#10b981',
+                strokeOpacity: 0.6,
+                strokeWeight: 2,
+                clickable: true,
+                zIndex: 100,
+            });
+            polygon.setMap(map);
+            allDrawnShapeOverlaysRef.current.push(polygon);
+            const recreatedData = { path: pathForRedo };
+            const recreatedShape = {
+                overlay: polygon,
+                type: window.google.maps.drawing.OverlayType.POLYGON,
+                id: Date.now(),
+                data: recreatedData,
+            };
+            setDrawnShapes([recreatedShape]);
+            localStorage.setItem('drawnShapes', JSON.stringify([{ type: recreatedShape.type, id: recreatedShape.id, data: recreatedShape.data }]));
+            window.google.maps.event.addListener(polygon, 'click', (event: { latLng: { lat: () => number; lng: () => number } }) => {
+                const clickedLat = event.latLng.lat();
+                const clickedLng = event.latLng.lng();
+                const waterMarker = createWaterSourceMarkerSimple({ lat: clickedLat, lng: clickedLng }, map);
+                if (waterMarker) {
+                    const newWaterSource = { id: Date.now(), position: { lat: clickedLat, lng: clickedLng }, marker: waterMarker };
+                    setWaterSources((prev) => [...prev, newWaterSource]);
+                    setCompletedSteps((prev) => (prev.includes(1) ? prev : [...prev, 1]));
+                    setCurrentStep(2);
+                    const placementPoints = createPumpPlacementPoints({ lat: clickedLat, lng: clickedLng }, map);
+                    setPumpPlacementPoints(placementPoints);
+                }
+            });
+            const pts = createPlantPoints(map, recreatedData, window.google.maps.drawing.OverlayType.POLYGON);
+            if (pts) {
+                pts.forEach((p) => {
+                    if (p.marker) allPlantPointMarkersRef.current.push(p.marker as google.maps.Marker);
+                });
+                setPlantPoints(pts);
+            }
+            setCompletedSteps((prev) => (prev.includes(0) ? prev : [...prev, 0]));
+            setCurrentStep(1);
+            setMapHistoryVersionRef.current?.(v => v + 1);
+        };
+        mapHistoryRef.current.push({ undo, redo });
 
         showToast(translations.areaDrawnSuccessfully || 'Area drawn successfully', 'success');
     }, [currentStep, waterSources, cleanupFreehandDrawing, showToast, translations, createWaterSourceMarkerSimple, createPumpPlacementPoints, createPlantPoints]);
@@ -2969,11 +3248,9 @@ function FreeMap() {
     useEffect(() => {
         if (!mapInitialized) return;
 
-        // Step 0: Draw Area - Auto-activate and initialize freehand drawing when page loads or when step 0 is current
+        // Step 0: Draw Area - Do not auto-activate; user must click "Draw Area" (blue button) first to enter drawing mode
         if (currentStep === 0 && !completedSteps.includes(0)) {
-            setIsDrawingMode(true);
-            // Auto-initialize drawing listeners so user can start drawing immediately
-            initializeFreehandDrawing();
+            // Leave isDrawingMode false until user clicks the Draw Area button
         }
         // Step 1: Water - Deactivate drawing
         else if (currentStep === 1 && completedSteps.includes(0) && !completedSteps.includes(1)) {
@@ -3539,6 +3816,43 @@ function FreeMap() {
             center: zone.center,
         }));
         localStorage.setItem('zones', JSON.stringify(zonesForStorage));
+
+        mapRedoStackRef.current = [];
+        const undo = () => {
+            newZones.forEach((z) => {
+                (z.overlay as google.maps.Polygon)?.setMap(null);
+                (z.centerMarker as google.maps.Marker)?.setMap(null);
+            });
+            setZones([]);
+            setCompletedSteps((prev) => prev.filter((s) => s !== 3));
+            setCurrentStep(3);
+            localStorage.removeItem('zones');
+            setMapHistoryVersionRef.current?.(v => v + 1);
+        };
+        const redo = () => {
+            const recreated: typeof newZones = [];
+            newZones.forEach((z) => {
+                const overlay = new window.google.maps.Polygon({
+                    paths: z.coordinates,
+                    fillColor: z.color,
+                    fillOpacity: 0.4,
+                    strokeColor: z.color,
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    clickable: false,
+                    zIndex: 500,
+                });
+                overlay.setMap(map);
+                const centerMarker = createZoneCenterMarker(map, z.center, z.name, z.color);
+                recreated.push({ ...z, overlay, centerMarker });
+            });
+            setZones(recreated);
+            setCompletedSteps((prev) => (prev.includes(3) ? prev : [...prev, 3]));
+            setCurrentStep(4);
+            localStorage.setItem('zones', JSON.stringify(zonesForStorage));
+            setMapHistoryVersionRef.current?.(v => v + 1);
+        };
+        mapHistoryRef.current.push({ undo, redo });
 
         return newZones;
     };
@@ -4202,6 +4516,25 @@ function FreeMap() {
         // Generate lateral pipes after sub-main pipes (pass generated sub-main pipes)
         const generatedLateralPipes = generateLateralPipes(map, generatedSubMainPipes || []);
 
+        mapRedoStackRef.current = [];
+        const undo = () => {
+            newMainPipes.forEach((p) => (p.overlay as google.maps.Polyline)?.setMap(null));
+            (generatedSubMainPipes || []).forEach((p) => (p.overlay as google.maps.Polyline)?.setMap(null));
+            (generatedLateralPipes || []).forEach((p) => (p.overlay as google.maps.Polyline)?.setMap(null));
+            setMainPipes([]);
+            setSubMainPipes([]);
+            setLateralPipes([]);
+            localStorage.removeItem('mainPipes');
+            localStorage.removeItem('subMainPipes');
+            localStorage.removeItem('lateralPipes');
+            setMapHistoryVersionRef.current?.(v => v + 1);
+        };
+        const redo = () => {
+            generateMainPipes(map);
+            setMapHistoryVersionRef.current?.(v => v + 1);
+        };
+        mapHistoryRef.current.push({ undo, redo });
+
         // After full pipeline is generated, compute and save summary metrics
         setTimeout(() => {
             try {
@@ -4474,7 +4807,7 @@ function FreeMap() {
                 };
                 localStorage.setItem('freePlanSummary', JSON.stringify(summary));
             } catch (e) {
-                console.error('Failed to compute/save free plan summary:', e);
+                console.error('Failed to compute/save plan summary:', e);
             }
         }, 0);
 
@@ -6149,9 +6482,9 @@ function FreeMap() {
                     transition={{ duration: 0.5, delay: 0.2 }}
                     className="relative mb-2 flex min-h-[300px] flex-1 overflow-hidden rounded-lg border border-slate-400/20 bg-slate-800/40 backdrop-blur-lg shadow-md md:mb-4 md:flex-none md:h-[420px]"
                 >
-                    {/* Search Component */}
-                    <div className="absolute left-1 top-1 z-10 w-48 sm:w-56 md:w-80 lg:w-96">
-                        <div className="relative">
+                    {/* Search + Undo/Redo row (justify-between) */}
+                    <div className="absolute left-1 right-1 top-1 z-10 flex items-center justify-between gap-2">
+                        <div className="relative w-48 flex-shrink-0 sm:w-56 md:w-80 lg:w-96">
                             <input
                                 type="text"
                                 value={searchValue}
@@ -6201,6 +6534,32 @@ function FreeMap() {
                                     ))}
                                 </motion.div>
                             )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0" data-undo-version={undoRedoVersion} data-map-history-version={mapHistoryVersion}>
+                            <button
+                                type="button"
+                                onClick={handleGlobalUndo}
+                                disabled={mapHistoryRef.current.length === 0 && !(isDrawingMode && currentPathRef.current.length > 0)}
+                                title={translations.drawingUndo}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-500 bg-slate-700/90 px-3 py-2 text-sm font-medium text-slate-200 shadow-md transition-all hover:bg-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-slate-700/90 md:px-4"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                <span className="hidden sm:inline">{translations.drawingUndo}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleGlobalRedo}
+                                disabled={mapRedoStackRef.current.length === 0 && !(isDrawingMode && redoStackRef.current.length > 0)}
+                                title={translations.drawingRedo}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-500 bg-slate-700/90 px-3 py-2 text-sm font-medium text-slate-200 shadow-md transition-all hover:bg-slate-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-slate-700/90 md:px-4"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                                </svg>
+                                <span className="hidden sm:inline">{translations.drawingRedo}</span>
+                            </button>
                         </div>
                     </div>
 
@@ -6256,7 +6615,9 @@ function FreeMap() {
                                     getButtonState(0) === 'completed'
                                         ? 'cursor-not-allowed bg-green-600 shadow-green-500/50'
                                         : getButtonState(0) === 'active'
-                                              ? 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
+                                              ? isDrawingMode
+                                                  ? 'bg-slate-600 hover:bg-slate-500 shadow-slate-900/50'
+                                                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/50'
                                           : 'cursor-not-allowed bg-slate-400'
                                 }`}
                             >
@@ -6434,7 +6795,12 @@ function FreeMap() {
                     </button>
                     <button
                         onClick={handleNext}
-                        className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-md shadow-blue-500/50 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98]"
+                        disabled={mainPipes.length === 0 || subMainPipes.length === 0 || lateralPipes.length === 0}
+                        className={`flex-1 rounded-lg px-4 py-2 text-white shadow-md transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${
+                            mainPipes.length === 0 || subMainPipes.length === 0 || lateralPipes.length === 0
+                                ? 'cursor-not-allowed bg-slate-500 opacity-70 shadow-slate-500/50'
+                                : 'bg-blue-600 shadow-blue-500/50 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/50'
+                        }`}
                     >
                         {translations.next}
                     </button>

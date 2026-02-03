@@ -1876,10 +1876,17 @@ function EnhancedHorticultureResultsPageContent() {
                         connectionStats: connectionStats,
                         zones:
                             irrigationZones && irrigationZones.length > 0
-                                ? irrigationZones.map((zone: IrrigationZoneExtended) => {
-                                      const zoneData = projectSummary?.zoneDetails?.find(
+                                ? irrigationZones.map((zone: IrrigationZoneExtended, zoneIdx: number) => {
+                                      let zoneData = projectSummary?.zoneDetails?.find(
                                           (z: { zoneId: string }) => z.zoneId === zone.id
                                       );
+                                      if (
+                                          !zoneData &&
+                                          projectSummary?.zoneDetails &&
+                                          projectSummary.zoneDetails.length > zoneIdx
+                                      ) {
+                                          zoneData = projectSummary.zoneDetails[zoneIdx];
+                                      }
                                       const plantCount = zone.plants ? zone.plants.length : 0;
                                       const sprinklersPerTree =
                                           sprinklerConfig?.sprinklersPerTree || 1;
@@ -2099,7 +2106,6 @@ function EnhancedHorticultureResultsPageContent() {
                         console.log(
                             `💾 Attempting to save horticultureSystemData: ${dataSizeKB.toFixed(2)}KB`
                         );
-
                         localStorage.setItem('horticultureSystemData', dataString);
                     } catch (error) {
                         if (error instanceof Error && error.name === 'QuotaExceededError') {
