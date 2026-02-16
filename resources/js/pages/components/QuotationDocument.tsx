@@ -900,7 +900,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         else sprinklersByType.set(key, { type: s.type, count: 1 });
                     });
                     sprinklersByType.forEach(({ type, count }) => {
-                        const matchingEquipment = results.analyzedSprinklers.find((eq: any) => {
+                        const matchingEquipment = results.analyzedSprinklers?.find((eq: any) => {
                             const eqName = eq.name || '';
                             const typeName = type?.nameTH || type?.nameEN || '';
                             return eqName === typeName ||
@@ -917,9 +917,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 equipmentMap.set(sprinklerKey, {
                                     id: sprinklerKey,
                                     seq: seq++,
-                                    image: matchingEquipment.image_url || matchingEquipment.image || '',
+                                    image: (matchingEquipment as any).image_url || matchingEquipment.image || '',
                                     date: '',
-                                    description: `${matchingEquipment.productCode || matchingEquipment.product_code || ''} - ${matchingEquipment.name || 'สปริงเกอร์'} (${matchingEquipment.brand || ''})`,
+                                    description: `${matchingEquipment.productCode || (matchingEquipment as any).product_code || ''} - ${matchingEquipment.name || 'สปริงเกอร์'} (${matchingEquipment.brand || ''})`,
                                     quantity: count,
                                     unitPrice: matchingEquipment.price || 0,
                                     discount: 0.0,
@@ -1170,7 +1170,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     else sprinklersByType.set(key, { type: s.type, count: 1 });
                 });
                 sprinklersByType.forEach(({ type, count }) => {
-                    const matchingEquipment = results.analyzedSprinklers.find((eq: any) => {
+                    const matchingEquipment = results.analyzedSprinklers?.find((eq: any) => {
                         const eqName = eq.name || '';
                         const typeName = type?.nameTH || type?.nameEN || '';
                         return eqName === typeName ||
@@ -1178,12 +1178,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 Math.abs((eq.pressureBar || 0) - (type?.pressure ?? 0)) < 0.5);
                     });
                     if (matchingEquipment && count > 0) {
+                        const eqAny = matchingEquipment as any;
                         initialItems.push({
                             id: `sprinkler_${matchingEquipment.id}`,
                             seq: seq++,
-                            image: matchingEquipment.image_url || matchingEquipment.image || '',
+                            image: eqAny.image_url || matchingEquipment.image || '',
                             date: '',
-                            description: `${matchingEquipment.productCode || matchingEquipment.product_code || ''} - ${matchingEquipment.name || 'สปริงเกอร์'} (${matchingEquipment.brand || ''})`,
+                            description: `${matchingEquipment.productCode || eqAny.product_code || ''} - ${matchingEquipment.name || 'สปริงเกอร์'} (${matchingEquipment.brand || ''})`,
                             quantity: count,
                             unitPrice: matchingEquipment.price || 0,
                             discount: 0.0,

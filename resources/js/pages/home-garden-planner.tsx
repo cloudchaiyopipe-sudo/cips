@@ -375,7 +375,17 @@ export default function HomeGardenPlanner() {
     const [selectedZoneEquipmentId, setSelectedZoneEquipmentId] = useState<number | null>(null);
     const [showZoneSprinklerPopup, setShowZoneSprinklerPopup] = useState<boolean>(false);
     const [showAutoSprinklerPopup, setShowAutoSprinklerPopup] = useState<boolean>(false);
+    const [showManualSprinklerPopup, setShowManualSprinklerPopup] = useState<boolean>(false);
     const [showConfirmAutoPlacePopup, setShowConfirmAutoPlacePopup] = useState<boolean>(false);
+    const [zoneSprinklerRadius, setZoneSprinklerRadius] = useState<number>(5);
+    const [zoneSprinklerPressure, setZoneSprinklerPressure] = useState<number>(2);
+    const [zoneSprinklerFlowRate, setZoneSprinklerFlowRate] = useState<number>(10);
+    const [autoSprinklerRadius, setAutoSprinklerRadius] = useState<number>(5);
+    const [autoSprinklerPressure, setAutoSprinklerPressure] = useState<number>(2);
+    const [autoSprinklerFlowRate, setAutoSprinklerFlowRate] = useState<number>(10);
+    const [manualSprinklerRadius, setManualSprinklerRadius] = useState<number>(5);
+    const [manualSprinklerPressure, setManualSprinklerPressure] = useState<number>(2);
+    const [manualSprinklerFlowRate, setManualSprinklerFlowRate] = useState<number>(10);
     const [sprinklerDetailPopup, setSprinklerDetailPopup] = useState<{ sprinklerId: string } | null>(null);
 
     // โหลดสปริงเกอร์จาก DB (equipment_categories name=sprinkler)

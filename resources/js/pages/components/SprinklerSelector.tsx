@@ -177,7 +177,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
             }
             return zoneSprinklerCount;
-        } else if (projectMode === 'garden' && gardenStats && activeZone) {
+        } else if ((projectMode as string) === 'garden' && gardenStats && activeZone) {
             const zone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
             if (zone) {
                 return zone.sprinklerCount || 0;
@@ -1211,7 +1211,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     if (
                         selected &&
                         (projectMode === 'horticulture' ||
-                            projectMode === 'garden' ||
+                            (projectMode as string) === 'garden' ||
                             projectMode === 'greenhouse')
                     ) {
                         localStorage.setItem(
@@ -1247,7 +1247,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     const options = [
                         {
                             value: '',
-                            label: `-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name.split(' (')[0]}` : ''} --`,
+                            label: `-- ${t('เลือก')} ${(projectMode as string) === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name.split(' (')[0]}` : ''} --`,
                         },
                         // ✅ Add selected sprinkler first if it's not in filtered list
                         ...(selectedFromAnalyzed ? [{
@@ -1282,10 +1282,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     ];
                     return options;
                 })()}
-                placeholder={`-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name.split(' (')[0]}` : ''} --`}
+                placeholder={`-- ${t('เลือก')} ${(projectMode as string) === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name.split(' (')[0]}` : ''} --`}
                 searchPlaceholder={
                     t('พิมพ์เพื่อค้นหา') +
-                    (projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')) +
+                    ((projectMode as string) === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')) +
                     ' (ชื่อ, รหัสสินค้า, แบรนด์, รัศมี)...'
                 }
                 className="mb-4 w-full"
@@ -1293,7 +1293,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             )}
 
             {/* ซ่อนข้อมูลสปริงเกอร์ที่เลือกสำหรับ garden mode */}
-            {projectMode !== 'garden' && selectedSprinkler && selectedAnalyzed && (
+            {(projectMode as string) !== 'garden' && selectedSprinkler && selectedAnalyzed && (
                 <div className="rounded-lg bg-gray-600 p-4 shadow-lg">
                     {/* Header */}
                     <div className="mb-4 border-b border-gray-500 pb-3">
@@ -1425,7 +1425,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                                         const sprinklersPerTree = config?.sprinklersPerTree || 1;
                                                         zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
                                                     }
-                                                } else if (projectMode === 'garden' && gardenStats && activeZone) {
+                                                } else if ((projectMode as string) === 'garden' && gardenStats && activeZone) {
                                                     const zone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
                                                     if (zone) {
                                                         zoneSprinklerCount = zone.sprinklerCount || 0;
@@ -1486,7 +1486,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                                         const sprinklersPerTree = config?.sprinklersPerTree || 1;
                                                         zoneSprinklerCount = zoneSprinklerCount * sprinklersPerTree;
                                                     }
-                                                } else if (projectMode === 'garden' && gardenStats && activeZone) {
+                                                } else if ((projectMode as string) === 'garden' && gardenStats && activeZone) {
                                                     const zone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
                                                     if (zone) {
                                                         zoneSprinklerCount = zone.sprinklerCount || 0;

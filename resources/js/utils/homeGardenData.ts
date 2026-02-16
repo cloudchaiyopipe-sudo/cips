@@ -350,8 +350,8 @@ export function getManualSprinklerColor(
 export function bakeSprinklerColorsIntoGardenData(data: GardenPlannerData): GardenPlannerData {
     const sprinklers = data.sprinklers || [];
     if (sprinklers.length === 0) return data;
-    const isAutoSprinkler = (s: Sprinkler) =>
-        (s?.id && (String(s.id).includes('_corner_') || /^[^_]+_sprinkler_/.test(String(s.id)))) ?? false;
+    const isAutoSprinkler = (s: Sprinkler): boolean =>
+        Boolean(s?.id && (String(s.id).includes('_corner_') || /^[^_]+_sprinkler_/.test(String(s.id))));
     const isMatchingAutoSprinkler = (s: Sprinkler) => {
         if (isAutoSprinkler(s)) return true;
         const t = s?.type;
@@ -5475,8 +5475,8 @@ function createUnifiedTrunkSystem(
     connectedPoints.set(sourceKey, sourcePos);
 
     // เชื่อมหัวฉีดทีละตัว โดยเลือกตัวที่ใกล้ network ที่สุด
-    const unconnectedSprinklers = [...validSprinklers];
-    
+    const unconnectedSprinklers: Sprinkler[] = [...validSprinklers];
+
     while (unconnectedSprinklers.length > 0) {
         let nearestSprinkler: Sprinkler | null = null;
         let nearestFromPoint: Coordinate | CanvasCoordinate | null = null;
@@ -5503,10 +5503,11 @@ function createUnifiedTrunkSystem(
 
         if (!nearestSprinkler || !nearestFromPoint) break;
 
-        // เชื่อมหัวฉีดที่ใกล้ที่สุดเข้า network
+        // เชื่อมหัวฉีดที่ใกล้ที่สุดเข้า network (assert after null check)
+        const current: Sprinkler = nearestSprinkler;
         const sprinklerPos = isCanvasMode
-            ? nearestSprinkler.canvasPosition || nearestSprinkler.position
-            : nearestSprinkler.position;
+            ? current.canvasPosition || current.position
+            : current.position;
 
         if (sprinklerPos) {
             // สร้างท่อจาก nearestFromPoint ไปยัง sprinklerPos
@@ -5521,14 +5522,14 @@ function createUnifiedTrunkSystem(
             // แปลง path เป็นท่อ
             for (let i = 0; i < path.length - 1; i++) {
                 const pipe = createUniformPipe(
-                    `mst_${waterSource.id}_${nearestSprinkler.id}_${i}`,
+                    `mst_${waterSource.id}_${current.id}_${i}`,
                     path[i],
                     path[i + 1],
                     isCanvasMode,
                     scale,
                     canvasData,
                     imageData,
-                    nearestSprinkler.zoneId
+                    current.zoneId
                 );
                 pipe.waterSourceId = waterSource.id;
                 pipes.push(pipe);
@@ -5541,7 +5542,7 @@ function createUnifiedTrunkSystem(
             }
 
             // เพิ่มหัวฉีดนี้เข้า connected
-            const sprinklerKey = `sprinkler_${nearestSprinkler.id}`;
+            const sprinklerKey = `sprinkler_${current.id}`;
             connected.add(sprinklerKey);
             connectedPoints.set(sprinklerKey, sprinklerPos);
         }
