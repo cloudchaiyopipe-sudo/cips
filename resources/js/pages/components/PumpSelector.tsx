@@ -1669,6 +1669,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     }, [analyzedPumps, sortedPumps, hasAutoSelected, onPumpChange, checkPumpAdequacy, selectedPump]);
 
     // ✅ Reset auto-select flag เมื่อ analyzedPumps เปลี่ยน (เช่น เมื่อเปลี่ยนโซน)
+    // โหมด garden: reset เมื่อ maxPumpHeadWithSafety เปลี่ยน เพื่อให้เลือกปั๊มใหม่เมื่อได้ head ที่ถูกต้อง
     // แต่ต้องไม่ reset ถ้าผู้ใช้ได้เลือกปั๊มเองแล้ว
     useEffect(() => {
         const userHasSelectedPump = selectedPump && selectedPump.id;
@@ -1676,7 +1677,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         if (!userHasSelectedPump) {
             setHasAutoSelected(false);
         }
-    }, [analyzedPumps, selectedPump]);
+    }, [
+        analyzedPumps,
+        selectedPump,
+        // โหมด garden: ให้ re-pick ปั๊มเมื่อ required head อัปเดต (จาก localStorage / allZoneResults)
+        projectMode === 'garden' ? maxPumpHeadWithSafety : 0,
+    ]);
 
     // ใช้ useRef เพื่อเก็บค่า pump id ก่อนหน้า
     const prevPumpIdRef = useRef<number | undefined>(undefined);

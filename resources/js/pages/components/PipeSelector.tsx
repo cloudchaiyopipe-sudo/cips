@@ -35,7 +35,7 @@ function getTargetHeadLoss(pipeType: string, head20Percent: number): number {
 import { getSelectedPipeDataInfo, getPipeDataWithSmartSize } from './PipeFrictionLoss';
 import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
 
-interface PipeSelectorProps {
+export interface PipeSelectorProps {
     pipeType: PipeType;
     results: CalculationResults;
     input: IrrigationInput;

@@ -11,11 +11,14 @@ import {
     CanvasCoordinate,
     GardenPlannerData,
     ZONE_TYPES,
+    SPRINKLER_TYPES,
     loadGardenData,
     formatArea,
     validateGardenData,
     clipCircleToPolygon,
     canvasToGPS,
+    getManualSprinklerColor,
+    Sprinkler,
 } from '../utils/homeGardenData';
 import { calculateGardenStatistics } from '../utils/gardenStatistics';
 interface HomeGardenSummaryProps {
@@ -606,27 +609,67 @@ const CanvasRenderer: React.FC<{
 
                     const sprinklerPoint = transformPoint(sprinkler.canvasPosition);
 
+                    // กำหนดสีเหมือนหน้า planner - ใช้ฟังก์ชันเดียวกัน
+                    const isAutoSprinkler = (s: Sprinkler): boolean => {
+                        // หัวฉีดอัตโนมัติมี id pattern: ${zone.id}_sprinkler_... หรือ ${zone.id}_corner_...
+                        return (
+                            s.id.includes('_corner_') ||
+                            s.id.match(/^[^_]+_sprinkler_/) !== null
+                        );
+                    };
+                    
+                    const isMatchingAutoSprinkler = (s: Sprinkler): boolean => {
+                        // หัวฉีดอัตโนมัติเป็นสีฟ้าเสมอ
+                        if (isAutoSprinkler(s)) {
+                            return true;
+                        }
+                        
+                        // สำหรับหัวฉีดที่เพิ่มเอง: ตรวจสอบว่าคุณสมบัติตรงกับ SPRINKLER_TYPES ใดๆ หรือไม่
+                        const autoType = SPRINKLER_TYPES.find(
+                            (st) => {
+                                const radiusMatch = Math.abs(st.radius - s.type.radius) < 0.01;
+                                const pressureMatch = Math.abs(st.pressure - s.type.pressure) < 0.01;
+                                const flowRateMatch = Math.abs(st.flowRate - s.type.flowRate) < 0.01;
+                                
+                                return radiusMatch && pressureMatch && flowRateMatch;
+                            }
+                        );
+                        
+                        return !!autoType;
+                    };
+                    
+                    const baseColor = getManualSprinklerColor(
+                        sprinkler,
+                        gardenData.sprinklers || [],
+                        isAutoSprinkler,
+                        isMatchingAutoSprinkler
+                    );
+
                     ctx.save();
 
+                    // วาดเป็นวงกลมเหมือนหน้า planner
+                    const radius = 6 * Math.max(0.5, transform.scale / baseTransform.scale);
+                    
                     ctx.shadowColor = 'rgba(0,0,0,0.8)';
                     ctx.shadowBlur = 3 * Math.max(0.5, transform.scale / baseTransform.scale);
                     ctx.shadowOffsetX = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
                     ctx.shadowOffsetY = 1 * Math.max(0.5, transform.scale / baseTransform.scale);
 
-                    ctx.fillStyle = sprinkler.type.color;
-                    ctx.font = `bold ${12 * Math.max(0.8, transform.scale / baseTransform.scale)}px Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = baseColor;
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2 * Math.max(0.5, transform.scale / baseTransform.scale);
 
+                    ctx.translate(sprinklerPoint.x, sprinklerPoint.y);
                     if (sprinkler.orientation) {
-                        ctx.translate(sprinklerPoint.x, sprinklerPoint.y);
                         ctx.rotate((sprinkler.orientation * Math.PI) / 180);
-                        ctx.fillText(sprinkler.type.icon, 0, 0);
-                        ctx.restore();
-                    } else {
-                        ctx.fillText(sprinkler.type.icon, sprinklerPoint.x, sprinklerPoint.y);
-                        ctx.restore();
                     }
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
                 });
 
                 // Render multiple water sources
@@ -935,6 +978,67 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             return null;
         }
     }, [gardenData]);
+
+    /** แยกหัวฉีดตามสี (เหมือนหน้า planner) พร้อมจำนวนและสเปก */
+    const sprinklerByColor = useMemo(() => {
+        if (!gardenData?.sprinklers?.length) return [];
+
+        const isAutoSprinkler = (s: Sprinkler): boolean =>
+            s.id.includes('_corner_') || s.id.match(/^[^_]+_sprinkler_/) !== null;
+
+        const isMatchingAutoSprinkler = (s: Sprinkler): boolean => {
+            if (isAutoSprinkler(s)) return true;
+            const autoType = SPRINKLER_TYPES.find(
+                (st) =>
+                    Math.abs(st.radius - s.type.radius) < 0.01 &&
+                    Math.abs(st.pressure - s.type.pressure) < 0.01 &&
+                    Math.abs(st.flowRate - s.type.flowRate) < 0.01
+            );
+            return !!autoType;
+        };
+
+        const groups = new Map<
+            string,
+            { color: string; count: number; radius: number; pressure: number; flowRate: number; typeName: string; sprinklerName: string }
+        >();
+
+        gardenData.sprinklers.forEach((sprinkler) => {
+            const color = getManualSprinklerColor(
+                sprinkler,
+                gardenData.sprinklers || [],
+                isAutoSprinkler,
+                isMatchingAutoSprinkler
+            );
+
+            const key = `${color}_${sprinkler.type.radius.toFixed(2)}_${sprinkler.type.pressure.toFixed(2)}_${sprinkler.type.flowRate.toFixed(2)}`;
+            const existing = groups.get(key);
+
+            const matchedType = SPRINKLER_TYPES.find(
+                (st) =>
+                    Math.abs(st.radius - sprinkler.type.radius) < 0.01 &&
+                    Math.abs(st.pressure - sprinkler.type.pressure) < 0.01 &&
+                    Math.abs(st.flowRate - sprinkler.type.flowRate) < 0.01
+            );
+            const typeName = matchedType ? matchedType.nameTH : t('หัวฉีดกำหนดเอง');
+            const sprinklerName = (sprinkler.type.nameTH || sprinkler.type.nameEN || typeName).trim() || typeName;
+
+            if (existing) {
+                existing.count += 1;
+            } else {
+                groups.set(key, {
+                    color,
+                    count: 1,
+                    radius: sprinkler.type.radius,
+                    pressure: sprinkler.type.pressure,
+                    flowRate: sprinkler.type.flowRate,
+                    typeName,
+                    sprinklerName,
+                });
+            }
+        });
+
+        return Array.from(groups.values()).sort((a, b) => b.count - a.count);
+    }, [gardenData, t]);
 
     const mapCenter = useMemo(() => {
         if (!gardenData) return [13.5799071, 100.8325833] as [number, number];
@@ -1451,70 +1555,105 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                     </div>
                                 </div>
 
-                                <div className="rounded-lg bg-gray-700 p-3">
-                                    <div className="mb-1 text-gray-400">{t('ข้อต่อทางแยก')}</div>
-                                    <div className="mt-1 grid grid-cols-2 gap-2">
-                                        <div>
-                                            <div className="text-xs text-gray-500">
-                                                {t('จำนวนรวม')}
-                                            </div>
-                                            <div className="font-bold text-purple-400">
-                                                {statistics.summary.totalJunctions} {t('จุด')}
-                                            </div>
+                                {statistics.summary.connectorSummary && (
+                                    <div className="rounded-lg bg-gray-700 p-3">
+                                        <div className="mb-1 text-gray-400">
+                                            🔗 {t('ข้อต่อที่ต้องใช้')}
                                         </div>
-                                        <div>
-                                            <div className="text-xs text-gray-500">
-                                                {t('แยกตามประเภท')}
-                                            </div>
-                                            <div className="text-xs">
-                                                <div className="text-purple-300">
-                                                    {t('ท่อ')}:{' '}
-                                                    {
-                                                        statistics.summary.junctionStatistics
-                                                            .pipeJunctions
-                                                    }
-                                                </div>
-                                                <div className="text-purple-300">
-                                                    {t('หัวฉีด')}:{' '}
-                                                    {
-                                                        statistics.summary.junctionStatistics
-                                                            .sprinklerJunctions
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {Object.keys(
-                                        statistics.summary.junctionStatistics.junctionsByWays
-                                    ).length > 0 && (
-                                        <div className="mt-2 border-t border-gray-600 pt-2">
-                                            <div className="mb-1 text-xs text-gray-500">
-                                                {t('จำนวนทางแยก:')}
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1 text-xs">
-                                                {Object.entries(
-                                                    statistics.summary.junctionStatistics
-                                                        .junctionsByWays
-                                                ).map(([ways, count]) => (
-                                                    <div key={ways} className="text-purple-300">
-                                                        {ways}-{t('ทาง')}: {count}
+                                        <div className="mt-1 space-y-1.5 text-sm">
+                                            {Object.entries(statistics.summary.connectorSummary.byWays)
+                                                .sort(([a], [b]) => Number(a) - Number(b))
+                                                .map(([ways, count]) => (
+                                                    <div key={ways} className="flex justify-between text-xs">
+                                                        <span className="text-gray-500">
+                                                            {t('ข้อต่อ')} {ways} {t('ทาง')}
+                                                        </span>
+                                                        <span className="font-medium text-orange-400">
+                                                            {count} {t('อัน')}
+                                                        </span>
                                                     </div>
                                                 ))}
-                                            </div>
+                                            {statistics.summary.connectorSummary.straightCouplers > 0 && (
+                                                <div className="flex justify-between border-t border-gray-600 pt-1.5 text-xs">
+                                                    <span className="text-gray-500">{t('ต่อตรง')}</span>
+                                                    <span className="font-medium text-cyan-400">
+                                                        {statistics.summary.connectorSummary.straightCouplers} {t('อัน')}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
+
+                {sprinklerByColor.length > 0 && (
+                    <div className="mt-6 rounded-xl bg-gray-800 p-6">
+                        <h3 className="mb-4 text-lg font-semibold text-blue-400">
+                            🎨 {t('หัวฉีดแยกตามประเภท/สี')}
+                        </h3>
+                        <p className="mb-4 text-sm text-gray-400">
+                            {t('แต่ละสีแสดงจำนวนหัวฉีดและสเปก (รัศมี, แรงดัน, อัตราการไหล)')}
+                        </p>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            {sprinklerByColor.map((group, index) => (
+                                <div
+                                    key={`${group.color}-${group.radius}-${index}`}
+                                    className="rounded-lg border border-gray-600 bg-gray-700 p-4"
+                                >
+                                    <div className="mb-3 flex items-center gap-3">
+                                        <div
+                                            className="h-8 w-8 shrink-0 rounded-full border-2 border-white/30"
+                                            style={{ backgroundColor: group.color }}
+                                            title={group.color}
+                                        />
+                                        <div>
+                                            <div className="font-semibold text-white">
+                                                {t('สี')} #{index + 1}
+                                            </div>
+                                            <div className="text-lg font-bold text-blue-400">
+                                                {group.count} {t('หัว')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5 text-sm">
+                                        <div className="text-gray-400">
+                                            <span className="font-medium text-gray-300">{t('ชื่อสปริงเกอร์')}:</span>{' '}
+                                            <span className="text-white">{group.sprinklerName}</span>
+                                        </div>
+                                        <div className="text-gray-400">
+                                            <span className="font-medium text-gray-300">{t('ประเภท')}:</span>{' '}
+                                            {group.typeName}
+                                        </div>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                            <span className="text-cyan-300">
+                                                {t('รัศมี')}: {group.radius.toFixed(1)} {t('ม.')}
+                                            </span>
+                                            <span className="text-amber-300">
+                                                {t('แรงดัน')}: {group.pressure.toFixed(1)} {t('บาร์')}
+                                            </span>
+                                            <span className="text-emerald-300">
+                                                {t('อัตราการไหล')}: {group.flowRate.toFixed(1)} {t('ล./นาที')}
+                                            </span>
+                                        </div>
+                                        <div className="pt-1 text-xs text-gray-500">
+                                            {t('รวมอัตราการไหล')}: {(group.flowRate * group.count).toFixed(1)} {t('ล./นาที')}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {statistics.zones.length > 0 && (
                     <div className="mt-6 rounded-xl bg-gray-800 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-green-400">
                             📍 {t('ข้อมูลแยกตามโซน')}
                         </h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-4 lg:grid-cols-5">
                             {statistics.zones.map((zone, index) => (
                                 <div key={zone.zoneId} className="rounded-lg bg-gray-700 p-4">
                                     <div className="mb-3 flex items-center justify-between">
@@ -1542,68 +1681,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 {zone.sprinklerCount} {t('ตัว')}
                                             </span>
                                         </div>
-                                        {zone.sprinklerCount > 0 && (
-                                            <>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        {t('ประเภทหัวฉีด:')}
-                                                    </span>
-                                                    <div className="text-right">
-                                                        {zone.sprinklerTypes.length > 0 ? (
-                                                            <div className="text-xs">
-                                                                {zone.sprinklerTypes.map(
-                                                                    (type, idx) => (
-                                                                        <div
-                                                                            key={idx}
-                                                                            className="font-medium text-cyan-400"
-                                                                        >
-                                                                            {type}
-                                                                        </div>
-                                                                    )
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="font-medium text-gray-500">
-                                                                -
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        {t('รัศมี:')}
-                                                    </span>
-                                                    <span className="font-medium text-cyan-400">
-                                                        {zone.sprinklerRadius > 0
-                                                            ? `${zone.sprinklerRadius.toFixed(1)} ${t('ม.')}`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        {t('แรงดัน:')}
-                                                    </span>
-                                                    <span className="font-medium text-cyan-400">
-                                                        {zone.sprinklerPressure > 0
-                                                            ? `${zone.sprinklerPressure.toFixed(1)} ${t('บาร์')}`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">
-                                                        {t('อัตราการไหลหัวฉีด:')}
-                                                    </span>
-                                                    <span className="font-medium text-cyan-400">
-                                                        {zone.sprinklerFlowRate > 0
-                                                            ? `${zone.sprinklerFlowRate.toFixed(1)} ${t('ล./นาที')}`
-                                                            : '-'}
-                                                    </span>
-                                                </div>
-                                            </>
-                                        )}
 
                                         {zone.totalPipeLength > 0 && (
                                             <div className="border-t border-gray-600 pt-2">

@@ -132,7 +132,7 @@ const getZoneAreaDataForZone = (
     }
 };
 
-import { calculatePipeRolls } from '../utils/calculations';
+import { calculatePipeRolls, getPipeLengthM, getPipePrice } from '../utils/calculations';
 
 interface QuotationItem {
     id: string;
@@ -763,8 +763,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         const initialItems: QuotationItem[] = [];
         let seq = 1;
 
+        // ใช้หลายโซนเมื่อมีมากกว่า 1 โซน (ให้ตรงกับ CostSummary ไม่ว่าโหมดไหน)
         const isMultiZone =
-            projectData?.useZones && projectData.zones && projectData.zones.length > 1;
+            (projectData?.useZones && projectData.zones && projectData.zones.length > 1) ||
+            (projectMode === 'garden' && (gardenStats?.zones?.length ?? 0) > 1) ||
+            (projectMode === 'field-crop' && (fieldCropData?.zones?.info?.length ?? 0) > 1);
 
         const isGreenhouseMode = projectMode === 'greenhouse' && greenhouseData;
         const isGreenhouseMultiPlot =
@@ -839,9 +842,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             seq: seq++,
                             image: branchPipe.image_url || branchPipe.image || '',
                             date: '',
-                            description: `${branchPipe.productCode || branchPipe.product_code || ''} - ท่อย่อย ${branchPipe.pipeType || ''} ${branchPipe.sizeMM || ''}mm ยาว ${branchPipe.lengthM || ''} ม./ม้วน`,
+                            description: `${branchPipe.productCode || branchPipe.product_code || ''} - ท่อย่อย ${branchPipe.pipeType || ''} ${branchPipe.sizeMM || ''}mm ยาว ${getPipeLengthM(branchPipe) || 100} ม./ม้วน`,
                             quantity: rolls,
-                            unitPrice: branchPipe.price || 0,
+                            unitPrice: getPipePrice(branchPipe),
                             discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: branchPipe,
@@ -859,10 +862,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 initialItems.push(item);
             }
         } else if (isMultiZone) {
-            // ใช้ zoneSprinklers โดยตรง (เพราะ zone IDs อาจไม่ตรงกัน)
             const equipmentMap = new Map();
 
-            // คำนวณ totalTrees จาก zoneInputs
             const totalTreesInAllZones =
                 Object.values(zoneInputs || {}).reduce(
                     (sum: number, input: any) => sum + (input.totalTrees || 0),
@@ -871,53 +872,89 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 results?.totalSprinklers ||
                 0;
 
-            // วนลูป zoneSprinklers โดยตรง (เหมือน CostSummary.tsx)
-            Object.keys(zoneSprinklers || {}).forEach((zoneId) => {
+            // รายการ zone IDs ให้ตรงกับ CostSummary: garden ใช้ gardenStats.zones, อื่นใช้ zoneSprinklers/zoneInputs/selectedPipes
+            const multiZoneIds =
+                projectMode === 'garden' && gardenStats?.zones?.length
+                    ? gardenStats.zones.map((z: any) => z.zoneId)
+                    : Array.from(
+                          new Set([
+                              ...Object.keys(zoneSprinklers || {}),
+                              ...Object.keys(zoneInputs || {}),
+                              ...Object.keys(selectedPipes || {}),
+                          ])
+                      ).filter((id) => id && id !== 'unknown');
+
+            multiZoneIds.forEach((zoneId) => {
                 const zoneSprinkler = zoneSprinklers[zoneId];
                 const zoneInput = zoneInputs[zoneId];
                 const zonePipes = selectedPipes[zoneId] || {};
 
-                if (zoneSprinkler) {
+                // โหมด garden: ใช้เฉพาะ gardenData.sprinklers + analyzedSprinklers (ราคาให้ตรงกับ CostSummary)
+                if (projectMode === 'garden' && gardenData?.sprinklers && results?.analyzedSprinklers) {
+                    const zoneSprinklersFromPlanner = gardenData.sprinklers.filter((s: any) => s.zoneId === zoneId);
+                    const sprinklersByType = new Map<string, { type: any; count: number }>();
+                    zoneSprinklersFromPlanner.forEach((s: any) => {
+                        const key = (s.type?.nameTH || s.type?.nameEN || 'Sprinkler');
+                        const existing = sprinklersByType.get(key);
+                        if (existing) existing.count += 1;
+                        else sprinklersByType.set(key, { type: s.type, count: 1 });
+                    });
+                    sprinklersByType.forEach(({ type, count }) => {
+                        const matchingEquipment = results.analyzedSprinklers.find((eq: any) => {
+                            const eqName = eq.name || '';
+                            const typeName = type?.nameTH || type?.nameEN || '';
+                            return eqName === typeName ||
+                                (Math.abs((eq.waterVolumeLitersPerMinute || 0) - (type?.flowRate ?? 0)) < 0.5 &&
+                                    Math.abs((eq.pressureBar || 0) - (type?.pressure ?? 0)) < 0.5);
+                        });
+                        if (matchingEquipment) {
+                            const sprinklerKey = `sprinkler_${matchingEquipment.id}`;
+                            if (equipmentMap.has(sprinklerKey)) {
+                                const existing = equipmentMap.get(sprinklerKey);
+                                existing.quantity += count;
+                                if (zoneId && !existing.zones.includes(zoneId)) existing.zones.push(zoneId);
+                            } else {
+                                equipmentMap.set(sprinklerKey, {
+                                    id: sprinklerKey,
+                                    seq: seq++,
+                                    image: matchingEquipment.image_url || matchingEquipment.image || '',
+                                    date: '',
+                                    description: `${matchingEquipment.productCode || matchingEquipment.product_code || ''} - ${matchingEquipment.name || 'สปริงเกอร์'} (${matchingEquipment.brand || ''})`,
+                                    quantity: count,
+                                    unitPrice: matchingEquipment.price || 0,
+                                    discount: 0.0,
+                                    taxes: 'Output\nVAT\n7%',
+                                    originalData: matchingEquipment,
+                                    zones: [zoneId],
+                                });
+                            }
+                        }
+                    });
+                } else if (zoneSprinkler) {
                     let sprinklerQuantity = 0;
-
-                    // ใช้ zoneInput.totalTrees ก่อน
-                    if (zoneInput) {
-                        sprinklerQuantity = zoneInput.totalTrees || 0;
-                    }
-
-                    // สำหรับ horticulture mode ให้คูณด้วย sprinklersPerTree (เหมือน CostSummary.tsx)
+                    if (zoneInput) sprinklerQuantity = zoneInput.totalTrees || 0;
                     if (projectMode === 'horticulture' && sprinklerQuantity > 0) {
                         const config = loadSprinklerConfig();
-                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                        sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
+                        sprinklerQuantity = sprinklerQuantity * (config?.sprinklersPerTree || 1);
                     }
-
-                    // ถ้ายังไม่มี ให้ใช้ results.totalSprinklers แบ่งตามจำนวน zones
                     if (sprinklerQuantity === 0 && results) {
-                        const zoneCount = Object.keys(zoneSprinklers || {}).length;
+                        const zoneCount = Math.max(multiZoneIds.length, 1);
                         sprinklerQuantity = Math.ceil((results.totalSprinklers || 0) / zoneCount);
                         if (projectMode === 'horticulture' && sprinklerQuantity > 0) {
                             const config = loadSprinklerConfig();
-                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                            sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
+                            sprinklerQuantity = sprinklerQuantity * (config?.sprinklersPerTree || 1);
                         }
                     }
-
                     const sprinklerKey = `sprinkler_${zoneSprinkler.id}`;
                     if (equipmentMap.has(sprinklerKey)) {
                         const existing = equipmentMap.get(sprinklerKey);
                         existing.quantity += sprinklerQuantity || 1;
-                        if (zoneId && !existing.zones.includes(zoneId)) {
-                            existing.zones.push(zoneId);
-                        }
+                        if (zoneId && !existing.zones.includes(zoneId)) existing.zones.push(zoneId);
                     } else {
                         equipmentMap.set(sprinklerKey, {
                             id: sprinklerKey,
                             seq: seq++,
-                            image:
-                                (zoneSprinkler as any).image_url ||
-                                (zoneSprinkler as any).image ||
-                                '',
+                            image: (zoneSprinkler as any).image_url || (zoneSprinkler as any).image || '',
                             date: '',
                             description: `${(zoneSprinkler as any).productCode || (zoneSprinkler as any).product_code || ''} - ${(zoneSprinkler as any).name || 'สปริงเกอร์'} (${(zoneSprinkler as any).brand || ''})`,
                             quantity: sprinklerQuantity || 1,
@@ -930,16 +967,23 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     }
                 }
 
-                // จัดการ pipes - ใช้วิธีเดียวกับ CostSummary.tsx
+                // จัดการ pipes - ใช้วิธีเดียวกับ CostSummary.tsx (ราคา/ความยาวจาก getPipePrice/getPipeLengthM)
                 const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
-                if (branchPipe && zoneInput && zoneInput.totalBranchPipeM > 0) {
+                const branchLength =
+                    projectMode === 'garden' && gardenStats?.zones
+                        ? (zoneInput && Number(zoneInput.totalBranchPipeM) > 0
+                              ? Number(zoneInput.totalBranchPipeM)
+                              : (gardenStats.zones.find((z: any) => z.zoneId === zoneId)?.totalPipeLength ?? 0))
+                        : (zoneInput ? Number(zoneInput.totalBranchPipeM) || 0 : 0);
+                if (branchPipe && branchLength > 0) {
                     const pipeKey = `branch_${branchPipe.id}`;
 
                     // คำนวณ extraLength (เหมือน CostSummary.tsx)
                     let extraLength = 0;
                     if (
-                        zoneInput.extraPipePerSprinkler &&
-                        zoneInput.extraPipePerSprinkler.pipeId === branchPipe.id &&
+                        zoneInput?.extraPipePerSprinkler &&
+                        (zoneInput.extraPipePerSprinkler.pipeId === branchPipe.id ||
+                            zoneInput.extraPipePerSprinkler.pipeId === branchPipe.productCode) &&
                         zoneInput.extraPipePerSprinkler.lengthPerHead > 0
                     ) {
                         const sprinklerCount = zoneInput.totalTrees || 0;
@@ -956,9 +1000,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         }
                     }
 
-                    // ใช้ totalLength + extraLength แล้วคำนวณ rolls (เหมือน CostSummary.tsx)
-                    const totalLength = zoneInput.totalBranchPipeM + extraLength;
-                    const rolls = calculatePipeRolls(totalLength, branchPipe.lengthM || 100);
+                    const totalLength = branchLength + extraLength;
+                    const lenM = getPipeLengthM(branchPipe) || 100;
+                    const rolls = calculatePipeRolls(totalLength, lenM);
 
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);
@@ -972,9 +1016,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             seq: seq++,
                             image: (branchPipe as any).image_url || (branchPipe as any).image || '',
                             date: '',
-                            description: `${(branchPipe as any).productCode || (branchPipe as any).product_code || ''} - ท่อย่อย ${(branchPipe as any).pipeType || ''} ${(branchPipe as any).sizeMM || ''}mm ยาว ${(branchPipe as any).lengthM || ''} ม./ม้วน`,
+                            description: `${(branchPipe as any).productCode || (branchPipe as any).product_code || ''} - ท่อย่อย ${(branchPipe as any).pipeType || ''} ${(branchPipe as any).sizeMM || ''}mm ยาว ${lenM} ม./ม้วน`,
                             quantity: rolls,
-                            unitPrice: (branchPipe as any).price || 0,
+                            unitPrice: getPipePrice(branchPipe),
                             discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: branchPipe,
@@ -1013,9 +1057,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         }
                     }
 
-                    // ใช้ totalLength + extraLength แล้วคำนวณ rolls (เหมือน CostSummary.tsx)
                     const totalLength = zoneInput.totalSecondaryPipeM + extraLength;
-                    const rolls = calculatePipeRolls(totalLength, secondaryPipe.lengthM || 100);
+                    const lenM = getPipeLengthM(secondaryPipe) || 100;
+                    const rolls = calculatePipeRolls(totalLength, lenM);
 
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);
@@ -1032,9 +1076,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 (secondaryPipe as any).image ||
                                 '',
                             date: '',
-                            description: `${(secondaryPipe as any).productCode || (secondaryPipe as any).product_code || ''} - ท่อรอง ${(secondaryPipe as any).pipeType || ''} ${(secondaryPipe as any).sizeMM || ''}mm ยาว ${(secondaryPipe as any).lengthM || ''} ม./ม้วน`,
+                            description: `${(secondaryPipe as any).productCode || (secondaryPipe as any).product_code || ''} - ท่อรอง ${(secondaryPipe as any).pipeType || ''} ${(secondaryPipe as any).sizeMM || ''}mm ยาว ${lenM} ม./ม้วน`,
                             quantity: rolls,
-                            unitPrice: (secondaryPipe as any).price || 0,
+                            unitPrice: getPipePrice(secondaryPipe),
                             discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: secondaryPipe,
@@ -1073,9 +1117,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         }
                     }
 
-                    // ใช้ totalLength + extraLength แล้วคำนวณ rolls (เหมือน CostSummary.tsx)
                     const totalLength = zoneInput.totalMainPipeM + extraLength;
-                    const rolls = calculatePipeRolls(totalLength, mainPipe.lengthM || 100);
+                    const lenM = getPipeLengthM(mainPipe) || 100;
+                    const rolls = calculatePipeRolls(totalLength, lenM);
 
                     if (equipmentMap.has(pipeKey)) {
                         const existing = equipmentMap.get(pipeKey);
@@ -1089,9 +1133,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             seq: seq++,
                             image: (mainPipe as any).image_url || (mainPipe as any).image || '',
                             date: '',
-                            description: `${(mainPipe as any).productCode || (mainPipe as any).product_code || ''} - ท่อหลัก ${(mainPipe as any).pipeType || ''} ${(mainPipe as any).sizeMM || ''}mm ยาว ${(mainPipe as any).lengthM || ''} ม./ม้วน`,
+                            description: `${(mainPipe as any).productCode || (mainPipe as any).product_code || ''} - ท่อหลัก ${(mainPipe as any).pipeType || ''} ${(mainPipe as any).sizeMM || ''}mm ยาว ${lenM} ม./ม้วน`,
                             quantity: rolls,
-                            unitPrice: (mainPipe as any).price || 0,
+                            unitPrice: getPipePrice(mainPipe),
                             discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: mainPipe,
@@ -1116,38 +1160,69 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 initialItems.push(item);
             }
         } else {
-            // สำหรับ single zone - ใช้ logic เดียวกับ CostSummary.tsx บรรทัด 932-960
-            // ตรวจสอบ zoneSprinklers ก่อน (เหมือน CostSummary.tsx)
-            Object.keys(zoneSprinklers || {}).forEach((zoneId) => {
-                const zoneSprinkler = zoneSprinklers[zoneId];
-                const zoneInput = zoneInputs[zoneId];
-
-                if (zoneSprinkler && zoneInput) {
-                    let sprinklerQuantity = zoneInput.totalTrees || results.totalSprinklers || 0;
-                    if (projectMode === 'horticulture') {
-                        const config = loadSprinklerConfig();
-                        const sprinklersPerTree = config?.sprinklersPerTree || 1;
-                        sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
-                    }
-
-                    if (sprinklerQuantity > 0) {
+            // Single zone - ให้ราคาหัวฉีดตรงกับ CostSummary (โหมด garden ใช้ gardenData.sprinklers + analyzedSprinklers)
+            if (projectMode === 'garden' && gardenData?.sprinklers && results?.analyzedSprinklers) {
+                const sprinklersByType = new Map<string, { type: any; count: number }>();
+                (gardenData.sprinklers || []).forEach((s: any) => {
+                    const key = (s.type?.nameTH || s.type?.nameEN || 'Sprinkler');
+                    const existing = sprinklersByType.get(key);
+                    if (existing) existing.count += 1;
+                    else sprinklersByType.set(key, { type: s.type, count: 1 });
+                });
+                sprinklersByType.forEach(({ type, count }) => {
+                    const matchingEquipment = results.analyzedSprinklers.find((eq: any) => {
+                        const eqName = eq.name || '';
+                        const typeName = type?.nameTH || type?.nameEN || '';
+                        return eqName === typeName ||
+                            (Math.abs((eq.waterVolumeLitersPerMinute || 0) - (type?.flowRate ?? 0)) < 0.5 &&
+                                Math.abs((eq.pressureBar || 0) - (type?.pressure ?? 0)) < 0.5);
+                    });
+                    if (matchingEquipment && count > 0) {
                         initialItems.push({
-                            id: `sprinkler_${zoneSprinkler.id}`,
+                            id: `sprinkler_${matchingEquipment.id}`,
                             seq: seq++,
-                            image:
-                                (zoneSprinkler as any).image_url ||
-                                (zoneSprinkler as any).image ||
-                                '',
+                            image: matchingEquipment.image_url || matchingEquipment.image || '',
                             date: '',
-                            description: `${(zoneSprinkler as any).productCode || (zoneSprinkler as any).product_code || ''} - ${(zoneSprinkler as any).name || 'สปริงเกอร์'} (${(zoneSprinkler as any).brand || ''})`,
-                            quantity: sprinklerQuantity,
-                            unitPrice: (zoneSprinkler as any).price || 0,
+                            description: `${matchingEquipment.productCode || matchingEquipment.product_code || ''} - ${matchingEquipment.name || 'สปริงเกอร์'} (${matchingEquipment.brand || ''})`,
+                            quantity: count,
+                            unitPrice: matchingEquipment.price || 0,
                             discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
-                            originalData: zoneSprinkler,
+                            originalData: matchingEquipment,
                         });
                     }
-                } else if (zoneSprinkler) {
+                });
+            } else {
+                Object.keys(zoneSprinklers || {}).forEach((zoneId) => {
+                    const zoneSprinkler = zoneSprinklers[zoneId];
+                    const zoneInput = zoneInputs[zoneId];
+
+                    if (zoneSprinkler && zoneInput) {
+                        let sprinklerQuantity = zoneInput.totalTrees || results.totalSprinklers || 0;
+                        if (projectMode === 'horticulture') {
+                            const config = loadSprinklerConfig();
+                            const sprinklersPerTree = config?.sprinklersPerTree || 1;
+                            sprinklerQuantity = sprinklerQuantity * sprinklersPerTree;
+                        }
+
+                        if (sprinklerQuantity > 0) {
+                            initialItems.push({
+                                id: `sprinkler_${zoneSprinkler.id}`,
+                                seq: seq++,
+                                image:
+                                    (zoneSprinkler as any).image_url ||
+                                    (zoneSprinkler as any).image ||
+                                    '',
+                                date: '',
+                                description: `${(zoneSprinkler as any).productCode || (zoneSprinkler as any).product_code || ''} - ${(zoneSprinkler as any).name || 'สปริงเกอร์'} (${(zoneSprinkler as any).brand || ''})`,
+                                quantity: sprinklerQuantity,
+                                unitPrice: (zoneSprinkler as any).price || 0,
+                                discount: 0.0,
+                                taxes: 'Output\nVAT\n7%',
+                                originalData: zoneSprinkler,
+                            });
+                        }
+                    } else if (zoneSprinkler) {
                     // ถ้ามี zoneSprinkler แต่ไม่มี zoneInput ให้แสดงด้วย (fallback)
                     let sprinklerQuantity = results?.totalSprinklers || 0;
                     if (projectMode === 'horticulture' && sprinklerQuantity > 0) {
@@ -1179,6 +1254,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     });
                 }
             });
+            }
 
             // ถ้ายังไม่มี sprinkler ให้ลองใช้ zoneSprinklers โดยไม่ต้องมี zoneInput
             const hasSprinkler = initialItems.some((item) => item.id.startsWith('sprinkler_'));
@@ -1256,23 +1332,28 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 }
             }
 
-            // สำหรับ single zone - ใช้ zoneInput ถ้ามี (เหมือน CostSummary.tsx บรรทัด 962-1037)
-            // หา zoneInput สำหรับ single zone
+            // สำหรับ single zone - ใช้ zoneInput ถ้ามี (ให้ตรงกับ CostSummary รวมทั้งหมด)
             const singleZoneInput =
                 Object.values(zoneInputs || {})[0] ||
                 (Object.keys(zoneInputs || {}).length > 0
                     ? zoneInputs[Object.keys(zoneInputs || {})[0]]
                     : null);
 
-            if (selectedBranchPipe && results) {
+            // ใช้ท่อที่เลือกหรือ auto-selected เหมือน CostSummary เพื่อให้ Subtotal ตรงกับ รวมทั้งหมด
+            const effectiveBranchPipe = selectedBranchPipe || results?.autoSelectedBranchPipe;
+            const effectiveSecondaryPipe = selectedSecondaryPipe || results?.autoSelectedSecondaryPipe;
+            const effectiveMainPipe = selectedMainPipe || results?.autoSelectedMainPipe;
+            const effectiveEmitterPipe = selectedEmitterPipe || results?.autoSelectedEmitterPipe;
+
+            if (effectiveBranchPipe && results) {
                 let quantity = results.branchPipeRolls || 0;
 
-                // ใช้ zoneInput.totalBranchPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
-                if (singleZoneInput && singleZoneInput.totalBranchPipeM > 0) {
+                if (singleZoneInput && Number(singleZoneInput.totalBranchPipeM) > 0) {
                     let extraLength = 0;
                     if (
                         singleZoneInput.extraPipePerSprinkler &&
-                        singleZoneInput.extraPipePerSprinkler.pipeId === selectedBranchPipe.id &&
+                        (singleZoneInput.extraPipePerSprinkler.pipeId === effectiveBranchPipe.id ||
+                            singleZoneInput.extraPipePerSprinkler.pipeId === effectiveBranchPipe.productCode) &&
                         singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
                     ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
@@ -1289,33 +1370,33 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    const totalLength = singleZoneInput.totalBranchPipeM + extraLength;
-                    quantity = calculatePipeRolls(totalLength, selectedBranchPipe.lengthM || 100);
+                    const totalLength = Number(singleZoneInput.totalBranchPipeM) + extraLength;
+                    quantity = calculatePipeRolls(totalLength, getPipeLengthM(effectiveBranchPipe) || 100);
                 }
 
                 initialItems.push({
                     id: 'branchPipe',
                     seq: seq++,
-                    image: selectedBranchPipe.image_url || selectedBranchPipe.image || '',
+                    image: effectiveBranchPipe.image_url || effectiveBranchPipe.image || '',
                     date: '',
-                    description: `${selectedBranchPipe.productCode || selectedBranchPipe.product_code || ''} - ท่อย่อย ${selectedBranchPipe.pipeType || ''} ${selectedBranchPipe.sizeMM || ''}mm ยาว ${selectedBranchPipe.lengthM || ''} ม./ม้วน`,
+                    description: `${effectiveBranchPipe.productCode || effectiveBranchPipe.product_code || ''} - ท่อย่อย ${effectiveBranchPipe.pipeType || ''} ${effectiveBranchPipe.sizeMM || ''}mm ยาว ${getPipeLengthM(effectiveBranchPipe) || 100} ม./ม้วน`,
                     quantity: quantity,
-                    unitPrice: selectedBranchPipe.price || 0,
+                    unitPrice: getPipePrice(effectiveBranchPipe),
                     discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
-                    originalData: selectedBranchPipe,
+                    originalData: effectiveBranchPipe,
                 });
             }
 
-            if (selectedSecondaryPipe && results) {
+            if (effectiveSecondaryPipe && results) {
                 let quantity = results.secondaryPipeRolls || 0;
 
-                // ใช้ zoneInput.totalSecondaryPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
-                if (singleZoneInput && singleZoneInput.totalSecondaryPipeM > 0) {
+                if (singleZoneInput && Number(singleZoneInput.totalSecondaryPipeM) > 0) {
                     let extraLength = 0;
                     if (
                         singleZoneInput.extraPipePerSprinkler &&
-                        singleZoneInput.extraPipePerSprinkler.pipeId === selectedSecondaryPipe.id &&
+                        (singleZoneInput.extraPipePerSprinkler.pipeId === effectiveSecondaryPipe.id ||
+                            singleZoneInput.extraPipePerSprinkler.pipeId === effectiveSecondaryPipe.productCode) &&
                         singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
                     ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
@@ -1332,36 +1413,36 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    const totalLength = singleZoneInput.totalSecondaryPipeM + extraLength;
+                    const totalLength = Number(singleZoneInput.totalSecondaryPipeM) + extraLength;
                     quantity = calculatePipeRolls(
                         totalLength,
-                        selectedSecondaryPipe.lengthM || 100
+                        getPipeLengthM(effectiveSecondaryPipe) || 100
                     );
                 }
 
                 initialItems.push({
                     id: 'secondaryPipe',
                     seq: seq++,
-                    image: selectedSecondaryPipe.image_url || selectedSecondaryPipe.image || '',
+                    image: effectiveSecondaryPipe.image_url || effectiveSecondaryPipe.image || '',
                     date: '',
-                    description: `${selectedSecondaryPipe.productCode || selectedSecondaryPipe.product_code || ''} - ท่อรอง ${selectedSecondaryPipe.pipeType || ''} ${selectedSecondaryPipe.sizeMM || ''}mm ยาว ${selectedSecondaryPipe.lengthM || ''} ม./ม้วน`,
+                    description: `${effectiveSecondaryPipe.productCode || effectiveSecondaryPipe.product_code || ''} - ท่อรอง ${effectiveSecondaryPipe.pipeType || ''} ${effectiveSecondaryPipe.sizeMM || ''}mm ยาว ${getPipeLengthM(effectiveSecondaryPipe) || 100} ม./ม้วน`,
                     quantity: quantity,
-                    unitPrice: selectedSecondaryPipe.price || 0,
+                    unitPrice: getPipePrice(effectiveSecondaryPipe),
                     discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
-                    originalData: selectedSecondaryPipe,
+                    originalData: effectiveSecondaryPipe,
                 });
             }
 
-            if (selectedMainPipe && results) {
+            if (effectiveMainPipe && results) {
                 let quantity = results.mainPipeRolls || 0;
 
-                // ใช้ zoneInput.totalMainPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
-                if (singleZoneInput && singleZoneInput.totalMainPipeM > 0) {
+                if (singleZoneInput && Number(singleZoneInput.totalMainPipeM) > 0) {
                     let extraLength = 0;
                     if (
                         singleZoneInput.extraPipePerSprinkler &&
-                        singleZoneInput.extraPipePerSprinkler.pipeId === selectedMainPipe.id &&
+                        (singleZoneInput.extraPipePerSprinkler.pipeId === effectiveMainPipe.id ||
+                            singleZoneInput.extraPipePerSprinkler.pipeId === effectiveMainPipe.productCode) &&
                         singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
                     ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
@@ -1378,37 +1459,33 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    const totalLength = singleZoneInput.totalMainPipeM + extraLength;
-                    quantity = calculatePipeRolls(totalLength, selectedMainPipe.lengthM || 100);
+                    const totalLength = Number(singleZoneInput.totalMainPipeM) + extraLength;
+                    quantity = calculatePipeRolls(totalLength, getPipeLengthM(effectiveMainPipe) || 100);
                 }
 
                 initialItems.push({
                     id: 'mainPipe',
                     seq: seq++,
-                    image: selectedMainPipe.image_url || selectedMainPipe.image || '',
+                    image: effectiveMainPipe.image_url || effectiveMainPipe.image || '',
                     date: '',
-                    description: `${selectedMainPipe.productCode || selectedMainPipe.product_code || ''} - ท่อหลัก ${selectedMainPipe.pipeType || ''} ${selectedMainPipe.sizeMM || ''}mm ยาว ${selectedMainPipe.lengthM || ''} ม./ม้วน`,
+                    description: `${effectiveMainPipe.productCode || effectiveMainPipe.product_code || ''} - ท่อหลัก ${effectiveMainPipe.pipeType || ''} ${effectiveMainPipe.sizeMM || ''}mm ยาว ${getPipeLengthM(effectiveMainPipe) || 100} ม./ม้วน`,
                     quantity: quantity,
-                    unitPrice: selectedMainPipe.price || 0,
+                    unitPrice: getPipePrice(effectiveMainPipe),
                     discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
-                    originalData: selectedMainPipe,
+                    originalData: effectiveMainPipe,
                 });
             }
 
-            if (selectedEmitterPipe && results) {
+            if (effectiveEmitterPipe && results) {
                 let quantity = results.emitterPipeRolls || 0;
 
-                // ใช้ zoneInput.totalEmitterPipeM + extraLength ถ้ามี (เหมือน CostSummary.tsx)
-                if (
-                    singleZoneInput &&
-                    singleZoneInput.totalEmitterPipeM &&
-                    singleZoneInput.totalEmitterPipeM > 0
-                ) {
+                if (singleZoneInput && Number(singleZoneInput.totalEmitterPipeM) > 0) {
                     let extraLength = 0;
                     if (
                         singleZoneInput.extraPipePerSprinkler &&
-                        singleZoneInput.extraPipePerSprinkler.pipeId === selectedEmitterPipe.id &&
+                        (singleZoneInput.extraPipePerSprinkler.pipeId === effectiveEmitterPipe.id ||
+                            singleZoneInput.extraPipePerSprinkler.pipeId === effectiveEmitterPipe.productCode) &&
                         singleZoneInput.extraPipePerSprinkler.lengthPerHead > 0
                     ) {
                         const sprinklerCount = singleZoneInput.totalTrees || 0;
@@ -1425,42 +1502,43 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 singleZoneInput.extraPipePerSprinkler.lengthPerHead;
                         }
                     }
-                    const totalLength = singleZoneInput.totalEmitterPipeM + extraLength;
-                    quantity = calculatePipeRolls(totalLength, selectedEmitterPipe.lengthM || 100);
+                    const totalLength = Number(singleZoneInput.totalEmitterPipeM) + extraLength;
+                    quantity = calculatePipeRolls(totalLength, getPipeLengthM(effectiveEmitterPipe) || 100);
                 }
 
                 initialItems.push({
                     id: 'emitterPipe',
                     seq: seq++,
-                    image: selectedEmitterPipe.image_url || selectedEmitterPipe.image || '',
+                    image: effectiveEmitterPipe.image_url || effectiveEmitterPipe.image || '',
                     date: '',
-                    description: `${selectedEmitterPipe.productCode || selectedEmitterPipe.product_code || ''} - ท่อย่อยแยก ${selectedEmitterPipe.pipeType || ''} ${selectedEmitterPipe.sizeMM || ''}mm ยาว ${selectedEmitterPipe.lengthM || ''} ม./ม้วน`,
+                    description: `${effectiveEmitterPipe.productCode || effectiveEmitterPipe.product_code || ''} - ท่อย่อยแยก ${effectiveEmitterPipe.pipeType || ''} ${effectiveEmitterPipe.sizeMM || ''}mm ยาว ${getPipeLengthM(effectiveEmitterPipe) || 100} ม./ม้วน`,
                     quantity: quantity,
-                    unitPrice: selectedEmitterPipe.price || 0,
+                    unitPrice: getPipePrice(effectiveEmitterPipe),
                     discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
-                    originalData: selectedEmitterPipe,
+                    originalData: effectiveEmitterPipe,
                 });
             }
         }
 
-        if (selectedPump && results && showPump) {
-            const pumpDescription = `${selectedPump.productCode || selectedPump.product_code || ''} - ${selectedPump.name || ''} ${selectedPump.powerHP || ''}HP ${selectedPump.phase || ''}เฟส (${selectedPump.brand || ''})`;
+        const effectivePump = selectedPump || results?.autoSelectedPump;
+        if (effectivePump && results && showPump) {
+            const pumpDescription = `${effectivePump.productCode || effectivePump.product_code || ''} - ${effectivePump.name || ''} ${effectivePump.powerHP || ''}HP ${effectivePump.phase || ''}เฟส (${effectivePump.brand || ''})`;
 
             initialItems.push({
                 id: 'pump',
                 seq: seq++,
-                image: selectedPump.image_url || selectedPump.image || '',
+                image: effectivePump.image_url || effectivePump.image || '',
                 date: '',
                 description: pumpDescription,
                 quantity: 1,
-                unitPrice: selectedPump.price || 0,
+                unitPrice: effectivePump.price || 0,
                 discount: 0.0,
                 taxes: 'Output\nVAT\n7%',
-                originalData: selectedPump,
+                originalData: effectivePump,
             });
 
-            const accessories: PumpAccessory[] = selectedPump.pumpAccessories || selectedPump.pumpAccessory || [];
+            const accessories: PumpAccessory[] = effectivePump.pumpAccessories || effectivePump.pumpAccessory || [];
 
             if (accessories && accessories.length > 0) {
                 // ดึง selectedGroupId จาก localStorage (เหมือนกับ PumpSelector.tsx)
@@ -1475,7 +1553,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 };
                 
                 // ดึง selectedGroupId จาก localStorage
-                const selectedGroupId = getStoredSelectedGroupId(selectedPump.id);
+                const selectedGroupId = getStoredSelectedGroupId(effectivePump.id);
                 
                 accessories
                     .sort(
@@ -1551,16 +1629,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
 
         if (selectedExtraPipe && selectedExtraPipe.pipe) {
+            const lenM = getPipeLengthM(selectedExtraPipe.pipe) || 1;
+            const quantity = lenM > 0 ? calculatePipeRolls(selectedExtraPipe.totalLength, lenM) : 0;
             initialItems.push({
                 id: 'extraPipe',
                 seq: seq++,
                 image: selectedExtraPipe.pipe.image_url || selectedExtraPipe.pipe.image || '',
                 date: '',
-                description: `${selectedExtraPipe.pipe.productCode || selectedExtraPipe.pipe.product_code || ''} - ท่อเสริม (Riser/แขนง) ${selectedExtraPipe.pipe.sizeMM || ''}mm ยาว ${selectedExtraPipe.pipe.lengthM || ''} ม./ม้วน`,
-                quantity: Math.ceil(
-                    selectedExtraPipe.totalLength / (selectedExtraPipe.pipe.lengthM || 1)
-                ),
-                unitPrice: selectedExtraPipe.pipe.price || 0,
+                description: `${selectedExtraPipe.pipe.productCode || selectedExtraPipe.pipe.product_code || ''} - ท่อเสริม (Riser/แขนง) ${selectedExtraPipe.pipe.sizeMM || ''}mm ยาว ${lenM} ม./ม้วน`,
+                quantity,
+                unitPrice: getPipePrice(selectedExtraPipe.pipe),
                 discount: 0.0,
                 taxes: 'Output\nVAT\n7%',
                 originalData: selectedExtraPipe.pipe,
@@ -1580,7 +1658,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 if (projectMode === 'garden' && gardenStats) {
                     const zone = gardenStats.zones.find((z: any) => z.zoneId === zoneId);
                     if (zone) {
-                        const effectiveZoneId = gardenStats.zones.length === 1 ? 'main-area' : zoneId;
+                        // ⚠️ ใช้ zone.zoneId จริงๆ ไม่ใช้ hardcoded 'main-area'
+                        const effectiveZoneId = zoneId;
                         const zoneInput = zoneInputs[effectiveZoneId];
                         totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
                     }
@@ -1677,6 +1756,60 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             }
         });
 
+        // โหมด garden: อุปกรณ์ข้อต่อที่เลือกจาก GardenConnectorEquipmentsSelector (localStorage)
+        const GARDEN_CONNECTOR_STORAGE_KEY = 'gardenConnectorEquipmentSelections';
+        if (projectMode === 'garden' && gardenStats?.summary?.connectorSummary) {
+            const summary = gardenStats.summary.connectorSummary;
+            const byWays = summary.byWays || {};
+            const straightCouplers = summary.straightCouplers ?? 0;
+            try {
+                const saved = localStorage.getItem(GARDEN_CONNECTOR_STORAGE_KEY);
+                const selections = saved ? JSON.parse(saved) : {};
+                Object.entries(byWays).forEach(([ways, count]) => {
+                    const numCount = Number(count);
+                    if (numCount <= 0) return;
+                    const key = `way-${ways}`;
+                    const sel = selections[key];
+                    const equipment = sel?.equipment;
+                    if (!equipment) return;
+                    const unitPrice = equipment.price ?? equipment.price_per_unit ?? 0;
+                    initialItems.push({
+                        id: `connection_equipment_garden_${key}_${equipment.id ?? key}`,
+                        seq: seq++,
+                        image: equipment.image || '',
+                        date: '',
+                        description: `${t('ข้อต่อ')} ${ways} ${t('ทาง')} - ${equipment.product_code || equipment.productCode || ''} - ${equipment.name || ''} (${equipment.brand || ''})`,
+                        quantity: numCount,
+                        unitPrice: Number(unitPrice) || 0,
+                        discount: 0.0,
+                        taxes: 'Output\nVAT\n7%',
+                        originalData: equipment,
+                    });
+                });
+                if (straightCouplers > 0) {
+                    const sel = selections['straight'];
+                    const equipment = sel?.equipment;
+                    if (equipment) {
+                        const unitPrice = equipment.price ?? equipment.price_per_unit ?? 0;
+                        initialItems.push({
+                            id: `connection_equipment_garden_straight_${equipment.id ?? 'straight'}`,
+                            seq: seq++,
+                            image: equipment.image || '',
+                            date: '',
+                            description: `${t('ต่อตรง')} - ${equipment.product_code || equipment.productCode || ''} - ${equipment.name || ''} (${equipment.brand || ''})`,
+                            quantity: straightCouplers,
+                            unitPrice: Number(unitPrice) || 0,
+                            discount: 0.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: equipment,
+                        });
+                    }
+                }
+            } catch (_) {
+                /* ignore */
+            }
+        }
+
         // เรียงลำดับ items ตาม seq
         const sortedItems = [...initialItems].sort((a, b) => a.seq - b.seq);
         setItems(sortedItems);
@@ -1709,6 +1842,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         fieldCropData,
         projectMode,
         greenhouseData,
+        t,
     ]);
 
     const calculateItemAmount = (item: QuotationItem) => {

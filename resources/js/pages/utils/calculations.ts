@@ -1,6 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/** ดึงราคาท่อ (รองรับทั้ง API และ analyzed pipe) — ใช้ร่วมกับ CostSummary และ QuotationDocument ให้ตรงกัน */
+export function getPipePrice(pipe: any): number {
+    if (!pipe) return 0;
+    const v = pipe.price ?? pipe.price_per_roll ?? pipe.price_per_m ?? 0;
+    return Number(v) || 0;
+}
+
+/** ดึงความยาวต่อม้วน (ม.) (รองรับทั้ง API และ analyzed pipe) */
+export function getPipeLengthM(pipe: any): number {
+    if (!pipe) return 0;
+    const v = pipe.lengthM ?? pipe.length_m ?? pipe.length ?? 0;
+    return Number(v) || 0;
+}
+
 export const calculatePipeRolls = (totalLength: number, rollLength: number): number => {
+    if (rollLength <= 0) return 0;
     return Math.ceil(totalLength / rollLength);
 };
 

@@ -14,6 +14,14 @@ import {
     CanvasCoordinate,
 } from './homeGardenData';
 
+/** สรุปข้อต่อที่ต้องใช้: แยกตามจำนวนทาง (กี่ทาง) + ต่อตรง ทุก 6 ม. ในท่อตรง */
+export interface ConnectorCountSummary {
+    /** จำนวนข้อต่อแยกตามทาง เช่น { 2: 5, 3: 3 } = ข้อต่อ 2 ทาง 5 อัน, ข้อต่อ 3 ทาง 3 อัน */
+    byWays: { [ways: number]: number };
+    /** จำนวนต่อตรง (ท่อตรงไม่เลี้ยว ทุก 6 ม. ใช้ 1 อัน เช่น 13 ม. = 2 อัน) */
+    straightCouplers: number;
+}
+
 // Interface สำหรับข้อมูลรวม
 export interface GardenSummary {
     totalArea: number; // พื้นที่รวมทั้งหมด (ตร.ม.)
@@ -26,6 +34,8 @@ export interface GardenSummary {
     totalPipeLengthFormatted: string; // ความยาวท่อรวมทั้งหมด (รูปแบบที่อ่านง่าย)
     totalJunctions: number; // จำนวนข้อต่อทางแยกรวมทั้งหมด
     junctionStatistics: JunctionStatistics; // สถิติข้อต่อทางแยกแยกตามประเภท
+    /** สรุปข้อต่อที่ต้องใช้ (กี่ทาง + ต่อตรง) */
+    connectorSummary: ConnectorCountSummary;
 }
 
 // Interface สำหรับข้อมูลข้อต่อทางแยก
@@ -134,6 +144,19 @@ function calculateSummary(
     // คำนวณสถิติข้อต่อทางแยก
     const junctionStatistics = calculateJunctionStatistics(pipes, sprinklers, scale);
 
+    // สรุปข้อต่อที่ต้องใช้: กี่ทาง (ไม่บอกขนาด) + ต่อตรงทุก 6 ม. เฉพาะช่วงท่อตรงไม่มีหัวฉีด/ไม่มีแยก
+    const straightCouplers = calculateStraightCouplerCount(
+        pipes,
+        junctionStatistics.junctionPoints,
+        sprinklers,
+        1.0,
+        scale
+    );
+    const connectorSummary: ConnectorCountSummary = {
+        byWays: { ...junctionStatistics.junctionsByWays },
+        straightCouplers,
+    };
+
     return {
         totalArea,
         totalAreaFormatted: formatArea(totalArea),
@@ -145,6 +168,7 @@ function calculateSummary(
         totalPipeLengthFormatted: formatDistance(totalPipeLength),
         totalJunctions: junctionStatistics.totalJunctions,
         junctionStatistics,
+        connectorSummary,
     };
 }
 
@@ -459,8 +483,7 @@ export function calculateJunctionStatistics(
         );
 
         if (sprinklerAtPoint) {
-            // หัวฉีดที่อยู่ปลายท่อ (เชื่อมต่อกับท่อเพียงท่อเดียว) ใช้ 2 ทาง
-            // หัวฉีดที่อยู่กลางเส้นทาง (เชื่อมต่อกับท่อมากกว่า 1 ท่อ) บวก 1 ทางเสมอ
+            // จุดเดียว = ข้อต่อ 1 อัน: หัวฉีดปลายท่อ = 2 ทาง, กลางเส้น = จำนวนท่อ + 1 ทาง (ทางแนวตั้งหัวฉีด)
             const ways = connectedPipeIds.length === 1 ? 2 : connectedPipeIds.length + 1;
 
             junctionPoints.push({
@@ -470,16 +493,7 @@ export function calculateJunctionStatistics(
                 sprinklerId: sprinklerAtPoint.id,
                 connectedPipes: connectedPipeIds,
             });
-
-            // ถ้ามีท่อมากกว่า 2 เส้น ให้สร้าง pipe junction เพิ่มเติมด้วย (จุดแยกที่มีหัวฉีดแต่ก็เป็นข้อต่อท่อด้วย)
-            if (connectedPipeIds.length >= 3) {
-                junctionPoints.push({
-                    position: group.position,
-                    ways: connectedPipeIds.length,
-                    type: 'pipe_junction',
-                    connectedPipes: connectedPipeIds,
-                });
-            }
+            // ไม่เพิ่ม pipe_junction แยก — นับเป็นข้อต่อเดียวกับ ways ด้านบน
         } else if (connectedPipeIds.length >= 2 && connectedPipeIds.length <= 6) {
             // จุดที่ไม่มีหัวฉีดแต่มีท่อเชื่อมต่อมากกว่า 1 ท่อ (แต่ไม่เกิน 6 ท่อ)
             // จำกัดจำนวนท่อเพื่อป้องกันข้อต่อ "ปลอม" ที่มีท่อมากเกินไป
@@ -564,6 +578,105 @@ export function calculateJunctionStatistics(
         junctionsByWays,
         junctionPoints,
     };
+}
+
+const STRAIGHT_COUPLER_INTERVAL_M = 6;
+
+/**
+ * ตรวจว่ามีหัวฉีดอยู่บนช่วงท่อ [distFromStartMin, distFromStartMax] หรือไม่ (ใช้กับต่อตรง: ถ้ามีหัวฉีด = ใช้ข้อต่ออื่นแล้ว ไม่นับต่อตรง)
+ */
+function hasSprinklerOnSegment(
+    pipeStart: Coordinate | CanvasCoordinate,
+    pipeEnd: Coordinate | CanvasCoordinate,
+    distMin: number,
+    distMax: number,
+    sprinklers: Sprinkler[],
+    tol: number,
+    scale: number
+): boolean {
+    for (const s of sprinklers) {
+        const pos = s.canvasPosition || s.position;
+        if (!pos) continue;
+        if (!isPointOnLineSegment(pos, pipeStart, pipeEnd, tol, scale)) continue;
+        const dist = calculateDistance(
+            pipeStart,
+            pos,
+            isCanvasCoordinate(pipeStart) ? scale : undefined
+        );
+        if (dist > distMin && dist < distMax) return true;
+    }
+    return false;
+}
+
+/**
+ * นับต่อตรง: เฉพาะท่อที่ตรงยาวอย่างเดียว ไม่มีหัวฉีดและไม่มีทางเลี้ยว/ทางแยกในช่วงนั้น
+ * ทุก 6 ม. ใช้ต่อตรง 1 อัน (เช่น 13 ม. = 2 อัน). ถ้ามีข้อต่ออื่นก่อน (แยก/เลี้ยว/หัวฉีด) = ใช้ข้อต่อนั้นจบ ไม่นับต่อตรงในช่วงนั้น
+ */
+export function calculateStraightCouplerCount(
+    pipes: Pipe[],
+    junctionPoints: JunctionPoint[],
+    sprinklers: Sprinkler[],
+    tolerance: number,
+    scale: number
+): number {
+    let total = 0;
+    const tol = tolerance;
+
+    pipes.forEach((pipe) => {
+        const start = pipe.canvasStart || pipe.start;
+        const end = pipe.canvasEnd || pipe.end;
+        if (!start || !end) return;
+
+        const fullLength =
+            typeof pipe.length === 'number' && !isNaN(pipe.length)
+                ? Math.max(0, pipe.length)
+                : calculateDistance(start, end, isCanvasCoordinate(start) ? scale : undefined);
+
+        // หาจุด junction ที่อยู่บนท่อนี้แต่ไม่ใช่ปลาย (กลางเส้น = จุดเลี้ยว/ทางแยก)
+        const interiorDistances: number[] = [];
+        junctionPoints.forEach((jp) => {
+            const onSegment = isPointOnLineSegment(jp.position, start, end, tol, scale);
+            if (!onSegment) return;
+            const distFromStart = calculateDistance(
+                start,
+                jp.position,
+                isCanvasCoordinate(start) ? scale : undefined
+            );
+            const distFromEnd = calculateDistance(
+                end,
+                jp.position,
+                isCanvasCoordinate(end) ? scale : undefined
+            );
+            if (distFromStart <= tol || distFromEnd <= tol) return;
+            interiorDistances.push(distFromStart);
+        });
+
+        const uniqueDistances = [...new Set(interiorDistances.map((d) => Math.round(d * 1000) / 1000))].sort(
+            (a, b) => a - b
+        );
+
+        // แต่ละช่วง: ตรง ไม่มีแยกในกลาง และต้องไม่มีหัวฉีดในช่วง ถึงจะนับต่อตรง
+        const considerSegment = (segStart: number, segEnd: number): void => {
+            const segLen = segEnd - segStart;
+            if (segLen <= 0) return;
+            if (hasSprinklerOnSegment(start, end, segStart, segEnd, sprinklers, tol, scale)) return;
+            total += Math.floor(segLen / STRAIGHT_COUPLER_INTERVAL_M);
+        };
+
+        if (uniqueDistances.length === 0) {
+            considerSegment(0, fullLength);
+            return;
+        }
+
+        let prev = 0;
+        uniqueDistances.forEach((d) => {
+            considerSegment(prev, d);
+            prev = d;
+        });
+        considerSegment(prev, fullLength);
+    });
+
+    return total;
 }
 
 /**

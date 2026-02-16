@@ -49,6 +49,196 @@ import {
     calculatePipeStatistics,
 } from '../utils/homeGardenData';
 
+/** Equipment จาก API (category = sprinkler) */
+interface SprinklerEquipment {
+    id: number;
+    name: string;
+    product_code?: string;
+    productCode?: string;
+    brand?: string;
+    description?: string;
+    image?: string | null;
+    radiusMeters?: number | number[];
+    pressureBar?: number | number[];
+    waterVolumeLitersPerMinute?: number | number[];
+}
+
+function toNum(v: number | number[] | string | undefined, preferMax = false): number {
+    if (v == null || v === '') return 4;
+    if (typeof v === 'number' && !Number.isNaN(v)) return v;
+    if (typeof v === 'string') return Number(v) || 4;
+    if (!Array.isArray(v) || v.length === 0) return 4;
+    const a = Number(v[0]);
+    const b = v.length >= 2 ? Number(v[1]) : a;
+    if (preferMax && v.length >= 2) return Math.max(a, b);
+    return v.length >= 2 ? (a + b) / 2 : a;
+}
+
+function formatNum(x: number): string {
+    return Number.isFinite(x) ? x.toFixed(1) : '0';
+}
+
+function equipmentToSprinklerType(e: SprinklerEquipment): SprinklerType {
+    const radius = toNum(e.radiusMeters, true);
+    const pressure = toNum(e.pressureBar);
+    const flowRate = toNum(e.waterVolumeLitersPerMinute, true);
+    return {
+        id: `equipment_${e.id}`,
+        nameEN: e.name,
+        nameTH: e.name,
+        icon: '💧',
+        radius: Math.max(0.5, Math.min(50, radius)),
+        pressure: Math.max(0.5, Math.min(10, pressure)),
+        flowRate: Math.max(1, Math.min(500, flowRate)),
+        suitableFor: ['grass', 'flowers', 'trees'],
+        color: '#33CCFF',
+    };
+}
+
+/** สร้างข้อความสำหรับค้นหา: รหัส, ชื่อ, แบรนด์, คำอธิบาย, สเปก */
+function equipmentSearchText(eq: SprinklerEquipment): string {
+    const code = eq.product_code ?? eq.productCode ?? '';
+    const name = eq.name ?? '';
+    const brand = eq.brand ?? '';
+    const desc = eq.description ?? '';
+    const r = formatNum(toNum(eq.radiusMeters, true));
+    const p = formatNum(toNum(eq.pressureBar));
+    const f = formatNum(toNum(eq.waterVolumeLitersPerMinute, true));
+    return `${code} ${name} ${brand} ${desc} ${r} ${p} ${f}`.toLowerCase();
+}
+
+/** Dropdown เลือกสปริงเกอร์: แสดงรูป, ค้นจากรหัส/ชื่อ/คุณสมบัติ */
+const SprinklerEquipmentSelect: React.FC<{
+    options: SprinklerEquipment[];
+    value: number | null;
+    onChange: (id: number | null) => void;
+    placeholder?: string;
+    size?: 'sm' | 'md';
+    t: (key: string) => string;
+}> = ({ options, value, onChange, placeholder, size = 'md', t }) => {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const selected = options.find((o) => o.id === value);
+    const searchLower = search.trim().toLowerCase();
+    const filtered =
+        searchLower === ''
+            ? options
+            : options.filter((eq) => equipmentSearchText(eq).includes(searchLower));
+
+    useEffect(() => {
+        if (!open) return;
+        setSearch('');
+        setTimeout(() => inputRef.current?.focus(), 50);
+    }, [open]);
+
+    useEffect(() => {
+        const onDocClick = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onDocClick);
+        return () => document.removeEventListener('mousedown', onDocClick);
+    }, []);
+
+    const isSm = size === 'sm';
+    const triggerClass = isSm
+        ? 'w-full rounded-lg border border-gray-600 bg-gray-700 px-2 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none'
+        : 'w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
+
+    return (
+        <div ref={containerRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className={`flex items-center gap-2 text-left ${triggerClass}`}
+            >
+                {selected ? (
+                    <>
+                        {selected.image ? (
+                            <img
+                                src={selected.image}
+                                alt=""
+                                className={isSm ? 'h-6 w-6 shrink-0 rounded object-cover' : 'h-8 w-8 shrink-0 rounded object-cover'}
+                            />
+                        ) : (
+                            <span className={isSm ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-600 text-xs' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-600 text-sm'}>
+                                💧
+                            </span>
+                        )}
+                        <span className="min-w-0 flex-1 truncate">
+                            {selected.product_code || selected.productCode || ''} {selected.name}
+                        </span>
+                        <span className="shrink-0 text-gray-400">▼</span>
+                    </>
+                ) : (
+                    <span className="text-gray-400">{placeholder ?? t('เลือกสปริงเกอร์')}</span>
+                )}
+            </button>
+
+            {open && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-hidden rounded-lg border border-gray-600 bg-gray-800 shadow-xl">
+                    <div className="border-b border-gray-600 p-2">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder={t('ค้นหา รหัส, ชื่อ, สเปก...')}
+                            className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                        />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto p-1">
+                        {filtered.length === 0 ? (
+                            <div className="py-4 text-center text-sm text-gray-400">
+                                {t('ไม่พบรายการ')}
+                            </div>
+                        ) : (
+                            filtered.map((eq) => (
+                                <button
+                                    key={eq.id}
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(eq.id);
+                                        setOpen(false);
+                                    }}
+                                    className={`flex w-full items-center gap-2 rounded px-2 py-2 text-left transition-colors hover:bg-gray-700 ${
+                                        value === eq.id ? 'bg-blue-900/40' : ''
+                                    }`}
+                                >
+                                    {eq.image ? (
+                                        <img
+                                            src={eq.image}
+                                            alt=""
+                                            className={isSm ? 'h-8 w-8 shrink-0 rounded object-cover' : 'h-10 w-10 shrink-0 rounded object-cover'}
+                                        />
+                                    ) : (
+                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-600 text-lg">
+                                            💧
+                                        </span>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <div className="truncate font-medium text-white">
+                                            {eq.product_code || eq.productCode || ''} {eq.name}
+                                        </div>
+                                        <div className="truncate text-xs text-gray-400">
+                                            {formatNum(toNum(eq.radiusMeters, true))}ม. · {formatNum(toNum(eq.pressureBar))}บาร์ · {formatNum(toNum(eq.waterVolumeLitersPerMinute, true))}ล./นาที
+                                            {eq.brand ? ` · ${eq.brand}` : ''}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const ModeSelection: React.FC<{
     onSelectMode: (mode: 'map' | 'canvas' | 'image') => void;
 }> = ({ onSelectMode }) => {
@@ -178,52 +368,55 @@ export default function HomeGardenPlanner() {
     const [isDrawingPolyline, setIsDrawingPolyline] = useState<boolean>(false);
     const [currentPolylinePoint, setCurrentPolylinePoint] = useState<CanvasCoordinate | null>(null);
 
-    // State สำหรับหัวฉีดที่วางเอง
-    const [manualSprinklerRadius, setManualSprinklerRadius] = useState<number>(4);
-    const [manualSprinklerPressure, setManualSprinklerPressure] = useState<number>(2.5);
-    const [manualSprinklerFlowRate, setManualSprinklerFlowRate] = useState<number>(15);
-    // State สำหรับหัวฉีดอัตโนมัติ (แยกจากหัวฉีดที่วางเอง)
-    const [autoSprinklerRadius, setAutoSprinklerRadius] = useState<number>(4);
-    const [autoSprinklerPressure, setAutoSprinklerPressure] = useState<number>(2.5);
-    const [autoSprinklerFlowRate, setAutoSprinklerFlowRate] = useState<number>(15);
-
-    // State สำหรับการตั้งค่าหัวฉีดสำหรับโซน (แยกจากหัวฉีดที่วางเองและหัวฉีดอัตโนมัติ)
-    const [zoneSprinklerRadius, setZoneSprinklerRadius] = useState<number>(4);
-    const [zoneSprinklerPressure, setZoneSprinklerPressure] = useState<number>(2.5);
-    const [zoneSprinklerFlowRate, setZoneSprinklerFlowRate] = useState<number>(15);
+    // สปริงเกอร์จาก DB (equipment_categories name=sprinkler)
+    const [sprinklerEquipments, setSprinklerEquipments] = useState<SprinklerEquipment[]>([]);
+    const [selectedManualEquipmentId, setSelectedManualEquipmentId] = useState<number | null>(null);
+    const [selectedAutoEquipmentId, setSelectedAutoEquipmentId] = useState<number | null>(null);
+    const [selectedZoneEquipmentId, setSelectedZoneEquipmentId] = useState<number | null>(null);
     const [showZoneSprinklerPopup, setShowZoneSprinklerPopup] = useState<boolean>(false);
     const [showAutoSprinklerPopup, setShowAutoSprinklerPopup] = useState<boolean>(false);
-    const [showManualSprinklerPopup, setShowManualSprinklerPopup] = useState<boolean>(false);
     const [showConfirmAutoPlacePopup, setShowConfirmAutoPlacePopup] = useState<boolean>(false);
+    const [sprinklerDetailPopup, setSprinklerDetailPopup] = useState<{ sprinklerId: string } | null>(null);
 
-
-    // หมายเหตุ: แต่ละหัวฉีดที่เพิ่มเองจะเก็บค่าคุณสมบัติของตัวเองไว้
-    // ค่า manualSprinklerRadius/Pressure/FlowRate จะใช้เฉพาะตอนเพิ่มหัวฉีดใหม่เท่านั้น
-    // ทำให้สามารถเพิ่มหัวฉีดหลากหลายขนาดได้
-
-    // อัปเดตค่า autoSprinklerRadius/Pressure/FlowRate เมื่อเลือกหัวฉีดอัตโนมัติ
-    // เพื่อแสดงค่าจริงของหัวฉีดอัตโนมัติใน input range
+    // โหลดสปริงเกอร์จาก DB (equipment_categories name=sprinkler)
     useEffect(() => {
-        // อัปเดตเฉพาะเมื่อ selectedSprinkler เปลี่ยน (ไม่ใช่เมื่อ sprinklers เปลี่ยน)
-        if (selectedSprinkler) {
-            const sprinkler = sprinklers.find((s) => s.id === selectedSprinkler);
-            if (sprinkler) {
-                // ตรวจสอบว่าเป็นหัวฉีดอัตโนมัติหรือไม่
-                const isAuto =
-                    sprinkler.id.includes('_corner_') ||
-                    sprinkler.id.match(/^[^_]+_sprinkler_/) !== null;
-                
-                // ถ้าเป็นหัวฉีดอัตโนมัติ ให้อัปเดตค่า autoSprinklerRadius/Pressure/FlowRate
-                // เพื่อแสดงค่าจริงของหัวฉีดอัตโนมัติใน input range
-                if (isAuto) {
-                    setAutoSprinklerRadius(sprinkler.type.radius);
-                    setAutoSprinklerPressure(sprinkler.type.pressure);
-                    setAutoSprinklerFlowRate(sprinkler.type.flowRate);
+        fetch('/api/sprinklers')
+            .then((res) => res.json())
+            .then((data: SprinklerEquipment[]) => {
+                if (Array.isArray(data) && data.length > 0) {
+                    setSprinklerEquipments(data);
+                    if (!selectedManualEquipmentId) setSelectedManualEquipmentId(data[0].id);
+                    if (!selectedAutoEquipmentId) setSelectedAutoEquipmentId(data[0].id);
+                    if (!selectedZoneEquipmentId) setSelectedZoneEquipmentId(data[0].id);
                 }
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSprinkler]); // เอา sprinklers ออกจาก dependencies เพื่อไม่ให้ทำงานเมื่อวางหัวฉีดใหม่
+            })
+            .catch(() => setSprinklerEquipments([]));
+    }, []);
+
+    const selectedManualEquipment = useMemo(
+        () => sprinklerEquipments.find((e) => e.id === selectedManualEquipmentId) ?? null,
+        [sprinklerEquipments, selectedManualEquipmentId]
+    );
+    const selectedAutoEquipment = useMemo(
+        () => sprinklerEquipments.find((e) => e.id === selectedAutoEquipmentId) ?? null,
+        [sprinklerEquipments, selectedAutoEquipmentId]
+    );
+    const selectedZoneEquipment = useMemo(
+        () => sprinklerEquipments.find((e) => e.id === selectedZoneEquipmentId) ?? null,
+        [sprinklerEquipments, selectedZoneEquipmentId]
+    );
+    const manualSprinklerType = useMemo(
+        () => (selectedManualEquipment ? equipmentToSprinklerType(selectedManualEquipment) : null),
+        [selectedManualEquipment]
+    );
+    const autoSprinklerType = useMemo(
+        () => (selectedAutoEquipment ? equipmentToSprinklerType(selectedAutoEquipment) : null),
+        [selectedAutoEquipment]
+    );
+    const zoneSprinklerType = useMemo(
+        () => (selectedZoneEquipment ? equipmentToSprinklerType(selectedZoneEquipment) : null),
+        [selectedZoneEquipment]
+    );
 
     const [showValidationErrors, setShowValidationErrors] = useState<boolean>(false);
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -599,15 +792,14 @@ export default function HomeGardenPlanner() {
                 }
             }
             
-            // สร้างหัวฉีดจากค่าที่ผู้ใช้กรอก (ใช้ค่าปัจจุบันจาก state)
-            const sprinklerType: SprinklerType = {
+            const sprinklerType: SprinklerType = manualSprinklerType ?? {
                 id: 'sprinkler',
                 nameEN: 'Sprinkler',
                 nameTH: 'Sprinkler',
                 icon: '💧',
-                radius: manualSprinklerRadius, // ใช้ค่าจาก state
-                pressure: manualSprinklerPressure, // ใช้ค่าจาก state
-                flowRate: manualSprinklerFlowRate, // ใช้ค่าจาก state
+                radius: 4,
+                pressure: 2.5,
+                flowRate: 15,
                 suitableFor: ['grass', 'flowers', 'trees'],
                 color: '#33CCFF',
             };
@@ -651,9 +843,7 @@ export default function HomeGardenPlanner() {
         },
         [
             gardenZones,
-            manualSprinklerRadius,
-            manualSprinklerPressure,
-            manualSprinklerFlowRate,
+            manualSprinklerType,
             canvasData,
             imageData,
             designMode,
@@ -817,25 +1007,17 @@ export default function HomeGardenPlanner() {
             const zone = gardenZones.find((z) => z.id === zoneId);
             if (!zone || zone.type === 'forbidden') return;
 
-            // หา SPRINKLER_TYPES ที่เหมาะกับโซนนี้เพื่อใช้ชื่อและ icon
-            const suitableSprinklers = SPRINKLER_TYPES.filter((st) =>
-                st.suitableFor.includes(zone.type)
-            );
-            // ใช้ตัวแรกที่เหมาะ หรือใช้ default
-            const autoSprinklerType = suitableSprinklers[0] || SPRINKLER_TYPES[0];
-            
-            // ใช้ค่าจาก autoSprinklerRadius/Pressure/FlowRate ถ้า useAutoSettings = true
-            // มิฉะนั้นใช้ค่าจาก zoneSprinklerRadius/Pressure/FlowRate (สำหรับโซน)
-            const sprinklerType: SprinklerType = {
-                id: autoSprinklerType.id,
-                nameEN: autoSprinklerType.nameEN,
-                nameTH: autoSprinklerType.nameTH,
-                icon: autoSprinklerType.icon,
-                radius: useAutoSettings ? autoSprinklerRadius : zoneSprinklerRadius,
-                pressure: useAutoSettings ? autoSprinklerPressure : zoneSprinklerPressure,
-                flowRate: useAutoSettings ? autoSprinklerFlowRate : zoneSprinklerFlowRate,
-                suitableFor: autoSprinklerType.suitableFor,
-                color: autoSprinklerType.color,
+            const baseType = useAutoSettings ? autoSprinklerType : zoneSprinklerType;
+            const sprinklerType: SprinklerType = baseType ?? {
+                id: 'sprinkler',
+                nameEN: 'Sprinkler',
+                nameTH: 'สปริงเกอร์',
+                icon: '💧',
+                radius: 4,
+                pressure: 2.5,
+                flowRate: 15,
+                suitableFor: ['grass', 'flowers', 'trees'],
+                color: '#33CCFF',
             };
             const coordinates = zone.canvasCoordinates || zone.coordinates;
             const isCanvas = !!zone.canvasCoordinates;
@@ -1049,12 +1231,8 @@ export default function HomeGardenPlanner() {
             imageData,
             currentScale,
             isCircleShape,
-            zoneSprinklerRadius,
-            zoneSprinklerPressure,
-            zoneSprinklerFlowRate,
-            autoSprinklerRadius,
-            autoSprinklerPressure,
-            autoSprinklerFlowRate,
+            autoSprinklerType,
+            zoneSprinklerType,
         ]
     );
 
@@ -1240,6 +1418,10 @@ export default function HomeGardenPlanner() {
         },
         [pipeEditMode]
     );
+
+    const handleSprinklerDoubleClick = useCallback((sprinklerId: string) => {
+        setSprinklerDetailPopup({ sprinklerId });
+    }, []);
 
     const addPipeBetweenSprinklers = useCallback(() => {
         const isCanvasMode = designMode === 'canvas' || designMode === 'image';
@@ -1505,15 +1687,14 @@ export default function HomeGardenPlanner() {
             const { lat, lng } = e.latlng;
 
             if (editMode === 'place') {
-                // สร้างหัวฉีดจากค่าที่ผู้ใช้กรอก (ใช้ค่าปัจจุบันจาก state)
-                const sprinklerType: SprinklerType = {
-                    id: 'sprinkler', // ใช้ 'sprinkler' เพื่อให้ตรงกับ handleCanvasSprinklerPlaced
+                const sprinklerType: SprinklerType = manualSprinklerType ?? {
+                    id: 'sprinkler',
                     nameEN: 'Sprinkler',
                     nameTH: 'Sprinkler',
                     icon: '💧',
-                    radius: manualSprinklerRadius, // ใช้ค่าจาก state
-                    pressure: manualSprinklerPressure, // ใช้ค่าจาก state
-                    flowRate: manualSprinklerFlowRate, // ใช้ค่าจาก state
+                    radius: 4,
+                    pressure: 2.5,
+                    flowRate: 15,
                     suitableFor: ['grass', 'flowers', 'trees'],
                     color: '#33CCFF',
                 };
@@ -1567,9 +1748,7 @@ export default function HomeGardenPlanner() {
             gardenZones,
             findLongestEdgeAngle,
             isPointInAvoidanceZone,
-            manualSprinklerRadius,
-            manualSprinklerPressure,
-            manualSprinklerFlowRate,
+            manualSprinklerType,
         ]
     );
 
@@ -2021,17 +2200,20 @@ export default function HomeGardenPlanner() {
                                                         </div>
 
                                                         {isConfigOpen &&
-                                                            zone.type !== 'forbidden' && (
-                                                                <div className="mt-3 space-y-3 border-t border-gray-600 pt-3">
-                                                                    <div className="space-y-3">
-                                                                        {/* ปุ่มเปิด Popup สำหรับตั้งค่า */}
-                                                                        <button
-                                                                            onClick={() => setShowZoneSprinklerPopup(true)}
-                                                                            className="w-full rounded-lg border border-blue-500 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-300 transition-all hover:bg-blue-500/30"
-                                                                        >
-                                                                            ⚙️ {t('ตั้งค่า')} ({zoneSprinklerRadius}ม., {zoneSprinklerPressure}บาร์, {zoneSprinklerFlowRate}ล./นาที)
-                                                                        </button>
-                                                                    </div>
+                                                            zone.type !== 'forbidden' &&
+                                                            sprinklerEquipments.length > 0 && (
+                                                                <div className="mt-3 space-y-2 border-t border-gray-600 pt-3">
+                                                                    <label className="block text-xs font-medium text-gray-400">
+                                                                        {t('สปริงเกอร์สำหรับโซน')}
+                                                                    </label>
+                                                                    <SprinklerEquipmentSelect
+                                                                        options={sprinklerEquipments}
+                                                                        value={selectedZoneEquipmentId}
+                                                                        onChange={setSelectedZoneEquipmentId}
+                                                                        placeholder={t('เลือกสปริงเกอร์')}
+                                                                        size="sm"
+                                                                        t={t}
+                                                                    />
                                                                 </div>
                                                             )}
                                                     </div>
@@ -2078,15 +2260,19 @@ export default function HomeGardenPlanner() {
                                                 : '📍 ' + t('วางหัวฉีดเอง')}
                                         </button>
 
-                                        {editMode === 'place' && (
-                                            <div className="space-y-3 border-b border-gray-600 pt-2 pb-3">
-                                                {/* ปุ่มเปิด Popup สำหรับตั้งค่า */}
-                                                <button
-                                                    onClick={() => setShowManualSprinklerPopup(true)}
-                                                    className="w-full rounded-lg border border-blue-500 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-300 transition-all hover:bg-blue-500/30"
-                                                >
-                                                    ⚙️ {t('ตั้งค่า')} ({manualSprinklerRadius}ม., {manualSprinklerPressure}บาร์, {manualSprinklerFlowRate}ล./นาที)
-                                                </button>
+                                        {editMode === 'place' && sprinklerEquipments.length > 0 && (
+                                            <div className="space-y-2 border-b border-gray-600 pt-2 pb-3">
+                                                <label className="block text-sm font-medium text-gray-300">
+                                                    {t('เลือกสปริงเกอร์')}
+                                                </label>
+                                                <SprinklerEquipmentSelect
+                                                    options={sprinklerEquipments}
+                                                    value={selectedManualEquipmentId}
+                                                    onChange={setSelectedManualEquipmentId}
+                                                    placeholder={t('เลือกสปริงเกอร์')}
+                                                    size="md"
+                                                    t={t}
+                                                />
                                             </div>
                                         )}
                                         </div>
@@ -2631,7 +2817,7 @@ export default function HomeGardenPlanner() {
                                         pipes={pipes}
                                         selectedZoneType={selectedZoneType}
                                         editMode={editMode}
-                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        manualSprinklerRadius={manualSprinklerType?.radius ?? 4}
                                         selectedSprinkler={selectedSprinkler}
                                         selectedPipes={selectedPipes}
                                         selectedSprinklersForPipe={selectedSprinklersForPipe}
@@ -2643,6 +2829,7 @@ export default function HomeGardenPlanner() {
                                         onMainPipePoint={() => {}}
                                         onSprinklerDragged={handleCanvasSprinklerDragged}
                                         onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDoubleClick={handleSprinklerDoubleClick}
                                         onSprinklerDelete={(id) => {
                                             setSprinklers((prev) =>
                                                 prev.filter((s) => s.id !== id)
@@ -2676,7 +2863,7 @@ export default function HomeGardenPlanner() {
                                         pipes={pipes}
                                         selectedZoneType={selectedZoneType}
                                         editMode={editMode}
-                                        manualSprinklerRadius={manualSprinklerRadius}
+                                        manualSprinklerRadius={manualSprinklerType?.radius ?? 4}
                                         selectedSprinkler={selectedSprinkler}
                                         selectedPipes={selectedPipes}
                                         selectedSprinklersForPipe={selectedSprinklersForPipe}
@@ -2688,6 +2875,7 @@ export default function HomeGardenPlanner() {
                                         onMainPipePoint={() => {}}
                                         onSprinklerDragged={handleCanvasSprinklerDragged}
                                         onSprinklerClick={handleCanvasSprinklerClick}
+                                        onSprinklerDoubleClick={handleSprinklerDoubleClick}
                                         onSprinklerDelete={(id) => {
                                             setSprinklers((prev) =>
                                                 prev.filter((s) => s.id !== id)
@@ -2722,8 +2910,8 @@ export default function HomeGardenPlanner() {
                 </div>
             </div>
 
-            {/* Popup สำหรับตั้งค่าหัวฉีดโซน */}
-            {showZoneSprinklerPopup && (
+            {/* Popup สำหรับตั้งค่าหัวฉีดโซน - ใช้ dropdown ในโซนแทน */}
+            {false && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <div className="w-full max-w-md rounded-xl bg-gray-800 p-6 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
@@ -2803,8 +2991,8 @@ export default function HomeGardenPlanner() {
                 </div>
             )}
 
-            {/* Popup สำหรับตั้งค่าหัวฉีดอัตโนมัติ */}
-            {showAutoSprinklerPopup && (
+            {/* Popup สำหรับตั้งค่าหัวฉีดอัตโนมัติ - ใช้ใน Confirm Auto Place แทน */}
+            {false && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <div className="w-full max-w-md rounded-xl bg-gray-800 p-6 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
@@ -2884,8 +3072,8 @@ export default function HomeGardenPlanner() {
                 </div>
             )}
 
-            {/* Popup สำหรับตั้งค่าหัวฉีดที่วางเอง */}
-            {showManualSprinklerPopup && (
+            {/* Popup สำหรับตั้งค่าหัวฉีดที่วางเอง - ใช้ dropdown เลือกสปริงเกอร์แทน */}
+            {false && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                     <div className="w-full max-w-md rounded-xl bg-gray-800 p-6 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
@@ -2971,7 +3159,7 @@ export default function HomeGardenPlanner() {
                     <div className="w-full max-w-md rounded-xl bg-gray-800 p-6 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-purple-400">
-                                🤖 {t('ตั้งค่าหัวฉีดอัตโนมัติ')}
+                                🤖 {t('เลือกสปริงเกอร์สำหรับวางอัตโนมัติ')}
                             </h3>
                             <button
                                 onClick={() => setShowConfirmAutoPlacePopup(false)}
@@ -2981,81 +3169,182 @@ export default function HomeGardenPlanner() {
                             </button>
                         </div>
                         <div className="space-y-4">
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    {t('รัศมี (ม.):')}
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="15"
-                                    step="0.5"
-                                    value={autoSprinklerRadius}
-                                    onChange={(e) =>
-                                        setAutoSprinklerRadius(
-                                            Math.max(1, Math.min(15, Number(e.target.value) || 1))
-                                        )
-                                    }
-                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    {t('แรงดัน (บาร์):')}
-                                </label>
-                                <input
-                                    type="number"
-                                    min="0.5"
-                                    max="5"
-                                    step="0.1"
-                                    value={autoSprinklerPressure}
-                                    onChange={(e) =>
-                                        setAutoSprinklerPressure(
-                                            Math.max(0.5, Math.min(5, Number(e.target.value) || 0.5))
-                                        )
-                                    }
-                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                                />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-300">
-                                    {t('Flow (ล./นาที):')}
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="50"
-                                    step="1"
-                                    value={autoSprinklerFlowRate}
-                                    onChange={(e) =>
-                                        setAutoSprinklerFlowRate(
-                                            Math.max(1, Math.min(50, Number(e.target.value) || 1))
-                                        )
-                                    }
-                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                                />
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowConfirmAutoPlacePopup(false)}
-                                    className="flex-1 rounded-lg border border-gray-600 bg-gray-700 py-2 text-sm font-medium text-white transition-all hover:bg-gray-600"
-                                >
-                                    {t('ยกเลิก')}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        autoPlaceAllSprinklers();
-                                        setShowConfirmAutoPlacePopup(false);
-                                    }}
-                                    className="flex-1 rounded-lg bg-purple-600 py-2 text-sm font-medium text-white transition-all hover:bg-purple-700"
-                                >
-                                    {t('ยืนยัน')}
-                                </button>
-                            </div>
+                            {sprinklerEquipments.length > 0 ? (
+                                <>
+                                    <label className="block text-sm font-medium text-gray-300">
+                                        {t('สปริงเกอร์')}
+                                    </label>
+                                    <SprinklerEquipmentSelect
+                                        options={sprinklerEquipments}
+                                        value={selectedAutoEquipmentId}
+                                        onChange={setSelectedAutoEquipmentId}
+                                        placeholder={t('เลือกสปริงเกอร์สำหรับวางอัตโนมัติ')}
+                                        size="md"
+                                        t={t}
+                                    />
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowConfirmAutoPlacePopup(false)}
+                                            className="flex-1 rounded-lg border border-gray-600 bg-gray-700 py-2 text-sm font-medium text-white transition-all hover:bg-gray-600"
+                                        >
+                                            {t('ยกเลิก')}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                autoPlaceAllSprinklers();
+                                                setShowConfirmAutoPlacePopup(false);
+                                            }}
+                                            className="flex-1 rounded-lg bg-purple-600 py-2 text-sm font-medium text-white transition-all hover:bg-purple-700"
+                                        >
+                                            {t('ยืนยัน')}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-sm text-gray-400">
+                                    {t('กำลังโหลดรายการสปริงเกอร์...')}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Popup รายละเอียดหัวฉีด (ดับเบิลคลิก) */}
+            {sprinklerDetailPopup && (() => {
+                const detailSprinkler = sprinklers.find((s) => s.id === sprinklerDetailPopup.sprinklerId);
+                if (!detailSprinkler) {
+                    return null;
+                }
+                const matchedEquipment = sprinklerEquipments.find(
+                    (eq) =>
+                        Math.abs(toNum(eq.radiusMeters, true) - detailSprinkler.type.radius) < 0.1 &&
+                        Math.abs(toNum(eq.pressureBar) - detailSprinkler.type.pressure) < 0.1 &&
+                        Math.abs(toNum(eq.waterVolumeLitersPerMinute, true) - detailSprinkler.type.flowRate) < 0.1
+                );
+                const arcStart = detailSprinkler.arcStartAngle ?? 0;
+                const arcEnd = detailSprinkler.arcEndAngle ?? 360;
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <div className="w-full max-w-md rounded-xl bg-gray-800 p-6 shadow-2xl">
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-lg font-semibold text-cyan-400">
+                                    💧 {t('ข้อมูลหัวฉีด')}
+                                </h3>
+                                <button
+                                    onClick={() => setSprinklerDetailPopup(null)}
+                                    className="text-gray-400 hover:text-white"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="text-sm font-medium text-gray-300">{t('ชื่อสปริงเกอร์')}</div>
+                                    <div className="mt-1 text-white">
+                                        {detailSprinkler.type.nameTH || detailSprinkler.type.nameEN || '-'}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                    <div className="rounded bg-gray-700 p-2">
+                                        <div className="text-gray-400">{t('รัศมี')}</div>
+                                        <div className="text-cyan-300">{detailSprinkler.type.radius.toFixed(1)} {t('ม.')}</div>
+                                    </div>
+                                    <div className="rounded bg-gray-700 p-2">
+                                        <div className="text-gray-400">{t('แรงดัน')}</div>
+                                        <div className="text-amber-300">{detailSprinkler.type.pressure.toFixed(1)} {t('บาร์')}</div>
+                                    </div>
+                                    <div className="rounded bg-gray-700 p-2">
+                                        <div className="text-gray-400">{t('อัตราการไหล')}</div>
+                                        <div className="text-emerald-300">{detailSprinkler.type.flowRate.toFixed(1)} {t('ล./นาที')}</div>
+                                    </div>
+                                </div>
+                                {sprinklerEquipments.length > 0 && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300">
+                                            {t('เปลี่ยนหัวฉีด')}
+                                        </label>
+                                        <div className="mt-1">
+                                            <SprinklerEquipmentSelect
+                                                options={sprinklerEquipments}
+                                                value={matchedEquipment?.id ?? null}
+                                                onChange={(eqId) => {
+                                                    const eq = sprinklerEquipments.find((e) => e.id === eqId);
+                                                    if (eq) {
+                                                        setSprinklers((prev) =>
+                                                            prev.map((s) =>
+                                                                s.id === sprinklerDetailPopup.sprinklerId
+                                                                    ? { ...s, type: equipmentToSprinklerType(eq) }
+                                                                    : s
+                                                            )
+                                                        );
+                                                    }
+                                                }}
+                                                placeholder={t('เลือกสปริงเกอร์')}
+                                                size="md"
+                                                t={t}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="border-t border-gray-600 pt-4">
+                                    <div className="mb-2 text-sm font-medium text-gray-300">
+                                        {t('มุมฉีด (องศา)')} — {t('แสดงตั้งแต่')} … {t('ถึง')}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={360}
+                                            value={arcStart}
+                                            onChange={(e) => {
+                                                const v = Math.max(0, Math.min(360, Number(e.target.value) || 0));
+                                                setSprinklers((prev) =>
+                                                    prev.map((s) =>
+                                                        s.id === sprinklerDetailPopup.sprinklerId
+                                                            ? { ...s, arcStartAngle: v, arcEndAngle: arcEnd }
+                                                            : s
+                                                    )
+                                                );
+                                            }}
+                                            className="w-20 rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
+                                        />
+                                        <span className="text-gray-400">°</span>
+                                        <span className="text-gray-500">–</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={360}
+                                            value={arcEnd}
+                                            onChange={(e) => {
+                                                const v = Math.max(0, Math.min(360, Number(e.target.value) || 360));
+                                                setSprinklers((prev) =>
+                                                    prev.map((s) =>
+                                                        s.id === sprinklerDetailPopup.sprinklerId
+                                                            ? { ...s, arcStartAngle: arcStart, arcEndAngle: v }
+                                                            : s
+                                                    )
+                                                );
+                                            }}
+                                            className="w-20 rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-white"
+                                        />
+                                        <span className="text-gray-400">°</span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {t('0° = ขวา, 90° = ล่าง, 180° = ซ้าย, 360° = วงกลมเต็ม')}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setSprinklerDetailPopup(null)}
+                                    className="w-full rounded-lg bg-cyan-600 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+                                >
+                                    {t('ปิด')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

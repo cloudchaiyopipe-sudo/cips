@@ -17,6 +17,7 @@ interface SprinklerSelectorProps {
     allZoneSprinklers: { [zoneId: string]: any };
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenStats?: any;
+    gardenData?: any;
     greenhouseData?: any;
     fieldCropData?: any;
     input?: IrrigationInput;
@@ -70,6 +71,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     allZoneSprinklers,
     projectMode = 'horticulture',
     gardenStats,
+    gardenData,
     greenhouseData,
     fieldCropData,
     input,
@@ -249,14 +251,35 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             if (projectMode === 'horticulture') {
                 sprinklerConfig = loadSprinklerConfig();
             } else if (projectMode === 'garden') {
-                if (gardenStats && activeZone) {
-                    const currentZone = gardenStats.zones.find(
-                        (z: any) => z.zoneId === activeZone.id
-                    );
-                    if (currentZone) {
+                // ⚠️ สำหรับ garden mode: ใช้ range กว้างๆ จาก gardenData.sprinklers ทั้งหมด
+                // เพื่อให้ครอบคลุมทุกชื่อที่ใช้จริงใน Planner
+                if (gardenData && activeZone) {
+                    const zoneSprinklers = gardenData.sprinklers?.filter(
+                        (s: any) => s.zoneId === activeZone.id
+                    ) || [];
+
+                    if (zoneSprinklers.length > 0) {
+                        // หา min/max จาก sprinklers ที่วางไว้จริง
+                        const flowRates = zoneSprinklers.map((s: any) => s.type.flowRate);
+                        const pressures = zoneSprinklers.map((s: any) => s.type.pressure);
+                        
+                        const minFlow = Math.min(...flowRates);
+                        const maxFlow = Math.max(...flowRates);
+                        const minPressure = Math.min(...pressures);
+                        const maxPressure = Math.max(...pressures);
+                        
+                        // ใช้ค่ากลาง + เพิ่ม margin ±60% เพื่อให้ครอบคลุม
+                        const avgFlow = (minFlow + maxFlow) / 2;
+                        const avgPressure = (minPressure + maxPressure) / 2;
+                        
                         sprinklerConfig = {
-                            flowRatePerMinute: currentZone.sprinklerFlowRate || 6.0,
-                            pressureBar: currentZone.sprinklerPressure || 2.5,
+                            flowRatePerMinute: avgFlow,
+                            pressureBar: avgPressure,
+                            // เก็บ min/max ไว้ใช้ใน filter
+                            minFlow,
+                            maxFlow,
+                            minPressure,
+                            maxPressure,
                         };
                     } else {
                         sprinklerConfig = {
@@ -404,12 +427,31 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         if (projectMode === 'horticulture') {
             sprinklerConfig = loadSprinklerConfig();
         } else if (projectMode === 'garden') {
-            if (gardenStats && activeZone) {
-                const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
-                if (currentZone) {
+            // ⚠️ สำหรับ garden mode: ใช้ range กว้างๆ จาก gardenData.sprinklers ทั้งหมด
+            if (gardenData && activeZone) {
+                const zoneSprinklers = gardenData.sprinklers?.filter(
+                    (s: any) => s.zoneId === activeZone.id
+                ) || [];
+
+                if (zoneSprinklers.length > 0) {
+                    const flowRates = zoneSprinklers.map((s: any) => s.type.flowRate);
+                    const pressures = zoneSprinklers.map((s: any) => s.type.pressure);
+                    
+                    const minFlow = Math.min(...flowRates);
+                    const maxFlow = Math.max(...flowRates);
+                    const minPressure = Math.min(...pressures);
+                    const maxPressure = Math.max(...pressures);
+                    
+                    const avgFlow = (minFlow + maxFlow) / 2;
+                    const avgPressure = (minPressure + maxPressure) / 2;
+                    
                     sprinklerConfig = {
-                        flowRatePerMinute: currentZone.sprinklerFlowRate || 6.0,
-                        pressureBar: currentZone.sprinklerPressure || 2.5,
+                        flowRatePerMinute: avgFlow,
+                        pressureBar: avgPressure,
+                        minFlow,
+                        maxFlow,
+                        minPressure,
+                        maxPressure,
                     };
                 } else {
                     sprinklerConfig = {
@@ -468,15 +510,37 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
         const { flowRatePerMinute, pressureBar } = sprinklerConfig;
 
+        // ⚠️ สำหรับ garden mode: ถ้ามี min/max จาก gardenData ให้ใช้ range นั้น
+        const hasMinMax = sprinklerConfig.minFlow !== undefined;
+        
         const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
-            const flowMatch = isValueInRange(
-                sprinkler.waterVolumeLitersPerMinute,
-                flowRatePerMinute
-            );
-
-            const pressureMatch = isValueInRange(sprinkler.pressureBar, pressureBar);
-
-            return flowMatch && pressureMatch;
+            const sprinklerFlow = getAverageValue(sprinkler.waterVolumeLitersPerMinute);
+            const sprinklerPressure = getAverageValue(sprinkler.pressureBar);
+            
+            if (projectMode === 'garden' && hasMinMax) {
+                // ใช้ range จาก gardenData sprinklers + margin 30%
+                const flowMin = sprinklerConfig.minFlow * 0.7;
+                const flowMax = sprinklerConfig.maxFlow * 1.3;
+                const pressureMin = sprinklerConfig.minPressure * 0.7;
+                const pressureMax = sprinklerConfig.maxPressure * 1.3;
+                
+                const flowMatch = sprinklerFlow >= flowMin && sprinklerFlow <= flowMax;
+                const pressureMatch = sprinklerPressure >= pressureMin && sprinklerPressure <= pressureMax;
+                return flowMatch && pressureMatch;
+            } else if (projectMode === 'field-crop') {
+                // ใช้ tolerance ±50% สำหรับ field-crop mode
+                const flowMatch = Math.abs(sprinklerFlow - flowRatePerMinute) <= flowRatePerMinute * 0.5;
+                const pressureMatch = Math.abs(sprinklerPressure - pressureBar) <= pressureBar * 0.5;
+                return flowMatch && pressureMatch;
+            } else {
+                // ใช้ isValueInRange แบบเดิมสำหรับ mode อื่นๆ
+                const flowMatch = isValueInRange(
+                    sprinkler.waterVolumeLitersPerMinute,
+                    flowRatePerMinute
+                );
+                const pressureMatch = isValueInRange(sprinkler.pressureBar, pressureBar);
+                return flowMatch && pressureMatch;
+            }
         });
 
         return compatibleSprinklers.sort((a: any, b: any) => {
@@ -761,6 +825,70 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         });
     };
 
+    // สำหรับ garden mode: group sprinklers by type from gardenData with equipment details
+    const gardenSprinklersByType = useMemo(() => {
+        if (projectMode !== 'garden' || !gardenData || !activeZone) {
+            return [];
+        }
+
+        const zoneSprinklers = gardenData.sprinklers?.filter(
+            (s: any) => s.zoneId === activeZone.id
+        ) || [];
+
+        if (zoneSprinklers.length === 0) {
+            return [];
+        }
+
+        // Group by EXACT equipment name (ชื่อสปริงเกอร์) เพื่อแยกแต่ละรุ่น
+        const typeGroups = new Map<string, {
+            name: string;
+            count: number;
+            radius: number;
+            pressure: number;
+            flowRate: number;
+            color: string;
+            equipment: any; // เพิ่ม equipment data
+        }>();
+
+        zoneSprinklers.forEach((s: any) => {
+            const name = s.type.nameTH || s.type.nameEN || 'Sprinkler';
+            const key = name;
+            
+            const existing = typeGroups.get(key);
+            
+            if (existing) {
+                existing.count += 1;
+            } else {
+                // หา matching equipment จาก analyzedSprinklers
+                const matchingEquipment = analyzedSprinklers.find((eq: any) => {
+                    const eqName = eq.name || '';
+                    const avgFlow = Array.isArray(eq.waterVolumeLitersPerMinute)
+                        ? (eq.waterVolumeLitersPerMinute[0] + eq.waterVolumeLitersPerMinute[1]) / 2
+                        : eq.waterVolumeLitersPerMinute || 0;
+                    const avgPressure = Array.isArray(eq.pressureBar)
+                        ? (eq.pressureBar[0] + eq.pressureBar[1]) / 2
+                        : eq.pressureBar || 0;
+                    
+                    return eqName === name || 
+                           (Math.abs(avgFlow - s.type.flowRate) < 0.5 &&
+                            Math.abs(avgPressure - s.type.pressure) < 0.5);
+                });
+
+                typeGroups.set(key, {
+                    name: name,
+                    count: 1,
+                    radius: s.type.radius,
+                    pressure: s.type.pressure,
+                    flowRate: s.type.flowRate,
+                    color: s.type.color || '#33CCFF',
+                    equipment: matchingEquipment || null,
+                });
+            }
+        });
+
+        return Array.from(typeGroups.values()).sort((a, b) => b.count - a.count);
+    }, [projectMode, gardenData, activeZone, analyzedSprinklers]);
+
     const addSprinklerItem = () => {
         setSelectedCategory(null);
         setSelectedEquipment(null);
@@ -931,29 +1059,142 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         }
                     }
                     return sprinklerConfig ? (
-                        <div className="mb-4 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
-                            <div className="flex flex-row flex-wrap items-center gap-6">
-                                <h4 className="m-0 flex items-center p-0 text-lg font-semibold text-cyan-300">
-                                    🚿 {t('สปริงเกอร์ที่ต้องการ')} =
-                                </h4>
-                                <div className="flex flex-row items-center gap-2">
-                                    <span className="text-lg text-gray-50">Q หัวฉีด:</span>
-                                    <span className="text-lg font-bold text-cyan-400">
-                                        {sprinklerConfig.flowRatePerMinute} {t('ลิตร/นาที')}
-                                    </span>
+                        <>
+                            {/* ซ่อนข้อมูล "สปริงเกอร์ที่ต้องการ" สำหรับ garden mode */}
+                            {projectMode !== 'garden' && (
+                                <div className="mb-4 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
+                                    <div className="flex flex-row flex-wrap items-center gap-6">
+                                        <h4 className="m-0 flex items-center p-0 text-lg font-semibold text-cyan-300">
+                                            🚿 {t('สปริงเกอร์ที่ต้องการ')} =
+                                        </h4>
+                                        <div className="flex flex-row items-center gap-2">
+                                            <span className="text-lg text-gray-50">Q หัวฉีด:</span>
+                                            <span className="text-lg font-bold text-cyan-400">
+                                                {sprinklerConfig.flowRatePerMinute} {t('ลิตร/นาที')}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-row items-center gap-2">
+                                            <span className="text-lg text-gray-50">แรงดัน:</span>
+                                            <span className="text-lg font-bold text-orange-400">
+                                                {formatPressure(sprinklerConfig.pressureBar)}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex flex-row items-center gap-2">
-                                    <span className="text-lg text-gray-50">แรงดัน:</span>
-                                    <span className="text-lg font-bold text-orange-400">
-                                        {formatPressure(sprinklerConfig.pressureBar)}
-                                    </span>
+                            )}
+                            
+                            {/* แสดงหัวฉีดที่เลือกไว้จาก Planner สำหรับ garden mode - แสดงรูปและสเปคครบถ้วน */}
+                            {projectMode === 'garden' && gardenSprinklersByType.length > 0 && (
+                                <div className="rounded border border-purple-700/50 bg-gradient-to-r from-purple-900/30 to-pink-900/30 p-4">
+                                    <h4 className="mb-4 flex items-center gap-2 text-xl font-bold text-purple-300">
+                                        💧 {t('หัวฉีดที่เลือกไว้จาก Planner')}
+                                    </h4>
+                                    <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
+                                        {gardenSprinklersByType.map((type, index) => (
+                                            <div
+                                                key={index}
+                                                className="rounded-lg border border-purple-600/50 bg-gray-800/70 p-4 shadow-lg"
+                                            >
+                                                {/* Header with color dot and name */}
+                                                <div className="mb-3 flex items-center gap-3">
+                                                    <div
+                                                        className="h-6 w-6 shrink-0 rounded-full border-2 border-white/50 shadow-lg"
+                                                        style={{ backgroundColor: type.color }}
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="text-lg font-bold text-white">
+                                                            {type.name}
+                                                        </div>
+                                                        {type.equipment?.product_code && (
+                                                            <div className="text-xs text-gray-400">
+                                                                รหัส: {type.equipment.product_code}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="rounded-full bg-orange-600 px-4 py-2 text-center">
+                                                        <div className="text-2xl font-bold text-white">
+                                                            {type.count}
+                                                        </div>
+                                                        <div className="text-xs text-orange-200">{t('หัว')}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Image */}
+                                                {type.equipment?.image && (
+                                                    <div className="mb-3">
+                                                        <img
+                                                            src={type.equipment.image}
+                                                            alt={type.name}
+                                                            className="h-32 w-full rounded-lg border border-purple-500/30 object-contain bg-gray-900/50 p-2"
+                                                            onError={(e) => {
+                                                                e.currentTarget.style.display = 'none';
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {/* Specs */}
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    <div className="rounded bg-gray-900/50 p-2">
+                                                        <div className="text-xs text-gray-400">{t('รัศมี')}</div>
+                                                        <div className="font-semibold text-cyan-300">
+                                                            {type.radius.toFixed(1)} {t('ม.')}
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded bg-gray-900/50 p-2">
+                                                        <div className="text-xs text-gray-400">{t('แรงดัน')}</div>
+                                                        <div className="font-semibold text-green-300">
+                                                            {type.pressure.toFixed(1)} {t('บาร์')}
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded bg-gray-900/50 p-2 col-span-2">
+                                                        <div className="text-xs text-gray-400">{t('อัตราการไหล')}</div>
+                                                        <div className="font-semibold text-blue-300">
+                                                            {type.flowRate.toFixed(1)} {t('ลิตร/นาที')}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Brand & Price */}
+                                                {type.equipment && (
+                                                    <div className="mt-3 space-y-1 border-t border-purple-600/30 pt-3 text-sm">
+                                                        {type.equipment.brand && (
+                                                            <div className="flex justify-between">
+                                                                <span className="text-gray-400">{t('ยี่ห้อ')}:</span>
+                                                                <span className="text-white">{type.equipment.brand}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-400">{t('ราคา/หัว')}:</span>
+                                                            <span className="font-semibold text-yellow-400">
+                                                                {type.equipment.price?.toLocaleString() || 0} {t('บาท')}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between border-t border-gray-700 pt-1">
+                                                            <span className="text-gray-300">{t('ราคารวม')}:</span>
+                                                            <span className="text-lg font-bold text-green-400">
+                                                                {((type.equipment.price || 0) * type.count).toLocaleString()} {t('บาท')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 rounded-lg bg-blue-900/40 p-3 text-sm text-blue-200">
+                                        <div className="mb-1 font-semibold text-blue-300">💡 {t('หมายเหตุ')}:</div>
+                                        <div>• {t('รายการนี้แสดงหัวฉีดที่วางไว้ใน Planner จริงๆ')}</div>
+                                        <div>• {t('ระบบจะใช้ข้อมูลนี้ในการคำนวณราคาและสรุปต้นทุน')}</div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
+                            )}
+                        </>
                     ) : null;
                 })()}
 
-            <SearchableDropdown
+            {/* ซ่อน dropdown สำหรับ garden mode */}
+            {projectMode !== 'garden' && (
+                <SearchableDropdown
                 value={(() => {
                     // Try productCode first, then product_code, then id
                     if (selectedSprinkler) {
@@ -1049,8 +1290,10 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 }
                 className="mb-4 w-full"
             />
+            )}
 
-            {selectedSprinkler && selectedAnalyzed && (
+            {/* ซ่อนข้อมูลสปริงเกอร์ที่เลือกสำหรับ garden mode */}
+            {projectMode !== 'garden' && selectedSprinkler && selectedAnalyzed && (
                 <div className="rounded-lg bg-gray-600 p-4 shadow-lg">
                     {/* Header */}
                     <div className="mb-4 border-b border-gray-500 pb-3">

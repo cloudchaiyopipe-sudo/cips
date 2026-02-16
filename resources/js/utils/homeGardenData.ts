@@ -39,6 +39,10 @@ export interface Sprinkler {
     type: SprinklerType;
     zoneId: string;
     orientation?: number;
+    /** มุมเริ่มของรัศมีฉีด (องศา 0–360, 0 = ขวา) ไม่กำหนด = 0 */
+    arcStartAngle?: number;
+    /** มุมสิ้นสุดของรัศมีฉีด (องศา 0–360) ไม่กำหนด = 360 = วงกลมเต็ม */
+    arcEndAngle?: number;
 }
 
 export interface WaterSource {
@@ -58,6 +62,8 @@ export interface Pipe {
     length: number;
     connectedSprinklers?: string[];
     zoneId?: string;
+    /** ใช้แยกท่อตามแหล่งน้ำ เมื่อมีหลายแหล่งน้ำ ท่อที่เชื่อมถึงกันจะอยู่แหล่งเดียว */
+    waterSourceId?: string;
 }
 
 export interface GardenPlannerData {
@@ -219,7 +225,37 @@ export const MANUAL_SPRINKLER_COLORS: string[] = [
 ];
 
 /**
- * กำหนดสีให้กับหัวฉีดที่เพิ่มเอง
+ * ใช้สำหรับการ์ดโครงการ (home): คืนสีจาก type.color เฉพาะเมื่อไม่ใช่ #33CCFF ไม่则จัดกลุ่มตาม (radius, pressure, flowRate) แล้วแยกสี
+ */
+export function getSprinklerColorForPreview(
+    sprinkler: { type?: { color?: string; radius?: number; pressure?: number; flowRate?: number } },
+    allSprinklers: Array<{ type?: { color?: string; radius?: number; pressure?: number; flowRate?: number } }>
+): string {
+    const c = sprinkler.type?.color;
+    if (c && c !== '#33CCFF' && typeof c === 'string' && /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(c)) return c;
+    const tol = 0.01;
+    const r = sprinkler.type?.radius ?? 0;
+    const p = sprinkler.type?.pressure ?? 0;
+    const f = sprinkler.type?.flowRate ?? 0;
+    const groups: Array<{ r: number; p: number; f: number }> = [];
+    const seen = new Set<string>();
+    allSprinklers.forEach((s) => {
+        const sr = s.type?.radius ?? 0;
+        const sp = s.type?.pressure ?? 0;
+        const sf = s.type?.flowRate ?? 0;
+        const key = `${sr.toFixed(4)}_${sp.toFixed(4)}_${sf.toFixed(4)}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        groups.push({ r: sr, p: sp, f: sf });
+    });
+    const palette = ['#33CCFF', ...MANUAL_SPRINKLER_COLORS];
+    const idx = groups.findIndex((g) => Math.abs(g.r - r) < tol && Math.abs(g.p - p) < tol && Math.abs(g.f - f) < tol);
+    return idx >= 0 ? palette[idx % palette.length] : palette[0];
+}
+
+/**
+ * กำหนดสีให้กับหัวฉีด (logic เดิมของ planner)
+ * - ถ้ามี type.color ที่บันทึกไว้ → ใช้สีนั้น (ให้ตรงกับที่ออกแบบไว้ใน planner)
  * - ถ้าคุณสมบัติตรงกับ SPRINKLER_TYPES → สีฟ้า (#33CCFF)
  * - ถ้าไม่ตรง → ใช้สีจาก MANUAL_SPRINKLER_COLORS (10 สี)
  * - หัวฉีดที่มีคุณสมบัติเหมือนกัน (ภายใน tolerance 0.01) จะได้สีเดียวกัน
@@ -230,92 +266,113 @@ export function getManualSprinklerColor(
     isAutoSprinkler: (s: Sprinkler) => boolean,
     isMatchingAutoSprinkler: (s: Sprinkler) => boolean
 ): string {
+    // ใช้สีที่บันทึกไว้ใน type.color เฉพาะเมื่อไม่ใช่สี default (#33CCFF) เพื่อไม่ให้หัวฉีดประเภทต่างกันใน planner ได้สีเดียวกัน
+    const savedColor = sprinkler.type?.color;
+    if (savedColor && savedColor !== '#33CCFF' && typeof savedColor === 'string' && /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(savedColor)) {
+        return savedColor;
+    }
+
     const tolerance = 0.01;
-    
+
     // หาหัวฉีดอัตโนมัติทั้งหมด
     const autoSprinklers = allSprinklers.filter((s) => isAutoSprinkler(s));
-    
+
     // ตรวจสอบว่าหัวฉีดนี้เป็นอัตโนมัติหรือไม่
     const isAuto = isAutoSprinkler(sprinkler);
-    
+
+    const r = sprinkler.type?.radius ?? 0;
+    const p = sprinkler.type?.pressure ?? 0;
+    const f = sprinkler.type?.flowRate ?? 0;
+
     // ถ้าเป็นอัตโนมัติ ให้ตรวจสอบว่ามีหัวฉีดที่วางเองที่มีคุณสมบัติเหมือนกันหรือไม่
     if (isAuto) {
-        // หาหัวฉีดที่วางเองที่มีคุณสมบัติเหมือนกับหัวฉีดอัตโนมัตินี้
         const matchingManual = allSprinklers.find(
             (s) =>
                 !isAutoSprinkler(s) &&
-                Math.abs(s.type.radius - sprinkler.type.radius) < tolerance &&
-                Math.abs(s.type.pressure - sprinkler.type.pressure) < tolerance &&
-                Math.abs(s.type.flowRate - sprinkler.type.flowRate) < tolerance
+                Math.abs((s.type?.radius ?? 0) - r) < tolerance &&
+                Math.abs((s.type?.pressure ?? 0) - p) < tolerance &&
+                Math.abs((s.type?.flowRate ?? 0) - f) < tolerance
         );
-        
-        // ถ้ามีหัวฉีดที่วางเองที่มีคุณสมบัติเหมือนกัน → สีฟ้า
-        if (matchingManual) {
-            return '#33CCFF';
-        }
-        
-        // ถ้าไม่มี → สีฟ้า (หัวฉีดอัตโนมัติเป็นสีฟ้าเสมอ)
+        if (matchingManual) return '#33CCFF';
         return '#33CCFF';
     }
-    
+
     // ถ้าเป็นหัวฉีดที่วางเอง ให้ตรวจสอบว่ามีหัวฉีดอัตโนมัติที่มีคุณสมบัติเหมือนกันหรือไม่
     const matchingAuto = autoSprinklers.find(
         (s) =>
-            Math.abs(s.type.radius - sprinkler.type.radius) < tolerance &&
-            Math.abs(s.type.pressure - sprinkler.type.pressure) < tolerance &&
-            Math.abs(s.type.flowRate - sprinkler.type.flowRate) < tolerance
+            Math.abs((s.type?.radius ?? 0) - r) < tolerance &&
+            Math.abs((s.type?.pressure ?? 0) - p) < tolerance &&
+            Math.abs((s.type?.flowRate ?? 0) - f) < tolerance
     );
-    
-    // ถ้ามีหัวฉีดอัตโนมัติที่มีคุณสมบัติเหมือนกัน → สีฟ้า
-    if (matchingAuto) {
-        return '#33CCFF';
-    }
-    
-    // ถ้าไม่ตรงกับอัตโนมัติ ให้ใช้สีจาก 10 สี
-    // หาหัวฉีดที่เพิ่มเองทั้งหมดที่ไม่ได้ตรงกับอัตโนมัติ
+    if (matchingAuto) return '#33CCFF';
+
+    // ถ้าไม่ตรงกับอัตโนมัติ ให้ใช้สีจาก 10 สี (กลุ่มหัวฉีดที่วางเองที่คุณสมบัติเหมือนกัน = สีเดียวกัน)
     const manualSprinklers = allSprinklers.filter(
         (s) => !isAutoSprinkler(s) && !isMatchingAutoSprinkler(s)
     );
-
-    // สร้าง groups ของหัวฉีดที่มีคุณสมบัติเหมือนกัน
     const groups: Array<{ radius: number; pressure: number; flowRate: number; colorIndex: number }> = [];
     const processedIds = new Set<string>();
 
     manualSprinklers.forEach((s) => {
         if (processedIds.has(s.id)) return;
-
-        // หาหัวฉีดทั้งหมดที่มีคุณสมบัติเหมือนกัน
+        const sr = s.type?.radius ?? 0;
+        const sp = s.type?.pressure ?? 0;
+        const sf = s.type?.flowRate ?? 0;
         const sameGroup = manualSprinklers.filter(
             (g) =>
                 !processedIds.has(g.id) &&
-                Math.abs(g.type.radius - s.type.radius) < tolerance &&
-                Math.abs(g.type.pressure - s.type.pressure) < tolerance &&
-                Math.abs(g.type.flowRate - s.type.flowRate) < tolerance
+                Math.abs((g.type?.radius ?? 0) - sr) < tolerance &&
+                Math.abs((g.type?.pressure ?? 0) - sp) < tolerance &&
+                Math.abs((g.type?.flowRate ?? 0) - sf) < tolerance
         );
-
-        // ทำเครื่องหมายว่าจัดการแล้ว
         sameGroup.forEach((g) => processedIds.add(g.id));
-
-        // เพิ่ม group ใหม่
         groups.push({
-            radius: s.type.radius,
-            pressure: s.type.pressure,
-            flowRate: s.type.flowRate,
-            colorIndex: groups.length, // ใช้ index ของ group เป็น colorIndex
+            radius: sr,
+            pressure: sp,
+            flowRate: sf,
+            colorIndex: groups.length,
         });
     });
 
-    // หา group ที่หัวฉีดนี้อยู่
     const matchingGroup = groups.find(
         (g) =>
-            Math.abs(g.radius - sprinkler.type.radius) < tolerance &&
-            Math.abs(g.pressure - sprinkler.type.pressure) < tolerance &&
-            Math.abs(g.flowRate - sprinkler.type.flowRate) < tolerance
+            Math.abs(g.radius - r) < tolerance &&
+            Math.abs(g.pressure - p) < tolerance &&
+            Math.abs(g.flowRate - f) < tolerance
     );
-
-    // ใช้สีตาม colorIndex ของ group (modulo 10 เพื่อให้อยู่ในช่วง 0-9)
     const colorIndex = matchingGroup ? matchingGroup.colorIndex : 0;
     return MANUAL_SPRINKLER_COLORS[colorIndex % MANUAL_SPRINKLER_COLORS.length];
+}
+
+/**
+ * ใส่สีที่คำนวณจาก getManualSprinklerColor ลงใน sprinklers ก่อนบันทึก เพื่อให้เมื่อโหลดกลับมา (การ์ด/planner/summary) สีตรงกับที่ออกแบบ
+ */
+export function bakeSprinklerColorsIntoGardenData(data: GardenPlannerData): GardenPlannerData {
+    const sprinklers = data.sprinklers || [];
+    if (sprinklers.length === 0) return data;
+    const isAutoSprinkler = (s: Sprinkler) =>
+        (s?.id && (String(s.id).includes('_corner_') || /^[^_]+_sprinkler_/.test(String(s.id)))) ?? false;
+    const isMatchingAutoSprinkler = (s: Sprinkler) => {
+        if (isAutoSprinkler(s)) return true;
+        const t = s?.type;
+        if (!t) return false;
+        return SPRINKLER_TYPES.some(
+            (st) =>
+                Math.abs(st.radius - (t.radius ?? 0)) < 0.01 &&
+                Math.abs(st.pressure - (t.pressure ?? 0)) < 0.01 &&
+                Math.abs(st.flowRate - (t.flowRate ?? 0)) < 0.01
+        );
+    };
+    return {
+        ...data,
+        sprinklers: sprinklers.map((s) => ({
+            ...s,
+            type: {
+                ...s.type,
+                color: getManualSprinklerColor(s, sprinklers, isAutoSprinkler, isMatchingAutoSprinkler),
+            },
+        })),
+    };
 }
 
 export const DEFAULT_CENTER: [number, number] = [13.5799071, 100.8325833];
@@ -986,6 +1043,55 @@ interface ImageBoundary {
     maxY: number;
 }
 
+/** สร้างโซนต้องห้ามรอบตำแหน่งแหล่งน้ำอื่น (ไม่รวม currentSourceId) เพื่อไม่ให้ท่อจากแหล่งหนึ่งไปผ่านหรือเชื่อมถึงอีกแหล่ง */
+function createForbiddenZonesAroundOtherWaterSources(
+    waterSources: WaterSource[],
+    currentSourceId: string,
+    isCanvasMode: boolean
+): GardenZone[] {
+    const zones: GardenZone[] = [];
+    // เพิ่ม radius ให้ใหญ่ขึ้นเพื่อป้องกันท่อข้ามแหล่งน้ำอีกตัว
+    const radius = isCanvasMode ? 50 : 0.00005; // canvas: px (เพิ่มจาก 28 เป็น 50), map: lat/lng
+    waterSources.forEach((source) => {
+        if (source.id === currentSourceId) return;
+        const pos = isCanvasMode
+            ? source.canvasPosition || source.position
+            : source.position;
+        if (!pos) return;
+        const x = getCoordValue(pos, 'x');
+        const y = getCoordValue(pos, 'y');
+        if (isCanvasMode) {
+            const coords: CanvasCoordinate[] = [
+                { x: x - radius, y: y - radius },
+                { x: x + radius, y: y - radius },
+                { x: x + radius, y: y + radius },
+                { x: x - radius, y: y + radius },
+            ];
+            zones.push({
+                id: `other_source_${source.id}`,
+                type: 'forbidden',
+                name: '',
+                coordinates: coords.map((c) => ({ lat: c.y, lng: c.x })),
+                canvasCoordinates: coords,
+            });
+        } else {
+            const coords: Coordinate[] = [
+                { lat: y - radius, lng: x - radius },
+                { lat: y - radius, lng: x + radius },
+                { lat: y + radius, lng: x + radius },
+                { lat: y + radius, lng: x - radius },
+            ];
+            zones.push({
+                id: `other_source_${source.id}`,
+                type: 'forbidden',
+                name: '',
+                coordinates: coords,
+            });
+        }
+    });
+    return zones;
+}
+
 // แบ่งหัวฉีดให้กับแหล่งน้ำที่ใกล้ที่สุด
 function assignSprinklersToWaterSources(
     waterSources: WaterSource[],
@@ -1033,7 +1139,7 @@ function assignSprinklersToWaterSources(
 
 // ตรวจสอบว่ามีท่อวนลูปหรือไม่ (cycle detection using DFS)
 function hasCycle(pipes: Pipe[]): boolean {
-    // Build adjacency list
+    // Build adjacency list for undirected graph (pipe network)
     const adjacency = new Map<string, string[]>();
     const nodes = new Set<string>();
 
@@ -1059,27 +1165,27 @@ function hasCycle(pipes: Pipe[]): boolean {
         adjacency.get(endKey)!.push(startKey);
     });
 
-    // DFS to detect cycles
+    // DFS to detect cycles in undirected graph
     const visited = new Set<string>();
-    const recStack = new Set<string>();
 
     const dfs = (node: string, parent: string | null): boolean => {
         visited.add(node);
-        recStack.add(node);
 
         const neighbors = adjacency.get(node) || [];
         for (const neighbor of neighbors) {
             if (!visited.has(neighbor)) {
+                // Continue DFS on unvisited neighbor
                 if (dfs(neighbor, node)) {
                     return true;
                 }
-            } else if (recStack.has(neighbor) && neighbor !== parent) {
-                // Found a back edge (cycle)
+            } else if (neighbor !== parent) {
+                // Found a back edge to visited node (not parent) - this is a cycle
+                // Note: In undirected graphs, we must check neighbor !== parent
+                // to avoid false positives from the bidirectional edge
                 return true;
             }
         }
 
-        recStack.delete(node);
         return false;
     };
 
@@ -1095,7 +1201,399 @@ function hasCycle(pipes: Pipe[]): boolean {
     return false;
 }
 
-// Remove duplicate pipes while preserving connectivity
+/**
+ * ตรวจสอบว่าท่อเชื่อมจากแหล่งน้ำหนึ่งไปยังอีกแหล่งน้ำหนึ่งหรือไม่
+ * ถ้าท่อเชื่อมถึงกันจากแหล่งน้ำ A ไปยังแหล่งน้ำ B จะทำให้ท่อแตก
+ * @returns true ถ้ามีท่อเชื่อมระหว่างแหล่งน้ำสองตัว
+ */
+function pipesConnectMultipleWaterSources(
+    pipes: Pipe[],
+    waterSources: WaterSource[],
+    isCanvasMode: boolean,
+    tolerance: number = 2.0
+): boolean {
+    if (waterSources.length <= 1) return false;
+
+    // สร้าง adjacency list จากท่อ
+    const adjacency = new Map<string, Set<string>>();
+    
+    pipes.forEach((pipe) => {
+        const start = pipe.canvasStart || pipe.start;
+        const end = pipe.canvasEnd || pipe.end;
+        if (!start || !end) return;
+
+        const startKey = 'x' in start ? `${start.x},${start.y}` : `${start.lat},${start.lng}`;
+        const endKey = 'x' in end ? `${end.x},${end.y}` : `${end.lat},${end.lng}`;
+
+        if (!adjacency.has(startKey)) {
+            adjacency.set(startKey, new Set());
+        }
+        if (!adjacency.has(endKey)) {
+            adjacency.set(endKey, new Set());
+        }
+
+        adjacency.get(startKey)!.add(endKey);
+        adjacency.get(endKey)!.add(startKey);
+    });
+
+    // สร้าง key สำหรับแหล่งน้ำแต่ละตัว
+    const waterSourceKeys = waterSources.map((ws) => {
+        const pos = isCanvasMode ? ws.canvasPosition || ws.position : ws.position;
+        if (!pos) return null;
+        return 'x' in pos ? `${pos.x},${pos.y}` : `${pos.lat},${pos.lng}`;
+    }).filter((key): key is string => key !== null);
+
+    if (waterSourceKeys.length <= 1) return false;
+
+    // ใช้ BFS เช็คว่าแหล่งน้ำแต่ละตัวเชื่อมถึงกันหรือไม่
+    for (let i = 0; i < waterSourceKeys.length; i++) {
+        const startSource = waterSourceKeys[i];
+        const visited = new Set<string>();
+        const queue: string[] = [startSource];
+        visited.add(startSource);
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const neighbors = adjacency.get(current);
+
+            if (neighbors) {
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push(neighbor);
+                    }
+                }
+            }
+        }
+
+        // เช็คว่าแหล่งน้ำอื่นๆอยู่ใน visited หรือไม่
+        for (let j = i + 1; j < waterSourceKeys.length; j++) {
+            if (visited.has(waterSourceKeys[j])) {
+                console.warn(`Pipes connect water source ${waterSources[i].id} to ${waterSources[j].id}`);
+                return true; // พบท่อเชื่อมระหว่างแหล่งน้ำ
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * ลบท่อที่ไม่เชื่อมต่อกับแหล่งน้ำหรือหัวฉีดเลย (dangling pipes)
+ */
+function removeDanglingPipes(
+    pipes: Pipe[],
+    waterSources: WaterSource[],
+    sprinklers: Sprinkler[],
+    isCanvasMode: boolean,
+    tolerance: number
+): Pipe[] {
+    if (pipes.length === 0) return pipes;
+
+    // สร้างรายการจุดที่สำคัญ (แหล่งน้ำและหัวฉีด)
+    const importantPoints = new Set<string>();
+    
+    waterSources.forEach(ws => {
+        const pos = isCanvasMode ? ws.canvasPosition || ws.position : ws.position;
+        if (pos) {
+            const key = 'x' in pos ? `${pos.x},${pos.y}` : `${pos.lat},${pos.lng}`;
+            importantPoints.add(key);
+        }
+    });
+    
+    sprinklers.forEach(sp => {
+        const pos = isCanvasMode ? sp.canvasPosition || sp.position : sp.position;
+        if (pos) {
+            const key = 'x' in pos ? `${pos.x},${pos.y}` : `${pos.lat},${pos.lng}`;
+            importantPoints.add(key);
+        }
+    });
+
+    // สร้าง adjacency list
+    const adjacency = new Map<string, Set<string>>();
+    const pipesByNode = new Map<string, Pipe[]>();
+    
+    pipes.forEach(pipe => {
+        const start = pipe.canvasStart || pipe.start;
+        const end = pipe.canvasEnd || pipe.end;
+        if (!start || !end) return;
+
+        const startKey = 'x' in start ? `${start.x},${start.y}` : `${start.lat},${start.lng}`;
+        const endKey = 'x' in end ? `${end.x},${end.y}` : `${end.lat},${end.lng}`;
+
+        if (!adjacency.has(startKey)) adjacency.set(startKey, new Set());
+        if (!adjacency.has(endKey)) adjacency.set(endKey, new Set());
+        adjacency.get(startKey)!.add(endKey);
+        adjacency.get(endKey)!.add(startKey);
+
+        if (!pipesByNode.has(startKey)) pipesByNode.set(startKey, []);
+        if (!pipesByNode.has(endKey)) pipesByNode.set(endKey, []);
+        pipesByNode.get(startKey)!.push(pipe);
+        pipesByNode.get(endKey)!.push(pipe);
+    });
+
+    // หาท่อที่เชื่อมกับแหล่งน้ำโดยใช้ BFS
+    const connectedToWaterSource = new Set<string>();
+    const validPipes = new Set<Pipe>();
+    
+    waterSources.forEach(ws => {
+        const pos = isCanvasMode ? ws.canvasPosition || ws.position : ws.position;
+        if (!pos) return;
+        
+        const wsKey = 'x' in pos ? `${pos.x},${pos.y}` : `${pos.lat},${pos.lng}`;
+        const visited = new Set<string>();
+        const queue: string[] = [wsKey];
+        visited.add(wsKey);
+        connectedToWaterSource.add(wsKey);
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const currentPipes = pipesByNode.get(current) || [];
+            currentPipes.forEach(p => validPipes.add(p));
+
+            const neighbors = adjacency.get(current);
+            if (neighbors) {
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push(neighbor);
+                        connectedToWaterSource.add(neighbor);
+                    }
+                }
+            }
+        }
+    });
+
+    const result = Array.from(validPipes);
+    if (result.length < pipes.length) {
+        console.log(`Removed ${pipes.length - result.length} dangling pipes`);
+    }
+    
+    return result;
+}
+
+/**
+ * เชื่อมหัวฉีดที่ยังไม่มีท่อเชื่อม โดยเชื่อมไปยังแหล่งน้ำโดยตรง (ไม่เช็ค cycle)
+ * เพราะการเช็ค cycle บล็อกการเชื่อม ทำให้หัวฉีดไม่ได้รับการเชื่อม
+ * Cycle จะถูกลบทีหลังในขั้นตอน cleanup loop
+ */
+function ensureAllSprinklersConnectedSimple(
+    pipes: Pipe[],
+    waterSources: WaterSource[],
+    sprinklers: Sprinkler[],
+    gardenZones: GardenZone[],
+    isCanvasMode: boolean,
+    scale: number,
+    canvasData?: unknown,
+    imageData?: unknown,
+    imageBoundary?: ImageBoundary,
+    sprinklerAssignment?: Map<string, Sprinkler[]>
+): Pipe[] {
+    const additionalPipes: Pipe[] = [];
+    const tolerance = isCanvasMode ? 2.0 : 0.00002;
+    const forbiddenZones = gardenZones.filter((z) => z.type === 'forbidden');
+
+    // สร้าง set ของหัวฉีดที่เชื่อมแล้ว
+    const connectedSprinklers = new Set<string>();
+    
+    sprinklers.forEach(sprinkler => {
+        const sprinklerPos = isCanvasMode
+            ? sprinkler.canvasPosition || sprinkler.position
+            : sprinkler.position;
+        if (!sprinklerPos) return;
+
+        // เช็คว่าหัวฉีดนี้เชื่อมกับท่อแล้วหรือยัง
+        const isConnected = [...pipes, ...additionalPipes].some(pipe => {
+            const start = pipe.canvasStart || pipe.start;
+            const end = pipe.canvasEnd || pipe.end;
+            if (!start || !end) return false;
+
+            const distToStart = calculateDistance(sprinklerPos, start, isCanvasMode ? scale : undefined);
+            const distToEnd = calculateDistance(sprinklerPos, end, isCanvasMode ? scale : undefined);
+
+            return distToStart <= tolerance || distToEnd <= tolerance;
+        });
+
+        if (isConnected) {
+            connectedSprinklers.add(sprinkler.id);
+        }
+    });
+
+    // เชื่อมหัวฉีดที่ยังไม่มีท่อ (ไม่เช็ค cycle เพื่อให้แน่ใจว่าหัวฉีดทุกตัวมีท่อเชื่อม)
+    sprinklers.forEach(sprinkler => {
+        if (connectedSprinklers.has(sprinkler.id)) return;
+
+        const sprinklerPos = isCanvasMode
+            ? sprinkler.canvasPosition || sprinkler.position
+            : sprinkler.position;
+        if (!sprinklerPos) return;
+
+        // หาแหล่งน้ำที่ใกล้ที่สุด หรือใช้ assignment
+        let assignedSource: WaterSource | null = null;
+        
+        if (sprinklerAssignment) {
+            for (const [sourceId, assignedSprinklers] of sprinklerAssignment) {
+                if (assignedSprinklers.some(s => s.id === sprinkler.id)) {
+                    assignedSource = waterSources.find(ws => ws.id === sourceId) || null;
+                    break;
+                }
+            }
+        }
+        
+        if (!assignedSource) {
+            // หาแหล่งน้ำที่ใกล้ที่สุด
+            let minDist = Infinity;
+            waterSources.forEach(ws => {
+                const wsPos = isCanvasMode ? ws.canvasPosition || ws.position : ws.position;
+                if (wsPos) {
+                    const dist = calculateDistance(sprinklerPos, wsPos, isCanvasMode ? scale : undefined);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        assignedSource = ws;
+                    }
+                }
+            });
+        }
+
+        if (!assignedSource) return;
+
+        const sourcePos = isCanvasMode
+            ? assignedSource.canvasPosition || assignedSource.position
+            : assignedSource.position;
+        if (!sourcePos) return;
+
+        // สร้างท่อเชื่อมตรงๆ โดยไม่เช็ค cycle (cycle จะถูกลบในขั้นตอน cleanup loop)
+        const otherSourceZones = createForbiddenZonesAroundOtherWaterSources(waterSources, assignedSource.id, isCanvasMode);
+        const combinedForbidden = [...forbiddenZones, ...otherSourceZones];
+        
+        const path = createShortestManhattanPath(
+            sourcePos,
+            sprinklerPos,
+            combinedForbidden,
+            isCanvasMode,
+            imageBoundary
+        );
+
+        // เพิ่มท่อโดยไม่เช็ค cycle
+        for (let i = 0; i < path.length - 1; i++) {
+            const pipe = createUniformPipe(
+                `reconnect_${assignedSource.id}_${sprinkler.id}_${i}`,
+                path[i],
+                path[i + 1],
+                isCanvasMode,
+                scale,
+                canvasData,
+                imageData,
+                sprinkler.zoneId
+            );
+            pipe.waterSourceId = assignedSource.id;
+            additionalPipes.push(pipe);
+        }
+
+        connectedSprinklers.add(sprinkler.id);
+        console.log(`Reconnected disconnected sprinkler ${sprinkler.id} to water source ${assignedSource.id}`);
+    });
+
+    if (additionalPipes.length > 0) {
+        console.log(`Added ${additionalPipes.length} pipes to reconnect ${sprinklers.length - connectedSprinklers.size} sprinklers`);
+    }
+
+    return [...pipes, ...additionalPipes];
+}
+
+/**
+ * แยกท่อตาม waterSourceId และลบท่อที่ไม่มี waterSourceId หรือท่อที่เชื่อมกับแหล่งน้ำหลายตัว
+ * @returns ท่อที่ถูกแยกแล้วและแน่ใจว่าไม่มีท่อเชื่อมระหว่างแหล่งน้ำ
+ */
+function separatePipesByWaterSource(
+    pipes: Pipe[],
+    waterSources: WaterSource[],
+    sprinklers: Sprinkler[],
+    isCanvasMode: boolean,
+    tolerance: number
+): Pipe[] {
+    if (waterSources.length <= 1) return pipes;
+
+    // สร้าง map ของ node -> waterSourceId โดยใช้ BFS จากแต่ละแหล่งน้ำ
+    const nodeToWaterSource = new Map<string, string>();
+    
+    waterSources.forEach((ws) => {
+        const pos = isCanvasMode ? ws.canvasPosition || ws.position : ws.position;
+        if (!pos) return;
+        
+        const wsKey = 'x' in pos ? `${pos.x},${pos.y}` : `${pos.lat},${pos.lng}`;
+        
+        // BFS จากแหล่งน้ำนี้ไปทุก node ที่เชื่อมถึงกันผ่านท่อที่มี waterSourceId ตรงกัน
+        const visited = new Set<string>();
+        const queue: string[] = [wsKey];
+        visited.add(wsKey);
+        nodeToWaterSource.set(wsKey, ws.id);
+
+        // สร้าง adjacency list สำหรับท่อของแหล่งน้ำนี้เท่านั้น
+        const adjacency = new Map<string, Set<string>>();
+        pipes.forEach((pipe) => {
+            if (pipe.waterSourceId !== ws.id) return;
+            
+            const start = pipe.canvasStart || pipe.start;
+            const end = pipe.canvasEnd || pipe.end;
+            if (!start || !end) return;
+
+            const startKey = 'x' in start ? `${start.x},${start.y}` : `${start.lat},${start.lng}`;
+            const endKey = 'x' in end ? `${end.x},${end.y}` : `${end.lat},${end.lng}`;
+
+            if (!adjacency.has(startKey)) adjacency.set(startKey, new Set());
+            if (!adjacency.has(endKey)) adjacency.set(endKey, new Set());
+            adjacency.get(startKey)!.add(endKey);
+            adjacency.get(endKey)!.add(startKey);
+        });
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const neighbors = adjacency.get(current);
+
+            if (neighbors) {
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push(neighbor);
+                        nodeToWaterSource.set(neighbor, ws.id);
+                    }
+                }
+            }
+        }
+    });
+
+    // กรองท่อที่ start และ end อยู่ใน waterSource เดียวกัน
+    const validPipes = pipes.filter((pipe) => {
+        const start = pipe.canvasStart || pipe.start;
+        const end = pipe.canvasEnd || pipe.end;
+        if (!start || !end) return false;
+
+        const startKey = 'x' in start ? `${start.x},${start.y}` : `${start.lat},${start.lng}`;
+        const endKey = 'x' in end ? `${end.x},${end.y}` : `${end.lat},${end.lng}`;
+
+        const startWS = nodeToWaterSource.get(startKey);
+        const endWS = nodeToWaterSource.get(endKey);
+
+        // ท่อต้องอยู่ในแหล่งน้ำเดียวกัน และต้องมี waterSourceId
+        if (!startWS || !endWS) {
+            console.warn(`Pipe ${pipe.id} has no water source assignment, removing`);
+            return false;
+        }
+        
+        if (startWS !== endWS) {
+            console.warn(`Pipe ${pipe.id} connects different water sources (${startWS} -> ${endWS}), removing`);
+            return false;
+        }
+
+        return true;
+    });
+
+    console.log(`Separated pipes: kept ${validPipes.length} out of ${pipes.length} pipes`);
+    return validPipes;
+}
+
+// Remove duplicate pipes while preserving connectivity (แยกตามแหล่งน้ำ ห้ามรวมท่อคนละแหล่ง)
 function removeDuplicatePipesPreservingConnectivity(
     pipes: Pipe[],
     tolerance: number,
@@ -1104,11 +1602,21 @@ function removeDuplicatePipesPreservingConnectivity(
     isCanvasMode: boolean,
     scale: number
 ): Pipe[] {
-    // Use the same logic as removeDuplicatePipes but with connectivity check
-    return removeDuplicatePipes(pipes, tolerance);
+    // แบ่งท่อตามแหล่งน้ำ แล้วลบซ้ำภายในแหล่งเดียวกันเท่านั้น จะได้ไม่ให้ท่อที่เชื่อมถึงกันไปรวมกับอีกแหล่ง
+    const bySource = new Map<string, Pipe[]>();
+    pipes.forEach((p) => {
+        const key = p.waterSourceId ?? '';
+        if (!bySource.has(key)) bySource.set(key, []);
+        bySource.get(key)!.push(p);
+    });
+    const result: Pipe[] = [];
+    bySource.forEach((group) => {
+        result.push(...removeDuplicatePipes(group, tolerance));
+    });
+    return result;
 }
 
-// Ensure all sprinklers are connected to water sources
+// Ensure all sprinklers are connected to their assigned water source only (ไม่ให้ท่อข้ามไปอีกแหล่ง)
 function ensureAllSprinklersConnected(
     pipes: Pipe[],
     waterSources: WaterSource[],
@@ -1118,33 +1626,169 @@ function ensureAllSprinklersConnected(
     scale: number,
     canvasData?: unknown,
     imageData?: unknown,
-    imageBoundary?: ImageBoundary
+    imageBoundary?: ImageBoundary,
+    sprinklerAssignment?: Map<string, Sprinkler[]>
 ): Pipe[] {
     const additionalPipes: Pipe[] = [];
     const forbiddenZones = gardenZones.filter((z) => z.type === 'forbidden');
     const tolerance = isCanvasMode ? 2.0 : 0.00002;
 
-    // Build adjacency list graph
-    const adjacencyList = new Map<string, Set<string>>();
-    const addEdge = (keyA: string, keyB: string) => {
-        if (!adjacencyList.has(keyA)) adjacencyList.set(keyA, new Set());
-        if (!adjacencyList.has(keyB)) adjacencyList.set(keyB, new Set());
-        adjacencyList.get(keyA)!.add(keyB);
-        adjacencyList.get(keyB)!.add(keyA);
+    const addEdge = (adj: Map<string, Set<string>>, keyA: string, keyB: string) => {
+        if (!adj.has(keyA)) adj.set(keyA, new Set());
+        if (!adj.has(keyB)) adj.set(keyB, new Set());
+        adj.get(keyA)!.add(keyB);
+        adj.get(keyB)!.add(keyA);
     };
 
-    // Add all pipes to graph
+    // กรณีมีหลายแหล่งน้ำ: ตรวจสอบการเชื่อมต่อแยกตามแหล่ง ห้ามท่อข้ามแหล่ง
+    const multiSource = waterSources.length > 1 && sprinklerAssignment && sprinklerAssignment.size > 0;
+
+    if (multiSource) {
+        waterSources.forEach((source) => {
+            const sourcePipes = pipes.filter((p) => p.waterSourceId === source.id);
+            const assignedSprinklers = sprinklerAssignment.get(source.id) || [];
+
+            const adjacencyList = new Map<string, Set<string>>();
+            sourcePipes.forEach((pipe) => {
+                const start = pipe.canvasStart || pipe.start;
+                const end = pipe.canvasEnd || pipe.end;
+                if (start && end) {
+                    const startKey = getCoordinateKeyForConnectivity(start, tolerance);
+                    const endKey = getCoordinateKeyForConnectivity(end, tolerance);
+                    addEdge(adjacencyList, startKey, endKey);
+                }
+            });
+
+            const sourcePos = isCanvasMode
+                ? source.canvasPosition || source.position
+                : source.position;
+            if (sourcePos) {
+                const sourceKey = getCoordinateKeyForConnectivity(sourcePos, tolerance);
+                if (!adjacencyList.has(sourceKey)) adjacencyList.set(sourceKey, new Set());
+            }
+
+            const connectedKeys = new Set<string>();
+            const queue: string[] = [];
+            if (sourcePos) {
+                const sk = getCoordinateKeyForConnectivity(sourcePos, tolerance);
+                connectedKeys.add(sk);
+                queue.push(sk);
+            }
+            while (queue.length > 0) {
+                const current = queue.shift()!;
+                const neighbors = adjacencyList.get(current);
+                if (neighbors) {
+                    neighbors.forEach((n) => {
+                        if (!connectedKeys.has(n)) {
+                            connectedKeys.add(n);
+                            queue.push(n);
+                        }
+                    });
+                }
+            }
+
+            const connectedPointsMap = new Map<string, Coordinate | CanvasCoordinate>();
+            connectedKeys.forEach((key) => {
+                const point = parseCoordinateKeyForConnectivity(key, isCanvasMode);
+                if (point) connectedPointsMap.set(key, point);
+            });
+
+            assignedSprinklers.forEach((sprinkler) => {
+                const sprinklerPos = isCanvasMode
+                    ? sprinkler.canvasPosition || sprinkler.position
+                    : sprinkler.position;
+                if (!sprinklerPos) return;
+
+                const sprinklerKey = getCoordinateKeyForConnectivity(sprinklerPos, tolerance);
+                let isConnected = connectedKeys.has(sprinklerKey);
+                if (!isConnected) {
+                    for (const [, point] of connectedPointsMap) {
+                        if (calculateDistance(sprinklerPos, point, isCanvasMode ? scale : undefined) <= tolerance) {
+                            isConnected = true;
+                            break;
+                        }
+                    }
+                }
+                if (isConnected) return;
+
+                let nearestPoint: Coordinate | CanvasCoordinate | null = null;
+                let minDistance = Infinity;
+                for (const [, point] of connectedPointsMap) {
+                    const d = calculateDistance(sprinklerPos, point, isCanvasMode ? scale : undefined);
+                    if (d < minDistance) {
+                        minDistance = d;
+                        nearestPoint = point;
+                    }
+                }
+                if (!nearestPoint && sourcePos) {
+                    minDistance = calculateDistance(sprinklerPos, sourcePos, isCanvasMode ? scale : undefined);
+                    nearestPoint = sourcePos;
+                }
+
+                if (nearestPoint) {
+                    const otherSourceZones = createForbiddenZonesAroundOtherWaterSources(waterSources, source.id, isCanvasMode);
+                    const combinedForbidden = [...forbiddenZones, ...otherSourceZones];
+                    const path = createShortestManhattanPath(
+                        nearestPoint,
+                        sprinklerPos,
+                        combinedForbidden,
+                        isCanvasMode,
+                        imageBoundary
+                    );
+                    
+                    // เช็คว่าการเพิ่มท่อนี้จะสร้าง cycle หรือไม่
+                    let cycleDetected = false;
+                    for (let i = 0; i < path.length - 1; i++) {
+                        // ตรวจสอบว่าเพิ่มท่อนี้จะสร้าง cycle หรือไม่
+                        if (wouldCreateCycle([...pipes, ...additionalPipes], path[i], path[i + 1])) {
+                            console.warn(`Skipping fill gap pipe that would create cycle: ${source.id} -> ${sprinkler.id} segment ${i}`);
+                            cycleDetected = true;
+                            break;
+                        }
+                        
+                        const pipe = createUniformPipe(
+                            `fill_gap_${source.id}_${sprinkler.id}_${Date.now()}_${i}`,
+                            path[i],
+                            path[i + 1],
+                            isCanvasMode,
+                            scale,
+                            canvasData,
+                            imageData,
+                            sprinkler.zoneId
+                        );
+                        pipe.waterSourceId = source.id;
+                        additionalPipes.push(pipe);
+
+                        const startKey = getCoordinateKeyForConnectivity(path[i], tolerance);
+                        const endKey = getCoordinateKeyForConnectivity(path[i + 1], tolerance);
+                        addEdge(adjacencyList, startKey, endKey);
+                        connectedKeys.add(startKey);
+                        connectedKeys.add(endKey);
+                        if (!connectedPointsMap.has(startKey)) connectedPointsMap.set(startKey, path[i]);
+                        if (!connectedPointsMap.has(endKey)) connectedPointsMap.set(endKey, path[i + 1]);
+                    }
+                    
+                    if (cycleDetected) {
+                        console.warn(`Could not connect sprinkler ${sprinkler.id} without creating cycle`);
+                    }
+                }
+            });
+        });
+        return [...pipes, ...additionalPipes];
+    }
+
+    // กรณีแหล่งน้ำเดียว: ใช้กราฟรวมเหมือนเดิม
+    const adjacencyList = new Map<string, Set<string>>();
     pipes.forEach((pipe) => {
         const start = pipe.canvasStart || pipe.start;
         const end = pipe.canvasEnd || pipe.end;
         if (start && end) {
             const startKey = getCoordinateKeyForConnectivity(start, tolerance);
             const endKey = getCoordinateKeyForConnectivity(end, tolerance);
-            addEdge(startKey, endKey);
+            addEdge(adjacencyList, startKey, endKey);
         }
     });
 
-    // Get water source keys
     const waterSourceKeys = new Set<string>();
     waterSources.forEach((source) => {
         const sourcePos = isCanvasMode
@@ -1153,30 +1797,21 @@ function ensureAllSprinklersConnected(
         if (sourcePos) {
             const sourceKey = getCoordinateKeyForConnectivity(sourcePos, tolerance);
             waterSourceKeys.add(sourceKey);
-            // ทำให้แหล่งน้ำอยู่ใน graph
-            if (!adjacencyList.has(sourceKey)) {
-                adjacencyList.set(sourceKey, new Set());
-            }
+            if (!adjacencyList.has(sourceKey)) adjacencyList.set(sourceKey, new Set());
         }
     });
 
-    // BFS to find all points connected to water sources
     const connectedToWaterSource = new Set<string>();
     const queue: string[] = [];
-
-    // เริ่มจากทุกแหล่งน้ำ
-    waterSourceKeys.forEach(key => {
+    waterSourceKeys.forEach((key) => {
         connectedToWaterSource.add(key);
         queue.push(key);
     });
-
-    // BFS
     while (queue.length > 0) {
         const current = queue.shift()!;
         const neighbors = adjacencyList.get(current);
-        
         if (neighbors) {
-            neighbors.forEach(neighbor => {
+            neighbors.forEach((neighbor) => {
                 if (!connectedToWaterSource.has(neighbor)) {
                     connectedToWaterSource.add(neighbor);
                     queue.push(neighbor);
@@ -1185,16 +1820,12 @@ function ensureAllSprinklersConnected(
         }
     }
 
-    // สร้าง map ของจุดที่เชื่อมต่อกับแหล่งน้ำ (key -> coordinate)
     const connectedPointsMap = new Map<string, Coordinate | CanvasCoordinate>();
-    connectedToWaterSource.forEach(key => {
+    connectedToWaterSource.forEach((key) => {
         const point = parseCoordinateKeyForConnectivity(key, isCanvasMode);
-        if (point) {
-            connectedPointsMap.set(key, point);
-        }
+        if (point) connectedPointsMap.set(key, point);
     });
 
-    // Check each sprinkler
     sprinklers.forEach((sprinkler) => {
         const sprinklerPos = isCanvasMode
             ? sprinkler.canvasPosition || sprinkler.position
@@ -1202,55 +1833,41 @@ function ensureAllSprinklersConnected(
         if (!sprinklerPos) return;
 
         const sprinklerKey = getCoordinateKeyForConnectivity(sprinklerPos, tolerance);
-
-        // ตรวจสอบว่าหัวฉีดเชื่อมกับแหล่งน้ำหรือไม่
         let isConnectedToWater = connectedToWaterSource.has(sprinklerKey);
-
-        // ถ้ายังไม่เชื่อม ตรวจสอบว่ามีจุดใกล้เคียงที่เชื่อมกับแหล่งน้ำหรือไม่
         if (!isConnectedToWater) {
-            for (const [pointKey, point] of connectedPointsMap) {
-                const distance = calculateDistance(sprinklerPos, point, isCanvasMode ? scale : undefined);
-                if (distance <= tolerance) {
+            for (const [, point] of connectedPointsMap) {
+                if (calculateDistance(sprinklerPos, point, isCanvasMode ? scale : undefined) <= tolerance) {
                     isConnectedToWater = true;
                     break;
                 }
             }
         }
+        if (isConnectedToWater) return;
 
-        if (isConnectedToWater) {
-            return;
-        }
-
-        // หัวฉีดไม่เชื่อมกับแหล่งน้ำ - หาจุดที่ใกล้ที่สุดที่เชื่อมกับแหล่งน้ำ
         let nearestPoint: Coordinate | CanvasCoordinate | null = null;
         let minDistance = Infinity;
-
-        for (const [pointKey, point] of connectedPointsMap) {
-            const distance = calculateDistance(sprinklerPos, point, isCanvasMode ? scale : undefined);
-            if (distance < minDistance) {
-                minDistance = distance;
+        for (const [, point] of connectedPointsMap) {
+            const d = calculateDistance(sprinklerPos, point, isCanvasMode ? scale : undefined);
+            if (d < minDistance) {
+                minDistance = d;
                 nearestPoint = point;
             }
         }
-
-        // ถ้ายังไม่เจอ (ไม่มีจุดที่เชื่อมกับแหล่งน้ำเลย) ให้เชื่อมกับแหล่งน้ำโดยตรง
         if (!nearestPoint && waterSources.length > 0) {
             waterSources.forEach((source) => {
                 const sourcePos = isCanvasMode
                     ? source.canvasPosition || source.position
                     : source.position;
                 if (!sourcePos) return;
-
-                const distance = calculateDistance(sprinklerPos, sourcePos, isCanvasMode ? scale : undefined);
-                if (distance < minDistance) {
-                    minDistance = distance;
+                const d = calculateDistance(sprinklerPos, sourcePos, isCanvasMode ? scale : undefined);
+                if (d < minDistance) {
+                    minDistance = d;
                     nearestPoint = sourcePos;
                 }
             });
         }
 
         if (nearestPoint) {
-            // Create path connecting sprinkler to nearest connected point
             const path = createShortestManhattanPath(
                 nearestPoint,
                 sprinklerPos,
@@ -1258,8 +1875,6 @@ function ensureAllSprinklersConnected(
                 isCanvasMode,
                 imageBoundary
             );
-
-            // สร้างท่อตาม path
             for (let i = 0; i < path.length - 1; i++) {
                 const pipe = createUniformPipe(
                     `fill_gap_${sprinkler.id}_${Date.now()}_${i}`,
@@ -1272,26 +1887,14 @@ function ensureAllSprinklersConnected(
                     sprinkler.zoneId
                 );
                 additionalPipes.push(pipe);
-
-                // เพิ่มจุดใหม่เข้า graph
                 const startKey = getCoordinateKeyForConnectivity(path[i], tolerance);
                 const endKey = getCoordinateKeyForConnectivity(path[i + 1], tolerance);
-                addEdge(startKey, endKey);
-                
-                // เพิ่มจุดใหม่เข้า connected set
+                addEdge(adjacencyList, startKey, endKey);
                 connectedToWaterSource.add(startKey);
                 connectedToWaterSource.add(endKey);
-                if (!connectedPointsMap.has(startKey)) {
-                    connectedPointsMap.set(startKey, path[i]);
-                }
-                if (!connectedPointsMap.has(endKey)) {
-                    connectedPointsMap.set(endKey, path[i + 1]);
-                }
+                if (!connectedPointsMap.has(startKey)) connectedPointsMap.set(startKey, path[i]);
+                if (!connectedPointsMap.has(endKey)) connectedPointsMap.set(endKey, path[i + 1]);
             }
-
-            console.log(`✅ เชื่อมต่อหัวฉีด ${sprinkler.id} เข้ากับระบบท่อ (ระยะทาง: ${minDistance.toFixed(2)})`);
-        } else {
-            console.warn(`⚠️ ไม่สามารถเชื่อมต่อหัวฉีด ${sprinkler.id} เข้ากับแหล่งน้ำได้`);
         }
     });
 
@@ -1376,11 +1979,12 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
                 return; // ไม่มีหัวฉีดที่ถูกจัดให้กับแหล่งน้ำนี้
             }
 
-            // สร้างท่อสำหรับแหล่งน้ำนี้
+            // สร้างท่อสำหรับแหล่งน้ำนี้ (ห้ามท่อผ่านหรือไปเชื่อมแหล่งน้ำอื่น)
             let sourcePipes: Pipe[] = [];
-
             const forbiddenZones = gardenZones.filter((z) => z.type === 'forbidden');
-            
+            const otherSourceZones = createForbiddenZonesAroundOtherWaterSources(waterSources, waterSource.id, isCanvasMode);
+            const combinedForbidden = [...forbiddenZones, ...otherSourceZones];
+
             sourcePipes = createUnifiedTrunkSystem(
                 waterSource,
                 assignedSprinklers,
@@ -1389,7 +1993,7 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
                 scale,
                 canvasData,
                 imageData,
-                forbiddenZones,
+                combinedForbidden,
                 imageBoundary
             );
 
@@ -1404,9 +2008,6 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
                 );
 
                 if (validSprinklers.length > 0) {
-                    // หา forbidden zones
-                    const forbiddenZones = gardenZones.filter((z) => z.type === 'forbidden');
-                    
                     const fallback: Pipe[] = [];
                     validSprinklers.forEach((sprinkler, sIdx) => {
                         const sprPos = isCanvasMode
@@ -1417,36 +2018,58 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
                         const path = createShortestManhattanPath(
                             sourcePos,
                             sprPos,
-                            forbiddenZones,
+                            combinedForbidden,
                             isCanvasMode,
                             imageBoundary
                         );
                         for (let i = 0; i < path.length - 1; i++) {
-                            fallback.push(
-                                createUniformPipe(
-                                    `fallback_${waterSource.id}_${sprinkler.id}_${sIdx}_${i}`,
-                                    path[i],
-                                    path[i + 1],
-                                    isCanvasMode,
-                                    scale,
-                                    canvasData,
-                                    imageData,
-                                    sprinkler.zoneId
-                                )
+                            const pipe = createUniformPipe(
+                                `fallback_${waterSource.id}_${sprinkler.id}_${sIdx}_${i}`,
+                                path[i],
+                                path[i + 1],
+                                isCanvasMode,
+                                scale,
+                                canvasData,
+                                imageData,
+                                sprinkler.zoneId
                             );
+                            pipe.waterSourceId = waterSource.id;
+                            fallback.push(pipe);
                         }
                     });
                     sourcePipes = fallback;
                 }
             }
 
-            // ตรวจสอบว่ามีท่อวนลูปหรือไม่
-            if (hasCycle(sourcePipes)) {
-                console.warn(`Cycle detected in pipes for water source ${waterSource.id}, removing cycles`);
+            // ตรวจสอบว่ามีท่อวนลูปหรือไม่ (ตรวจซ้ำหลายรอบเพื่อให้แน่ใจ)
+            let cycleCheckCount = 0;
+            const maxCycleChecks = 5;
+            
+            while (hasCycle(sourcePipes) && cycleCheckCount < maxCycleChecks) {
+                console.warn(`Cycle detected in pipes for water source ${waterSource.id} (attempt ${cycleCheckCount + 1}), removing cycles`);
                 // ถ้าพบท่อวนลูป ให้ลบท่อที่ทำให้เกิดลูปออก
+                const beforeCount = sourcePipes.length;
                 sourcePipes = removeCyclesFromPipes(sourcePipes);
+                const afterCount = sourcePipes.length;
+                
+                if (beforeCount === afterCount) {
+                    // ถ้าจำนวนท่อไม่เปลี่ยน แสดงว่า removeCyclesFromPipes ไม่ได้ลบอะไร
+                    // แต่ยัง detect cycle อยู่ อาจมีปัญหา ให้หยุด
+                    console.error(`❌ Cannot remove cycle for water source ${waterSource.id}, no pipes were removed`);
+                    break;
+                }
+                
+                cycleCheckCount++;
+            }
+            
+            if (cycleCheckCount >= maxCycleChecks && hasCycle(sourcePipes)) {
+                console.error(`❌ Still have cycles in water source ${waterSource.id} after ${maxCycleChecks} attempts`);
             }
 
+            // กำหนดแหล่งน้ำให้ท่อชัดเจน เพื่อไม่ให้ท่อที่เชื่อมถึงกันไปหาแหล่งน้ำอีกตัว
+            sourcePipes.forEach((p) => {
+                p.waterSourceId = waterSource.id;
+            });
             allPipes.push(...sourcePipes);
         });
 
@@ -1461,13 +2084,252 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
             );
         }
 
-        // ตรวจสอบและเชื่อมต่อท่อที่ขาดหายไป
-        allPipes = ensureAllSprinklersConnected(allPipes, waterSources, sprinklers, gardenZones, isCanvasMode, scale, canvasData, imageData, imageBoundary);
+        // ⚠️ Validation: ตรวจสอบว่าท่อจากแหล่งน้ำต่างกันไม่เชื่อมต่อกัน
+        if (waterSources.length > 1) {
+            const tolerance = isCanvasMode ? 2.0 : 0.00002;
+            const crossConnections: string[] = [];
+            
+            for (let i = 0; i < allPipes.length; i++) {
+                const pipe1 = allPipes[i];
+                if (!pipe1.waterSourceId) continue;
+                
+                for (let j = i + 1; j < allPipes.length; j++) {
+                    const pipe2 = allPipes[j];
+                    if (!pipe2.waterSourceId || pipe1.waterSourceId === pipe2.waterSourceId) continue;
+                    
+                    // เช็คว่า pipe1 และ pipe2 มี endpoint ที่ใกล้กันมากไหม (= เชื่อมต่อกัน)
+                    const p1Start = pipe1.canvasStart || pipe1.start;
+                    const p1End = pipe1.canvasEnd || pipe1.end;
+                    const p2Start = pipe2.canvasStart || pipe2.start;
+                    const p2End = pipe2.canvasEnd || pipe2.end;
+                    
+                    if (!p1Start || !p1End || !p2Start || !p2End) continue;
+                    
+                    const connections = [
+                        { dist: calculateDistance(p1Start, p2Start, isCanvasMode ? scale : undefined), points: 'start-start' },
+                        { dist: calculateDistance(p1Start, p2End, isCanvasMode ? scale : undefined), points: 'start-end' },
+                        { dist: calculateDistance(p1End, p2Start, isCanvasMode ? scale : undefined), points: 'end-start' },
+                        { dist: calculateDistance(p1End, p2End, isCanvasMode ? scale : undefined), points: 'end-end' },
+                    ];
+                    
+                    for (const conn of connections) {
+                        if (conn.dist <= tolerance) {
+                            crossConnections.push(`Pipe ${pipe1.id} (source ${pipe1.waterSourceId}) connects to Pipe ${pipe2.id} (source ${pipe2.waterSourceId}) at ${conn.points}`);
+                        }
+                    }
+                }
+            }
+            
+            if (crossConnections.length > 0) {
+                console.warn('⚠️ พบท่อที่เชื่อมถึงกันข้ามแหล่งน้ำ:', crossConnections.length, 'จุด');
+                console.warn('รายละเอียด:', crossConnections);
+            }
+        }
 
-        // ตรวจสอบท่อวนลูปอีกครั้งหลังจากลบท่อซ้ำ
+        // ตรวจสอบและเชื่อมต่อท่อที่ขาดหายไป (แยกตามแหล่งน้ำ ไม่ให้ท่อที่เชื่อมถึงกันไปหาแหล่งน้ำอีกตัว)
+        allPipes = ensureAllSprinklersConnected(allPipes, waterSources, sprinklers, gardenZones, isCanvasMode, scale, canvasData, imageData, imageBoundary, sprinklerAssignment);
+
+        // ตรวจสอบและลบท่อวนลูปซ้ำๆจนกว่าจะไม่มี cycle (เพราะ ensureAllSprinklersConnected อาจสร้าง cycle ใหม่)
+        let cycleCheckIterations = 0;
+        const maxCycleCheckIterations = 10; // ป้องกันการวนลูปไม่รู้จบ
+        
+        while (hasCycle(allPipes) && cycleCheckIterations < maxCycleCheckIterations) {
+            console.warn(`Cycle detected in pipe network (iteration ${cycleCheckIterations + 1}), removing cycles`);
+            
+            // ลบ cycle แยกตาม waterSourceId เพื่อไม่ให้กระทบกับแหล่งน้ำอื่น
+            if (waterSources.length > 1) {
+                const pipesBySource = new Map<string, Pipe[]>();
+                waterSources.forEach(ws => pipesBySource.set(ws.id, []));
+                
+                allPipes.forEach(pipe => {
+                    if (pipe.waterSourceId) {
+                        const sourcePipes = pipesBySource.get(pipe.waterSourceId);
+                        if (sourcePipes) {
+                            sourcePipes.push(pipe);
+                        }
+                    }
+                });
+                
+                // ลบ cycle ในแต่ละแหล่งน้ำแยกกัน
+                const noCyclePipes: Pipe[] = [];
+                waterSources.forEach(ws => {
+                    const sourcePipes = pipesBySource.get(ws.id) || [];
+                    if (sourcePipes.length > 0 && hasCycle(sourcePipes)) {
+                        const cleaned = removeCyclesFromPipes(sourcePipes);
+                        noCyclePipes.push(...cleaned);
+                    } else {
+                        noCyclePipes.push(...sourcePipes);
+                    }
+                });
+                
+                allPipes = noCyclePipes;
+            } else {
+                allPipes = removeCyclesFromPipes(allPipes);
+            }
+            
+            cycleCheckIterations++;
+        }
+        
+        if (cycleCheckIterations >= maxCycleCheckIterations) {
+            console.error('❌ ไม่สามารถลบ cycle ออกได้ทั้งหมดภายในจำนวนรอบที่กำหนด');
+        }
+
+        // ตรวจสอบว่าท่อเชื่อมจากแหล่งน้ำหนึ่งไปยังอีกแหล่งน้ำหนึ่งหรือไม่
+        if (waterSources.length > 1 && pipesConnectMultipleWaterSources(allPipes, waterSources, isCanvasMode, isCanvasMode ? 2.0 : 0.00002)) {
+            console.error('❌ พบท่อเชื่อมระหว่างแหล่งน้ำหลายตัว ระบบจะลบท่อที่ทำให้เกิดการเชื่อมต่อนี้');
+            // ลบท่อที่ทำให้เกิดการเชื่อมระหว่างแหล่งน้ำ โดยการแยกท่อตาม waterSourceId
+            allPipes = separatePipesByWaterSource(allPipes, waterSources, sprinklers, isCanvasMode, isCanvasMode ? 2.0 : 0.00002);
+            
+            // ตรวจสอบ cycle อีกครั้งหลังจากแยกท่อ
+            if (hasCycle(allPipes)) {
+                console.warn('Cycle detected after separating pipes, removing cycles');
+                allPipes = removeCyclesFromPipes(allPipes);
+            }
+        }
+
+        // วนลูปเพื่อลบ cycle, ลบท่อ dangling, และเชื่อมหัวฉีดที่ขาดหาย
+        // จนกว่าจะไม่มี cycle และหัวฉีดทุกตัวมีท่อเชื่อม
+        let cleanupIterations = 0;
+        const maxCleanupIterations = 10;
+        
+        while (cleanupIterations < maxCleanupIterations) {
+            let changesMade = false;
+            
+            // 1. ลบ cycle ถ้ามี (ตรวจซ้ำหลายรอบจนไม่มี cycle)
+            let cycleRemovalAttempts = 0;
+            const maxCycleRemovalAttempts = 5;
+            
+            while (hasCycle(allPipes) && cycleRemovalAttempts < maxCycleRemovalAttempts) {
+                console.warn(`Cleanup iteration ${cleanupIterations + 1}, cycle removal attempt ${cycleRemovalAttempts + 1}: Removing cycles`);
+                const beforeCount = allPipes.length;
+                
+                if (waterSources.length > 1) {
+                    const pipesBySource = new Map<string, Pipe[]>();
+                    waterSources.forEach(ws => pipesBySource.set(ws.id, []));
+                    
+                    allPipes.forEach(pipe => {
+                        if (pipe.waterSourceId) {
+                            const sourcePipes = pipesBySource.get(pipe.waterSourceId);
+                            if (sourcePipes) {
+                                sourcePipes.push(pipe);
+                            }
+                        }
+                    });
+                    
+                    const noCyclePipes: Pipe[] = [];
+                    waterSources.forEach(ws => {
+                        const sourcePipes = pipesBySource.get(ws.id) || [];
+                        if (sourcePipes.length > 0) {
+                            // ลบ cycle ซ้ำจนกว่าจะไม่มี
+                            let wsAttempts = 0;
+                            let wsPipes = sourcePipes;
+                            while (hasCycle(wsPipes) && wsAttempts < 3) {
+                                wsPipes = removeCyclesFromPipes(wsPipes);
+                                wsAttempts++;
+                            }
+                            noCyclePipes.push(...wsPipes);
+                        }
+                    });
+                    
+                    allPipes = noCyclePipes;
+                } else {
+                    allPipes = removeCyclesFromPipes(allPipes);
+                }
+                
+                if (beforeCount !== allPipes.length) {
+                    changesMade = true;
+                }
+                
+                cycleRemovalAttempts++;
+            }
+            
+            if (hasCycle(allPipes)) {
+                console.error(`❌ Still have cycles after ${cycleRemovalAttempts} removal attempts in cleanup iteration ${cleanupIterations + 1}`);
+            }
+            
+            // 2. ลบท่อที่ไม่เชื่อมกับอะไร (dangling pipes)
+            const beforeDanglingCount = allPipes.length;
+            allPipes = removeDanglingPipes(allPipes, waterSources, sprinklers, isCanvasMode, isCanvasMode ? 2.0 : 0.00002);
+            if (beforeDanglingCount !== allPipes.length) {
+                console.log(`Cleanup iteration ${cleanupIterations + 1}: Removed ${beforeDanglingCount - allPipes.length} dangling pipes`);
+                changesMade = true;
+            }
+            
+            // 3. เชื่อมหัวฉีดที่ขาดหาย
+            const beforeReconnectCount = allPipes.length;
+            allPipes = ensureAllSprinklersConnectedSimple(allPipes, waterSources, sprinklers, gardenZones, isCanvasMode, scale, canvasData, imageData, imageBoundary, sprinklerAssignment);
+            if (beforeReconnectCount !== allPipes.length) {
+                console.log(`Cleanup iteration ${cleanupIterations + 1}: Added ${allPipes.length - beforeReconnectCount} pipes to reconnect sprinklers`);
+                changesMade = true;
+            }
+            
+            cleanupIterations++;
+            
+            // ถ้าไม่มีการเปลี่ยนแปลงในรอบนี้ แสดงว่าเสร็จแล้ว
+            if (!changesMade) {
+                console.log(`Cleanup completed after ${cleanupIterations} iterations`);
+                break;
+            }
+        }
+        
+        if (cleanupIterations >= maxCleanupIterations) {
+            console.warn(`⚠️ Reached max cleanup iterations (${maxCleanupIterations})`);
+        }
+        
+        // ตรวจสอบสุดท้ายว่าไม่มี cycle และบังคับลบจนหมด
+        let finalCycleAttempts = 0;
+        const maxFinalCycleAttempts = 10;
+        
+        while (hasCycle(allPipes) && finalCycleAttempts < maxFinalCycleAttempts) {
+            console.error(`❌ Still have cycles after cleanup, forcing cycle removal (attempt ${finalCycleAttempts + 1})`);
+            const beforeCount = allPipes.length;
+            
+            // แยกตามแหล่งน้ำและลบ cycle
+            if (waterSources.length > 1) {
+                const pipesBySource = new Map<string, Pipe[]>();
+                waterSources.forEach(ws => pipesBySource.set(ws.id, []));
+                
+                allPipes.forEach(pipe => {
+                    if (pipe.waterSourceId) {
+                        const sourcePipes = pipesBySource.get(pipe.waterSourceId);
+                        if (sourcePipes) {
+                            sourcePipes.push(pipe);
+                        }
+                    }
+                });
+                
+                const noCyclePipes: Pipe[] = [];
+                waterSources.forEach(ws => {
+                    const sourcePipes = pipesBySource.get(ws.id) || [];
+                    if (sourcePipes.length > 0) {
+                        const cleaned = removeCyclesFromPipes(sourcePipes);
+                        noCyclePipes.push(...cleaned);
+                    }
+                });
+                
+                allPipes = noCyclePipes;
+            } else {
+                allPipes = removeCyclesFromPipes(allPipes);
+            }
+            
+            console.log(`Final cycle removal: ${beforeCount} -> ${allPipes.length} pipes (removed ${beforeCount - allPipes.length})`);
+            
+            if (beforeCount === allPipes.length) {
+                console.error(`❌ Cannot remove cycles, no pipes were removed in this attempt`);
+                break;
+            }
+            
+            finalCycleAttempts++;
+        }
+        
         if (hasCycle(allPipes)) {
-            console.warn('Cycle detected in final pipe network, removing cycles');
-            allPipes = removeCyclesFromPipes(allPipes);
+            console.error(`❌❌❌ CRITICAL: Still have cycles after ${finalCycleAttempts} final attempts!`);
+            // แสดงรายละเอียดเพื่อ debug
+            console.error(`Total pipes: ${allPipes.length}`);
+            console.error(`Water sources: ${waterSources.length}`);
+            console.error(`Sprinklers: ${sprinklers.length}`);
+        } else {
+            console.log(`✅ Final check: No cycles detected. Total pipes: ${allPipes.length}`);
         }
 
         return allPipes;
@@ -1480,6 +2342,9 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
 // ลบท่อที่ทำให้เกิดลูปออก (ใช้ Minimum Spanning Tree approach)
 function removeCyclesFromPipes(pipes: Pipe[]): Pipe[] {
     if (pipes.length === 0) return pipes;
+
+    // ถ้ามีท่อน้อยกว่า 3 เส้น จะไม่มี cycle ได้
+    if (pipes.length < 3) return pipes;
 
     // Build graph
     const nodes = new Map<string, number>();
@@ -1509,6 +2374,7 @@ function removeCyclesFromPipes(pipes: Pipe[]): Pipe[] {
     });
 
     // Kruskal's algorithm to find MST (removes cycles)
+    // เรียงตามน้ำหนัก (ความยาว) เพื่อเก็บท่อที่สั้นที่สุด
     edges.sort((a, b) => a.weight - b.weight);
 
     const parent = new Array(nodeIndex).fill(0).map((_, i) => i);
@@ -1528,11 +2394,21 @@ function removeCyclesFromPipes(pipes: Pipe[]): Pipe[] {
     };
 
     const mstPipes: Pipe[] = [];
+    const removedPipes: Pipe[] = [];
+    
     edges.forEach((edge) => {
         if (union(edge.from, edge.to)) {
+            // ท่อนี้ไม่สร้าง cycle สามารถเก็บได้
             mstPipes.push(edge.pipe);
+        } else {
+            // ท่อนี้สร้าง cycle ต้องลบ
+            removedPipes.push(edge.pipe);
         }
     });
+
+    if (removedPipes.length > 0) {
+        console.log(`Removed ${removedPipes.length} pipes that created cycles:`, removedPipes.map(p => p.id));
+    }
 
     return mstPipes;
 }
@@ -1838,18 +2714,24 @@ export function loadGardenData(): GardenPlannerData | null {
 
         if (typeof window !== 'undefined' && window.localStorage) {
             try {
-                const data = localStorage.getItem(STORAGE_KEY);
-                if (data) {
-                    const parsedData = JSON.parse(data);
-                    if (
-                        parsedData &&
-                        Array.isArray(parsedData.gardenZones) &&
-                        Array.isArray(parsedData.sprinklers) &&
-                        Array.isArray(parsedData.pipes)
-                    ) {
-                        const validatedData = validateAndFixLoadedData(parsedData);
-                        inMemoryData = validatedData;
-                        return validatedData;
+                const keysToTry = [STORAGE_KEY, 'gardenData'];
+                for (const key of keysToTry) {
+                    const data = localStorage.getItem(key);
+                    if (data) {
+                        const parsedData = JSON.parse(data);
+                        if (
+                            parsedData &&
+                            Array.isArray(parsedData.gardenZones) &&
+                            Array.isArray(parsedData.sprinklers) &&
+                            Array.isArray(parsedData.pipes)
+                        ) {
+                            const validatedData = validateAndFixLoadedData(parsedData);
+                            inMemoryData = validatedData;
+                            if (key !== STORAGE_KEY) {
+                                localStorage.setItem(STORAGE_KEY, data);
+                            }
+                            return validatedData;
+                        }
                     }
                 }
             } catch (e) {
@@ -1902,6 +2784,11 @@ function validateAndFixLoadedData(data: GardenPlannerData | (GardenPlannerData &
     }
 
     return fixedData as GardenPlannerData;
+}
+
+/** ล้างแคชในหน่วยความจำเท่านั้น (ไม่ลบ localStorage) ใช้เมื่อจะเปิดโครงการอื่น เพื่อให้ loadGardenData() อ่านจาก localStorage ใหม่ */
+export function clearGardenDataCache(): void {
+    inMemoryData = null;
 }
 
 export function clearGardenData(): boolean {
@@ -4546,6 +5433,10 @@ function createSimplifiedZoneNetwork(
 }
 
 // Create unified trunk system with single main line from water source
+/**
+ * สร้างระบบท่อแบบ MST (Minimum Spanning Tree) - รับประกันไม่มี cycle
+ * ใช้ Prim's algorithm เชื่อมจุดทีละจุดโดยเลือกจุดที่ใกล้ที่สุด
+ */
 function createUnifiedTrunkSystem(
     waterSource: WaterSource,
     sprinklers: Sprinkler[],
@@ -4562,80 +5453,108 @@ function createUnifiedTrunkSystem(
         ? waterSource.canvasPosition || waterSource.position
         : waterSource.position;
 
-    if (sprinklers.length === 0) return pipes;
+    if (!sourcePos || sprinklers.length === 0) return pipes;
 
-    // Group sprinklers by zone
-    const sprinklersByZone = new Map<string, Sprinkler[]>();
-    sprinklers.forEach((sprinkler) => {
-        if (!sprinklersByZone.has(sprinkler.zoneId)) {
-            sprinklersByZone.set(sprinkler.zoneId, []);
+    // กรอง sprinklers ที่มี position
+    const validSprinklers = sprinklers.filter(s => {
+        const pos = isCanvasMode ? s.canvasPosition || s.position : s.position;
+        return pos !== undefined && pos !== null;
+    });
+
+    if (validSprinklers.length === 0) return pipes;
+
+    // Prim's MST Algorithm - รับประกันไม่มี cycle
+    const connected = new Set<string>(); // จุดที่เชื่อมแล้ว
+    const connectedPoints = new Map<string, Coordinate | CanvasCoordinate>(); // key -> position
+    
+    // เริ่มจากแหล่งน้ำ
+    const sourceKey = 'x' in sourcePos 
+        ? `source_${sourcePos.x}_${sourcePos.y}`
+        : `source_${sourcePos.lat}_${sourcePos.lng}`;
+    connected.add(sourceKey);
+    connectedPoints.set(sourceKey, sourcePos);
+
+    // เชื่อมหัวฉีดทีละตัว โดยเลือกตัวที่ใกล้ network ที่สุด
+    const unconnectedSprinklers = [...validSprinklers];
+    
+    while (unconnectedSprinklers.length > 0) {
+        let nearestSprinkler: Sprinkler | null = null;
+        let nearestFromPoint: Coordinate | CanvasCoordinate | null = null;
+        let minDistance = Infinity;
+
+        // หาหัวฉีดที่ใกล้ network ที่สุด
+        unconnectedSprinklers.forEach(sprinkler => {
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
+            
+            if (!sprinklerPos) return;
+
+            // เช็คระยะทางจากหัวฉีดนี้ไปยังทุกจุดใน network
+            for (const [, connectedPoint] of connectedPoints) {
+                const dist = calculateDistance(sprinklerPos, connectedPoint, isCanvasMode ? scale : undefined);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestSprinkler = sprinkler;
+                    nearestFromPoint = connectedPoint;
+                }
+            }
+        });
+
+        if (!nearestSprinkler || !nearestFromPoint) break;
+
+        // เชื่อมหัวฉีดที่ใกล้ที่สุดเข้า network
+        const sprinklerPos = isCanvasMode
+            ? nearestSprinkler.canvasPosition || nearestSprinkler.position
+            : nearestSprinkler.position;
+
+        if (sprinklerPos) {
+            // สร้างท่อจาก nearestFromPoint ไปยัง sprinklerPos
+            const path = createShortestManhattanPath(
+                nearestFromPoint,
+                sprinklerPos,
+                forbiddenZones || [],
+                isCanvasMode,
+                imageBoundary
+            );
+
+            // แปลง path เป็นท่อ
+            for (let i = 0; i < path.length - 1; i++) {
+                const pipe = createUniformPipe(
+                    `mst_${waterSource.id}_${nearestSprinkler.id}_${i}`,
+                    path[i],
+                    path[i + 1],
+                    isCanvasMode,
+                    scale,
+                    canvasData,
+                    imageData,
+                    nearestSprinkler.zoneId
+                );
+                pipe.waterSourceId = waterSource.id;
+                pipes.push(pipe);
+
+                // เพิ่มจุดระหว่างทางเข้า connected points
+                const pointKey = 'x' in path[i + 1]
+                    ? `point_${(path[i + 1] as CanvasCoordinate).x}_${(path[i + 1] as CanvasCoordinate).y}`
+                    : `point_${(path[i + 1] as Coordinate).lat}_${(path[i + 1] as Coordinate).lng}`;
+                connectedPoints.set(pointKey, path[i + 1]);
+            }
+
+            // เพิ่มหัวฉีดนี้เข้า connected
+            const sprinklerKey = `sprinkler_${nearestSprinkler.id}`;
+            connected.add(sprinklerKey);
+            connectedPoints.set(sprinklerKey, sprinklerPos);
         }
-        sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
-    });
 
-    // Find all zone entry points
-    const zoneEntryPoints: Array<{
-        point: Coordinate | CanvasCoordinate;
-        zoneId: string;
-        zoneSprinklers: Sprinkler[];
-        zoneCoords: (Coordinate | CanvasCoordinate)[];
-    }> = [];
-
-    sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
-        const zone = gardenZones.find((z) => z.id === zoneId);
-        if (!zone) return;
-
-        const zoneCoords = isCanvasMode
-            ? zone.canvasCoordinates || zone.coordinates
-            : zone.coordinates;
-        if (!zoneCoords || zoneCoords.length < 3) return;
-
-        const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
-        if (entryPoint) {
-            zoneEntryPoints.push({
-                point: entryPoint,
-                zoneId,
-                zoneSprinklers,
-                zoneCoords,
-            });
+        // ลบหัวฉีดนี้ออกจาก unconnected
+        const index = unconnectedSprinklers.indexOf(nearestSprinkler);
+        if (index > -1) {
+            unconnectedSprinklers.splice(index, 1);
         }
-    });
+    }
 
-    if (zoneEntryPoints.length === 0) return pipes;
-
-    // Create single main trunk line that connects all zones efficiently
-    const mainTrunk = createMainTrunkLine(
-        sourcePos,
-        zoneEntryPoints,
-        isCanvasMode,
-        scale,
-        canvasData,
-        imageData,
-        forbiddenZones,
-        waterSource.id,
-        imageBoundary
-    );
-    pipes.push(...mainTrunk);
-
-    // Create zone-specific networks that branch from the main trunk
-    zoneEntryPoints.forEach(({ point, zoneId, zoneSprinklers, zoneCoords }) => {
-        const zonePipes = createZoneBranchNetwork(
-            mainTrunk,
-            point,
-            zoneCoords,
-            zoneSprinklers,
-            isCanvasMode,
-            scale,
-            canvasData,
-            imageData,
-            zoneId,
-            forbiddenZones,
-            waterSource.id,
-            imageBoundary
-        );
-        pipes.push(...zonePipes);
-    });
-
+    console.log(`MST created: ${pipes.length} pipes for ${validSprinklers.length} sprinklers`);
+    
     return pipes;
 }
 
@@ -4732,6 +5651,66 @@ function createOptimalTrunkPath(
 }
 
 // Create zone branch network that connects to main trunk
+/**
+ * ตรวจสอบว่าการเพิ่มท่อใหม่จะสร้าง cycle หรือไม่
+ */
+function wouldCreateCycle(
+    existingPipes: Pipe[],
+    newPipeStart: Coordinate | CanvasCoordinate,
+    newPipeEnd: Coordinate | CanvasCoordinate
+): boolean {
+    // สร้าง adjacency list จากท่อที่มีอยู่
+    const adjacency = new Map<string, Set<string>>();
+    
+    existingPipes.forEach((pipe) => {
+        const start = pipe.canvasStart || pipe.start;
+        const end = pipe.canvasEnd || pipe.end;
+        if (!start || !end) return;
+
+        const startKey = 'x' in start ? `${start.x},${start.y}` : `${start.lat},${start.lng}`;
+        const endKey = 'x' in end ? `${end.x},${end.y}` : `${end.lat},${end.lng}`;
+
+        if (!adjacency.has(startKey)) adjacency.set(startKey, new Set());
+        if (!adjacency.has(endKey)) adjacency.set(endKey, new Set());
+        
+        adjacency.get(startKey)!.add(endKey);
+        adjacency.get(endKey)!.add(startKey);
+    });
+
+    // เช็คว่า start และ end ของท่อใหม่เชื่อมถึงกันอยู่แล้วหรือไม่
+    const startKey = 'x' in newPipeStart ? `${newPipeStart.x},${newPipeStart.y}` : `${newPipeStart.lat},${newPipeStart.lng}`;
+    const endKey = 'x' in newPipeEnd ? `${newPipeEnd.x},${newPipeEnd.y}` : `${newPipeEnd.lat},${newPipeEnd.lng}`;
+
+    // ถ้า start และ end เป็นจุดเดียวกัน ก็สร้าง cycle แน่นอน
+    if (startKey === endKey) return true;
+
+    // ใช้ BFS เช็คว่า start เชื่อมถึง end อยู่แล้วหรือไม่
+    const visited = new Set<string>();
+    const queue: string[] = [startKey];
+    visited.add(startKey);
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        
+        if (current === endKey) {
+            // เจอแล้ว แสดงว่าถ้าเพิ่มท่อนี้จะเกิด cycle
+            return true;
+        }
+
+        const neighbors = adjacency.get(current);
+        if (neighbors) {
+            for (const neighbor of neighbors) {
+                if (!visited.has(neighbor)) {
+                    visited.add(neighbor);
+                    queue.push(neighbor);
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 function createZoneBranchNetwork(
     mainTrunk: Pipe[],
     zoneEntryPoint: Coordinate | CanvasCoordinate,
@@ -4756,7 +5735,7 @@ function createZoneBranchNetwork(
 
     sprinklerGroups.forEach((group, groupIndex) => {
         if (group.length === 1) {
-            // Single sprinkler - connect to zone entry point or existing trunk
+            // Single sprinkler - connect to zone entry point ONLY (ไม่เชื่อมกับท่ออื่นเพื่อป้องกัน cycle)
             const sprinkler = group[0];
             if (connectedSprinklers.has(sprinkler.id)) return;
 
@@ -4765,14 +5744,8 @@ function createZoneBranchNetwork(
                 : sprinkler.position;
             if (!sprinklerPos) return;
 
-            // Connect to zone entry point or closest point on existing network
-            const connectionPoint =
-                findClosestPointOnAnyTrunk(
-                    [...mainTrunk, ...pipes],
-                    sprinklerPos,
-                    isCanvasMode,
-                    scale
-                ) || zoneEntryPoint;
+            // เชื่อมกับ zoneEntryPoint เท่านั้น เพื่อไม่ให้เกิด cycle
+            const connectionPoint = zoneEntryPoint;
             const branchPath = createShortestManhattanPath(
                 connectionPoint,
                 sprinklerPos,
@@ -4780,39 +5753,47 @@ function createZoneBranchNetwork(
                 isCanvasMode
             );
 
+            // เช็คว่าการเพิ่มท่อนี้จะสร้าง cycle หรือไม่
+            const allCurrentPipes = [...mainTrunk, ...pipes];
+            let wouldCreateCycleFlag = false;
+            
             for (let i = 0; i < branchPath.length - 1; i++) {
-                    const pipe = createUniformPipe(
-                        `zone_branch_${waterSourceId || 'default'}_${zoneId}_${sprinkler.id}_${i}`,
-                        branchPath[i],
-                        branchPath[i + 1],
-                        isCanvasMode,
-                        scale,
-                        canvasData,
-                        imageData,
-                        zoneId
-                    );
+                if (wouldCreateCycle(allCurrentPipes, branchPath[i], branchPath[i + 1])) {
+                    console.warn(`Skipping pipe segment that would create cycle: ${sprinkler.id} segment ${i}`);
+                    wouldCreateCycleFlag = true;
+                    break;
+                }
+                
+                const pipe = createUniformPipe(
+                    `zone_branch_${waterSourceId || 'default'}_${zoneId}_${sprinkler.id}_${i}`,
+                    branchPath[i],
+                    branchPath[i + 1],
+                    isCanvasMode,
+                    scale,
+                    canvasData,
+                    imageData,
+                    zoneId
+                );
                 pipes.push(pipe);
+                allCurrentPipes.push(pipe);
             }
 
-            connectedSprinklers.add(sprinkler.id);
+            if (!wouldCreateCycleFlag) {
+                connectedSprinklers.add(sprinkler.id);
+            }
         } else {
             // Multiple aligned sprinklers - create efficient line
             const sortedGroup = sortSprinklersForConnection(group, isCanvasMode);
 
-            // Connect first sprinkler to trunk/entry point
+            // Connect first sprinkler to zone entry point ONLY (ไม่เชื่อมกับท่ออื่นเพื่อป้องกัน cycle)
             const firstSprinkler = sortedGroup[0];
             if (!connectedSprinklers.has(firstSprinkler.id)) {
                 const firstPos = isCanvasMode
                     ? firstSprinkler.canvasPosition || firstSprinkler.position
                     : firstSprinkler.position;
                 if (firstPos) {
-                    const connectionPoint =
-                        findClosestPointOnAnyTrunk(
-                            [...mainTrunk, ...pipes],
-                            firstPos,
-                            isCanvasMode,
-                            scale
-                        ) || zoneEntryPoint;
+                    // เชื่อมกับ zoneEntryPoint เท่านั้น เพื่อไม่ให้เกิด cycle
+                    const connectionPoint = zoneEntryPoint;
                     const mainBranchPath = createShortestManhattanPath(
                         connectionPoint,
                         firstPos,
@@ -4820,7 +5801,17 @@ function createZoneBranchNetwork(
                         isCanvasMode
                     );
 
+                    // เช็คว่าการเพิ่มท่อนี้จะสร้าง cycle หรือไม่
+                    const allCurrentPipes = [...mainTrunk, ...pipes];
+                    let wouldCreateCycleFlag = false;
+                    
                     for (let i = 0; i < mainBranchPath.length - 1; i++) {
+                        if (wouldCreateCycle(allCurrentPipes, mainBranchPath[i], mainBranchPath[i + 1])) {
+                            console.warn(`Skipping group main branch that would create cycle: group ${groupIndex} segment ${i}`);
+                            wouldCreateCycleFlag = true;
+                            break;
+                        }
+                        
                         const pipe = createUniformPipe(
                             `zone_group_main_${waterSourceId || 'default'}_${zoneId}_g${groupIndex}_${i}`,
                             mainBranchPath[i],
@@ -4832,9 +5823,12 @@ function createZoneBranchNetwork(
                             zoneId
                         );
                         pipes.push(pipe);
+                        allCurrentPipes.push(pipe);
                     }
 
-                    connectedSprinklers.add(firstSprinkler.id);
+                    if (!wouldCreateCycleFlag) {
+                        connectedSprinklers.add(firstSprinkler.id);
+                    }
                 }
             }
 
@@ -4861,7 +5855,17 @@ function createZoneBranchNetwork(
                     isCanvasMode
                 );
 
+                // เช็คว่าการเพิ่มท่อนี้จะสร้าง cycle หรือไม่
+                const allCurrentPipes = [...mainTrunk, ...pipes];
+                let wouldCreateCycleFlag = false;
+                
                 for (let j = 0; j < connectionPath.length - 1; j++) {
+                    if (wouldCreateCycle(allCurrentPipes, connectionPath[j], connectionPath[j + 1])) {
+                        console.warn(`Skipping connection between sprinklers that would create cycle: ${currentSprinkler.id} -> ${nextSprinkler.id}`);
+                        wouldCreateCycleFlag = true;
+                        break;
+                    }
+                    
                     const pipe = createUniformPipe(
                         `zone_group_link_${waterSourceId || 'default'}_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
                         connectionPath[j],
@@ -4873,9 +5877,12 @@ function createZoneBranchNetwork(
                         zoneId
                     );
                     pipes.push(pipe);
+                    allCurrentPipes.push(pipe);
                 }
 
-                connectedSprinklers.add(nextSprinkler.id);
+                if (!wouldCreateCycleFlag) {
+                    connectedSprinklers.add(nextSprinkler.id);
+                }
             }
         }
     });

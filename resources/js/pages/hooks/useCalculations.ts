@@ -19,6 +19,7 @@ import {
     calculateEnhancedFieldStats,
     FieldCropData,
 } from '../../utils/fieldCropData';
+import { selectBestPipeByHeadLoss } from '../../utils/horticulturePipeCalculations';
 
 export interface ZoneCalculationData {
     zoneId: string;
@@ -276,6 +277,15 @@ const calculateZoneResults = (
                 )
             )
             .sort((a, b) => {
+                // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                if (projectMode === 'garden') {
+                    if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                    const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                    if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                    if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                    return a.price - b.price;
+                }
+                // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                 if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                 if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                 return a.price - b.price;
@@ -304,6 +314,15 @@ const calculateZoneResults = (
                     )
                 )
                 .sort((a, b) => {
+                    // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                    if (projectMode === 'garden') {
+                        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                        const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                        if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                        return a.price - b.price;
+                    }
+                    // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                     if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                     if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                     return a.price - b.price;
@@ -332,6 +351,15 @@ const calculateZoneResults = (
                     )
                 )
                 .sort((a, b) => {
+                    // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                    if (projectMode === 'garden') {
+                        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                        const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                        if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                        return a.price - b.price;
+                    }
+                    // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                     if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                     if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                     return a.price - b.price;
@@ -399,6 +427,15 @@ const calculateZoneResults = (
                     )
                 )
                 .sort((a, b) => {
+                    // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                    if (projectMode === 'garden') {
+                        if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                        const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                        if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                        if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                        return a.price - b.price;
+                    }
+                    // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                     if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                     if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                     return a.price - b.price;
@@ -621,9 +658,9 @@ const autoSelectBestPipe = (
         velocityMax = 3.0;
         minPressure = 6;
     } else if (projectMode === 'garden') {
-        velocityMin = 0.3;
+        velocityMin = 0.05;  // ยอมรับความเร็วต่ำ เพื่อให้ท่อขนาดใหญ่ (HL ต่ำ) ผ่าน ไม่ถูกกรองออก
         velocityMax = 3.5;
-        minPressure = 6;
+        minPressure = 4;     // รองรับท่อ PN5 ที่มี head loss ต่ำ
     }
 
     const maxHeadM = head20PercentM != null ? getMaxHeadLossForPipeType(pipeType, head20PercentM) : null;
@@ -635,16 +672,42 @@ const autoSelectBestPipe = (
             maxHeadM != null
                 ? pipe.headLoss <= maxHeadM
                 : (pipe.headLoss / (pipe.lengthM || 1)) * 100 <= 20;
+        
         return isVelocityOK && isPressureOK && isHeadLossOK;
     });
 
-    let candidates = suitablePipes.length > 0 ? suitablePipes : analyzedPipes;
-    if (maxHeadM != null && suitablePipes.length === 0) {
-        const underLimit = analyzedPipes.filter((p) => p.headLoss <= maxHeadM);
-        candidates = underLimit.length > 0 ? underLimit : analyzedPipes;
+    // สำหรับ garden: ใช้เฉพาะท่อ PVC (ตรงกับ UI ที่ default เป็น PVC), แล้วเรียงตาม head loss ต่ำสุดเท่านั้น
+    let candidates: any[];
+    if (projectMode === 'garden') {
+        const pvcOnly =
+            pipeType === 'branch' || pipeType === 'emitter'
+                ? analyzedPipes.filter(
+                      (p) =>
+                          (p.pipeType && String(p.pipeType).toUpperCase() === 'PVC') ||
+                          (p.type && String(p.type).toUpperCase() === 'PVC')
+                  )
+                : analyzedPipes;
+        candidates = pvcOnly.length > 0 ? pvcOnly : analyzedPipes;
+    } else {
+        candidates = suitablePipes.length > 0 ? suitablePipes : analyzedPipes;
+        if (maxHeadM != null && suitablePipes.length === 0) {
+            const underLimit = analyzedPipes.filter((p) => p.headLoss <= maxHeadM);
+            candidates = underLimit.length > 0 ? underLimit : analyzedPipes;
+        }
     }
 
     return candidates.sort((a, b) => {
+        // สำหรับ garden mode: เลือกท่อจาก head loss ต่ำที่สุดเท่านั้น (ตัวเลขเทียบเป็น number)
+        if (projectMode === 'garden') {
+            const aHL = Number(a.headLoss);
+            const bHL = Number(b.headLoss);
+            if (!Number.isFinite(aHL)) return 1;
+            if (!Number.isFinite(bHL)) return -1;
+            if (Math.abs(aHL - bHL) > 0.0001) return aHL - bHL;
+            return (a.price || 0) - (b.price || 0);
+        }
+        
+        // สำหรับ mode อื่นๆ: ใช้ logic เดิม
         if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
         if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
         if (maxHeadM != null) {
@@ -1129,18 +1192,54 @@ export const useCalculations = (
                 )
             )
             .sort((a, b) => {
+                // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                if (projectMode === 'garden') {
+                    if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                    const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                    if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                    if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                    return a.price - b.price;
+                }
+                // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                 if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                 if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                 return a.price - b.price;
             });
 
-        const autoSelectedBranchPipe = autoSelectBestPipe(
+        // โหมด garden: ใช้ logic เดียวกับปุ่ม "เลือกอัตโนมัติ" (selectBestPipeByHeadLoss) เพื่อให้ได้ท่อ "แนะนำ" ตั้งแต่ครั้งแรก
+        let autoSelectedBranchPipe = autoSelectBestPipe(
             analyzedBranchPipes,
             'branch',
             flowData.branchFlowLPM,
             projectMode,
             head20PercentM
         );
+        if (projectMode === 'garden' && pipeData.length > 0 && sanitizedInput.longestBranchPipeM > 0) {
+            const pvcPipes = pipeData.filter(
+                (p) =>
+                    (p.pipeType && String(p.pipeType).toUpperCase() === 'PVC') ||
+                    (p.type && String(p.type).toUpperCase() === 'PVC')
+            );
+            const head20Garden = 2.5 * 10.197 * 0.2; // ~5.1 m จาก pressure 2.5 bar
+            const bestPipeInfo = {
+                id: 'branch-garden',
+                length: Number(sanitizedInput.longestBranchPipeM) || 20,
+                count: sanitizedInput.sprinklersPerLongestBranch || sanitizedInput.totalTrees || 1,
+                waterFlowRate: flowData.branchFlowLPM,
+                sprinklerCount: flowData.totalSprinklers,
+            };
+            const fromHorticultureLogic = selectBestPipeByHeadLoss(
+                pvcPipes.length > 0 ? pvcPipes : pipeData,
+                'branch',
+                bestPipeInfo,
+                'PVC',
+                {},
+                head20Garden
+            );
+            if (fromHorticultureLogic) {
+                autoSelectedBranchPipe = fromHorticultureLogic;
+            }
+        }
 
         const analyzedSecondaryPipes = hasValidSecondaryPipe
             ? pipeData
@@ -1155,6 +1254,15 @@ export const useCalculations = (
                       )
                   )
                   .sort((a, b) => {
+                      // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                      if (projectMode === 'garden') {
+                          if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                          const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                          if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                          if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                          return a.price - b.price;
+                      }
+                      // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                       if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                       if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                       return a.price - b.price;
@@ -1184,6 +1292,15 @@ export const useCalculations = (
                       )
                   )
                   .sort((a, b) => {
+                      // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                      if (projectMode === 'garden') {
+                          if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                          const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                          if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                          if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                          return a.price - b.price;
+                      }
+                      // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                       if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                       if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                       return a.price - b.price;
@@ -1219,6 +1336,15 @@ export const useCalculations = (
                       )
                   )
                   .sort((a, b) => {
+                      // สำหรับ garden mode: ให้ความสำคัญกับ head loss มากกว่า isRecommended
+                      if (projectMode === 'garden') {
+                          if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
+                          const headLossDiff = Math.abs(a.headLoss - b.headLoss);
+                          if (headLossDiff > 0.5) return a.headLoss - b.headLoss;
+                          if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
+                          return a.price - b.price;
+                      }
+                      // สำหรับ mode อื่นๆ: ใช้ logic เดิม
                       if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                       if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                       return a.price - b.price;

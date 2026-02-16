@@ -10,7 +10,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { refreshCsrfToken } from '../bootstrap';
-import { calculatePolygonArea } from '../utils/homeGardenData';
+import { calculatePolygonArea, clearGardenDataCache, getSprinklerColorForPreview, SPRINKLER_TYPES } from '../utils/homeGardenData';
 import HorticultureMapPreview from '../components/horticulture/HorticultureMapPreview';
 import QuotationDocument from './components/QuotationDocument';
 import {
@@ -408,6 +408,277 @@ const FieldCard = ({
                     {field.category === 'home-garden' ? (
                         // Home Garden specific display
                         <>
+                            {/* รูปแผนผังสวนบ้าน: รูปอัพโหลด / SVG จากโซน / placeholder */}
+                            {(() => {
+                                const gd = field.garden_data;
+                                if (!gd) return null;
+                                const parsed = typeof gd === 'string' ? (() => { try { return JSON.parse(gd); } catch { return null; } })() : gd;
+                                if (!parsed) return null;
+                                // โหมดอัพโหลดแผน: แสดงรูปแปลน + ท่อ/หัวฉีด/แหล่งน้ำ ทับบนรูป (พิกัดตามภาพ)
+                                if (parsed.designMode === 'image' && parsed.imageData?.url) {
+                                    const imgW = parsed.imageData.width ?? 800;
+                                    const imgH = parsed.imageData.height ?? 600;
+                                    const pipesImg = parsed.pipes || [];
+                                    const waterSourcesImg = parsed.waterSources || [];
+                                    const rawSprinklersImg = parsed.sprinklers || [];
+                                    const sprinklersImg = rawSprinklersImg.map((sp: any) => {
+                                        const t = sp?.type;
+                                        const typeId = typeof t === 'string' ? t : t?.id;
+                                        const preset = typeId ? SPRINKLER_TYPES.find((st: any) => st.id === typeId) : null;
+                                        return {
+                                            ...sp,
+                                            type: {
+                                                id: typeId ?? t?.id,
+                                                radius: t?.radius ?? preset?.radius ?? 4,
+                                                pressure: t?.pressure ?? preset?.pressure ?? 2,
+                                                flowRate: t?.flowRate ?? preset?.flowRate ?? 18,
+                                                color: t?.color,
+                                            },
+                                        };
+                                    });
+                                    const toPt = (p: any) => (p?.x != null && p?.y != null) ? { x: p.x, y: p.y } : null;
+                                    const dataScaleImg = parsed.imageData?.scale ?? 20;
+                                    return (
+                                        <div className="mb-3 relative overflow-hidden rounded-lg border border-gray-600" style={{ height: '180px' }}>
+                                            <img
+                                                src={parsed.imageData.url}
+                                                alt="แผนผังสวน"
+                                                className="absolute inset-0 h-full w-full object-cover object-center"
+                                            />
+                                            <svg
+                                                className="absolute inset-0 h-full w-full"
+                                                viewBox={`0 0 ${imgW} ${imgH}`}
+                                                preserveAspectRatio="xMidYMid meet"
+                                            >
+                                                {/* รัศมีหัวฉีด (โปร่งใส) */}
+                                                {sprinklersImg.map((sp: any, idx: number) => {
+                                                    const pt = toPt(sp?.canvasPosition || sp?.position);
+                                                    if (!pt) return null;
+                                                    const rM = (sp.type?.radius != null && sp.type.radius > 0) ? sp.type.radius : 4;
+                                                    const rPx = rM * dataScaleImg;
+                                                    if (rPx < 2) return null;
+                                                    const col = getSprinklerColorForPreview(sp, sprinklersImg);
+                                                    const hexToRgba = (hex: string, a: number) => {
+                                                        if (!hex?.startsWith('#')) return `rgba(51,204,255,${a})`;
+                                                        const h = hex.replace('#', '');
+                                                        const r = parseInt(h.slice(0, 2), 16);
+                                                        const g = parseInt(h.slice(2, 4), 16);
+                                                        const b = parseInt(h.slice(4, 6), 16);
+                                                        return `rgba(${r},${g},${b},${a})`;
+                                                    };
+                                                    return <circle key={`im-sp-r-${idx}`} cx={pt.x} cy={pt.y} r={rPx} fill={hexToRgba(col, 0.15)} stroke={col} strokeWidth={1} />;
+                                                })}
+                                                {/* ท่อ */}
+                                                {pipesImg.map((pipe: any, idx: number) => {
+                                                    const a = toPt(pipe.canvasStart || pipe.start);
+                                                    const b = toPt(pipe.canvasEnd || pipe.end);
+                                                    if (!a || !b) return null;
+                                                    return <line key={`im-pipe-${idx}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#8B5CF6" strokeWidth={Math.max(2, imgW / 200)} strokeLinecap="round" />;
+                                                })}
+                                                {/* แหล่งน้ำ */}
+                                                {waterSourcesImg.map((ws: any, idx: number) => {
+                                                    const pt = toPt(ws?.canvasPosition || ws?.position);
+                                                    if (!pt) return null;
+                                                    return (
+                                                        <g key={`im-ws-${idx}`}>
+                                                            <circle cx={pt.x} cy={pt.y} r={Math.max(8, imgW / 80)} fill="#1F2937" stroke="#3B82F6" strokeWidth={1.5} />
+                                                            <circle cx={pt.x} cy={pt.y} r={Math.max(3, imgW / 200)} fill="#3B82F6" />
+                                                        </g>
+                                                    );
+                                                })}
+                                                {/* จุดหัวฉีด */}
+                                                {sprinklersImg.map((sp: any, idx: number) => {
+                                                    const pt = toPt(sp?.canvasPosition || sp?.position);
+                                                    if (!pt) return null;
+                                                    const col = getSprinklerColorForPreview(sp, sprinklersImg);
+                                                    return <circle key={`im-sp-${idx}`} cx={pt.x} cy={pt.y} r={Math.max(3, imgW / 150)} fill={col} stroke="#FFF" strokeWidth={1} />;
+                                                })}
+                                            </svg>
+                                        </div>
+                                    );
+                                }
+                                // โหมดวาดเอง/แผนที่: วาด SVG จากโซน + ท่อ + แหล่งน้ำ + หัวฉีด (สีและสัดส่วนให้ตรงกับหน้าแผน)
+                                const zones = parsed.gardenZones || [];
+                                const pipes = parsed.pipes || [];
+                                const waterSources = parsed.waterSources || [];
+                                const rawSprinklers = parsed.sprinklers || [];
+                                const sprinklers = rawSprinklers.map((sp: any) => {
+                                    const t = sp?.type;
+                                    const typeId = typeof t === 'string' ? t : t?.id;
+                                    const preset = typeId ? SPRINKLER_TYPES.find((st: any) => st.id === typeId) : null;
+                                    return {
+                                        ...sp,
+                                        type: {
+                                            id: typeId ?? t?.id,
+                                            nameEN: t?.nameEN ?? preset?.nameEN,
+                                            nameTH: t?.nameTH ?? preset?.nameTH,
+                                            radius: t?.radius ?? preset?.radius ?? 4,
+                                            pressure: t?.pressure ?? preset?.pressure ?? 2,
+                                            flowRate: t?.flowRate ?? preset?.flowRate ?? 18,
+                                            color: t?.color,
+                                            suitableFor: t?.suitableFor ?? preset?.suitableFor ?? [],
+                                            icon: t?.icon ?? preset?.icon,
+                                        },
+                                    };
+                                });
+                                const isCanvasSpace = parsed.designMode === 'canvas' || parsed.designMode === 'image';
+                                const toPoint = (p: any) => (p?.x != null && p?.y != null) ? { x: p.x, y: p.y } : (p?.lat != null && p?.lng != null) ? { x: p.lng, y: p.lat } : null;
+                                const pipePoint = (pipe: any, which: 'start' | 'end') => {
+                                    if (isCanvasSpace && (pipe.canvasStart || pipe.canvasEnd)) {
+                                        const pt = which === 'start' ? (pipe.canvasStart || pipe.start) : (pipe.canvasEnd || pipe.end);
+                                        return toPoint(pt);
+                                    }
+                                    return toPoint(which === 'start' ? pipe.start : pipe.end);
+                                };
+                                const nodePoint = (obj: any) => {
+                                    if (isCanvasSpace && (obj?.canvasPosition != null)) return toPoint(obj.canvasPosition);
+                                    return toPoint(obj?.position || obj?.canvasPosition);
+                                };
+                                const collectXY = (out: { x: number; y: number }[], ...items: any[]) => {
+                                    items.forEach((it: any) => {
+                                        if (it?.x != null && it?.y != null) { out.push({ x: it.x, y: it.y }); return; }
+                                        if (it?.lat != null && it?.lng != null) { out.push({ x: it.lng, y: it.lat }); return; }
+                                        if (it?.position) { const t = toPoint(it.position); if (t) out.push(t); }
+                                        if (it?.canvasPosition) { const t = toPoint(it.canvasPosition); if (t) out.push(t); }
+                                        if (it?.start) { const t = toPoint(it.start); if (t) out.push(t); }
+                                        if (it?.canvasStart) { const t = toPoint(it.canvasStart); if (t) out.push(t); }
+                                        if (it?.end) { const t = toPoint(it.end); if (t) out.push(t); }
+                                        if (it?.canvasEnd) { const t = toPoint(it.canvasEnd); if (t) out.push(t); }
+                                    });
+                                };
+                                const allPts: { x: number; y: number }[] = [];
+                                zones.forEach((z: any) => (z.canvasCoordinates || z.coordinates || []).forEach((p: any) => { const t = toPoint(p); if (t) allPts.push(t); }));
+                                pipes.forEach((p: any) => {
+                                    const a = pipePoint(p, 'start');
+                                    const b = pipePoint(p, 'end');
+                                    if (a) allPts.push(a);
+                                    if (b) allPts.push(b);
+                                });
+                                waterSources.forEach((s: any) => { const t = nodePoint(s); if (t) allPts.push(t); });
+                                sprinklers.forEach((s: any) => { const t = nodePoint(s); if (t) allPts.push(t); });
+                                const coordsList = zones
+                                    .filter((z: any) => (z.canvasCoordinates && z.canvasCoordinates.length >= 3) || (z.coordinates && z.coordinates.length >= 3))
+                                    .map((z: any) => ({ zone: z, points: (z.canvasCoordinates || z.coordinates) as Array<{ x: number; y: number } | { lat: number; lng: number }> }));
+                                const hasAny = coordsList.length > 0 || pipes.length > 0 || waterSources.length > 0 || sprinklers.length > 0;
+                                if (hasAny && (allPts.length >= 2 || coordsList.length > 0)) {
+                                    const xs = allPts.length ? allPts.map(p => p.x) : [0, 1];
+                                    const ys = allPts.length ? allPts.map(p => p.y) : [0, 1];
+                                    const minX = Math.min(...xs);
+                                    const maxX = Math.max(...xs);
+                                    const minY = Math.min(...ys);
+                                    const maxY = Math.max(...ys);
+                                    const pad = 12;
+                                    const w = Math.max(maxX - minX, 1) + pad * 2;
+                                    const h = Math.max(maxY - minY, 1) + pad * 2;
+                                    const scale = Math.min(260 / w, 180 / h, 2);
+                                    const viewW = w * scale;
+                                    const viewH = h * scale;
+                                    const toSvg = (p: any) => {
+                                        const x = p.x != null ? (p.x - minX + pad) * scale : (p.lng - minX + pad) * scale;
+                                        const y = p.y != null ? (p.y - minY + pad) * scale : (p.lat - minY + pad) * scale;
+                                        return { x, y };
+                                    };
+                                    // สีโซนให้ตรงกับ ZONE_TYPES ใน homeGardenData (สนามหญ้า/ดอกไม้/ต้นไม้/ห้าม)
+                                    const zoneColors: Record<string, string> = { grass: '#22C55E', flowers: '#F472B6', trees: '#16A34A', forbidden: '#EF4444' };
+                                    // สีท่อ/หัวฉีด/แหล่งน้ำให้ตรงกับหน้าแผน: ท่อม่วง หัวฉีดจุดขาว แหล่งน้ำโทนเข้ม+น้ำเงิน
+                                    const PIPE_STROKE = '#8B5CF6';
+                                    const WS_FILL = '#1F2937';
+                                    const WS_STROKE = '#3B82F6';
+                                    const dataScale = (parsed.canvasData?.scale ?? parsed.imageData?.scale) || 20;
+                                    const hexToRgba = (hex: string, alpha: number) => {
+                                        if (!hex || !hex.startsWith('#')) return `rgba(51,204,255,${alpha})`;
+                                        const h = hex.replace('#', '');
+                                        const r = parseInt(h.slice(0, 2), 16);
+                                        const g = parseInt(h.slice(2, 4), 16);
+                                        const b = parseInt(h.slice(4, 6), 16);
+                                        return `rgba(${r},${g},${b},${alpha})`;
+                                    };
+                                    const sprinklerColor = (sp: any) => getSprinklerColorForPreview(sp, sprinklers);
+                                    return (
+                                        <div className="mb-3 overflow-hidden rounded-lg border border-gray-600 bg-gray-800" style={{ height: '180px' }}>
+                                            <svg width="100%" height="180" viewBox={`0 0 ${viewW} ${viewH}`} preserveAspectRatio="xMidYMid meet" className="block">
+                                                <defs>
+                                                    {coordsList.map(({ zone, points }) => {
+                                                        const pts = points.map((p: any) => toSvg(p)).map(({ x, y }) => `${x},${y}`).join(' ');
+                                                        return <clipPath key={`cp-${zone.id}`} id={`clip-zone-${zone.id}`}><polygon points={pts} /></clipPath>;
+                                                    })}
+                                                </defs>
+                                                {/* โซน */}
+                                                {coordsList.map(({ zone, points }, idx) => {
+                                                    const pts = points.map((p: any) => toSvg(p)).map(({ x, y }) => `${x},${y}`).join(' ');
+                                                    const fill = zoneColors[zone.type] || '#22C55E';
+                                                    return <polygon key={`z-${zone.id || idx}`} points={pts} fill={fill} fillOpacity={0.4} stroke={fill} strokeWidth={1} />;
+                                                })}
+                                                {/* ท่อ - สีม่วงเหมือนหน้าแผน */}
+                                                {pipes.map((pipe: any, idx: number) => {
+                                                    const a = pipePoint(pipe, 'start');
+                                                    const b = pipePoint(pipe, 'end');
+                                                    if (!a || !b) return null;
+                                                    const sa = toSvg(a);
+                                                    const sb = toSvg(b);
+                                                    return <line key={`pipe-${idx}`} x1={sa.x} y1={sa.y} x2={sb.x} y2={sb.y} stroke={PIPE_STROKE} strokeWidth={2.5} strokeLinecap="round" />;
+                                                })}
+                                                {/* รัศมีขอบเขตหัวฉีด - ตัดภายในโซน และใช้สีตามที่บันทึก (logic เดียวกับ planner/summary) */}
+                                                {sprinklers.map((sp: any, idx: number) => {
+                                                    const p = nodePoint(sp);
+                                                    if (!p) return null;
+                                                    const s = toSvg(p);
+                                                    const radiusM = (sp.type?.radius != null && sp.type.radius > 0) ? sp.type.radius : 4;
+                                                    const rSvg = radiusM * dataScale * scale;
+                                                    if (rSvg < 1) return null;
+                                                    const color = sprinklerColor(sp);
+                                                    const circleEl = <circle cx={s.x} cy={s.y} r={rSvg} fill={hexToRgba(color, 0.12)} stroke={color} strokeWidth={1} />;
+                                                    const zoneId = sp.zoneId;
+                                                    const hasZoneClip = zoneId && coordsList.some((c: any) => c.zone.id === zoneId);
+                                                    if (hasZoneClip) {
+                                                        return <g key={`sp-r-${idx}`} clipPath={`url(#clip-zone-${zoneId})`}>{circleEl}</g>;
+                                                    }
+                                                    return <g key={`sp-r-${idx}`}>{circleEl}</g>;
+                                                })}
+                                                {/* แหล่งน้ำ - โทนเข้ม+น้ำเงินเหมือนปั๊ม/ก๊อก */}
+                                                {waterSources.map((ws: any, idx: number) => {
+                                                    const p = nodePoint(ws);
+                                                    if (!p) return null;
+                                                    const s = toSvg(p);
+                                                    return (
+                                                        <g key={`ws-${idx}`}>
+                                                            <circle cx={s.x} cy={s.y} r={7} fill={WS_FILL} stroke={WS_STROKE} strokeWidth={1.5} />
+                                                            <circle cx={s.x} cy={s.y} r={2.5} fill={WS_STROKE} />
+                                                        </g>
+                                                    );
+                                                })}
+                                                {/* หัวฉีด - สีตามที่บันทึก (ใช้ getManualSprinklerColor เหมือน planner/summary) */}
+                                                {sprinklers.map((sp: any, idx: number) => {
+                                                    const p = nodePoint(sp);
+                                                    if (!p) return null;
+                                                    const s = toSvg(p);
+                                                    const fillColor = sprinklerColor(sp);
+                                                    return <circle key={`sp-${idx}`} cx={s.x} cy={s.y} r={4} fill={fillColor} stroke="#FFFFFF" strokeWidth={1} />;
+                                                })}
+                                            </svg>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="mb-3 flex h-[180px] items-center justify-center rounded-lg border border-gray-600 bg-gray-700/50">
+                                        <span className="text-gray-400">🏡 {parsed.designMode === 'canvas' ? t('draw_yourself') : parsed.designMode === 'map' ? t('using_map') : '—'}</span>
+                                    </div>
+                                );
+                            })()}
+                            {/* ความต้องการ - อัตราการไหลรวมจากหัวฉีด */}
+                            <div className="flex justify-between">
+                                <span>{t('ความต้องการ') || 'ความต้องการ'}:</span>
+                                <span className="text-white">
+                                    {(() => {
+                                        const gd = field.garden_data;
+                                        const data = typeof gd === 'string' ? (() => { try { return JSON.parse(gd); } catch { return null; } })() : gd;
+                                        const sprinklersList = data?.sprinklers || [];
+                                        const totalFlow = sprinklersList.reduce((sum: number, s: any) => sum + (s?.type?.flowRate ?? 0), 0);
+                                        if (totalFlow > 0) return `${Math.round(totalFlow)} ลิตร/นาที`;
+                                        return '—';
+                                    })()}
+                                </span>
+                            </div>
                             <div className="flex justify-between">
                                 <span>{t('area_label')}:</span>
                                 <span className="text-white">
@@ -1968,11 +2239,16 @@ export default function Home() {
 
             // Route to appropriate planner based on field category
             switch (field.category) {
-                case 'home-garden':
-                    // For home garden, navigate to the planner without URL parameters
-                    // The data will be loaded from database using currentFieldId
+                case 'home-garden': {
+                    // ล้างแคชก่อน แล้วโหลดข้อมูลโครงการนี้ลง localStorage เพื่อให้ planner แสดงตามที่บันทึกไว้
+                    clearGardenDataCache();
+                    if (field.garden_data) {
+                        const gardenData = typeof field.garden_data === 'string' ? (() => { try { return JSON.parse(field.garden_data); } catch { return null; } })() : field.garden_data;
+                        if (gardenData) localStorage.setItem('gardenPlannerData', JSON.stringify(gardenData));
+                    }
                     navigateToRoute('/home-garden/planner');
                     break;
+                }
 
                 case 'field-crop':
                     navigateToRoute('/field-crop');
@@ -3038,13 +3314,14 @@ export default function Home() {
                                         if (stats.zoneSprinklers) localStorage.setItem('horticultureZoneSprinklers', JSON.stringify(stats.zoneSprinklers));
                                     }
 
-                                    // ✅ โหลด gardenData สำหรับ home-garden mode
+                                    // ✅ โหลด gardenData สำหรับ home-garden (ล้างแคชก่อน แล้วเซ็ตข้อมูลโครงการนี้ เพื่อให้ planner แสดงตามที่บันทึกไว้)
                                     if (selectedFinishedProject.category === 'home-garden') {
+                                        clearGardenDataCache();
                                         if (selectedFinishedProject.garden_data) {
                                             const gardenData = typeof selectedFinishedProject.garden_data === 'string'
                                                 ? JSON.parse(selectedFinishedProject.garden_data)
                                                 : selectedFinishedProject.garden_data;
-                                            localStorage.setItem('gardenData', JSON.stringify(gardenData));
+                                            localStorage.setItem('gardenPlannerData', JSON.stringify(gardenData));
                                         }
                                         if (selectedFinishedProject.garden_stats) {
                                             const gardenStats = typeof selectedFinishedProject.garden_stats === 'string'
@@ -3073,7 +3350,7 @@ export default function Home() {
                                     // ✅ แก้ไข route ให้ถูกต้อง
                                     const plannerModeMap: { [key: string]: string } = {
                                         horticulture: '/horticulture/planner',
-                                        'home-garden': '/garden/planner',
+                                        'home-garden': '/home-garden/planner',
                                         'field-crop': '/field-crop/planner',
                                         greenhouse: '/greenhouse/planner',
                                     };

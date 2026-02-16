@@ -72,6 +72,7 @@ interface CanvasDesignerProps {
     onMainPipePoint: (point: CanvasCoordinate) => void;
     onSprinklerDragged: (sprinklerId: string, newPos: CanvasCoordinate) => void;
     onSprinklerClick: (sprinklerId: string) => void;
+    onSprinklerDoubleClick?: (sprinklerId: string) => void;
     onSprinklerDelete: (sprinklerId: string) => void;
     onWaterSourceDelete: (sourceId: string) => void;
     onPipeClick: (pipeId: string) => void;
@@ -102,6 +103,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     onMainPipePoint,
     onSprinklerDragged,
     onSprinklerClick,
+    onSprinklerDoubleClick,
     onSprinklerDelete,
     onWaterSourceDelete,
     onPipeClick,
@@ -176,6 +178,22 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
     const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
     const [lastPanPosition, setLastPanPosition] = useState<{ panX: number; panY: number } | null>(
         null
+    );
+
+    const lastSprinklerClickRef = useRef<{ id: string; time: number } | null>(null);
+    const fireSprinklerClick = useCallback(
+        (sprinklerId: string) => {
+            const now = Date.now();
+            const prev = lastSprinklerClickRef.current;
+            if (prev?.id === sprinklerId && now - prev.time < 400) {
+                lastSprinklerClickRef.current = null;
+                onSprinklerDoubleClick?.(sprinklerId);
+            } else {
+                lastSprinklerClickRef.current = { id: sprinklerId, time: now };
+                onSprinklerClick(sprinklerId);
+            }
+        },
+        [onSprinklerClick, onSprinklerDoubleClick]
     );
 
     const zoneDrawingTools: ZoneDrawingTool[] = [
@@ -1255,8 +1273,19 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
                 const isSelected = selectedPipes.has(pipe.id);
 
+                // สร้างสีจาก waterSourceId เพื่อแยกท่อแต่ละแหล่งน้ำให้ชัดเจน
+                let pipeColor = '#8B5CF6'; // default purple
+                if (pipe.waterSourceId) {
+                    // สร้างสีจาก waterSourceId ด้วย hash
+                    const hash = pipe.waterSourceId.split('').reduce((acc, char) => {
+                        return char.charCodeAt(0) + ((acc << 5) - acc);
+                    }, 0);
+                    const hue = Math.abs(hash % 360);
+                    pipeColor = `hsl(${hue}, 70%, 60%)`;
+                }
+
                 ctx.lineCap = 'round';
-                ctx.strokeStyle = isSelected ? '#FBBF24' : '#8B5CF6';
+                ctx.strokeStyle = isSelected ? '#FBBF24' : pipeColor;
                 ctx.lineWidth = (isSelected ? 8 : 6) / viewport.zoom;
                 ctx.beginPath();
                 ctx.moveTo(startScreen.x, startScreen.y);
@@ -1723,18 +1752,15 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 return;
             }
 
-            // Check sprinkler clicks for pipe edit mode and other modes
-            if (pipeEditMode || editMode === 'connect-sprinklers') {
-                const clickedSprinkler = sprinklers.find((s) => {
-                    if (!s.canvasPosition) return false;
-                    const dist = calculateDistance(worldPos, s.canvasPosition);
-                    return dist < 18 / viewport.zoom;
-                });
-
-                if (clickedSprinkler) {
-                    onSprinklerClick(clickedSprinkler.id);
-                    return;
-                }
+            // ตรวจสอบการคลิกหัวฉีด (ทุกโหมด) — คลิกเดียวเลือก, ดับเบิลคลิกเปิดรายละเอียด
+            const clickedSprinkler = sprinklers.find((s) => {
+                if (!s.canvasPosition) return false;
+                const dist = calculateDistance(worldPos, s.canvasPosition);
+                return dist < 18 / viewport.zoom;
+            });
+            if (clickedSprinkler) {
+                fireSprinklerClick(clickedSprinkler.id);
+                return;
             }
 
             // Then check pipe clicks
@@ -1827,15 +1853,15 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             // Handle other tools that should work without needing to press "ใช้เครื่องมือวาด"
             if (editMode === 'drag-sprinkler') {
-                const clickedSprinkler = sprinklers.find((s) => {
+                const dragSprinkler = sprinklers.find((s) => {
                     if (!s.canvasPosition) return false;
                     const dist = calculateDistance(worldPos, s.canvasPosition);
                     return dist < 18 / viewport.zoom;
                 });
 
-                if (clickedSprinkler) {
-                    setDraggedSprinkler(clickedSprinkler.id);
-                    onSprinklerClick(clickedSprinkler.id);
+                if (dragSprinkler) {
+                    setDraggedSprinkler(dragSprinkler.id);
+                    fireSprinklerClick(dragSprinkler.id);
                     return;
                 }
             }
@@ -1895,7 +1921,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             createCircleZone,
             createRegularPolygon,
             sprinklers,
-            onSprinklerClick,
+            fireSprinklerClick,
             isDrawing,
             currentPolygon,
             onSprinklerPlaced,
@@ -2158,12 +2184,67 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
         showDimensionDirectionDialog,
     ]);
 
+    const arcPathFromDegrees = useCallback(
+        (cx: number, cy: number, r: number, startDeg: number, endDeg: number): string => {
+            const toRad = (d: number) => (d * Math.PI) / 180;
+            const startRad = toRad(startDeg);
+            const endRad = toRad(endDeg);
+            const x1 = cx + r * Math.cos(startRad);
+            const y1 = cy + r * Math.sin(startRad);
+            const x2 = cx + r * Math.cos(endRad);
+            const y2 = cy + r * Math.sin(endRad);
+            let span = ((endDeg - startDeg) % 360 + 360) % 360;
+            if (span === 0) span = 360;
+            const largeArc = span > 180 ? 1 : 0;
+            return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+        },
+        []
+    );
+
     const renderSprinklerRadius = useCallback(
         (sprinkler: Sprinkler, isSelected: boolean): JSX.Element | null => {
             if (!sprinkler.canvasPosition || !showSprinklerRadius) return null;
 
             const zone = gardenZones.find((z) => z.id === sprinkler.zoneId);
             const scale = enhancedMode ? enhancedScale : canvasData.scale;
+            const radiusPixels = sprinkler.type.radius * scale * viewport.zoom;
+            const screenPos = worldToScreen(sprinkler.canvasPosition);
+            const startAngle = sprinkler.arcStartAngle ?? 0;
+            const endAngle = sprinkler.arcEndAngle ?? 360;
+            const isFullCircle =
+                (startAngle === 0 && endAngle === 360) ||
+                (Math.abs((endAngle - startAngle) % 360) < 0.01);
+
+            const renderCircleOrArc = (strokeDasharray = '0') => {
+                if (!isFullCircle && sprinkler.arcStartAngle != null && sprinkler.arcEndAngle != null) {
+                    const d = arcPathFromDegrees(
+                        screenPos.x,
+                        screenPos.y,
+                        radiusPixels,
+                        startAngle,
+                        endAngle
+                    );
+                    return (
+                        <path
+                            d={d}
+                            fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                            stroke={isSelected ? '#FFD700' : sprinkler.type.color}
+                            strokeWidth={2 / viewport.zoom}
+                        />
+                    );
+                }
+                return (
+                    <circle
+                        cx={screenPos.x}
+                        cy={screenPos.y}
+                        r={radiusPixels}
+                        fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                        stroke={isSelected ? '#FFD700' : sprinkler.type.color}
+                        strokeWidth={2 / viewport.zoom}
+                        strokeDasharray={strokeDasharray}
+                    />
+                );
+            };
 
             try {
                 if (
@@ -2172,23 +2253,13 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     zone.canvasCoordinates.length < 3 ||
                     sprinkler.zoneId === 'virtual_zone'
                 ) {
-                    const radiusPixels = sprinkler.type.radius * scale * viewport.zoom;
-                    const screenPos = worldToScreen(sprinkler.canvasPosition);
                     return (
                         <g key={`radius-${sprinkler.id}`}>
-                            <circle
-                                cx={screenPos.x}
-                                cy={screenPos.y}
-                                r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
-                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
-                                strokeWidth={2 / viewport.zoom}
-                                strokeDasharray={
-                                    sprinkler.zoneId === 'virtual_zone'
-                                        ? `${8 / viewport.zoom},${4 / viewport.zoom}`
-                                        : '0'
-                                }
-                            />
+                            {renderCircleOrArc(
+                                sprinkler.zoneId === 'virtual_zone'
+                                    ? `${8 / viewport.zoom},${4 / viewport.zoom}`
+                                    : '0'
+                            )}
                         </g>
                     );
                 }
@@ -2208,6 +2279,28 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 if (clipResult === 'FULL_CIRCLE') {
                     return (
                         <g key={`radius-${sprinkler.id}`}>
+                            {renderCircleOrArc()}
+                        </g>
+                    );
+                } else if (clipResult === 'MASKED_CIRCLE') {
+                    const zoneScreenCoords = zone.canvasCoordinates.map(worldToScreen);
+                    const content = !isFullCircle && sprinkler.arcStartAngle != null && sprinkler.arcEndAngle != null
+                        ? (
+                            <path
+                                d={arcPathFromDegrees(
+                                    screenPos.x,
+                                    screenPos.y,
+                                    radiusPixels,
+                                    startAngle,
+                                    endAngle
+                                )}
+                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
+                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
+                                strokeWidth={2 / viewport.zoom}
+                                clipPath={`url(#clip-${sprinkler.id})`}
+                            />
+                        )
+                        : (
                             <circle
                                 cx={screenPos.x}
                                 cy={screenPos.y}
@@ -2215,11 +2308,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                 fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
                                 stroke={isSelected ? '#FFD700' : sprinkler.type.color}
                                 strokeWidth={2 / viewport.zoom}
+                                clipPath={`url(#clip-${sprinkler.id})`}
                             />
-                        </g>
-                    );
-                } else if (clipResult === 'MASKED_CIRCLE') {
-                    const zoneScreenCoords = zone.canvasCoordinates.map(worldToScreen);
+                        );
                     return (
                         <g key={`radius-${sprinkler.id}`}>
                             <defs>
@@ -2231,16 +2322,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                     />
                                 </clipPath>
                             </defs>
-
-                            <circle
-                                cx={screenPos.x}
-                                cy={screenPos.y}
-                                r={radiusPixels}
-                                fill={isSelected ? '#FFD700' + '15' : sprinkler.type.color + '15'}
-                                stroke={isSelected ? '#FFD700' : sprinkler.type.color}
-                                strokeWidth={2 / viewport.zoom}
-                                clipPath={`url(#clip-${sprinkler.id})`}
-                            />
+                            {content}
                         </g>
                     );
                 } else if (Array.isArray(clipResult) && clipResult.length >= 3) {
@@ -2273,6 +2355,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             showSprinklerRadius,
             viewport,
             worldToScreen,
+            arcPathFromDegrees,
         ]
     );
 
