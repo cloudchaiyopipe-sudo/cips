@@ -189,7 +189,6 @@ export const fieldCropTranslations = {
         obstacles: 'obstacles',
         'Obstacle Type': 'Obstacle Type',
         Building: 'Building',
-        'Water Source': 'Water Source',
         Rock: 'Rock',
         Tree: 'Tree',
         Other: 'Other',
@@ -233,7 +232,6 @@ export const fieldCropTranslations = {
         // Irrigation settings
         Radius: 'Radius',
         'Coverage Radius': 'Coverage Radius',
-        Spacing: 'Spacing',
         'Emitter Spacing': 'Emitter Spacing',
         Overlap: 'Overlap',
         'Overlap Coverage': 'Overlap Coverage',
@@ -252,7 +250,6 @@ export const fieldCropTranslations = {
         'Water Needs': 'Water Needs',
         'Growth Period': 'Growth Period',
         'Reset all spacing to crop defaults': 'Reset all spacing to crop defaults',
-        'Reset Defaults': 'Reset Defaults',
         'No crops selected for spacing configuration':
             'No crops selected for spacing configuration',
         Default: 'Default',
@@ -724,7 +721,6 @@ export const fieldCropTranslations = {
         'Pipe Generate': 'Pipe Generate',
         'Generate pipe layout and connections': 'Generate pipe layout and connections',
         points: 'points',
-        'L/irrigation': 'L/irrigation',
     },
     th: {
         // Common
@@ -913,7 +909,6 @@ export const fieldCropTranslations = {
         obstacles: 'สิ่งกีดขวาง',
         'Obstacle Type': 'ประเภทสิ่งกีดขวาง',
         Building: 'อาคาร',
-        'Water Source': 'แหล่งน้ำ',
         Rock: 'หิน',
         Tree: 'ต้นไม้',
         Other: 'อื่นๆ',
@@ -957,7 +952,6 @@ export const fieldCropTranslations = {
         // Irrigation settings
         Radius: 'รัศมี',
         'Coverage Radius': 'รัศมีความครอบคลุม',
-        Spacing: 'ระยะห่าง',
         'Emitter Spacing': 'ระยะห่างหัวพ่น',
         Overlap: 'การซ้อนทับ',
         'Overlap Coverage': 'การครอบคลุมแบบซ้อนทับ',
@@ -976,7 +970,6 @@ export const fieldCropTranslations = {
         'Water Needs': 'ความต้องการน้ำ',
         'Growth Period': 'ระยะเวลาเจริญเติบโต',
         'Reset all spacing to crop defaults': 'รีเซ็ตระยะห่างทั้งหมดเป็นค่าเริ่มต้นของพืช',
-        'Reset Defaults': 'รีเซ็ตค่าเริ่มต้น',
         'No crops selected for spacing configuration': 'ไม่มีพืชที่เลือกสำหรับการตั้งค่าระยะห่าง',
         Default: 'ค่าเริ่มต้น',
         'Modified spacing': 'ระยะห่างที่ปรับแล้ว',
@@ -1374,7 +1367,6 @@ export const fieldCropTranslations = {
         'Auto Update': 'อัปเดตอัตโนมัติ',
         'Zones are generated based on irrigation equipment positions only': 'สร้างโซนจากตำแหน่งอุปกรณ์น้ำเท่านั้น',
         'Map library not loaded. Please refresh the page.': 'ไลบรารีแผนที่ยังไม่โหลด กรุณาโหลดหน้าใหม่',
-        'Map not loaded. Please wait for the map to load.': 'แผนที่ยังไม่โหลด กรุณารอโหลดแผนที่',
         // Step 4 Pipe – extra Thai
         'Connect Mode': 'โหมดเชื่อมต่อ',
         'Stop Drawing': 'หยุดวาด',
@@ -1445,6 +1437,5 @@ export const fieldCropTranslations = {
         'Pipe Generate': 'สร้างท่อ',
         'Generate pipe layout and connections': 'สร้างเส้นท่อและการเชื่อมต่อ',
         points: 'จุด',
-        'L/irrigation': 'ลิตร/ครั้ง',
     },
 };

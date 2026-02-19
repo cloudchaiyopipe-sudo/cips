@@ -1711,12 +1711,16 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
 
         // ท่อเสริม: เพิ่มเฉพาะเมื่อไม่ใช่ท่อเดียวกับ branch/secondary/main/emitter (ถ้าเป็นท่อเดียวกัน CostSummary รวมไว้ในท่อนั้นแล้ว จะไม่นับซ้ำ)
+        const effectiveBranchPipeForExtra = selectedBranchPipe || results?.autoSelectedBranchPipe;
+        const effectiveSecondaryPipeForExtra = selectedSecondaryPipe || results?.autoSelectedSecondaryPipe;
+        const effectiveMainPipeForExtra = selectedMainPipe || results?.autoSelectedMainPipe;
+        const effectiveEmitterPipeForExtra = selectedEmitterPipe || results?.autoSelectedEmitterPipe;
         if (selectedExtraPipe && selectedExtraPipe.pipe) {
             const extraId = String(selectedExtraPipe.pipe.id ?? selectedExtraPipe.pipe.productCode ?? (selectedExtraPipe.pipe as any).product_code ?? '');
-            const sameAsBranch = effectiveBranchPipe && (effectiveBranchPipe.id === selectedExtraPipe.pipe.id || String(effectiveBranchPipe.productCode) === extraId || String((effectiveBranchPipe as any).product_code) === extraId);
-            const sameAsSecondary = effectiveSecondaryPipe && (effectiveSecondaryPipe.id === selectedExtraPipe.pipe.id || String(effectiveSecondaryPipe.productCode) === extraId || String((effectiveSecondaryPipe as any).product_code) === extraId);
-            const sameAsMain = effectiveMainPipe && (effectiveMainPipe.id === selectedExtraPipe.pipe.id || String(effectiveMainPipe.productCode) === extraId || String((effectiveMainPipe as any).product_code) === extraId);
-            const sameAsEmitter = effectiveEmitterPipe && (effectiveEmitterPipe.id === selectedExtraPipe.pipe.id || String(effectiveEmitterPipe.productCode) === extraId || String((effectiveEmitterPipe as any).product_code) === extraId);
+            const sameAsBranch = effectiveBranchPipeForExtra && (effectiveBranchPipeForExtra.id === selectedExtraPipe.pipe.id || String(effectiveBranchPipeForExtra.productCode) === extraId || String((effectiveBranchPipeForExtra as any).product_code) === extraId);
+            const sameAsSecondary = effectiveSecondaryPipeForExtra && (effectiveSecondaryPipeForExtra.id === selectedExtraPipe.pipe.id || String(effectiveSecondaryPipeForExtra.productCode) === extraId || String((effectiveSecondaryPipeForExtra as any).product_code) === extraId);
+            const sameAsMain = effectiveMainPipeForExtra && (effectiveMainPipeForExtra.id === selectedExtraPipe.pipe.id || String(effectiveMainPipeForExtra.productCode) === extraId || String((effectiveMainPipeForExtra as any).product_code) === extraId);
+            const sameAsEmitter = effectiveEmitterPipeForExtra && (effectiveEmitterPipeForExtra.id === selectedExtraPipe.pipe.id || String(effectiveEmitterPipeForExtra.productCode) === extraId || String((effectiveEmitterPipeForExtra as any).product_code) === extraId);
             if (!sameAsBranch && !sameAsSecondary && !sameAsMain && !sameAsEmitter) {
                 const lenM = getPipeLengthM(selectedExtraPipe.pipe) || 1;
                 const quantity = lenM > 0 ? calculatePipeRolls(selectedExtraPipe.totalLength, lenM) : 0;
@@ -3638,7 +3642,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
                                     {(selectedSprinkler ||
                                         (zoneSprinklers && Object.keys(zoneSprinklers).length > 0) ||
-                                        (projectMode === 'garden' && gardenData?.sprinklers?.length > 0 && results?.analyzedSprinklers?.length > 0)) && (
+                                        (projectMode === 'garden' && gardenData?.sprinklers?.length > 0 && (results?.analyzedSprinklers?.length ?? 0) > 0)) && (
                                         <div className="mb-3 text-sm">
                                             <p className="font-bold">
                                                 {t('4. สเปกหัวฉีดที่เลือก')}
@@ -3647,7 +3651,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                                 const zones = zoneSprinklers || {};
                                                 const byId = new Map<number | string, any>();
                                                 // โหมด garden: ใช้เฉพาะจาก gardenData.sprinklers + analyzedSprinklers (แหล่งเดียวกับรายการในใบเสนอราคา) ไม่ปน zoneSprinklers
-                                                if (projectMode === 'garden' && gardenData?.sprinklers?.length > 0 && results?.analyzedSprinklers?.length > 0) {
+                                                if (projectMode === 'garden' && gardenData?.sprinklers?.length > 0 && (results?.analyzedSprinklers?.length ?? 0) > 0) {
                                                     const analyzed = results.analyzedSprinklers as any[];
                                                     const byTypeKey = new Map<string, any>();
                                                     (gardenData.sprinklers as any[]).forEach((s: any) => {

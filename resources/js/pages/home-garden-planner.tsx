@@ -284,7 +284,7 @@ const ModeSelection: React.FC<{
                         {modes.map((mode) => (
                             <div
                                 key={mode.id}
-                                onClick={() => onSelectMode(mode.id)}
+                                onClick={() => onSelectMode(mode.id as 'canvas' | 'image')}
                                 className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
                             >
                                 <div className="mb-4 text-center">

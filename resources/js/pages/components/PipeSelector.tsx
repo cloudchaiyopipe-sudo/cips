@@ -922,7 +922,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 selectedPipeType,
                 selectedPipeSizes,
                 sprinklerPressure.head20PercentM,
-                projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
+                (projectMode as string) === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
             );
 
             if (bestPipe) {
@@ -941,7 +941,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             selectedPipeType,
                             selectedPipeSizes,
                             sprinklerPressure.head20PercentM,
-                            projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
+                            (projectMode as string) === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
                         );
                         if (
                             alternativeBest &&
@@ -1020,7 +1020,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     selectedPipeType,
                     selectedPipeSizes,
                     sprinklerPressure.head20PercentM,
-                    projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
+                    (projectMode as string) === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
                 );
                 if (bestPipe) {
                     const normId = (p: any) =>
@@ -1829,7 +1829,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                 selectedPipeType,
                                                 selectedPipeSizes,
                                                 sprinklerPressure.head20PercentM,
-                                                projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
+                                                (projectMode as string) === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
                                             );
                                             if (bestPipe) {
                                                 onPipeChange(bestPipe);
