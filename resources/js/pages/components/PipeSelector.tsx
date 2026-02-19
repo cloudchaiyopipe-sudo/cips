@@ -11,6 +11,7 @@ import {
     calculateNewHeadLoss,
     calculateSprinklerPressure,
     validatePipeSelection,
+    validatePipeSizeHierarchy,
     selectBestPipe,
     createCalculationSummary,
     PipeCalculationResult,
@@ -124,45 +125,119 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         if (projectMode === 'field-crop') {
             const fcData = fieldCropData || getEnhancedFieldCropData();
             if (fcData) {
+                // ใช้ข้อมูลต่อโซน (เหมือน horticulture) เพื่อให้ headloss อยู่ในช่วงที่เหมาะสม และเลือกท่อที่ใกล้ target ไม่ใช่ท่อที่ headloss ต่ำสุด
+                const currentZone = activeZoneId
+                    ? fcData.zones?.info?.find(
+                          (z: any) => String(z.id) === String(activeZoneId)
+                      )
+                    : null;
+                const zoneLateralCount = currentZone?.pipeStats?.lateral?.count ?? fcData.pipes?.stats?.lateral?.count ?? 1;
+                const zoneSprinklerCount = currentZone?.sprinklerCount ?? 1;
+                // จำนวนทางออกท่อย่อย = จำนวนหัวฉีดบน lateral ที่ยาวที่สุด (จาก field-crop-summary ส่งมาเป็น lateralOutlets)
+                const branchOutlets = currentZone?.lateralOutlets ?? currentZone?.sprinklersOnLongestLateral ?? zoneSprinklerCount;
+                // จำนวนทางออกท่อเมนรอง = จำนวน lateral ที่เชื่อมกับ submain ที่ยาวที่สุด (จาก field-crop-summary ส่งมาเป็น submainOutlets)
+                const secondaryOutlets = currentZone?.submainOutlets ?? currentZone?.connectedLaterals ?? 1;
+                const perSprinklerLmin = (fcData as any)?.irrigationSettings?.sprinkler_system?.flow ?? 30;
+                const totalProjectSprinklers =
+                    (fcData.summary as any)?.totalSprinklerCount ??
+                    fcData.zones?.info?.reduce((s: number, z: any) => s + (z.sprinklerCount ?? 0), 0) ??
+                    zoneSprinklerCount;
+                const getZoneFlow = (key: 'lateral' | 'submain' | 'main') => {
+                    if (!currentZone) return undefined;
+                    const camel = key === 'lateral' ? 'lateralFlowLMin' : key === 'submain' ? 'submainFlowLMin' : 'mainFlowLMin';
+                    const snake = key === 'lateral' ? 'lateral_flow_l_min' : key === 'submain' ? 'submain_flow_l_min' : 'main_flow_l_min';
+                    const v = (currentZone as any)[camel] ?? (currentZone as any)[snake];
+                    return typeof v === 'number' && v > 0 ? v : undefined;
+                };
+
                 const createFieldCropPipeInfo = (
                     type: string,
                     length: number,
-                    flowRate: number
+                    flowRate: number,
+                    count: number,
+                    sprinklerCount?: number
                 ) => ({
                     id: `${type}-pipe-field-crop`,
                     length: length,
-                    count: 1,
+                    count: count,
+                    sprinklerCount: sprinklerCount,
                     waterFlowRate: flowRate,
                     details: { type: type },
                 });
 
+                // ใช้น้ำ + การคำนวณ loss: ใช้ flow/ความยาวตรงกับ field-crop-summary (ไม่ clamp ต่ำ เพื่อให้ head loss ถูกต้อง)
+                const MIN_FLOW_LMIN = 1;
+                const getLongest = (type: 'lateral' | 'submain' | 'main') => {
+                    const zoneStats =
+                        type === 'main'
+                            ? (fcData.pipes?.stats as any)?.main ?? (currentZone?.pipeStats as any)?.main
+                            : (currentZone?.pipeStats as any)?.[type] ?? (fcData.pipes?.stats as any)?.[type];
+                    if (!zoneStats) return type === 'lateral' ? 50 : type === 'submain' ? 100 : 200;
+                    const len =
+                        zoneStats.longestLength ??
+                        zoneStats.longest ??
+                        (zoneStats as any).longest_length ??
+                        (type === 'lateral' ? 50 : type === 'submain' ? 100 : 200);
+                    return Number(len) || (type === 'lateral' ? 50 : type === 'submain' ? 100 : 200);
+                };
+
                 switch (pipeType) {
-                    case 'branch':
+                    case 'branch': {
+                        const lateralLongest = getLongest('lateral');
+                        const lateralFlow = getZoneFlow('lateral');
+                        const fallbackBranch = perSprinklerLmin * Math.max(Math.round(branchOutlets), 1);
+                        const flowPerLateral = lateralFlow != null ? lateralFlow : Math.max(MIN_FLOW_LMIN, fallbackBranch);
                         return createFieldCropPipeInfo(
                             'branch',
-                            fcData.pipes?.stats?.lateral?.longest || 50,
-                            (fcData.summary?.totalWaterRequirementPerDay || 0) /
-                                Math.max(fcData.summary?.totalPlantingPoints || 1, 1) /
-                                60
+                            lateralLongest,
+                            flowPerLateral,
+                            Math.max(Math.round(branchOutlets), 1),
+                            Math.max(Math.round(branchOutlets), 1)
                         );
-                    case 'secondary':
+                    }
+                    case 'secondary': {
+                        const submainLongest = getLongest('submain');
+                        const submainFlow = getZoneFlow('submain');
+                        const fallbackSubmain =
+                            perSprinklerLmin *
+                            Math.max(Math.round(branchOutlets), 1) *
+                            Math.max(Math.round(secondaryOutlets), 1);
+                        const zoneFlow = submainFlow != null ? submainFlow : Math.max(MIN_FLOW_LMIN, fallbackSubmain);
                         return createFieldCropPipeInfo(
                             'secondary',
-                            fcData.pipes?.stats?.submain?.longest || 100,
-                            (fcData.summary?.totalWaterRequirementPerDay || 0) / 60
+                            submainLongest,
+                            zoneFlow,
+                            Math.max(Math.round(secondaryOutlets), 1),
+                            undefined
                         );
-                    case 'main':
+                    }
+                    case 'main': {
+                        const mainLongest = getLongest('main');
+                        const mainFlow = getZoneFlow('main');
+                        const fallbackMain = perSprinklerLmin * Math.max(totalProjectSprinklers, 1);
+                        const projectFlow = mainFlow != null ? mainFlow : Math.max(MIN_FLOW_LMIN, fallbackMain);
                         return createFieldCropPipeInfo(
                             'main',
-                            fcData.pipes?.stats?.main?.longest || 200,
-                            (fcData.summary?.totalWaterRequirementPerDay || 0) / 60
+                            mainLongest,
+                            projectFlow,
+                            1,
+                            undefined
                         );
-                    case 'emitter':
+                    }
+                    case 'emitter': {
+                        const lateralAvg =
+                            fcData.pipes?.stats?.lateral?.averageLength ??
+                            (currentZone?.pipeStats?.lateral?.totalLength && currentZone?.pipeStats?.lateral?.count
+                                ? currentZone.pipeStats.lateral.totalLength / Math.max(currentZone.pipeStats.lateral.count, 1)
+                                : 20);
                         return createFieldCropPipeInfo(
                             'emitter',
-                            fcData.pipes?.stats?.lateral?.averageLength || 20,
-                            0.24
+                            lateralAvg,
+                            0.24,
+                            zoneSprinklerCount,
+                            zoneSprinklerCount
                         );
+                    }
                     default:
                         return null;
                 }
@@ -679,18 +754,45 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         // This prevents auto-selecting when loading from database where selectedPipe already has a value
         const hasSelectedPipe = selectedPipe && typeof selectedPipe === 'object' && Object.keys(selectedPipe).length > 0;
 
-        if (
-            availablePipes.length > 0 &&
+        // ✅ เลือกท่อตามลำดับ: ท่อย่อย (branch) ก่อน → ท่อเมนรอง (secondary) → ท่อเมนหลัก (main). ไม่เลือกท่อเมนรอง/เมนหลักก่อนกว่าจะมีท่อย่อย/เมนรอง
+        if (pipeType === 'secondary' && !selectedPipeSizes?.branch) return;
+        if (pipeType === 'main' && !selectedPipeSizes?.secondary) return;
+        if (pipeType === 'emitter' && !selectedPipeSizes?.branch) return;
+
+        // รอให้รายการท่อโหลดเกือบครบก่อนค่อย auto-select
+        const MIN_PIPES_FOR_AUTO_SELECT = 50;
+        const pipesLoaded = availablePipes.length >= MIN_PIPES_FOR_AUTO_SELECT;
+        // การแก้เป็นท่อแนะนำ: ใช้เกณฑ์ต่ำ (มี 3+ ตัวเลือกหลัง hierarchy) ไม่รอ 50
+        const MIN_PIPES_FOR_CORRECTION = 3;
+        const enoughPipesToCorrect = availablePipes.length >= MIN_PIPES_FOR_CORRECTION;
+        const canAutoSelect =
+            pipesLoaded &&
             currentZoneBestPipe &&
             sprinklerPressure &&
             !isManuallySelected &&
             !wasManuallySelectedInThisZone &&
             !hasSelectedPipe &&
-            activeZoneId
-        ) {
+            activeZoneId;
+        // field-crop: แม้ parent จะ restore 200/306 มาก่อน พอมีท่อพอเลือกแล้วให้ทับด้วยท่อแนะนำ (ถ้าผู้ใช้ยังไม่เคยเลือกเอง)
+        const shouldCorrectToRecommended =
+            projectMode === 'field-crop' &&
+            enoughPipesToCorrect &&
+            currentZoneBestPipe &&
+            sprinklerPressure &&
+            activeZoneId &&
+            !isManuallySelected &&
+            !wasManuallySelectedInThisZone &&
+            hasSelectedPipe;
+
+        if (canAutoSelect) {
             const hierarchyFilteredPipes = getFilteredPipesByHierarchy(availablePipes);
 
             if (hierarchyFilteredPipes.length === 0) {
+                return;
+            }
+            // ต้องมีตัวเลือกอย่างน้อย 3 ตัว (ไม่เลือกจากแค่ 1–2 ตัว)
+            const MIN_CHOICES_AFTER_HIERARCHY = 3;
+            if (hierarchyFilteredPipes.length < MIN_CHOICES_AFTER_HIERARCHY) {
                 return;
             }
 
@@ -819,7 +921,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 currentZoneBestPipe,
                 selectedPipeType,
                 selectedPipeSizes,
-                sprinklerPressure.head20PercentM
+                sprinklerPressure.head20PercentM,
+                projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
             );
 
             if (bestPipe) {
@@ -837,7 +940,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             currentZoneBestPipe,
                             selectedPipeType,
                             selectedPipeSizes,
-                            sprinklerPressure.head20PercentM
+                            sprinklerPressure.head20PercentM,
+                            projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
                         );
                         if (
                             alternativeBest &&
@@ -847,6 +951,53 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         }
                     } else {
                         onPipeChange(null);
+                    }
+                }
+            }
+        } else if (shouldCorrectToRecommended) {
+            // field-crop: parent อาจ restore 200/306 มาก่อน → โหลดครบแล้วทับด้วยท่อแนะนำ
+            // โซน 2+: ถ้า main รันก่อน secondary จะเห็น secondary=200 → hierarchy เป็น main>=200 ได้ผลผิด
+            // ข้าม main correction เมื่อ sibling ยังเป็นค่า default (≥100) รอให้ branch/secondary correct ก่อน แล้วค่อย correct main ในรอบถัดไป
+            const siblingStillDefault =
+                pipeType === 'main' &&
+                (Number(selectedPipeSizes?.secondary) >= 100 || Number(selectedPipeSizes?.branch) >= 100);
+            if (siblingStillDefault) {
+                // main รอ sibling correct ก่อน
+            } else {
+                const hierarchyFilteredPipes = getFilteredPipesByHierarchy(availablePipes);
+                const MIN_CHOICES = 3;
+                if (
+                    hierarchyFilteredPipes.length >= MIN_CHOICES &&
+                    selectedPipe &&
+                    Number(selectedPipe.sizeMM) > 0
+                ) {
+                    const bestPipe = selectBestPipeByHeadLoss(
+                        hierarchyFilteredPipes,
+                        pipeType,
+                        currentZoneBestPipe,
+                        selectedPipeType,
+                        selectedPipeSizes,
+                        sprinklerPressure!.head20PercentM,
+                        { preferSmallestValidPipe: true }
+                    );
+                    const sameSize =
+                        bestPipe &&
+                        Number(selectedPipe.sizeMM) === Number(bestPipe.sizeMM);
+                    if (bestPipe && !sameSize) {
+                        const validate = (p: any) => {
+                            const s = p.sizeMM;
+                            const main = selectedPipeSizes.main ?? 0;
+                            const sec = selectedPipeSizes.secondary ?? 0;
+                            const br = selectedPipeSizes.branch ?? 0;
+                            const em = selectedPipeSizes.emitter ?? 0;
+                            if (pipeType === 'main') return s >= Math.max(sec, br, em);
+                            if (pipeType === 'secondary') return (main === 0 || s <= main) && s >= Math.max(br, em);
+                            if (pipeType === 'branch' || pipeType === 'emitter') return (main === 0 || s <= main) && (sec === 0 || s <= sec);
+                            return true;
+                        };
+                        if (validate(bestPipe)) {
+                            onPipeChange(bestPipe);
+                        }
                     }
                 }
             }
@@ -868,7 +1019,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     currentZoneBestPipe,
                     selectedPipeType,
                     selectedPipeSizes,
-                    sprinklerPressure.head20PercentM
+                    sprinklerPressure.head20PercentM,
+                    projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
                 );
                 if (bestPipe) {
                     const normId = (p: any) =>
@@ -900,6 +1052,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         getPipeTypeName,
         projectMode,
     ]);
+
+    // ล้างการเลือกท่อเมื่อท่อที่เลือกอยู่ละเมิด hierarchy (เช่น ท่อย่อยใหญ่กว่าท่อเมนรอง)
+    useEffect(() => {
+        if (!selectedPipe || !selectedPipeSizes || Object.keys(selectedPipeSizes).length === 0) return;
+        const sizeMM = Number(selectedPipe.sizeMM ?? 0);
+        if (!validatePipeSizeHierarchy(pipeType, sizeMM, selectedPipeSizes)) {
+            onPipeChange(null);
+        }
+    }, [selectedPipe, selectedPipeSizes, pipeType, onPipeChange]);
 
     useEffect(() => {
         if (selectedPipe && currentZoneBestPipe) {
@@ -1053,10 +1214,25 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         }),
     ];
     
-    
+    // โหมด field-crop: ท่อที่ระบบแนะนำ = ท่อที่เล็กที่สุดที่ head loss ผ่าน (ใช้แสดง "แนะนำ" ใน dropdown)
+    const bestPipeForFieldCrop =
+        projectMode === 'field-crop' &&
+        currentZoneBestPipe &&
+        sprinklerPressure &&
+        pipesToUse.length > 0
+            ? selectBestPipeByHeadLoss(
+                  pipesToUse,
+                  pipeType,
+                  currentZoneBestPipe,
+                  selectedPipeType,
+                  selectedPipeSizes,
+                  sprinklerPressure.head20PercentM,
+                  { preferSmallestValidPipe: true }
+              )
+            : null;
+
     const pipeOptions = pipesToUse
         .filter((pipe) => {
-            // ✅ Always include selected pipe, even if it doesn't pass validation
             const isSelectedPipe = selectedPipe && (
                 pipe.id === selectedPipe.id ||
                 pipe.productCode === selectedPipe.productCode ||
@@ -1064,11 +1240,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 pipe.productCode === selectedPipe.product_code ||
                 (pipe as any).product_code === selectedPipe.product_code
             );
-            
-            if (isSelectedPipe) {
-                return true;
-            }
-            
+
             const tempValidation = (candidatePipe: any): boolean => {
                 const candidateSize = candidatePipe.sizeMM;
 
@@ -1197,21 +1369,23 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 hasWarning: hasWarning,
                 diffFromTarget: diffFromTarget,
                 isHierarchyCompliant: isHierarchyCompliant,
-                isRecommended: isHierarchyCompliant && diffFromTarget <= 0.5,
+                isRecommended:
+                    (projectMode === 'field-crop' &&
+                        bestPipeForFieldCrop &&
+                        (String(pipe.id) === String(bestPipeForFieldCrop.id) ||
+                            pipe.productCode === bestPipeForFieldCrop.productCode ||
+                            (pipe as any).product_code === (bestPipeForFieldCrop as any).product_code)) ||
+                    (isHierarchyCompliant && diffFromTarget <= 0.5),
                 isGoodChoice: isHierarchyCompliant && diffFromTarget <= 1.0,
                 isUsable: isHierarchyCompliant,
                 isSelected: isSelectedPipe, // ✅ Mark selected pipe for easier sorting
+                sizeMM: Number(pipe.sizeMM ?? 0), // สำหรับเรียงโหมด field-crop: ท่อเล็กก่อน
             };
-            
-            // ✅ Debug: Log selected pipe and first few options to check values
-            const pipeIndexInPipesToUse = pipesToUse.indexOf(pipe);
-            
-            
+
             return option;
         })
         .sort((a, b) => {
             // ✅ Selected pipe should ALWAYS be at the top (highest priority)
-            // Use isSelected flag from option object for more reliable matching
             const aIsSelected = a.isSelected || (selectedPipe && (
                 a.value === selectedPipe.id ||
                 String(a.value) === String(selectedPipe.id) ||
@@ -1224,18 +1398,19 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 b.productCode === selectedPipe.productCode ||
                 b.productCode === selectedPipe.product_code
             ));
-            
-            
-            // ✅ Priority 1: Selected pipe always goes first
+
             if (aIsSelected && !bIsSelected) return -1;
             if (!aIsSelected && bIsSelected) return 1;
-            
-            // ✅ Priority 2: If both are selected or both are not selected, sort by hierarchy compliance
+
             if (a.isHierarchyCompliant !== b.isHierarchyCompliant) {
                 return a.isHierarchyCompliant ? -1 : 1;
             }
 
-            // ✅ Priority 3: Finally sort by diffFromTarget
+            // โหมด field-crop: เรียงท่อเล็กก่อน (ขนาดเล็ก → ใกล้ target head loss) เพื่อให้ตัวที่แนะนำอยู่บน
+            if (projectMode === 'field-crop') {
+                const sizeDiff = (a.sizeMM ?? 0) - (b.sizeMM ?? 0);
+                if (sizeDiff !== 0) return sizeDiff;
+            }
             return a.diffFromTarget - b.diffFromTarget;
         });
 
@@ -1304,33 +1479,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="text-[12px] font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${gardenZoneStats.totalPipeLength.toFixed(1)} ม.`
-                                    : projectMode === 'field-crop' && fieldCropData && activeZoneId
-                                      ? (() => {
-                                            const currentZone = fieldCropData.zones.info.find(
-                                                (z: any) => z.id === activeZoneId
-                                            );
-                                            if (currentZone) {
-                                                const sprinklerFlow =
-                                                    fieldCropData.irrigationSettings
-                                                        ?.sprinkler_system?.flow ?? 0;
-                                                const sprinklerCount =
-                                                    currentZone.sprinklerCount || 0;
-
-                                                switch (pipeType) {
-                                                    case 'branch':
-                                                        return `${(currentZone.pipeStats.lateral.longestLength || 0).toFixed(1)} ม.`;
-                                                    case 'secondary':
-                                                        return `${(currentZone.pipeStats.submain.longestLength || 0).toFixed(1)} ม.`;
-                                                    case 'main':
-                                                        return `${(currentZone.pipeStats.main.longestLength || 0).toFixed(1)} ม.`;
-                                                    case 'emitter':
-                                                        return `${(currentZone.pipeStats.lateral.longestLength || 0).toFixed(1)} ม.`;
-                                                    default:
-                                                        return `${currentZoneBestPipe.length.toFixed(1)} ม.`;
-                                                }
-                                            }
-                                            return `${currentZoneBestPipe.length.toFixed(1)} ม.`;
-                                        })()
+                                    : projectMode === 'field-crop' && currentZoneBestPipe
+                                      ? `${currentZoneBestPipe.length.toFixed(1)} ม.`
                                       : projectMode === 'greenhouse' && activeZoneId
                                         ? (() => {
                                               // ดึงข้อมูลจาก localStorage ที่เก็บไว้จาก green-house-summary.tsx
@@ -1391,32 +1541,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="text-[12px] font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? gardenZoneStats.sprinklerCount
-                                    : projectMode === 'field-crop' && fieldCropData && activeZoneId
-                                      ? (() => {
-                                            const currentZone = fieldCropData.zones.info.find(
-                                                (z: any) => z.id === activeZoneId
-                                            );
-                                            if (currentZone) {
-                                                // Based on the table: lateral=5, submain=5, main=1
-                                                switch (pipeType) {
-                                                    case 'branch':
-                                                        // Lateral pipe outlets (sprinklers per lateral)
-                                                        return 5; // Based on the table showing 5 outlets for lateral
-                                                    case 'secondary':
-                                                        // Submain pipe outlets (laterals per submain)
-                                                        return 5; // Based on the table showing 5 outlets for submain
-                                                    case 'main':
-                                                        // Main pipe outlets (submains per main)
-                                                        return 1; // Based on the table showing 1 outlet for main
-                                                    case 'emitter':
-                                                        // Emitter pipe outlets (same as lateral)
-                                                        return 5;
-                                                    default:
-                                                        return currentZoneBestPipe.count;
-                                                }
-                                            }
-                                            return currentZoneBestPipe.count;
-                                        })()
+                                    : projectMode === 'field-crop' && currentZoneBestPipe
+                                      ? (currentZoneBestPipe.sprinklerCount ?? currentZoneBestPipe.count)
                                       : projectMode === 'greenhouse' && activeZoneId
                                         ? (() => {
                                               // ดึงข้อมูลจาก localStorage ที่เก็บไว้จาก green-house-summary.tsx
@@ -1492,35 +1618,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="text-[12px] font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${(gardenZoneStats.sprinklerFlowRate * gardenZoneStats.sprinklerCount).toFixed(1)} L/min`
-                                    : projectMode === 'field-crop' && fieldCropData && activeZoneId
-                                      ? (() => {
-                                            const currentZone = fieldCropData.zones.info.find(
-                                                (z: any) => z.id === activeZoneId
-                                            );
-                                            if (currentZone && fieldCropData.irrigationSettings) {
-                                                const sprinklerFlow =
-                                                    fieldCropData.irrigationSettings
-                                                        .sprinkler_system?.flow ?? 0;
-                                                // Based on the table: lateral=30, submain=120, main=120
-                                                switch (pipeType) {
-                                                    case 'branch':
-                                                        // Lateral pipe flow (per lateral)
-                                                        return `30.0 L/min`; // Based on the table showing 30 L/min for lateral
-                                                    case 'secondary':
-                                                        // Submain pipe flow (total for submain)
-                                                        return `120.0 L/min`; // Based on the table showing 120 L/min for submain
-                                                    case 'main':
-                                                        // Main pipe flow (total for main)
-                                                        return `120.0 L/min`; // Based on the table showing 120 L/min for main
-                                                    case 'emitter':
-                                                        // Emitter pipe flow (per emitter)
-                                                        return `30.0 L/min`; // Same as lateral
-                                                    default:
-                                                        return `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`;
-                                                }
-                                            }
-                                            return `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`;
-                                        })()
+                                    : projectMode === 'field-crop' && currentZoneBestPipe
+                                      ? `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`
                                       : projectMode === 'greenhouse' && activeZoneId
                                         ? (() => {
                                               // ดึงข้อมูลจาก localStorage ที่เก็บไว้จาก green-house-summary.tsx
@@ -1626,12 +1725,15 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                         return '';
                                     })()}
                                     onChange={(value) => {
-                                        // ✅ Find by id (options use id as value)
-                                        const pipe = availablePipes.find((p) => p.id === value);
-                                        
+                                        const pipe = pipesToUse.find(
+                                            (p) => p.id === value || p.productCode === value || (p as any).product_code === value
+                                        ) ?? availablePipes.find((p) => p.id === value);
                                         if (pipe) {
+                                            const sizeMM = Number(pipe.sizeMM ?? 0);
+                                            if (!validatePipeSizeHierarchy(pipeType, sizeMM, selectedPipeSizes || {})) {
+                                                return;
+                                            }
                                             setIsManuallySelected(true);
-                                            // บันทึกการเลือกด้วยตนเองในโซนนี้
                                             if (activeZoneId) {
                                                 const zoneKey = `${activeZoneId}_${pipeType}`;
                                                 setZoneManualSelections((prev) => ({
@@ -1726,7 +1828,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                 currentZoneBestPipe,
                                                 selectedPipeType,
                                                 selectedPipeSizes,
-                                                sprinklerPressure.head20PercentM
+                                                sprinklerPressure.head20PercentM,
+                                                projectMode === 'field-crop' ? { preferSmallestValidPipe: true } : undefined
                                             );
                                             if (bestPipe) {
                                                 onPipeChange(bestPipe);

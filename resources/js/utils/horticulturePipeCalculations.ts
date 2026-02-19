@@ -71,11 +71,31 @@ export function findPressureLoss(
         const { data: pipeData, selectedSize, sizeInfo } = smartPipeResult;
 
         const sizeData = pipeData[selectedSize];
+        if (!Array.isArray(sizeData) || sizeData.length === 0) return null;
+
+        const firstRow = sizeData[0];
+        const lastRow = sizeData[sizeData.length - 1];
+
+        // ถ้า design flow ต่ำกว่าค่าในตาราง (เช่น เลือกท่อ 200mm แต่ไหลแค่ 60 L/min) อย่าใช้แถวแรกของตาราง (2200 L/min)
+        // ให้ extrapolate: pressure loss แปรผันประมาณกับ flow^2
+        if (flowRate < firstRow.flow) {
+            const ratio = flowRate / firstRow.flow;
+            const pressureLossScaled = firstRow.pressureLoss * ratio * ratio;
+            return {
+                pressureLoss: pressureLossScaled,
+                actualFlow: flowRate,
+                actualSize: selectedSize,
+                sizeInfo: {
+                    isExactSizeMatch: sizeInfo.isExactMatch,
+                    sizeReason: sizeInfo.reason,
+                },
+            };
+        }
 
         let selectedFlow = sizeData.find((data) => data.flow >= flowRate);
 
         if (!selectedFlow) {
-            selectedFlow = sizeData[sizeData.length - 1];
+            selectedFlow = lastRow;
         }
 
         return {
@@ -480,15 +500,14 @@ export function validatePipeSizeHierarchy(
 }
 
 /**
- * เลือกท่อที่ดีที่สุดตาม Head Loss เป้าหมาย 1.9 ม.
+ * เลือกท่อที่ดีที่สุดตาม Head Loss เป้าหมาย
  * @param availablePipes รายการท่อที่มีให้เลือก
  * @param pipeType ประเภทท่อ
  * @param bestPipeInfo ข้อมูลท่อที่ต้องการน้ำมากที่สุด
  * @param selectedPipeType ประเภทวัสดุท่อ (PE/PVC)
  * @param selectedPipeSizes ขนาดท่อที่เลือกไว้แล้ว
  * @param head20Percent ค่า 20% ของ Head จากแรงดันหัวฉีด (เมตร)
- * @param targetHeadLoss [เลิกใช้แล้ว] เก็บไว้เพื่อ backward compatibility
- * @returns ท่อที่เหมาะสมที่สุด
+ * @param options preferSmallestValidPipe: เมื่อ true เลือกท่อที่เล็กที่สุดที่ headLoss <= max (สำหรับ field-crop เพื่อไม่ให้เลือกท่อใหญ่เกินจำเป็น)
  */
 export function selectBestPipeByHeadLoss(
     availablePipes: any[],
@@ -496,8 +515,10 @@ export function selectBestPipeByHeadLoss(
     bestPipeInfo: BestPipeInfo,
     selectedPipeType: string,
     selectedPipeSizes: SelectedPipeSizes,
-    head20Percent: number
+    head20Percent: number,
+    options?: { preferSmallestValidPipe?: boolean }
 ): any | null {
+    const preferSmallestValidPipe = options?.preferSmallestValidPipe === true;
     if (!availablePipes.length || !bestPipeInfo) {
         return null;
     }
@@ -507,7 +528,6 @@ export function selectBestPipeByHeadLoss(
     });
 
     if (!validPipes.length) {
-        // ถ้าไม่มีท่อที่ผ่าน hierarchy validation ให้ return null
         return null;
     }
 
@@ -559,15 +579,39 @@ export function selectBestPipeByHeadLoss(
         return null;
     }
 
+    const maxAllowed = pipeType === 'main' ? head20Percent : head20Percent;
+    const validCandidatesByLimit = candidates.filter((c) => c.headLoss <= maxAllowed);
+
     let bestCandidates: Array<{ pipe: any; headLoss: number; calculation: any }>;
 
-    if (isMaxLimitMode) {
-        // ห้ามเกิน head20Percent สำหรับทุกประเภท
-        const maxAllowed = pipeType === 'main' ? head20Percent : head20Percent;
-        const validCandidates = candidates.filter((c) => c.headLoss <= maxAllowed);
+    // โหมด field-crop: ในกลุ่มที่ head loss ผ่าน ใช้ "ใกล้เป้า" ก่อน แล้วค่อยท่อเล็ก (ไม่เลือกท่อใหญ่เกินที่ head loss ต่ำมาก)
+    const sizeAsc = (a: any, b: any) => Number(a.pipe?.sizeMM ?? 0) - Number(b.pipe?.sizeMM ?? 0);
+    if (preferSmallestValidPipe) {
+        if (validCandidatesByLimit.length > 0) {
+            // มีท่อที่ผ่าน: เลือกที่ head loss ใกล้ targetHeadLossValue (40%/60%/100%) ก่อน แล้วค่อยขนาดเล็ก
+            bestCandidates = [...validCandidatesByLimit].sort((a, b) => {
+                const diffA = Math.abs(a.headLoss - targetHeadLossValue);
+                const diffB = Math.abs(b.headLoss - targetHeadLossValue);
+                if (diffA !== diffB) return diffA - diffB;
+                const sizeDiff = sizeAsc(a, b);
+                if (sizeDiff !== 0) return sizeDiff;
+                return a.headLoss - b.headLoss;
+            });
+        } else {
+            // ไม่มีท่อที่ผ่าน: เลือกท่อที่เกินเกณฑ์น้อยที่สุด แล้วค่อยขนาดเล็ก
+            bestCandidates = [...candidates].sort((a, b) => {
+                const excessA = Math.max(0, a.headLoss - maxAllowed);
+                const excessB = Math.max(0, b.headLoss - maxAllowed);
+                if (excessA !== excessB) return excessA - excessB;
+                const sizeDiff = sizeAsc(a, b);
+                if (sizeDiff !== 0) return sizeDiff;
+                return a.headLoss - b.headLoss;
+            });
+        }
+    } else if (isMaxLimitMode) {
+        const validCandidates = validCandidatesByLimit;
 
         if (validCandidates.length > 0) {
-            // เลือกที่ใกล้เคียง targetHeadLossValue มากที่สุด
             const minDiff = Math.min(
                 ...validCandidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
             );
@@ -575,7 +619,6 @@ export function selectBestPipeByHeadLoss(
                 (c) => Math.abs(c.headLoss - targetHeadLossValue) === minDiff
             );
         } else {
-            // ถ้าไม่มีท่อที่ผ่านเกณฑ์ maxAllowed ให้เลือกที่ใกล้เคียง head20Percent มากที่สุด
             const minDiff = Math.min(
                 ...candidates.map((c) => Math.abs(c.headLoss - head20Percent))
             );
@@ -583,6 +626,13 @@ export function selectBestPipeByHeadLoss(
                 (c) => Math.abs(c.headLoss - head20Percent) === minDiff
             );
         }
+
+        bestCandidates.sort((a, b) => {
+            const priceA = a.pipe.price || 0;
+            const priceB = b.pipe.price || 0;
+            if (priceA !== priceB) return priceA - priceB;
+            return Number(a.pipe.sizeMM ?? 0) - Number(b.pipe.sizeMM ?? 0);
+        });
     } else {
         const minDiff = Math.min(
             ...candidates.map((c) => Math.abs(c.headLoss - targetHeadLossValue))
@@ -590,18 +640,21 @@ export function selectBestPipeByHeadLoss(
         bestCandidates = candidates.filter(
             (c) => Math.abs(c.headLoss - targetHeadLossValue) === minDiff
         );
+        bestCandidates.sort((a, b) => {
+            const priceA = a.pipe.price || 0;
+            const priceB = b.pipe.price || 0;
+            if (priceA !== priceB) return priceA - priceB;
+            return Number(a.pipe.sizeMM ?? 0) - Number(b.pipe.sizeMM ?? 0);
+        });
     }
 
-    bestCandidates.sort((a, b) => {
-        const priceA = a.pipe.price || 0;
-        const priceB = b.pipe.price || 0;
-        if (priceA !== priceB) {
-            return priceA - priceB;
-        }
-        return a.pipe.sizeMM - b.pipe.sizeMM;
-    });
+    const bestPipe = bestCandidates[0]?.pipe ?? null;
 
-    const bestPipe = bestCandidates[0]?.pipe || null;
+    if (bestPipe) return bestPipe;
 
-    return bestPipe || validPipes[0];
+    // Fallback: อย่าใช้ validPipes[0] เพราะลำดับจาก API อาจเป็นท่อใหญ่สุด — เลือกท่อที่ขนาดเล็กที่สุด
+    const sorted = [...validPipes].sort(
+        (a, b) => Number(a.sizeMM ?? 0) - Number(b.sizeMM ?? 0)
+    );
+    return sorted[0] ?? null;
 }

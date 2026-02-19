@@ -330,19 +330,9 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
             if (!zone || !assignedCrop) return 0;
 
-            console.log(`🧮 Calculating plants for zone ${zoneId}:`, {
-                zoneName: zone.name,
-                cropValue: assignedCrop,
-            });
-
             // ตรวจสอบข้อมูล spacing ปัจจุบัน
             const currentRowSpacing = rowSpacing[assignedCrop] || 25; // default 25cm for rice
             const currentPlantSpacing = plantSpacing[assignedCrop] || 25; // default 25cm for rice
-
-            console.log(`📏 Current spacing:`, {
-                rowSpacing: `${currentRowSpacing} cm`,
-                plantSpacing: `${currentPlantSpacing} cm`,
-            });
 
             try {
                 // คำนวณพื้นที่ zone
@@ -357,11 +347,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                 const turfPolygon = turf.polygon([polygonCoords]);
                 const areaInSquareMeters = turf.area(turfPolygon);
 
-                console.log(`📐 Zone area: ${areaInSquareMeters.toFixed(2)} ตร.ม.`);
-
                 // ตรวจสอบว่าพื้นที่สมเหตุสมผลหรือไม่
                 if (areaInSquareMeters < 1) {
-                    console.warn(`⚠️ Zone area too small: ${areaInSquareMeters} ตร.ม.`);
                     return 0;
                 }
 
@@ -374,14 +361,6 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                 // จำนวนต้นทั้งหมดใน zone
                 const totalPlants = Math.floor(areaInSquareMeters * plantsPerSquareMeter);
-
-                console.log(`🌱 Plant calculation details:`, {
-                    areaM2: areaInSquareMeters.toFixed(2),
-                    rowSpacingM: rowSpacingInM.toFixed(2),
-                    plantSpacingM: plantSpacingInM.toFixed(2),
-                    plantsPerSqm: plantsPerSquareMeter.toFixed(1),
-                    totalPlants: totalPlants.toLocaleString(),
-                });
 
                 // เตือนถ้าจำนวนต้นน้อยผิดปกติ
                 if (totalPlants < 100 && areaInSquareMeters > 100) {

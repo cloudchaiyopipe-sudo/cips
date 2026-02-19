@@ -14,6 +14,7 @@ import {
     PlantPoint,
     Obstacle,
     FIELD_STYLING,
+    MAP_CONFIG,
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
 
@@ -1447,8 +1448,8 @@ export default function InitialArea(props: FieldCropPageProps) {
                 setObstacles([]);
                 setRowSpacing({});
                 setPlantSpacing({});
-                setMapCenter([13.7563, 100.5018]);
-                setMapZoom(16);
+                setMapCenter([MAP_CONFIG.DEFAULT_CENTER.lat, MAP_CONFIG.DEFAULT_CENTER.lng]);
+                setMapZoom(MAP_CONFIG.DEFAULT_ZOOM);
                 if (map) {
                     if (drawnPolygonRef.current) {
                         drawnPolygonRef.current.setMap(null);
@@ -1526,8 +1527,8 @@ export default function InitialArea(props: FieldCropPageProps) {
                 setObstacles([]);
                 setRowSpacing({});
                 setPlantSpacing({});
-                setMapCenter([13.7563, 100.5018]);
-                setMapZoom(16);
+                setMapCenter([MAP_CONFIG.DEFAULT_CENTER.lat, MAP_CONFIG.DEFAULT_CENTER.lng]);
+                setMapZoom(MAP_CONFIG.DEFAULT_ZOOM);
             }
 
             if (map) {
@@ -1947,6 +1948,14 @@ export default function InitialArea(props: FieldCropPageProps) {
             loadedMap.addListener('zoom_changed', () => {
                 const newZoom = loadedMap.getZoom() || 16;
                 setMapZoom(newZoom);
+            })
+        );
+        listenersRef.current.push(
+            loadedMap.addListener('center_changed', () => {
+                const center = loadedMap.getCenter();
+                if (center) {
+                    setMapCenter([center.lat(), center.lng()]);
+                }
             })
         );
 
@@ -2499,15 +2508,17 @@ export default function InitialArea(props: FieldCropPageProps) {
                 ),
                 mapCenter: map
                     ? {
-                          lat: map.getCenter()?.lat() || 13.7563,
-                          lng: map.getCenter()?.lng() || 100.5018,
+                          lat: map.getCenter()?.lat() || 17.5633821,
+                          lng: map.getCenter()?.lng() || 103.8484052,
                       }
-                    : { lat: 13.7563, lng: 100.5018 },
+                    : { lat: 17.5633821, lng: 103.8484052 },
                 mapZoom: map ? Math.max(1, Math.min(22, map.getZoom() || 16)) : 16,
             };
             safeSetItem('fieldCropData', fieldData);
-        } catch {
-            // Error saving field data before navigation
+        } catch (err) {
+            console.warn('Failed to save field data before navigation', err);
+            alert(t('Could not save progress. Please try again.'));
+            return;
         }
 
         const params = {
@@ -2577,10 +2588,10 @@ export default function InitialArea(props: FieldCropPageProps) {
             ),
             mapCenter: map
                 ? {
-                      lat: map.getCenter()?.lat() || 13.7563,
-                      lng: map.getCenter()?.lng() || 100.5018,
+                      lat: map.getCenter()?.lat() || 17.5633821,
+                      lng: map.getCenter()?.lng() || 103.8484052,
                   }
-                : { lat: 13.7563, lng: 100.5018 },
+                : { lat: 17.5633821, lng: 103.8484052 },
             mapZoom: map ? Math.max(1, Math.min(22, map.getZoom() || 16)) : 16,
         };
 
@@ -2787,8 +2798,10 @@ export default function InitialArea(props: FieldCropPageProps) {
                         mapZoom: fieldData.mapZoom,
                     };
                     safeSetItem('fieldCropData', minimalData);
-                } catch {
-                    // Failed to clear localStorage
+                } catch (fallbackErr) {
+                    console.warn('Failed to save field data even after fallback', fallbackErr);
+                    alert(t('Could not save progress. Please try again.'));
+                    return;
                 }
             }
         }
@@ -2838,78 +2851,42 @@ export default function InitialArea(props: FieldCropPageProps) {
                             className="flex w-80 flex-col border-r border-white"
                             style={{ backgroundColor: '#000005' }}
                         >
-                            {/* Header with Step Navigation */}
-                            <div className="border-b border-white p-4">
+                            {/* Header: back + wizard progress */}
+                            <div className="border-b border-white/30 p-3">
                                 <button
                                     onClick={handleBackToCropSelection}
-                                    className="mb-4 flex items-center text-sm text-blue-400 hover:text-blue-300"
+                                    className="mb-3 flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
                                 >
-                                    <svg
-                                        className="mr-2 h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M15 19l-7-7 7-7"
-                                        />
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                     {t('Back to Crop Selection')}
                                 </button>
-
-                                <div className="mb-3">
-                                    <h1 className="text-lg font-bold text-white">
-                                        {steps.find((s) => s.id === activeStep)?.title}
-                                    </h1>
-                                </div>
-
-                                {/* Step Navigation */}
-                                <div className="mb-4 flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-1">
                                     {steps.map((step, index) => {
                                         const status = getStepStatus(step.id);
                                         const isClickable = isStepAccessible(step.id);
-
                                         return (
                                             <div key={step.id} className="flex items-center">
                                                 <button
-                                                    onClick={() =>
-                                                        isClickable && handleStepClick(step)
-                                                    }
+                                                    type="button"
+                                                    onClick={() => isClickable && handleStepClick(step)}
                                                     disabled={!isClickable}
-                                                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                                                    title={step.title}
+                                                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                                                         status === 'completed'
-                                                            ? 'cursor-pointer bg-green-600 text-white hover:bg-green-500'
+                                                            ? 'bg-green-600 text-white hover:bg-green-500'
                                                             : status === 'active'
-                                                              ? 'cursor-not-allowed bg-blue-600 text-white'
+                                                              ? 'bg-blue-600 text-white'
                                                               : status === 'accessible'
-                                                                ? 'cursor-pointer bg-gray-600 text-white hover:bg-gray-500'
-                                                                : 'cursor-not-allowed bg-gray-700 text-gray-400'
+                                                                ? 'bg-gray-600 text-white hover:bg-gray-500'
+                                                                : 'bg-gray-700 text-gray-500'
                                                     }`}
                                                 >
-                                                    {status === 'completed' ? (
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="currentColor"
-                                                            viewBox="0 0 20 20"
-                                                        >
-                                                            <path
-                                                                fillRule="evenodd"
-                                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                                                clipRule="evenodd"
-                                                            />
-                                                        </svg>
-                                                    ) : (
-                                                        step.id
-                                                    )}
+                                                    {status === 'completed' ? '✓' : step.id}
                                                 </button>
-
                                                 {index < steps.length - 1 && (
-                                                    <div
-                                                        className={`mx-2 h-0.5 w-8 ${completed.includes(step.id) ? 'bg-green-600' : 'bg-gray-600'}`}
-                                                    ></div>
+                                                    <div className={`mx-1 h-0.5 w-4 flex-1 min-w-0 ${completed.includes(step.id) ? 'bg-green-600' : 'bg-gray-600'}`} />
                                                 )}
                                             </div>
                                         );
@@ -2917,56 +2894,137 @@ export default function InitialArea(props: FieldCropPageProps) {
                                 </div>
                             </div>
 
-                            {/* Scrollable Content */}
+                            {/* Scrollable Content — order: 1 Draw → 2 Water → 3 Plants → Crops/Spacing */}
                             <div className="flex-1 overflow-y-auto">
-                                <div className="space-y-6 p-4">
-                                    {/* Selected Crops */}
+                                <div className="space-y-4 p-3">
+                                    {/* 1. Draw area */}
+                                    <div className="rounded-lg border border-white/50 bg-white/5 p-3">
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
+                                            <span className="text-sm font-semibold text-white">{t('Draw area')}</span>
+                                        </div>
+                                        {!isMainAreaSet ? (
+                                            <p className="mb-2 text-xs text-gray-400">{t('Draw main field on map')}</p>
+                                        ) : (
+                                            <>
+                                                <div className="mb-2 flex items-center justify-between text-xs">
+                                                    <span className="text-green-400">✓ {areaRai != null ? `${areaRai.toFixed(1)} ${t('rai')}` : t('Set')}</span>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    {!isEditingMainArea ? (
+                                                        <button type="button" onClick={editMainArea} className="flex-1 rounded bg-blue-600 px-2 py-1.5 text-xs text-white hover:bg-blue-700">
+                                                            ✏️ {t('Edit Shape')}
+                                                        </button>
+                                                    ) : (
+                                                        <button type="button" onClick={confirmMainArea} className="flex-1 rounded bg-green-600 px-2 py-1.5 text-xs text-white hover:bg-green-700">
+                                                            ✓ {t('Confirm Shape')}
+                                                        </button>
+                                                    )}
+                                                    <button type="button" onClick={clearArea} className="rounded bg-orange-600 px-2 py-1.5 text-xs text-white hover:bg-orange-700">
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* 2. Add water */}
+                                    <div className="rounded-lg border border-white/50 bg-white/5 p-3">
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
+                                            <span className="text-sm font-semibold text-white">{t('Add water')}</span>
+                                        </div>
+                                        <p className="mb-2 text-xs text-gray-400">{t('Add at least one water source')}</p>
+                                        {!isMainAreaSet ? (
+                                            <p className="text-xs text-amber-400">← {t('Draw area')} {t('first')}</p>
+                                        ) : (
+                                            <>
+                                                <div className="mb-2 flex flex-wrap gap-1">
+                                                    {(['polygon', 'rectangle', 'circle'] as const).map((shape) => (
+                                                        <button key={shape} type="button" onClick={() => startDrawingObstacle('water_source', shape)} disabled={isDrawingObstacle}
+                                                            className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50" title={t('Water Source')}>
+                                                            💧 <span className="capitalize">{shape === 'polygon' ? '▣' : shape === 'rectangle' ? '▭' : '○'}</span>
+                                                        </button>
+                                                    ))}
+                                                    {(['polygon', 'rectangle', 'circle'] as const).map((shape) => (
+                                                        <button key={shape} type="button" onClick={() => startDrawingObstacle('other', shape)} disabled={isDrawingObstacle}
+                                                            className="flex items-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs text-white hover:bg-gray-700 disabled:opacity-50" title={t('Obstacle')}>
+                                                            🚧 <span className="capitalize">{shape === 'polygon' ? '▣' : shape === 'rectangle' ? '▭' : '○'}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                {isDrawingObstacle && (
+                                                    <button type="button" onClick={stopDrawingObstacle} className="w-full rounded bg-red-600 py-1 text-xs text-white hover:bg-red-700">
+                                                        {t('Cancel Drawing')}
+                                                    </button>
+                                                )}
+                                                {obstacleCount > 0 && (
+                                                    <div className="mt-2 space-y-1">
+                                                        {obstacles.map((ob, i) => (
+                                                            <div key={ob.id} className="flex items-center justify-between rounded bg-gray-800 px-2 py-1 text-xs">
+                                                                <span>{ob.type === 'water_source' ? '💧' : '🚧'} #{i + 1}</span>
+                                                                <button type="button" onClick={() => deleteObstacle(ob.id)} className="text-red-400 hover:text-red-300">×</button>
+                                                            </div>
+                                                        ))}
+                                                        <button type="button" onClick={clearObstacles} className="w-full rounded bg-red-600/80 py-1 text-xs text-white hover:bg-red-600">
+                                                            🗑️ {t('Clear All Obstacles')}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* 3. Get plant count */}
+                                    <div className="rounded-lg border border-white/50 bg-white/5 p-3">
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
+                                            <span className="text-sm font-semibold text-white">{t('Get plant count')}</span>
+                                        </div>
+                                        {!isMainAreaSet ? (
+                                            <p className="text-xs text-amber-400">← {t('Draw area')} {t('first')}</p>
+                                        ) : (
+                                            <>
+                                                <div className="flex gap-2">
+                                                    <button type="button" onClick={handleGeneratePlantPoints} disabled={isGeneratingPlants}
+                                                        className="flex-1 rounded bg-green-600 px-2 py-2 text-xs text-white hover:bg-green-700 disabled:bg-gray-500">
+                                                        {isGeneratingPlants ? t('Calculating...') : t('Calculate plant count')}
+                                                    </button>
+                                                    {realPlantCount > 0 && (
+                                                        <button type="button" onClick={clearPlantPoints} className="rounded bg-red-600 px-2 py-2 text-xs text-white hover:bg-red-700">🗑️</button>
+                                                    )}
+                                                </div>
+                                                {realPlantCount > 0 && (
+                                                    <>
+                                                        <p className="mt-2 text-xs text-green-400">✓ {realPlantCount} {t('plants')}</p>
+                                                        {waterRequirementInfo.total != null && (
+                                                            <p className="text-xs text-blue-300">💧 {waterRequirementInfo.total.toFixed(0)} {t('L/irrigation')}</p>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Crops & Spacing (compact) */}
                                     {selectedCrops.length > 0 && (
-                                        <div className="rounded-lg border border-white p-4">
-                                            <h3 className="mb-3 text-sm font-semibold text-white">
-                                                {t('Selected Crops')}
-                                            </h3>
-                                            <div className="flex flex-wrap gap-2">
+                                        <div className="rounded-lg border border-white/50 bg-white/5 p-3">
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <span className="text-sm font-semibold text-white">{t('Crops')}</span>
+                                                <button type="button" onClick={resetSpacingToDefaults} className="text-xs text-gray-400 hover:text-white" title={t('Reset Defaults')}>↺</button>
+                                            </div>
+                                            <div className="mb-2 flex flex-wrap gap-1">
                                                 {selectedCrops.map((crop, idx) => {
                                                     const cropData = getCropByValue(crop);
-                                                    const translatedCrop = getTranslatedCropByValue(
-                                                        crop,
-                                                        language as 'en' | 'th'
-                                                    );
+                                                    const translatedCrop = getTranslatedCropByValue(crop, language as 'en' | 'th');
                                                     return (
-                                                        <span
-                                                            key={idx}
-                                                            className="flex items-center gap-1 rounded border border-white bg-blue-600 px-3 py-1 text-xs text-white"
-                                                        >
-                                                            <span className="text-sm">
-                                                                {cropData?.icon || '🌱'}
-                                                            </span>
-                                                            <span>
-                                                                {translatedCrop?.name || crop}
-                                                            </span>
+                                                        <span key={idx} className="inline-flex items-center gap-1 rounded bg-blue-600/80 px-2 py-0.5 text-xs text-white">
+                                                            {cropData?.icon || '🌱'} {translatedCrop?.name || crop}
                                                         </span>
                                                     );
                                                 })}
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {/* Crop Spacing Settings */}
-                                    {selectedCrops.length > 0 && (
-                                        <div className="rounded-lg border border-white p-4">
-                                            <div className="mb-3 flex items-center justify-between">
-                                                <h3 className="text-sm font-semibold text-white">
-                                                    {t('Crop Spacing Settings')}
-                                                </h3>
-                                                <button
-                                                    onClick={resetSpacingToDefaults}
-                                                    className="rounded bg-gray-600 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-500"
-                                                    title={t('Reset Defaults')}
-                                                >
-                                                    ↺ {t('Reset Defaults')}
-                                                </button>
-                                            </div>
-                                            <div className="space-y-3">
+                                            <div className="space-y-2">
                                                 {selectedCrops.map((crop) => {
                                                     const spacingInfo = getCropSpacingInfo(crop);
                                                     const isEditingRow =
@@ -3144,469 +3202,20 @@ export default function InitialArea(props: FieldCropPageProps) {
                                                     );
                                                 })}
                                             </div>
-                                            <div className="mt-3 text-xs text-yellow-400">
-                                                * {t('Modified spacing')}
-                                            </div>
+                                            <p className="mt-1 text-xs text-gray-500">* {t('Modified')}</p>
                                         </div>
                                     )}
-
-                                    {/* Main Area Control */}
-                                    <div className="rounded-lg border border-white p-4">
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            🎯 {t('Main Area')}
-                                        </h3>
-                                        {!isMainAreaSet ? (
-                                            <div className="space-y-3">
-                                                <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
-                                                    🔍{' '}
-                                                    {t(
-                                                        'Please draw the main farming area using the tools on the map'
-                                                    )}
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {t('Status')}:{' '}
-                                                    <span className="text-yellow-400">
-                                                        {t('Waiting for area')}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <div
-                                                        className={`mb-3 rounded p-2 text-xs ${isEditingMainArea ? 'bg-yellow-900 bg-opacity-30 text-yellow-300' : 'bg-green-900 bg-opacity-30 text-green-300'}`}
-                                                    >
-                                                        {isEditingMainArea
-                                                            ? '✏️ ' +
-                                                              t(
-                                                                  'Editing main area shape - drag points to modify'
-                                                              )
-                                                            : '✅ ' +
-                                                              t(
-                                                                  'Main area has been set successfully'
-                                                              )}
-                                                    </div>
-                                                    <div className="space-y-2 border-t border-gray-700 pt-3 text-xs">
-                                                        <h4 className="mb-2 text-sm font-semibold text-white">
-                                                            📊 {t('Field Information')}
-                                                        </h4>
-                                                        <div className="flex justify-between text-gray-400">
-                                                            <span>{t('Total Area')}:</span>
-                                                            <span>
-                                                                {areaRai !== null
-                                                                    ? areaRai.toFixed(2)
-                                                                    : '--'}{' '}
-                                                                {t('rai')}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between text-gray-400">
-                                                            <span>{t('Perimeter')}:</span>
-                                                            <span>
-                                                                {perimeterMeters !== null
-                                                                    ? perimeterMeters.toFixed(1)
-                                                                    : '--'}{' '}
-                                                                {t('meters')}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between text-gray-400">
-                                                            <span>{t('Main Area')}:</span>
-                                                            {mainArea.length >= 3 ? (
-                                                                <span className="text-green-400">
-                                                                    ✅ {t('Set')}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-yellow-400">
-                                                                    ⏳ {t('Not Set')}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    {!isEditingMainArea ? (
-                                                        <button
-                                                            onClick={editMainArea}
-                                                            className="flex-1 rounded bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700"
-                                                        >
-                                                            ✏️ {t('Edit Shape')}
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={confirmMainArea}
-                                                            className="flex-1 rounded bg-green-600 px-3 py-2 text-xs text-white transition-colors hover:bg-green-700"
-                                                        >
-                                                            ✅ {t('Confirm Shape')}
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={clearArea}
-                                                        className="flex-1 rounded bg-orange-600 px-3 py-2 text-xs text-white transition-colors hover:bg-orange-700"
-                                                    >
-                                                        🗑️ {t('Clear Area')}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Obstacles Controls */}
-                                    <div className="rounded-lg border border-white p-4">
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            🚧 {t('Obstacles & Features')}
-                                        </h3>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between text-xs">
-                                                <span className="text-gray-400">
-                                                    {t('Total Obstacles')}:
-                                                </span>
-                                                <span className="text-yellow-300">
-                                                    {obstacleCount}
-                                                </span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <div className="text-xs text-blue-200">
-                                                    💧 {t('Water Source')}:
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-1">
-                                                    <button
-                                                        onClick={() =>
-                                                            startDrawingObstacle(
-                                                                'water_source',
-                                                                'polygon'
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isDrawingObstacle || !isMainAreaSet
-                                                        }
-                                                        className="flex items-center justify-center gap-1 rounded bg-blue-600 px-1 py-1 text-xs text-white transition-colors hover:bg-blue-700 disabled:bg-gray-500"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M4 4l16 4-4 16-12-20z"
-                                                            />
-                                                        </svg>
-                                                        {t('Polygon')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            startDrawingObstacle(
-                                                                'water_source',
-                                                                'rectangle'
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isDrawingObstacle || !isMainAreaSet
-                                                        }
-                                                        className="flex items-center justify-center gap-1 rounded bg-blue-600 px-1 py-1 text-xs text-white transition-colors hover:bg-blue-700 disabled:bg-gray-500"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <rect
-                                                                x="3"
-                                                                y="3"
-                                                                width="18"
-                                                                height="18"
-                                                                rx="2"
-                                                                ry="2"
-                                                            />
-                                                        </svg>
-                                                        {t('Rectangle')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            startDrawingObstacle(
-                                                                'water_source',
-                                                                'circle'
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isDrawingObstacle || !isMainAreaSet
-                                                        }
-                                                        className="flex items-center justify-center gap-1 rounded bg-blue-600 px-1 py-1 text-xs text-white transition-colors hover:bg-blue-700 disabled:bg-gray-500"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <circle cx="12" cy="12" r="10" />
-                                                        </svg>
-                                                        {t('Circle')}
-                                                    </button>
-                                                </div>
-                                                <div className="text-xs text-gray-200">
-                                                    🚧 {t('Other obstacles')}:
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-1">
-                                                    <button
-                                                        onClick={() =>
-                                                            startDrawingObstacle('other', 'polygon')
-                                                        }
-                                                        disabled={
-                                                            isDrawingObstacle || !isMainAreaSet
-                                                        }
-                                                        className="flex items-center justify-center gap-1 rounded bg-gray-600 px-1 py-1 text-xs text-white transition-colors hover:bg-gray-700 disabled:bg-gray-500"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M4 4l16 4-4 16-12-20z"
-                                                            />
-                                                        </svg>
-                                                        {t('Polygon')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            startDrawingObstacle(
-                                                                'other',
-                                                                'rectangle'
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isDrawingObstacle || !isMainAreaSet
-                                                        }
-                                                        className="flex items-center justify-center gap-1 rounded bg-gray-600 px-1 py-1 text-xs text-white transition-colors hover:bg-gray-700 disabled:bg-gray-500"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <rect
-                                                                x="3"
-                                                                y="3"
-                                                                width="18"
-                                                                height="18"
-                                                                rx="2"
-                                                                ry="2"
-                                                            />
-                                                        </svg>
-                                                        {t('Rectangle')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            startDrawingObstacle('other', 'circle')
-                                                        }
-                                                        disabled={
-                                                            isDrawingObstacle || !isMainAreaSet
-                                                        }
-                                                        className="flex items-center justify-center gap-1 rounded bg-gray-600 px-1 py-1 text-xs text-white transition-colors hover:bg-gray-700 disabled:bg-gray-500"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <circle cx="12" cy="12" r="10" />
-                                                        </svg>
-                                                        {t('Circle')}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {!isMainAreaSet && (
-                                                <div className="rounded bg-orange-900 bg-opacity-30 p-2 text-xs text-orange-300">
-                                                    🔒{' '}
-                                                    {t(
-                                                        'Please set main area before adding obstacles'
-                                                    )}
-                                                </div>
-                                            )}
-                                            {isDrawingObstacle && (
-                                                <button
-                                                    onClick={stopDrawingObstacle}
-                                                    className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                >
-                                                    {t('Cancel Drawing')}
-                                                </button>
-                                            )}
-                                            {obstacleCount > 0 && (
-                                                <>
-                                                    <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
-                                                        🔍 {t('Obstacle Layers')}
-                                                    </div>
-                                                    <div className="max-h-32 space-y-1 overflow-y-auto">
-                                                        {obstacles.map((obstacle, index) => (
-                                                            <div
-                                                                key={obstacle.id}
-                                                                className="flex items-center justify-between rounded border-l-4 bg-gray-800 p-2 text-xs"
-                                                                style={{
-                                                                    borderLeftColor:
-                                                                        obstacle.type ===
-                                                                        'water_source'
-                                                                            ? '#3b82f6'
-                                                                            : '#6b7280',
-                                                                }}
-                                                            >
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-lg">
-                                                                        {obstacle.type ===
-                                                                        'water_source'
-                                                                            ? '💧'
-                                                                            : '🚧'}
-                                                                    </span>
-                                                                    <div>
-                                                                        <div className="font-medium text-white">
-                                                                            {obstacle.type ===
-                                                                            'water_source'
-                                                                                ? t('Water Source')
-                                                                                : t(
-                                                                                      'Obstacle'
-                                                                                  )}{' '}
-                                                                            {index + 1}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {
-                                                                                obstacle.coordinates
-                                                                                    .length
-                                                                            }{' '}
-                                                                            {t('points')}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <button
-                                                                    onClick={() =>
-                                                                        deleteObstacle(obstacle.id)
-                                                                    }
-                                                                    className="rounded px-2 py-1 text-red-400 hover:bg-red-900 hover:bg-opacity-30 hover:text-red-300"
-                                                                    title={t('Delete obstacle')}
-                                                                >
-                                                                    🗑️
-                                                                </button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    <button
-                                                        onClick={clearObstacles}
-                                                        className="w-full rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                    >
-                                                        🗑️ {t('Clear All Obstacles')}
-                                                    </button>
-                                                </>
-                                            )}
-                                            {obstacleCount === 0 && isMainAreaSet && (
-                                                <div className="rounded bg-orange-900 bg-opacity-30 p-2 text-xs text-orange-300">
-                                                    💡{' '}
-                                                    {t(
-                                                        'Draw obstacles like water sources, rocks, or buildings within the main area'
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Plant Points Controls */}
-                                    <div className="rounded-lg border border-white p-4">
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            🌱 {t('Plant Points')}
-                                        </h3>
-                                        <div className="space-y-3">
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={handleGeneratePlantPoints}
-                                                    disabled={isGeneratingPlants || !isMainAreaSet}
-                                                    className="flex-1 rounded bg-green-600 px-3 py-2 text-xs text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-500"
-                                                >
-                                                    {isGeneratingPlants
-                                                        ? t('Calculating...')
-                                                        : t('Calculate Plant Count')}
-                                                </button>
-                                                {realPlantCount > 0 && (
-                                                    <button
-                                                        onClick={clearPlantPoints}
-                                                        className="rounded bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                    >
-                                                        {t('Clear')}
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {!isMainAreaSet && (
-                                                <div className="rounded bg-orange-900 bg-opacity-30 p-2 text-xs text-orange-300">
-                                                    🔒{' '}
-                                                    {t(
-                                                        'Please set main area before calculating plant count'
-                                                    )}
-                                                </div>
-                                            )}
-                                            <div className="flex items-center justify-between text-xs">
-                                                <span className="text-gray-400">
-                                                    {t('Total Plant Count')}:
-                                                </span>
-                                                <span className="text-green-300">
-                                                    {realPlantCount}
-                                                </span>
-                                            </div>
-                                            {realPlantCount > 0 && (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center justify-between text-xs">
-                                                        <span className="text-gray-400">
-                                                            {t('Rows')}:
-                                                        </span>
-                                                        <span className="text-blue-300">
-                                                            {calculatedRows}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs">
-                                                        <span className="text-gray-400">
-                                                            {t('Max Columns')}:
-                                                        </span>
-                                                        <span className="text-blue-300">
-                                                            {calculatedColumns}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {waterRequirementInfo.total !== null && (
-                                                <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
-                                                    💧 {t('Total Water Requirement')}:{' '}
-                                                    {waterRequirementInfo.total?.toFixed(2)}{' '}
-                                                    {t('liters per irrigation')}
-                                                </div>
-                                            )}
-                                            {realPlantCount === 0 && (
-                                                <div className="rounded bg-green-900 bg-opacity-30 p-2 text-xs text-green-300">
-                                                    🌱{' '}
-                                                    {t(
-                                                        'Generate optimal planting positions based on your crop spacing settings'
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
-                            {/* Bottom Action Buttons */}
-                            <div className="border-t border-white p-4">
+                            {/* Bottom: Back | Reset | Next */}
+                            <div className="border-t border-white/30 p-3">
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={handleBack}
-                                        className="flex-1 rounded bg-gray-600 px-4 py-2 text-sm text-white transition-colors hover:bg-gray-500"
-                                    >
+                                    <button type="button" onClick={handleBack}
+                                        className="flex-1 rounded bg-gray-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-gray-500">
                                         {t('Back')}
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => {
                                             setMainArea([]);
                                             setAreaRai(null);
@@ -3620,8 +3229,8 @@ export default function InitialArea(props: FieldCropPageProps) {
                                             setObstacles([]);
                                             setRowSpacing({});
                                             setPlantSpacing({});
-                                            setMapCenter([13.7563, 100.5018]);
-                                            setMapZoom(16);
+                                            setMapCenter([MAP_CONFIG.DEFAULT_CENTER.lat, MAP_CONFIG.DEFAULT_CENTER.lng]);
+                                            setMapZoom(MAP_CONFIG.DEFAULT_ZOOM);
                                             if (map) {
                                                 if (drawnPolygonRef.current) {
                                                     detachOverlay(drawnPolygonRef.current);
@@ -3642,19 +3251,12 @@ export default function InitialArea(props: FieldCropPageProps) {
                                             }
                                             localStorage.removeItem('fieldCropData');
                                         }}
-                                        className="flex-1 rounded bg-orange-600 px-4 py-2 text-sm text-white transition-colors hover:bg-orange-500"
-                                    >
+                                        className="flex-1 rounded bg-orange-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-orange-500">
                                         {t('Reset')}
                                     </button>
-                                    <button
-                                        onClick={handleContinue}
-                                        disabled={
-                                            mainArea.length < 3 ||
-                                            !hasWaterSource ||
-                                            realPlantCount === 0
-                                        }
-                                        className="flex-1 rounded bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-500"
-                                    >
+                                    <button type="button" onClick={handleContinue}
+                                        disabled={mainArea.length < 3 || !hasWaterSource || realPlantCount === 0}
+                                        className="flex-1 rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-500">
                                         {t('Next')}
                                     </button>
                                 </div>
@@ -3683,21 +3285,86 @@ export default function InitialArea(props: FieldCropPageProps) {
                                         isEditModeEnabled={true}
                                         mainArea={mainArea}
                                     />
+                                    <DistanceMeasurementOverlay
+                                        map={map}
+                                        isActive={false}
+                                        editMode={'mainArea'}
+                                    />
+                                </HorticultureMapComponent>
 
-                                    {/* Drawing Tools Overlay - Only show for main area drawing */}
-                                    {!isMainAreaSet && (
-                                        <div className="pointer-events-none absolute left-4 top-16 z-10 rounded-lg border border-white bg-black bg-opacity-80 p-2 shadow-lg">
-                                            <h4 className="mb-1 text-xs font-semibold text-white">
-                                                🎯 {t('Drawing Tools')}
-                                            </h4>
-                                            <div className="pointer-events-auto flex flex-col gap-1">
+                                {/* Drawing Tools - outside map so map receives clicks */}
+                                {!isMainAreaSet && (
+                                    <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-lg border border-white bg-black bg-opacity-80 p-1.5 shadow-lg">
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => startDrawing('polygon')}
+                                                disabled={isDrawing}
+                                                title={t('Polygon')}
+                                                className={`rounded p-2 transition-colors ${isDrawing && selectedShape === 'polygon' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
+                                            >
+                                                <svg
+                                                    className="h-5 w-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M4 4l16 4-4 16-12-20z"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => startDrawing('rectangle')}
+                                                disabled={isDrawing}
+                                                title={t('Rectangle')}
+                                                className={`rounded p-2 transition-colors ${isDrawing && selectedShape === 'rectangle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
+                                            >
+                                                <svg
+                                                    className="h-5 w-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <rect
+                                                        x="3"
+                                                        y="3"
+                                                        width="18"
+                                                        height="18"
+                                                        rx="2"
+                                                        ry="2"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => startDrawing('circle')}
+                                                disabled={isDrawing}
+                                                title={t('Circle')}
+                                                className={`rounded p-2 transition-colors ${isDrawing && selectedShape === 'circle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
+                                            >
+                                                <svg
+                                                    className="h-5 w-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <circle cx="12" cy="12" r="10" />
+                                                </svg>
+                                            </button>
+                                            {isDrawing && (
                                                 <button
-                                                    onClick={() => startDrawing('polygon')}
-                                                    disabled={isDrawing}
-                                                    className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${isDrawing && selectedShape === 'polygon' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
+                                                    type="button"
+                                                    onClick={stopDrawing}
+                                                    title={t('Cancel')}
+                                                    className="rounded bg-red-600 p-2 text-white transition-colors hover:bg-red-700"
                                                 >
                                                     <svg
-                                                        className="h-3 w-3"
+                                                        className="h-5 w-5"
                                                         fill="none"
                                                         stroke="currentColor"
                                                         viewBox="0 0 24 24"
@@ -3706,94 +3373,22 @@ export default function InitialArea(props: FieldCropPageProps) {
                                                             strokeLinecap="round"
                                                             strokeLinejoin="round"
                                                             strokeWidth={2}
-                                                            d="M4 4l16 4-4 16-12-20z"
+                                                            d="M6 18L18 6M6 6l12 12"
                                                         />
                                                     </svg>
-                                                    {t('Polygon')}
                                                 </button>
-                                                <button
-                                                    onClick={() => startDrawing('rectangle')}
-                                                    disabled={isDrawing}
-                                                    className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${isDrawing && selectedShape === 'rectangle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
-                                                >
-                                                    <svg
-                                                        className="h-3 w-3"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <rect
-                                                            x="3"
-                                                            y="3"
-                                                            width="18"
-                                                            height="18"
-                                                            rx="2"
-                                                            ry="2"
-                                                        />
-                                                    </svg>
-                                                    {t('Rectangle')}
-                                                </button>
-                                                <button
-                                                    onClick={() => startDrawing('circle')}
-                                                    disabled={isDrawing}
-                                                    className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${isDrawing && selectedShape === 'circle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
-                                                >
-                                                    <svg
-                                                        className="h-3 w-3"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <circle cx="12" cy="12" r="10" />
-                                                    </svg>
-                                                    {t('Circle')}
-                                                </button>
-                                                {isDrawing && (
-                                                    <button
-                                                        onClick={stopDrawing}
-                                                        className="flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-xs text-white transition-colors hover:bg-red-700"
-                                                    >
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M6 18L18 6M6 6l12 12"
-                                                            />
-                                                        </svg>
-                                                        {t('Cancel')}
-                                                    </button>
-                                                )}
-                                            </div>
+                                            )}
                                         </div>
-                                    )}
-                                    <DistanceMeasurementOverlay
-                                        map={map}
-                                        isActive={false}
-                                        editMode={'mainArea'}
-                                    />
-                                </HorticultureMapComponent>
+                                    </div>
+                                )}
 
                                 {/* Overlays */}
                                 {isDrawing && !isMainAreaSet && (
                                     <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-lg border border-blue-500 bg-blue-900 bg-opacity-90 p-3 shadow-lg">
                                         <div className="text-center text-sm text-white">
-                                            <div className="mb-1 font-semibold">
-                                                🎯 {t('Drawing Mode Active')}
-                                            </div>
+                                            <div className="mb-1 font-semibold">🎯 {t('Drawing')}</div>
                                             <div className="text-xs text-blue-200">
-                                                {selectedShape === 'polygon'
-                                                    ? t(
-                                                          'Click points to draw polygon, double-click to finish'
-                                                      )
-                                                    : selectedShape === 'rectangle'
-                                                      ? t('Click and drag to draw rectangle')
-                                                      : t('Click and drag to draw circle')}
+                                                {selectedShape === 'polygon' ? '▣' : selectedShape === 'rectangle' ? '▭' : '○'}
                                             </div>
                                         </div>
                                     </div>
@@ -3801,12 +3396,8 @@ export default function InitialArea(props: FieldCropPageProps) {
                                 {isEditingMainArea && (
                                     <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-lg border border-yellow-500 bg-yellow-900 bg-opacity-90 p-3 shadow-lg">
                                         <div className="text-center text-sm text-white">
-                                            <div className="mb-1 font-semibold">
-                                                ✏️ {t('Editing Main Area')}
-                                            </div>
-                                            <div className="text-xs text-yellow-200">
-                                                {t('Drag the white points to modify the shape')}
-                                            </div>
+                                            <div className="mb-1 font-semibold">✏️ {t('Edit Shape')}</div>
+                                            <div className="text-xs text-yellow-200">↔ {t('Drag points')}</div>
                                         </div>
                                     </div>
                                 )}
@@ -3820,14 +3411,8 @@ export default function InitialArea(props: FieldCropPageProps) {
                                 {isDrawingObstacle && (
                                     <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-lg border border-purple-500 bg-purple-900 bg-opacity-90 p-3 shadow-lg">
                                         <div className="text-center text-sm text-white">
-                                            <div className="mb-1 font-semibold">
-                                                🚧 {t('Drawing Obstacle')}
-                                            </div>
-                                            <div className="text-xs text-purple-200">
-                                                {t('Drawing')}:{' '}
-                                                {selectedObstacleType.replace('_', ' ')} (
-                                                {selectedObstacleShape})
-                                            </div>
+                                            <div className="mb-1 font-semibold">🚧 {t('Drawing')}</div>
+                                            <div className="text-xs text-purple-200">{selectedObstacleType === 'water_source' ? '💧' : '▣'} {selectedObstacleShape}</div>
                                             <div className="text-xs text-purple-200">
                                                 {selectedObstacleShape === 'polygon'
                                                     ? t(

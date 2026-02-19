@@ -6,7 +6,6 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom';
 import { router } from '@inertiajs/react';
 
-import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
 import CanvasDesigner from '../components/homegarden/CanvasDesigner';
 import ImageDesigner from '../components/homegarden/ImageDesigner';
 import Navbar from '../components/Navbar';
@@ -240,23 +239,10 @@ const SprinklerEquipmentSelect: React.FC<{
 };
 
 const ModeSelection: React.FC<{
-    onSelectMode: (mode: 'map' | 'canvas' | 'image') => void;
+    onSelectMode: (mode: 'canvas' | 'image') => void;
 }> = ({ onSelectMode }) => {
     const { t } = useLanguage();
     const modes = [
-        {
-            id: 'map',
-            icon: '🗺️',
-            title: t('Google Map'),
-            desc: t('ใช้แผนที่ดาวเทียมเพื่อดูพื้นที่จริงของบ้านคุณ (แนะนำสำหรับบ้านหลังใหญ่)'),
-            features: [
-                t('เห็นพื้นที่จริงจากดาวเทียม'),
-                t('วัดระยะทางแม่นยำ'),
-                t('ค้นหาตำแหน่งได้ง่าย'),
-                t('เหมาะสำหรับพื้นที่ที่มีความกว้างมาก'),
-            ],
-            color: 'blue',
-        },
         {
             id: 'canvas',
             icon: '✏️',
@@ -294,24 +280,12 @@ const ModeSelection: React.FC<{
                         🏡 {t('เลือกวิธีการออกแบบระบบน้ำ')}
                     </h1>
 
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         {modes.map((mode) => (
                             <div
                                 key={mode.id}
-                                onClick={() => {
-                                    if (mode.id === 'map') {
-                                        alert(
-                                            t(
-                                                'โหมด Google Map อยู่ในช่วงปรับปรุงชั่วคราว กรุณาเลือกโหมดอื่น'
-                                            )
-                                        );
-                                        return;
-                                    }
-                                    onSelectMode(mode.id as any);
-                                }}
-                                className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700 ${
-                                    mode.id === 'map' ? 'opacity-70' : ''
-                                }`}
+                                onClick={() => onSelectMode(mode.id)}
+                                className={`cursor-pointer rounded-xl border-2 border-transparent bg-gray-800 p-6 transition-all hover:scale-105 hover:border-${mode.color}-500 hover:bg-gray-700`}
                             >
                                 <div className="mb-4 text-center">
                                     <div className="mb-3 text-5xl">{mode.icon}</div>
@@ -320,11 +294,6 @@ const ModeSelection: React.FC<{
                                     </h3>
                                 </div>
                                 <p className="text-sm text-gray-300">{mode.desc}</p>
-                                {mode.id === 'map' && (
-                                    <div className="mt-3 inline-block rounded bg-amber-900/40 px-2 py-1 text-xs font-medium text-amber-300">
-                                        {t('อยู่ในช่วงปรับปรุง')}
-                                    </div>
-                                )}
                                 <ul className="mt-4 space-y-1 text-xs text-gray-400">
                                     {mode.features.map((feature, i) => (
                                         <li key={i}>✓ {feature}</li>
@@ -344,7 +313,7 @@ const ModeSelection: React.FC<{
 };
 
 export default function HomeGardenPlanner() {
-    const [designMode, setDesignMode] = useState<'map' | 'canvas' | 'image' | null>(null);
+    const [designMode, setDesignMode] = useState<'canvas' | 'image' | null>(null);
     const [activeTab, setActiveTab] = useState<'zones' | 'sprinklers' | 'pipes'>('zones');
     const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
     const [selectedZoneType, setSelectedZoneType] = useState<string>('grass');
@@ -477,7 +446,7 @@ export default function HomeGardenPlanner() {
             const legacyWaterSource = (savedData as any).waterSource;
             setWaterSources(savedData.waterSources || (legacyWaterSource ? [legacyWaterSource] : []));
             setPipes(savedData.pipes || []);
-            setDesignMode(savedData.designMode);
+            setDesignMode(savedData.designMode === 'map' ? 'canvas' : savedData.designMode);
             
             let loadedImageData: any = null;
             if (savedData.imageData) {
@@ -1959,11 +1928,9 @@ export default function HomeGardenPlanner() {
                             🏡 {t('ระบบออกแบบระบบน้ำสำหรับสวนบ้าน')}
                             <span className="ml-2 text-xs font-normal text-gray-400">
                                 (
-                                {designMode === 'map'
-                                    ? 'Google Map'
-                                    : designMode === 'canvas'
-                                      ? t('วาดเอง')
-                                      : t('รูปแบบแปลน')}
+                                {designMode === 'canvas'
+                                    ? t('วาดเอง')
+                                    : t('รูปแบบแปลน')}
                                 )
                             </span>
                         </h1>
@@ -2788,36 +2755,6 @@ export default function HomeGardenPlanner() {
                     {/* <div className="lg:col-span-3"> */}
                     <div className="order-1 lg:order-2 lg:col-span-3">
                         <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
-                            {designMode === 'map' && (
-                                <div className="flex h-full w-full items-center justify-center bg-gray-900">
-                                    <div className="mx-4 max-w-lg rounded-xl border border-amber-600 bg-amber-900/30 p-6 text-center shadow-2xl">
-                                        <div className="mb-2 text-4xl">🚧</div>
-                                        <h2 className="mb-2 text-xl font-bold text-amber-300">
-                                            {t('โหมด Google Map อยู่ในช่วงปรับปรุง')}
-                                        </h2>
-                                        <p className="mb-4 text-sm text-amber-200">
-                                            {t(
-                                                'ขณะนี้ไม่สามารถใช้งานโหมดแผนที่ได้ชั่วคราว กรุณาเลือกโหมด วาดเอง หรือ รูปแบบแปลน เพื่อใช้งานต่อ'
-                                            )}
-                                        </p>
-                                        <div className="flex justify-center gap-2">
-                                            <button
-                                                onClick={() => setDesignMode('canvas')}
-                                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                                            >
-                                                ✏️ {t('ไปที่โหมดวาดเอง')}
-                                            </button>
-                                            <button
-                                                onClick={() => setDesignMode('image')}
-                                                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
-                                            >
-                                                🖼️ {t('ไปที่โหมดรูปแบบแปลน')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
                             {designMode === 'canvas' && (
                                 <div className="flex h-full w-full items-center justify-center bg-gray-900">
                                     <CanvasDesigner

@@ -274,14 +274,7 @@ Route::delete('/folders-api/{folderId}', function ($folderId) {
             ], 400);
         }
 
-        // Check if folder has fields
-        if ($folder->fields()->count() > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot delete folder that contains fields'
-            ], 400);
-        }
-
+        // Allow delete when folder has fields: DB FK fields.folder_id has onDelete('set null')
         $folder->delete();
 
         return response()->json([
@@ -327,14 +320,7 @@ Route::post('/folders-api/{folderId}/delete', function ($folderId) {
             ], 400);
         }
 
-        // Check if folder has fields
-        if ($folder->fields()->count() > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot delete folder that contains fields'
-            ], 400);
-        }
-
+        // Allow delete when folder has fields: DB FK fields.folder_id has onDelete('set null')
         $folder->delete();
 
         return response()->json([

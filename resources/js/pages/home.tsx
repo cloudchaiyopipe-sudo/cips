@@ -12,6 +12,7 @@ import Navbar from '../components/Navbar';
 import { refreshCsrfToken } from '../bootstrap';
 import { calculatePolygonArea, clearGardenDataCache, getSprinklerColorForPreview, SPRINKLER_TYPES } from '../utils/homeGardenData';
 import HorticultureMapPreview from '../components/horticulture/HorticultureMapPreview';
+import { getTranslatedCropByValue } from './field-crop/choose-crop';
 import QuotationDocument from './components/QuotationDocument';
 import {
     FaFolder,
@@ -156,7 +157,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('easy_interface'),
             t('residential_focus'),
         ],
-        isAvailable: false, // กำลังพัฒนา
+        isAvailable: true, // พร้อมใช้งาน
     },
     {
         id: 'greenhouse',
@@ -248,7 +249,7 @@ const FieldCard = ({
     t: (key: string) => string;
 }) => {
     const [showMenu, setShowMenu] = useState(false);
-    
+    const { language } = useLanguage();
     // Close menu when clicking outside
     useEffect(() => {
         const handleClickOutside = () => {
@@ -869,14 +870,13 @@ const FieldCard = ({
                     ) : (
                         // Default display for horticulture and other categories
                         <>
-                            {/* Map Preview for horticulture */}
-                            {field.category === 'horticulture' && (() => {
+                            {/* Map Preview for horticulture และ field-crop */}
+                            {(field.category === 'horticulture' || field.category === 'field-crop') && (() => {
                                 const data = (field as any).projectData || field.project_data;
 
                                 if (!data) return null;
 
                                 let parsedData = data;
-                                // Parse if it's a string
                                 if (typeof data === 'string') {
                                     try {
                                         parsedData = JSON.parse(data);
@@ -886,7 +886,7 @@ const FieldCard = ({
                                     }
                                 }
 
-                                // ✅ ถ้ามี projectImage ที่บันทึกไว้ → แสดงรูปภาพนั้น (รูปที่บันทึกจาก Results)
+                                // แสดงรูปแผนผังที่บันทึกไว้ (จาก Results / field-crop-summary)
                                 if (parsedData?.projectImage && parsedData.projectImage.startsWith('data:image/')) {
                                     return (
                                         <div className="mb-3">
@@ -900,34 +900,64 @@ const FieldCard = ({
                                     );
                                 }
 
-                                // ถ้าไม่มี projectImage → ใช้ HorticultureMapPreview (วาดแผนที่)
-                                // Check if mainArea exists and has data
-                                if (!parsedData?.mainArea || parsedData.mainArea.length === 0) {
-                                    return null;
+                                // เฉพาะ horticulture: ถ้าไม่มี projectImage ใช้ HorticultureMapPreview (วาดจาก mainArea)
+                                if (field.category === 'horticulture' && parsedData?.mainArea && parsedData.mainArea.length > 0) {
+                                    return (
+                                        <div className="mb-3">
+                                            <HorticultureMapPreview
+                                                fieldId={field.id}
+                                                projectData={parsedData}
+                                                height="180px"
+                                            />
+                                        </div>
+                                    );
                                 }
-
-                                return (
-                                    <div className="mb-3">
-                                        <HorticultureMapPreview
-                                            fieldId={field.id}
-                                            projectData={parsedData}
-                                            height="180px"
-                                        />
-                                    </div>
-                                );
+                                return null;
                             })()}
 
                             <div className="flex justify-between">
                                 <span>{t('plant_name')}:</span>
                                 <span className="text-white">
                                     {(() => {
-                                        // Priority 1: Use plant name from projectData.selectedPlantType (for custom plants)
-                                        // Check both projectData (from backend) and project_data (for compatibility)
-                                        const projectData = (field as any).projectData || field.project_data;
-                                        if (projectData?.selectedPlantType?.name) {
-                                            return projectData.selectedPlantType.name;
+                                        // field-crop: ชื่อพืชจาก zoneAssignments, zones[].cropType และ selectedCrops
+                                        if (field.category === 'field-crop') {
+                                            const fcData = (field as any).field_crop_data;
+                                            const parsed = typeof fcData === 'string' ? (() => { try { return JSON.parse(fcData); } catch { return null; } })() : fcData;
+                                            const cropValuesSet = new Set<string>();
+                                            const zoneAssignments = parsed?.crops?.zoneAssignments ?? parsed?.crops?.zone_assignments;
+                                            if (zoneAssignments && typeof zoneAssignments === 'object') {
+                                                Object.values(zoneAssignments).filter(Boolean).forEach((v: any) => cropValuesSet.add(String(v)));
+                                            }
+                                            const zones = parsed?.zones?.info;
+                                            if (Array.isArray(zones)) {
+                                                zones.forEach((z: any) => {
+                                                    const ct = z?.cropType ?? z?.crop_type;
+                                                    if (ct != null && ct !== '') cropValuesSet.add(String(ct));
+                                                });
+                                            }
+                                            const selectedCrops = parsed?.crops?.selectedCrops ?? parsed?.crops?.selected_crops;
+                                            if (Array.isArray(selectedCrops) && selectedCrops.length) {
+                                                selectedCrops.forEach((v: any) => {
+                                                    if (v != null && v !== '') cropValuesSet.add(typeof v === 'object' ? String((v as any).value ?? (v as any).id ?? '') : String(v));
+                                                });
+                                            }
+                                            const cropValues = [...cropValuesSet].filter(Boolean);
+                                            const names: string[] = [];
+                                            const resolveName = (val: string): string => {
+                                                if (Array.isArray(selectedCrops) && selectedCrops[0] && typeof selectedCrops[0] === 'object' && selectedCrops[0] !== null && 'value' in selectedCrops[0]) {
+                                                    const found = (selectedCrops as any[]).find((c: any) => String(c?.value) === String(val) || String(c?.id) === String(val));
+                                                    if (found?.name) return found.name;
+                                                }
+                                                const n = getTranslatedCropByValue(val, language)?.name ?? getTranslatedCropByValue(val.replace(/-/g, '_'), language)?.name ?? getTranslatedCropByValue(val.toLowerCase(), language)?.name;
+                                                return n || val;
+                                            };
+                                            for (const val of cropValues) {
+                                                names.push(resolveName(val));
+                                            }
+                                            if (names.length) return names.join(', ');
                                         }
-                                        // Priority 2: Use plant name from plantType relation
+                                        const projectData = (field as any).projectData || field.project_data;
+                                        if (projectData?.selectedPlantType?.name) return projectData.selectedPlantType.name;
                                         return field.plantType?.name || 'N/A';
                                     })()}
                                 </span>
@@ -935,28 +965,71 @@ const FieldCard = ({
                             <div className="flex justify-between">
                                 <span>{t('area_label')}:</span>
                                 <span className="text-white">
-                                    {field.totalArea != null
-                                        ? typeof field.totalArea === 'number'
-                                            ? field.totalArea.toFixed(2)
-                                            : (parseFloat(field.totalArea) || 0).toFixed(2)
-                                        : 'N/A'}{' '}
+                                    {(() => {
+                                        if (field.category === 'field-crop') {
+                                            const fcData = (field as any).field_crop_data;
+                                            const parsed = typeof fcData === 'string' ? (() => { try { return JSON.parse(fcData); } catch { return null; } })() : fcData;
+                                            // พื้นที่รวมทั้งโครงการ (ไม่ใช่แค่โซนเดียว)
+                                            const rai = parsed?.area?.sizeInRai ?? parsed?.area?.rai;
+                                            if (rai != null) return Number(rai).toFixed(2);
+                                            const zones = parsed?.zones?.info;
+                                            if (Array.isArray(zones) && zones.length > 0) {
+                                                const total = zones.reduce((sum: number, z: any) => sum + (Number(z.areaInRai) || Number(z.area) / 1600 || 0), 0);
+                                                if (total > 0) return total.toFixed(2);
+                                            }
+                                        }
+                                        return field.totalArea != null
+                                            ? typeof field.totalArea === 'number'
+                                                ? field.totalArea.toFixed(2)
+                                                : (parseFloat(field.totalArea) || 0).toFixed(2)
+                                            : 'N/A';
+                                    })()}{' '}
                                     {t('rai')}
                                 </span>
                             </div>
                             <div className="flex justify-between">
                                 <span>{t('quantity')}:</span>
                                 <span className="text-white">
-                                    {field.totalPlants != null ? field.totalPlants : 'N/A'} {t('plants_unit')}
+                                    {(() => {
+                                        if (field.category === 'field-crop') {
+                                            const fcData = (field as any).field_crop_data;
+                                            const parsed = typeof fcData === 'string' ? (() => { try { return JSON.parse(fcData); } catch { return null; } })() : fcData;
+                                            // จำนวนหัวฉีดรวมทุกโซน
+                                            const total = parsed?.irrigation?.totalCount ?? parsed?.summary?.totalPlantingPoints;
+                                            if (total != null) return total;
+                                            const zones = parsed?.zones?.info;
+                                            if (Array.isArray(zones) && zones.length > 0) {
+                                                const sum = zones.reduce((s: number, z: any) => s + (Number(z.sprinklerCount) || Number(z.totalPlantingPoints) || 0), 0);
+                                                if (sum > 0) return sum;
+                                            }
+                                        }
+                                        return field.totalPlants != null ? field.totalPlants : 'N/A';
+                                    })()}{' '}
+                                    {field.category === 'field-crop' ? (t('sprinkler_unit') || 'หัว') : t('plants_unit')}
                                 </span>
                             </div>
                             <div className="flex justify-between">
                                 <span>{t('water_need')}:</span>
                                 <span className="text-white">
-                                    {field.total_water_need != null
-                                        ? typeof field.total_water_need === 'number'
-                                            ? field.total_water_need.toFixed(2)
-                                            : (parseFloat(field.total_water_need) || 0).toFixed(2)
-                                        : 'N/A'}{' '}
+                                    {(() => {
+                                        if (field.category === 'field-crop') {
+                                            const fcData = (field as any).field_crop_data;
+                                            const parsed = typeof fcData === 'string' ? (() => { try { return JSON.parse(fcData); } catch { return null; } })() : fcData;
+                                            // ความต้องการน้ำรวมทั้งโครงการ (ลิตร/วัน หรือลิตร/ครั้ง ตามที่ backend ส่ง)
+                                            const fromSummary = parsed?.summary?.totalWaterRequirementPerDay;
+                                            if (fromSummary != null) return Number(fromSummary).toFixed(2);
+                                            const zones = parsed?.zones?.info;
+                                            if (Array.isArray(zones) && zones.length > 0) {
+                                                const sum = zones.reduce((s: number, z: any) => s + (Number(z.totalWaterRequirementPerDay) || 0), 0);
+                                                if (sum > 0) return sum.toFixed(2);
+                                            }
+                                        }
+                                        return field.total_water_need != null
+                                            ? typeof field.total_water_need === 'number'
+                                                ? field.total_water_need.toFixed(2)
+                                                : (parseFloat(field.total_water_need) || 0).toFixed(2)
+                                            : 'N/A';
+                                    })()}{' '}
                                     {t('liters_per_session')}
                                 </span>
                             </div>
@@ -3338,6 +3411,9 @@ export default function Home() {
                                             : selectedFinishedProject.field_crop_data;
                                         localStorage.setItem('fieldCropData', JSON.stringify(fieldCropData));
                                     }
+                                    if (selectedFinishedProject.category) {
+                                        localStorage.setItem('projectType', selectedFinishedProject.category);
+                                    }
 
                                     // ✅ โหลด greenhouseData สำหรับ greenhouse mode
                                     if (selectedFinishedProject.category === 'greenhouse' && selectedFinishedProject.greenhouse_data) {
@@ -3394,6 +3470,17 @@ export default function Home() {
                                         if (stats.sprinklerEquipmentSets) localStorage.setItem('sprinklerEquipmentSets', JSON.stringify(stats.sprinklerEquipmentSets));
                                         if (stats.connectionEquipments) localStorage.setItem('connectionEquipments', JSON.stringify(stats.connectionEquipments));
                                         if (stats.results) localStorage.setItem('calculationResults', JSON.stringify(stats.results));
+                                    }
+
+                                    // ✅ โหลด fieldCropData สำหรับ field-crop เมื่อเปิดใน Product (ให้หน้า product อ่านได้จาก localStorage)
+                                    if (selectedFinishedProject.category === 'field-crop' && selectedFinishedProject.field_crop_data) {
+                                        const fieldCropData = typeof selectedFinishedProject.field_crop_data === 'string'
+                                            ? JSON.parse(selectedFinishedProject.field_crop_data)
+                                            : selectedFinishedProject.field_crop_data;
+                                        localStorage.setItem('fieldCropData', JSON.stringify(fieldCropData));
+                                    }
+                                    if (selectedFinishedProject.category) {
+                                        localStorage.setItem('projectType', selectedFinishedProject.category);
                                     }
 
                                     const productModeMap: { [key: string]: string } = {

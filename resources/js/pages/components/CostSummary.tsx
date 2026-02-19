@@ -125,7 +125,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             return zone?.zoneName || zoneId;
         }
         if (projectMode === 'field-crop' && fieldCropData) {
-            const zone = fieldCropData.zones.info.find((z: any) => z.id === zoneId);
+            const zone = fieldCropData.zones.info.find((z: any) => String(z.id) === String(zoneId));
             return zone?.name || zoneId;
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
@@ -295,7 +295,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     return true;
                 }
 
-                if (secondaryPipe && (secondaryPipe.id === extraPipeId || secondaryPipe.productCode === extraPipeId)) {
+                if (secondaryPipe && (secondaryPipe.id === extraPipeId || secondaryPipe.productCode === extraPipeId || (secondaryPipe as any).product_code === extraPipeId)) {
                     const key = getPipeKey(secondaryPipe);
                     if (!pipeSummary.secondary[key]) {
                         pipeSummary.secondary[key] = {
@@ -304,12 +304,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             quantity: 0,
                             zones: [],
                             totalCost: 0,
+                            extraLength: 0,
                         };
                     }
+                    pipeSummary.secondary[key].extraLength =
+                        (pipeSummary.secondary[key].extraLength || 0) + extraLength;
                     return true;
                 }
 
-                if (mainPipe && (mainPipe.id === extraPipeId || mainPipe.productCode === extraPipeId)) {
+                if (mainPipe && (mainPipe.id === extraPipeId || mainPipe.productCode === extraPipeId || (mainPipe as any).product_code === extraPipeId)) {
                     const key = getPipeKey(mainPipe);
                     if (!pipeSummary.main[key]) {
                         pipeSummary.main[key] = {
@@ -318,8 +321,11 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             quantity: 0,
                             zones: [],
                             totalCost: 0,
+                            extraLength: 0,
                         };
                     }
+                    pipeSummary.main[key].extraLength =
+                        (pipeSummary.main[key].extraLength || 0) + extraLength;
                     return true;
                 }
 
@@ -485,9 +491,10 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             });
         } else if (projectMode === 'field-crop' && fieldCropData) {
             fieldCropData.zones.info.forEach((zone: any) => {
-                const zoneSprinkler = zoneSprinklers[zone.id];
-                const zonePipes = selectedPipes[zone.id] || {};
-                const zoneInput = zoneInputs[zone.id];
+                const zoneId = String(zone.id);
+                const zoneSprinkler = zoneSprinklers[zoneId] ?? zoneSprinklers[zone.id];
+                const zonePipes = selectedPipes[zoneId] || selectedPipes[zone.id] || {};
+                const zoneInput = zoneInputs[zoneId] ?? zoneInputs[zone.id];
 
                 if (zoneSprinkler) {
                     let sprinklerQuantity = 0;
@@ -495,9 +502,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     if (
                         projectMode === 'field-crop' &&
                         fieldCropData?.zoneSummaries &&
-                        fieldCropData.zoneSummaries[zone.id]
+                        (fieldCropData.zoneSummaries[zoneId] ?? fieldCropData.zoneSummaries[zone.id])
                     ) {
-                        const zoneSummary = fieldCropData.zoneSummaries[zone.id];
+                        const zoneSummary = fieldCropData.zoneSummaries[zoneId] ?? fieldCropData.zoneSummaries[zone.id];
                         if (
                             zoneSummary.totalIrrigationPoints &&
                             zoneSummary.totalIrrigationPoints > 0
@@ -514,7 +521,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             zone.sprinklerCount ||
                             Math.ceil((zone.totalPlantingPoints || 100) / 10);
                     }
-                    const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
+                    const sprinklerCost = (zoneSprinkler.price ?? 0) * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
                     const key = `${zoneSprinkler.id}`;
@@ -527,7 +534,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(getZoneName(zone.id));
+                    sprinklerSummary[key].zones.push(getZoneName(zoneId));
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
@@ -537,9 +544,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     if (
                         projectMode === 'field-crop' &&
                         fieldCropData?.zoneSummaries &&
-                        fieldCropData.zoneSummaries[zone.id]
+                        (fieldCropData.zoneSummaries[zoneId] ?? fieldCropData.zoneSummaries[zone.id])
                     ) {
-                        const zoneSummary = fieldCropData.zoneSummaries[zone.id];
+                        const zoneSummary = fieldCropData.zoneSummaries[zoneId] ?? fieldCropData.zoneSummaries[zone.id];
                         if (
                             zoneSummary.totalIrrigationPoints &&
                             zoneSummary.totalIrrigationPoints > 0
@@ -556,11 +563,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             zone.sprinklerCount ||
                             Math.ceil((zone.totalPlantingPoints || 100) / 10);
                     }
-                    processExtraPipe(zone.id, zoneInput, sprinklerCount);
+                    processExtraPipe(zoneId, zoneInput, sprinklerCount);
 
-                    // ✅ ใช้เฉพาะท่อที่เลือกไว้สำหรับโซนนี้เท่านั้น (ไม่ใช้ fallback จาก results.autoSelected*)
+                    // field-crop: ใช้เฉพาะท่อที่ผู้ใช้เลือก (ไม่ fallback autoSelected*) รวมความยาวทุกโซนแล้ว ceil ครั้งเดียว
                     const branchPipe = zonePipes.branch;
-                    if (branchPipe && zoneInput.totalBranchPipeM > 0) {
+                    const totalBranchM = Number(zoneInput.totalBranchPipeM) || 0;
+                    if (branchPipe && totalBranchM > 0) {
                         const key = getPipeKey(branchPipe);
                         if (!pipeSummary.branch[key]) {
                             pipeSummary.branch[key] = {
@@ -571,12 +579,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 totalCost: 0,
                             };
                         }
-                        pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(getZoneName(zone.id));
+                        pipeSummary.branch[key].totalLength += totalBranchM;
+                        pipeSummary.branch[key].zones.push(getZoneName(zoneId));
                     }
 
                     const secondaryPipe = zonePipes.secondary;
-                    if (secondaryPipe && zoneInput.totalSecondaryPipeM > 0) {
+                    const totalSecondaryM = Number(zoneInput.totalSecondaryPipeM) || 0;
+                    if (secondaryPipe && totalSecondaryM > 0) {
                         const key = getPipeKey(secondaryPipe);
                         if (!pipeSummary.secondary[key]) {
                             pipeSummary.secondary[key] = {
@@ -587,12 +596,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 totalCost: 0,
                             };
                         }
-                        pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(getZoneName(zone.id));
+                        pipeSummary.secondary[key].totalLength += totalSecondaryM;
+                        pipeSummary.secondary[key].zones.push(getZoneName(zoneId));
                     }
 
                     const mainPipe = zonePipes.main;
-                    if (mainPipe && zoneInput.totalMainPipeM > 0) {
+                    const totalMainM = Number(zoneInput.totalMainPipeM) || 0;
+                    if (mainPipe && totalMainM > 0) {
                         const key = getPipeKey(mainPipe);
                         if (!pipeSummary.main[key]) {
                             pipeSummary.main[key] = {
@@ -603,16 +613,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 totalCost: 0,
                             };
                         }
-                        pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(getZoneName(zone.id));
+                        pipeSummary.main[key].totalLength += totalMainM;
+                        pipeSummary.main[key].zones.push(getZoneName(zoneId));
                     }
 
                     const emitterPipe = zonePipes.emitter;
-                    if (
-                        emitterPipe &&
-                        zoneInput.totalEmitterPipeM &&
-                        zoneInput.totalEmitterPipeM > 0
-                    ) {
+                    const totalEmitterM = Number(zoneInput.totalEmitterPipeM) || 0;
+                    if (emitterPipe && totalEmitterM > 0) {
                         const key = getPipeKey(emitterPipe);
                         if (!pipeSummary.emitter[key]) {
                             pipeSummary.emitter[key] = {
@@ -623,8 +630,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 totalCost: 0,
                             };
                         }
-                        pipeSummary.emitter[key].totalLength += zoneInput.totalEmitterPipeM;
-                        pipeSummary.emitter[key].zones.push(getZoneName(zone.id));
+                        pipeSummary.emitter[key].totalLength += totalEmitterM;
+                        pipeSummary.emitter[key].zones.push(getZoneName(zoneId));
                     }
                 }
             });
@@ -1163,15 +1170,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
                     }
                 } else if (projectMode === 'field-crop' && fieldCropData) {
-                    const zone = fieldCropData.zones?.info?.find((z: any) => z.id === zoneId);
+                    const zone = fieldCropData.zones?.info?.find((z: any) => String(z.id) === String(zoneId));
                     if (zone) {
-                        const zoneSummary = fieldCropData.zoneSummaries?.[zoneId];
+                        const zoneSummary = fieldCropData.zoneSummaries?.[String(zoneId)] ?? fieldCropData.zoneSummaries?.[zoneId];
                         if (zoneSummary?.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
                             totalSprinklers = zoneSummary.totalIrrigationPoints;
                         } else if (zoneSummary?.sprinklerCount && zoneSummary.sprinklerCount > 0) {
                             totalSprinklers = zoneSummary.sprinklerCount;
                         } else {
-                            const zoneInput = zoneInputs[zoneId];
+                            const zoneInput = zoneInputs[String(zoneId)] ?? zoneInputs[zoneId];
                             totalSprinklers = zoneInput?.totalTrees || zone.sprinklerCount || 0;
                         }
                     }
@@ -1224,7 +1231,9 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         }
                     });
                 } else if (equipmentSet.groups) {
+                    const selectedGroupId = equipmentSet.selectedGroupId;
                     equipmentSet.groups.forEach((group: any) => {
+                        if (selectedGroupId != null && selectedGroupId !== '' && group.group_id != null && group.group_id !== selectedGroupId) return;
                         if (group.items) {
                             group.items.forEach((item: any) => {
                                 // ตรวจสอบว่า item.equipment มีจริงๆ หรือไม่ (เหมือน QuotationDocument.tsx)
@@ -1332,6 +1341,22 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     React.useEffect(() => {
         if (costs.totalCost) {
             localStorage.setItem('calculatedTotalCost', costs.totalCost.toString());
+        }
+        if (typeof window !== 'undefined' && localStorage.getItem('DEBUG_PRICE_COMPARE') === '1') {
+            console.log('[PriceCompare] CostSummary total', { totalCost: costs.totalCost.toFixed(2) });
+            const breakdown = {
+                totalSprinklerCost: costs.totalSprinklerCost,
+                totalBranchPipeCost: costs.totalBranchPipeCost,
+                totalSecondaryPipeCost: costs.totalSecondaryPipeCost,
+                totalMainPipeCost: costs.totalMainPipeCost,
+                totalEmitterPipeCost: costs.totalEmitterPipeCost,
+                extraPipeCost: costs.extraPipeCost,
+                pumpCost: costs.pumpCost,
+                pumpAccessoriesCost: costs.pumpAccessoriesCost,
+                sprinklerEquipmentSetsCost: costs.sprinklerEquipmentSetsCost,
+                connectionEquipmentsCost: costs.connectionEquipmentsCost,
+            };
+            localStorage.setItem('DEBUG_COST_BREAKDOWN', JSON.stringify(breakdown));
         }
     }, [costs.totalCost]);
 
@@ -1563,7 +1588,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             {(uniqueBranchPipes > 0 ||
                 uniqueSecondaryPipes > 0 ||
                 uniqueMainPipes > 0 ||
-                uniqueEmitterPipes > 0) && (
+                uniqueEmitterPipes > 0 ||
+                (costs as any).extraPipeSummary) && (
                 <div className="mb-4 rounded bg-purple-900 p-3">
                     <h3 className="mb-2 text-sm font-semibold text-purple-300">
                         🔧 {t('รายละเอียดท่อ:')}

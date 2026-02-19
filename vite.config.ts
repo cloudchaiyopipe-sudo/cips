@@ -26,7 +26,9 @@ export default defineConfig(({ command, mode }) => {
                     'resources/js/pages/map-planner.tsx',
                     'resources/js/pages/generate-tree.tsx',
                     'resources/js/pages/home-garden-planner.tsx',
-                    'resources/js/pages/home-garden-summary.tsx'
+                    'resources/js/pages/home-garden-summary.tsx',
+                    'resources/js/pages/field-crop/field-crop-summary.tsx',
+                    'resources/js/pages/field-crop/choose-crop.tsx'
                 ],
                 refresh: true,
             }),
@@ -64,7 +66,7 @@ export default defineConfig(({ command, mode }) => {
         
         resolve: {
             alias: {
-                '@': '/resources/js',
+                '@': path.resolve(__dirname, 'resources/js'),
                 'ziggy-js': path.resolve(__dirname, 'vendor/tightenco/ziggy'),
             },
         },
@@ -80,7 +82,7 @@ export default defineConfig(({ command, mode }) => {
             'CESIUM_BASE_URL': JSON.stringify('/cesium/'),
         },
         
-        // Optimization
+        // Optimization (pre-bundle deps to avoid 504 Outdated Optimize Dep)
         optimizeDeps: {
             include: [
                 'react',
@@ -90,6 +92,7 @@ export default defineConfig(({ command, mode }) => {
                 'leaflet',
                 'html2canvas',
                 'jspdf',
+                'react-icons',
                 'react-icons/fa',
                 'leaflet-curve',
                 'leaflet-image',
@@ -100,12 +103,17 @@ export default defineConfig(({ command, mode }) => {
                 'lucide-react',
                 'react-markdown',
                 'cesium',
+                '@turf/turf',
+                '@turf/boolean-point-in-polygon',
+                '@turf/line-intersect',
+                '@turf/point-to-line-distance',
+                'geojson',
             ],
             exclude: [
                 // Exclude Google Maps from pre-bundling to avoid issues
                 'google-maps',
             ],
-            // บังคับให้ rebuild dependencies เมื่อ environment variables เปลี่ยน
+            // บังคับ rebuild dependencies ในโหมด dev (ถ้าเจอ 504 Outdated Optimize Dep ให้ลบ node_modules/.vite แล้วรัน dev ใหม่)
             force: command === 'serve',
         },
         

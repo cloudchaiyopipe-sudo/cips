@@ -13,6 +13,7 @@ import {
     PlantPoint,
     IrrigationPositions,
     IrrigationSettings,
+    MAP_CONFIG,
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
 
@@ -541,7 +542,8 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     const finalSelectedCrops =
         parsedSelectedCrops.length > 0 ? parsedSelectedCrops : fieldData.selectedCrops;
     const finalMapCenter =
-        parsedMapCenter.lat !== 13.7563 || parsedMapCenter.lng !== 100.5018
+        parsedMapCenter.lat !== MAP_CONFIG.DEFAULT_CENTER.lat ||
+        parsedMapCenter.lng !== MAP_CONFIG.DEFAULT_CENTER.lng
             ? parsedMapCenter
             : fieldData.mapCenter;
     const finalMapZoom = parsedMapZoom !== 18 ? parsedMapZoom : fieldData.mapZoom;

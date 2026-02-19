@@ -6223,7 +6223,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             }
 
             // Draw pumps on map load
-            console.log('[PipeGenerate] Drawing pumps on map load:', pumps);
             if (pumps && pumps.length > 0) {
                 mapManager.drawPumps(pumps, t);
             }
@@ -6458,7 +6457,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         const canUndoPump = pumpHistoryIndex > 0;
 
         if (!canUndoPipe && !canUndoPump) {
-            console.log('❌ No undo available');
             return;
         }
 
@@ -6468,18 +6466,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             (!canUndoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
 
         if (shouldUndoPipe) {
-            console.log(
-                '🔙 Undoing pipe action (last pipe action:',
-                new Date(pipeManager.lastPipeActionTime.current).toLocaleTimeString(),
-                ')'
-            );
             pipeManager.undo();
         } else {
-            console.log(
-                '🔙 Undoing pump action (last pump action:',
-                new Date(lastPumpActionTime.current).toLocaleTimeString(),
-                ')'
-            );
             undoPump();
         }
     }, [pipeManager, pumpHistoryIndex, undoPump, lastPumpActionTime]);
@@ -6489,7 +6477,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         const canRedoPump = pumpHistoryIndex < pumpHistory.length - 1;
 
         if (!canRedoPipe && !canRedoPump) {
-            console.log('❌ No redo available');
             return;
         }
 
@@ -6499,10 +6486,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             (!canRedoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
 
         if (shouldRedoPipe) {
-            console.log('🔜 Redoing pipe action');
             pipeManager.redo();
         } else {
-            console.log('🔜 Redoing pump action');
             redoPump();
         }
     }, [pipeManager, pumpHistoryIndex, pumpHistory.length, redoPump, lastPumpActionTime]);
@@ -6515,15 +6500,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // Debug logging for undo/redo availability
     useEffect(() => {
-        console.log('🔍 Undo/Redo Status:', {
-            canUndo,
-            canRedo,
-            pipeHistoryIndex: pipeManager.pipeHistoryIndex,
-            pipeHistoryLength: pipeManager.pipeHistoryLength,
-            pumpHistoryIndex,
-            pumpHistoryLength: pumpHistory.length,
-            pipesCount: pipeManager.pipes.length,
-        });
     }, [
         canUndo,
         canRedo,
@@ -6535,8 +6511,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     ]);
 
     useEffect(() => {
-        console.log('[PipeGenerate] Drawing pumps on map (useEffect):', pumps);
-        console.log('[PipeGenerate] mapRef.current:', mapManager.mapRef.current ? 'ready' : 'null');
         if (mapManager.mapRef.current) {
             mapManager.drawPumps(pumps, t);
         } else {
@@ -6658,85 +6632,36 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                             className="flex w-80 flex-col border-r border-white"
                             style={{ backgroundColor: '#000005' }}
                         >
-                            <div className="border-b border-white p-4">
+                            <div className="border-b border-white/30 p-3">
                                 <button
+                                    type="button"
                                     onClick={handleBack}
-                                    className="mb-3 flex items-center text-sm text-blue-400 hover:text-blue-300"
+                                    className="mb-3 flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
                                 >
-                                    <svg
-                                        className="mr-2 h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M15 19l-7-7 7-7"
-                                        />
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                     {t('Back to Zone Obstacle')}
                                 </button>
-
-                                <div className="mb-3">
-                                    <h1 className="text-lg font-bold text-white">
-                                        {
-                                            steps.find((s) => s.id === (props.currentStep || 4))
-                                                ?.title
-                                        }
-                                    </h1>
-                                </div>
-
-                                <div className="mb-4 flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-1">
                                     {steps.map((step, index) => {
                                         const isActive = step.id === (props.currentStep || 4);
                                         const isCompleted =
-                                            parseCompletedSteps(props.completedSteps).includes(
-                                                step.id
-                                            ) ||
-                                            Math.max(
-                                                0,
-                                                ...parseCompletedSteps(props.completedSteps)
-                                            ) >= step.id;
-
+                                            parseCompletedSteps(props.completedSteps).includes(step.id) ||
+                                            Math.max(0, ...parseCompletedSteps(props.completedSteps)) >= step.id;
                                         return (
                                             <div key={step.id} className="flex items-center">
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleStepClick(step)}
-                                                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                                                        isCompleted
-                                                            ? 'cursor-pointer bg-green-600 text-white hover:bg-green-500'
-                                                            : isActive
-                                                              ? 'cursor-not-allowed bg-blue-600 text-white'
-                                                              : 'cursor-pointer bg-gray-600 text-white hover:bg-gray-500'
+                                                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                                                        isCompleted ? 'bg-green-600 text-white hover:bg-green-500' : isActive ? 'bg-blue-600 text-white' : 'cursor-pointer bg-gray-600 text-white hover:bg-gray-500'
                                                     }`}
                                                 >
-                                                    {isCompleted ? (
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="currentColor"
-                                                            viewBox="0 0 20 20"
-                                                        >
-                                                            <path
-                                                                fillRule="evenodd"
-                                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                                                clipRule="evenodd"
-                                                            />
-                                                        </svg>
-                                                    ) : (
-                                                        step.id
-                                                    )}
+                                                    {isCompleted ? '✓' : step.id}
                                                 </button>
-
                                                 {index < steps.length - 1 && (
-                                                    <div
-                                                        className={`mx-2 h-0.5 w-8 ${
-                                                            isCompleted
-                                                                ? 'bg-green-600'
-                                                                : 'bg-gray-600'
-                                                        }`}
-                                                    ></div>
+                                                    <div className={`mx-1 h-0.5 w-4 flex-1 min-w-0 ${isCompleted ? 'bg-green-600' : 'bg-gray-600'}`} />
                                                 )}
                                             </div>
                                         );
@@ -6748,10 +6673,10 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                 <div className="space-y-6 p-4" style={{ willChange: 'auto' }}>
                                     {fieldData.selectedCrops.length > 0 && (
                                         <div
-                                            className="rounded-lg border border-white p-4"
+                                            className="rounded-lg border border-white/50 p-3"
                                             style={{ backgroundColor: '#000005' }}
                                         >
-                                            <h3 className="mb-3 text-sm font-semibold text-white">
+                                            <h3 className="mb-2 text-xs font-semibold text-white">
                                                 {t('Selected Crops')}
                                             </h3>
                                             <div className="flex flex-wrap gap-2">
@@ -6774,9 +6699,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                     )}
 
                                     {fieldData.selectedIrrigationType && (
-                                        <div className="rounded-lg border border-white p-4">
-                                            <h3 className="mb-3 text-sm font-semibold text-white">
-                                                💧 {t('Irrigation Information')}
+                                        <div className="rounded-lg border border-white/50 p-3">
+                                            <h3 className="mb-2 text-xs font-semibold text-white">
+                                                {t('Step4Block1')}
                                             </h3>
                                             <div className="space-y-2 text-xs">
                                                 <div className="flex justify-between text-gray-400">
@@ -6897,454 +6822,244 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         </div>
                                     )}
 
+                                    {/* ---------- วาดท่อตามลำดับ (เรียง 1 → 2 → 3 ไม่ข้ามไปมา) ---------- */}
                                     <div
-                                        className="rounded-lg border border-white p-4"
+                                        className="rounded-lg border border-blue-500/50 bg-blue-950/30 p-3"
                                         style={{ backgroundColor: '#000005' }}
                                     >
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            🔧 {t('Pipe Generation')}
+                                        <h3 className="mb-3 text-xs font-semibold text-blue-300">
+                                            📌 {t('Step4WorkflowTitle')}
                                         </h3>
 
-                                        {/* Distance Meter Display */}
+                                        {/* กำลังวาด: แสดงความยาว + ปุ่มหยุดไว้บนสุด */}
                                         {pipeManager.isDrawing && (
-                                            <div className="mb-4 rounded-lg border border-blue-600/30 bg-blue-600/20 p-3">
-                                                <div className="text-center">
-                                                    <div className="text-lg font-bold text-blue-400">
-                                                        📏{' '}
-                                                        {pipeManager.drawingState.currentDistance.toFixed(
-                                                            1
+                                            <div className="mb-3 rounded-lg border border-blue-500/50 bg-blue-600/20 p-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div>
+                                                        <span className="text-sm font-bold text-blue-300">
+                                                            📏 {pipeManager.drawingState.currentDistance.toFixed(1)} m
+                                                        </span>
+                                                        {pipeManager.selectedType === 'lateral' && (
+                                                            <span className="ml-2 text-xs text-purple-300">
+                                                                💧 {pipeManager.drawingState.currentFlowRate || 0} L/min
+                                                            </span>
                                                         )}
-                                                        m
                                                     </div>
-                                                    <div className="text-xs text-blue-300">
-                                                        {t('Current Pipe Length')}
-                                                    </div>
-
-                                                    {/* แสดงข้อมูลอุปกรณ์ให้น้ำและอัตราการไหลสำหรับ lateral */}
-                                                    {pipeManager.selectedType === 'lateral' && (
-                                                        <div className="mt-2 space-y-1">
-                                                            <div className="text-sm font-bold text-purple-400">
-                                                                💧{' '}
-                                                                {pipeManager.drawingState
-                                                                    .currentFlowRate || 0}{' '}
-                                                                L/min
-                                                            </div>
-                                                            <div className="text-xs text-purple-300">
-                                                                {t('Current Flow Rate')}
-                                                            </div>
-                                                            <div className="text-xs text-purple-200">
-                                                                🔗{' '}
-                                                                {pipeManager.drawingState
-                                                                    .connectedSprinklers?.length ||
-                                                                    0}{' '}
-                                                                {t('Equipment Connected')}
-                                                            </div>
-                                                            <div className="text-xs text-gray-400">
-                                                                {t(
-                                                                    'Includes sprinklers, pivots, drip tapes, and water jets'
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {pipeManager.drawingState.startPoint &&
-                                                        pipeManager.drawingState.currentPoint && (
-                                                            <div className="mt-1 text-xs text-blue-200">
-                                                                📍 {t('Start')}: (
-                                                                {pipeManager.drawingState.startPoint.lat.toFixed(
-                                                                    4
-                                                                )}
-                                                                ,{' '}
-                                                                {pipeManager.drawingState.startPoint.lng.toFixed(
-                                                                    4
-                                                                )}
-                                                                )
-                                                            </div>
-                                                        )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={stopDrawing}
+                                                        className="shrink-0 rounded border border-red-400 bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
+                                                    >
+                                                        ⏹ {t('Stop Drawing')}
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
 
-                                        <div className="space-y-3">
-                                            {/* Main Pipe Section with Curve Options */}
-                                            <div className="space-y-2">
-                                                <div className="mb-2 text-xs font-semibold text-red-400">
-                                                    🔴 {t('Main Pipe')} - {t('Curved Drawing')}
-                                                </div>
-
-                                                {/* Curve Type Selection */}
-                                                <div className="mb-2 grid grid-cols-3 gap-1">
-                                                    <button
-                                                        onClick={() =>
-                                                            pipeManager.setSelectedCurveType(
-                                                                'straight'
-                                                            )
-                                                        }
-                                                        className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                                            pipeManager.selectedCurveType ===
-                                                            'straight'
-                                                                ? 'border-gray-500 bg-gray-600 text-white'
-                                                                : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                        }`}
-                                                    >
-                                                        📏 {t('Straight')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            pipeManager.setSelectedCurveType(
-                                                                'bezier'
-                                                            )
-                                                        }
-                                                        className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                                            pipeManager.selectedCurveType ===
-                                                            'bezier'
-                                                                ? 'border-blue-500 bg-blue-600 text-white'
-                                                                : 'border-blue-600 bg-blue-700 text-blue-300 hover:bg-blue-600'
-                                                        }`}
-                                                    >
-                                                        🎯 {t('Bezier')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            pipeManager.setSelectedCurveType(
-                                                                'spline'
-                                                            )
-                                                        }
-                                                        className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                                            pipeManager.selectedCurveType ===
-                                                            'spline'
-                                                                ? 'border-green-500 bg-green-600 text-white'
-                                                                : 'border-green-600 bg-green-700 text-green-300 hover:bg-green-600'
-                                                        }`}
-                                                    >
-                                                        🌊 {t('Spline')}
-                                                    </button>
-                                                </div>
-
-                                                <div className="flex items-center space-x-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            startDrawing(
-                                                                'main',
-                                                                pipeManager.selectedCurveType
-                                                            );
-                                                        }}
-                                                        className={`flex flex-1 items-center justify-center rounded border border-white px-3 py-2 text-xs text-white transition-colors ${
-                                                            pipeManager.isDrawing &&
-                                                            pipeManager.selectedType === 'main'
-                                                                ? 'cursor-not-allowed bg-red-700'
-                                                                : 'cursor-pointer bg-red-600 hover:bg-red-700'
-                                                        }`}
-                                                        disabled={
-                                                            pipeManager.isDrawing &&
-                                                            pipeManager.selectedType !== 'main'
-                                                        }
-                                                    >
-                                                        <span className="mr-2">🔴</span>
-                                                        {pipeManager.isDrawing &&
-                                                        pipeManager.selectedType === 'main'
-                                                            ? `${t('Drawing')} ${t('Main Pipe')} (${pipeManager.selectedCurveType})...`
-                                                            : `${t('Draw')} ${t('Main Pipe')} (${pipeManager.selectedCurveType})`}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => clearPipes('main')}
-                                                        className="flex items-center justify-center rounded border border-white bg-red-600/80 px-2 py-2 text-xs text-white transition-colors hover:bg-red-600"
-                                                        title={t('Clear Main Pipes')}
-                                                    >
-                                                        🗑️
-                                                    </button>
-                                                </div>
-
-                                                {/* Curve Type Info */}
-                                                {pipeManager.selectedCurveType !== 'straight' && (
-                                                    <div className="rounded border border-gray-700 bg-gray-800/50 p-2 text-xs text-gray-400">
-                                                        {pipeManager.selectedCurveType ===
-                                                            'bezier' && (
-                                                            <div>
-                                                                <strong>
-                                                                    🎯 {t('Bezier Curve')}:
-                                                                </strong>{' '}
-                                                                {t(
-                                                                    'Click 3 points: start, control, end'
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        {pipeManager.selectedCurveType ===
-                                                            'spline' && (
-                                                            <div>
-                                                                <strong>
-                                                                    🌊 {t('Spline Curve')}:
-                                                                </strong>{' '}
-                                                                {t(
-                                                                    'Click multiple points for smooth curve'
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                        {/* 1. ท่อหลัก */}
+                                        <div className="mb-3 rounded border border-red-500/40 bg-red-950/20 p-2">
+                                            <div className="mb-1.5 text-xs font-semibold text-red-300">
+                                                {t('Step4Pipe1Title')}
                                             </div>
-
-                                            <div className="flex items-center space-x-2">
+                                            <div className="mb-1.5 flex gap-1">
+                                                {(['straight', 'bezier', 'spline'] as const).map((curve) => (
+                                                    <button
+                                                        key={curve}
+                                                        type="button"
+                                                        onClick={() => pipeManager.setSelectedCurveType(curve)}
+                                                        className={`rounded border px-1.5 py-0.5 text-xs ${
+                                                            pipeManager.selectedCurveType === curve
+                                                                ? 'border-red-400 bg-red-600 text-white'
+                                                                : 'border-gray-600 bg-gray-700 text-gray-400'
+                                                        }`}
+                                                    >
+                                                        {curve === 'straight' ? '📏' : curve === 'bezier' ? '🎯' : '🌊'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-1">
                                                 <button
-                                                    onClick={() => {
-                                                        startDrawing('submain');
-                                                    }}
-                                                    className={`flex flex-1 items-center justify-center rounded border border-white px-3 py-2 text-xs text-white transition-colors ${
-                                                        pipeManager.isDrawing &&
-                                                        pipeManager.selectedType === 'submain'
-                                                            ? 'cursor-not-allowed bg-purple-700'
-                                                            : 'cursor-pointer bg-purple-600 hover:bg-purple-700'
+                                                    type="button"
+                                                    onClick={() => startDrawing('main', pipeManager.selectedCurveType)}
+                                                    className={`flex-1 rounded border border-red-400 px-2 py-1.5 text-xs text-white ${
+                                                        pipeManager.isDrawing && pipeManager.selectedType === 'main'
+                                                            ? 'bg-red-700'
+                                                            : 'bg-red-600 hover:bg-red-700'
                                                     }`}
-                                                    disabled={
-                                                        pipeManager.isDrawing &&
-                                                        pipeManager.selectedType !== 'submain'
-                                                    }
+                                                    disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'main'}
                                                 >
-                                                    <span className="mr-2">🟣</span>
-                                                    {pipeManager.isDrawing &&
-                                                    pipeManager.selectedType === 'submain'
-                                                        ? t('Drawing Submain Pipe...')
-                                                        : t('Draw Submain Pipe')}
+                                                    {pipeManager.isDrawing && pipeManager.selectedType === 'main'
+                                                        ? t('Drawing') + '...'
+                                                        : t('Draw')}
                                                 </button>
                                                 <button
+                                                    type="button"
+                                                    onClick={() => clearPipes('main')}
+                                                    className="rounded border border-red-500/60 bg-red-600/80 px-2 py-1.5 text-xs text-white hover:bg-red-600"
+                                                    title={t('Clear Main Pipes')}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* 2. ท่อรอง */}
+                                        <div className="mb-3 rounded border border-purple-500/40 bg-purple-950/20 p-2">
+                                            <div className="mb-1.5 text-xs font-semibold text-purple-300">
+                                                {t('Step4Pipe2Title')}
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startDrawing('submain')}
+                                                    className={`flex-1 rounded border border-purple-400 px-2 py-1.5 text-xs text-white ${
+                                                        pipeManager.isDrawing && pipeManager.selectedType === 'submain'
+                                                            ? 'bg-purple-700'
+                                                            : 'bg-purple-600 hover:bg-purple-700'
+                                                    }`}
+                                                    disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'submain'}
+                                                >
+                                                    {pipeManager.isDrawing && pipeManager.selectedType === 'submain'
+                                                        ? t('Drawing') + '...'
+                                                        : t('Draw')}
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => clearPipes('submain')}
-                                                    className="flex items-center justify-center rounded border border-white bg-purple-600/80 px-2 py-2 text-xs text-white transition-colors hover:bg-purple-600"
+                                                    className="rounded border border-purple-500/60 bg-purple-600/80 px-2 py-1.5 text-xs text-white hover:bg-purple-600"
                                                     title={t('Clear Submain Pipes')}
                                                 >
                                                     🗑️
                                                 </button>
                                             </div>
+                                        </div>
 
-                                            <div className="flex items-center space-x-2">
+                                        {/* 3. ท่อย่อย */}
+                                        <div className="mb-3 rounded border border-green-500/40 bg-green-950/20 p-2">
+                                            <div className="mb-1.5 text-xs font-semibold text-green-300">
+                                                {t('Step4Pipe3Title')}
+                                            </div>
+                                            <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                                                <span className="text-gray-400">{t('Lateral Mode')}:</span>
                                                 <button
-                                                    onClick={() => {
-                                                        startDrawing('lateral');
-                                                    }}
-                                                    className={`flex flex-1 items-center justify-center rounded border border-white px-3 py-2 text-xs text-white transition-colors ${
-                                                        pipeManager.isDrawing &&
-                                                        pipeManager.selectedType === 'lateral'
-                                                            ? 'cursor-not-allowed bg-green-700'
-                                                            : 'cursor-pointer bg-green-600 hover:bg-green-700'
-                                                    }`}
-                                                    disabled={
-                                                        pipeManager.isDrawing &&
-                                                        pipeManager.selectedType !== 'lateral'
-                                                    }
+                                                    type="button"
+                                                    onClick={() => pipeManager.setLateralMode('inRow')}
+                                                    className={`rounded border px-1.5 py-0.5 ${pipeManager.lateralMode === 'inRow' ? 'border-green-400 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
                                                 >
-                                                    <span className="mr-2">🟢</span>
-                                                    {pipeManager.isDrawing &&
-                                                    pipeManager.selectedType === 'lateral'
-                                                        ? t('Drawing Lateral Pipe...')
-                                                        : t('Draw Lateral Pipe')}
+                                                    {t('Within rows')}
                                                 </button>
                                                 <button
+                                                    type="button"
+                                                    onClick={() => pipeManager.setLateralMode('betweenRows')}
+                                                    className={`rounded border px-1.5 py-0.5 ${pipeManager.lateralMode === 'betweenRows' ? 'border-green-400 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
+                                                >
+                                                    {t('Between rows')}
+                                                </button>
+                                            </div>
+                                            <div className="mb-1.5 flex items-center gap-1.5 text-xs">
+                                                <span className="text-gray-400">{t('Connect Mode')}:</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleLateralConnectionMode}
+                                                    className={`rounded border px-1.5 py-0.5 ${lateralConnectionMode.isActive ? 'border-blue-400 bg-blue-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
+                                                >
+                                                    {lateralConnectionMode.isActive ? t('ON') : t('OFF')}
+                                                </button>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startDrawing('lateral')}
+                                                    className={`flex-1 rounded border border-green-400 px-2 py-1.5 text-xs text-white ${
+                                                        pipeManager.isDrawing && pipeManager.selectedType === 'lateral'
+                                                            ? 'bg-green-700'
+                                                            : 'bg-green-600 hover:bg-green-700'
+                                                    }`}
+                                                    disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'lateral'}
+                                                >
+                                                    {pipeManager.isDrawing && pipeManager.selectedType === 'lateral'
+                                                        ? t('Drawing') + '...'
+                                                        : t('Draw')}
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => clearPipes('lateral')}
-                                                    className="flex items-center justify-center rounded border border-white bg-green-600/80 px-2 py-2 text-xs text-white transition-colors hover:bg-green-600"
+                                                    className="rounded border border-green-500/60 bg-green-600/80 px-2 py-1.5 text-xs text-white hover:bg-green-600"
                                                     title={t('Clear Lateral Pipes')}
                                                 >
                                                     🗑️
                                                 </button>
                                             </div>
-
-                                            {/* Lateral mode toggle */}
-                                            <div className="mt-2 flex items-center space-x-2">
-                                                <span className="text-xs text-gray-300">
-                                                    {t('Lateral Mode')}
-                                                </span>
-                                                <button
-                                                    onClick={() =>
-                                                        pipeManager.setLateralMode('inRow')
-                                                    }
-                                                    className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                                        pipeManager.lateralMode === 'inRow'
-                                                            ? 'border-green-500 bg-green-600 text-white'
-                                                            : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    }`}
-                                                >
-                                                    {t('Within rows')}
-                                                </button>
-                                                <button
-                                                    onClick={() =>
-                                                        pipeManager.setLateralMode('betweenRows')
-                                                    }
-                                                    className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                                        pipeManager.lateralMode === 'betweenRows'
-                                                            ? 'border-green-500 bg-green-600 text-white'
-                                                            : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    }`}
-                                                >
-                                                    {t('Between rows')}
-                                                </button>
-                                            </div>
-
-                                            {/* ปุ่มเปิด/ปิดโหมดเชื่อมท่อ */}
-                                            <div className="mt-2 flex items-center space-x-2">
-                                                <span className="text-xs text-gray-300">
-                                                    {t('Connect Mode')}
-                                                </span>
-                                                <button
-                                                    onClick={toggleLateralConnectionMode}
-                                                    className={`rounded border px-2 py-1 text-xs transition-colors ${
-                                                        lateralConnectionMode.isActive
-                                                            ? 'border-blue-500 bg-blue-600 text-white'
-                                                            : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    }`}
-                                                >
-                                                    {lateralConnectionMode.isActive
-                                                        ? t('ON')
-                                                        : t('OFF')}
-                                                </button>
-                                            </div>
-
-                                            {pipeManager.isDrawing && (
-                                                <button
-                                                    onClick={stopDrawing}
-                                                    className="flex w-full items-center justify-center rounded border border-white bg-gray-600 px-3 py-2 text-xs text-white transition-colors hover:bg-gray-700"
-                                                >
-                                                    <span className="mr-2">⏹️</span>
-                                                    {t('Stop Drawing')}
-                                                </button>
-                                            )}
-
-                                            <button
-                                                onClick={() => clearPipes()}
-                                                className="flex w-full items-center justify-center rounded border border-white bg-gray-600 px-3 py-2 text-xs text-white transition-colors hover:bg-gray-700"
-                                                disabled={pipeManager.isDrawing}
-                                            >
-                                                <span className="mr-2">🗑️</span>
-                                                {t('Clear All Pipes')}
-                                            </button>
                                         </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => clearPipes()}
+                                            className="w-full rounded border border-gray-500 bg-gray-600 px-2 py-1.5 text-xs text-white hover:bg-gray-500 disabled:opacity-50"
+                                            disabled={pipeManager.isDrawing}
+                                        >
+                                            🗑️ {t('Clear All Pipes')}
+                                        </button>
                                     </div>
 
+                                    {/* ---------- ตั้งค่าเสริม (Snap + ปั๊ม) ---------- */}
                                     <div
-                                        className="rounded-lg border border-white p-4"
+                                        className="rounded-lg border border-white/50 p-3"
                                         style={{ backgroundColor: '#000005' }}
                                     >
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            🎯 {t('Snap Settings')}
+                                        <h3 className="mb-2 text-xs font-semibold text-gray-400">
+                                            {t('Step4OptionsTitle')}
                                         </h3>
                                         <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs text-gray-300">
-                                                    {t('Snap Mode')}
-                                                </span>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-gray-400">{t('Snap Mode')}</span>
                                                 <button
-                                                    onClick={() =>
-                                                        snapSystem.setIsEnabled(
-                                                            !snapSystem.isEnabled
-                                                        )
-                                                    }
-                                                    className={`rounded border px-3 py-1 text-xs transition-colors ${
-                                                        snapSystem.isEnabled
-                                                            ? 'border-green-500 bg-green-600 text-white'
-                                                            : 'border-gray-500 bg-gray-600 text-gray-300'
-                                                    }`}
+                                                    type="button"
+                                                    onClick={() => snapSystem.setIsEnabled(!snapSystem.isEnabled)}
+                                                    className={`rounded border px-2 py-0.5 text-xs ${snapSystem.isEnabled ? 'border-green-500 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
                                                 >
-                                                    {snapSystem.isEnabled
-                                                        ? t('Enabled')
-                                                        : t('Disabled')}
+                                                    {snapSystem.isEnabled ? t('Enabled') : t('Disabled')}
                                                 </button>
                                             </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-xs text-gray-300">
-                                                    {t('Snap Distance')}:{' '}
-                                                    {Math.min(Math.max(snapSystem.distance, 1), 5)}m
-                                                </label>
+                                            <div className="text-xs">
+                                                <label className="text-gray-400">{t('Snap Distance')}: {Math.min(Math.max(snapSystem.distance, 1), 5)}m</label>
                                                 <input
                                                     type="range"
                                                     min="1"
                                                     max="5"
-                                                    value={Math.min(
-                                                        Math.max(snapSystem.distance, 1),
-                                                        5
-                                                    )}
-                                                    onChange={(e) =>
-                                                        snapSystem.setDistance(
-                                                            Math.min(
-                                                                Math.max(
-                                                                    parseInt(e.target.value),
-                                                                    1
-                                                                ),
-                                                                5
-                                                            )
-                                                        )
-                                                    }
-                                                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-700"
+                                                    value={Math.min(Math.max(snapSystem.distance, 1), 5)}
+                                                    onChange={(e) => snapSystem.setDistance(Math.min(Math.max(parseInt(e.target.value), 1), 5))}
+                                                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-gray-700"
                                                 />
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        className="rounded-lg border border-white p-4"
-                                        style={{ backgroundColor: '#000005' }}
-                                    >
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            ⚙️ {t('Pump Management')}
-                                        </h3>
-                                        <div className="space-y-3">
-                                            <div className="mb-2 text-xs text-gray-300">
-                                                {t('Placed Pumps')}: {pumps.length}
-                                            </div>
-                                            <div className="rounded bg-blue-900 bg-opacity-30 p-2 text-xs text-blue-300">
-                                                💡{' '}
-                                                {t(
-                                                    'Pumps on map are not clickable. Use this section to manage pumps.'
+                                            <div className="border-t border-gray-600 pt-2">
+                                                <div className="mb-1 text-xs text-gray-400">{t('Pump Management')} ({pumps.length})</div>
+                                                {pumps.length > 0 && (
+                                                    <div className="max-h-24 space-y-1 overflow-y-auto">
+                                                        {pumps.map((pump) => (
+                                                            <div key={pump.id} className="flex items-center justify-between rounded border border-orange-600/30 bg-orange-600/10 px-2 py-1 text-xs">
+                                                                <span className="text-gray-300">{pump.name} {pump.capacity} L/h</span>
+                                                                <button type="button" onClick={() => removePump(pump.id)} className="text-red-400 hover:text-red-300" title={t('Remove Pump')}>🗑️</button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {pumps.length > 0 && (
+                                                    <button type="button" onClick={removeAllPumps} className="mt-1 w-full rounded border border-red-500/60 bg-red-600/80 py-1 text-xs text-white hover:bg-red-600">
+                                                        {t('Remove All Pumps')}
+                                                    </button>
                                                 )}
                                             </div>
-
-                                            {pumps.length > 0 && (
-                                                <div className="max-h-32 space-y-2 overflow-y-auto">
-                                                    {pumps.map((pump) => (
-                                                        <div
-                                                            key={pump.id}
-                                                            className="flex items-center justify-between rounded border border-orange-600/30 bg-orange-600/10 p-2 text-xs"
-                                                        >
-                                                            <div className="flex items-center space-x-2">
-                                                                <span className="text-orange-400">
-                                                                    ⚙️
-                                                                </span>
-                                                                <div>
-                                                                    <div className="font-semibold text-gray-300">
-                                                                        {pump.name}
-                                                                    </div>
-                                                                    <div className="text-gray-400">
-                                                                        {pump.capacity} L/h
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => removePump(pump.id)}
-                                                                className="text-xs text-red-400 hover:text-red-300"
-                                                                title={t('Remove Pump')}
-                                                            >
-                                                                🗑️
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {pumps.length > 0 && (
-                                                <button
-                                                    onClick={removeAllPumps}
-                                                    className="flex w-full items-center justify-center rounded border border-white bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
-                                                >
-                                                    <span className="mr-2">🗑️</span>
-                                                    {t('Remove All Pumps')}
-                                                </button>
-                                            )}
                                         </div>
                                     </div>
 
+                                    {/* ---------- สรุป ---------- */}
                                     <div
-                                        className="rounded-lg border border-white p-4"
+                                        className="rounded-lg border border-white/50 p-3"
                                         style={{ backgroundColor: '#000005' }}
                                     >
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            📈 {t('Pipe Summary')}
+                                        <h3 className="mb-2 text-xs font-semibold text-white">
+                                            {t('Step4SummaryTitle')}
                                         </h3>
                                         <div className="mb-3 grid grid-cols-2 gap-3 text-center">
                                             <div className="rounded border border-red-600/30 bg-red-600/20 p-2">

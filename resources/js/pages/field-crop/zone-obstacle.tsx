@@ -1935,80 +1935,36 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                             className="flex w-80 flex-col border-r border-white"
                             style={{ backgroundColor: '#000005' }}
                         >
-                            {/* Header */}
-                            <div className="border-b border-white p-4">
+                            {/* Header: back + step progress */}
+                            <div className="border-b border-white/30 p-3">
                                 <button
+                                    type="button"
                                     onClick={handleBack}
-                                    className="mb-3 flex items-center text-sm text-blue-400 hover:text-blue-300"
+                                    className="mb-3 flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
                                 >
-                                    <svg
-                                        className="mr-2 h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M15 19l-7-7 7-7"
-                                        />
+                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                     {t('Back to Irrigation System')}
                                 </button>
-
-                                <div className="mb-3">
-                                    <h1 className="text-lg font-bold text-white">
-                                        {steps.find((s) => s.id === currentStep)?.title}
-                                    </h1>
-                                </div>
-
-                                {/* Step Navigation */}
-                                <div className="mb-4 flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-1">
                                     {steps.map((step, index) => {
                                         const isActive = step.id === currentStep;
                                         const parsedSteps = parseCompletedSteps(completedSteps);
-                                        const isCompleted =
-                                            parsedSteps.includes(step.id) ||
-                                            Math.max(0, ...parsedSteps) >= step.id;
-
+                                        const isCompleted = parsedSteps.includes(step.id) || Math.max(0, ...parsedSteps) >= step.id;
                                         return (
                                             <div key={step.id} className="flex items-center">
                                                 <button
+                                                    type="button"
                                                     onClick={() => handleStepClick(step)}
-                                                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                                                        isCompleted
-                                                            ? 'cursor-pointer bg-green-600 text-white hover:bg-green-500'
-                                                            : isActive
-                                                              ? 'cursor-not-allowed bg-blue-600 text-white'
-                                                              : 'cursor-pointer bg-gray-600 text-white hover:bg-gray-500'
+                                                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                                                        isCompleted ? 'bg-green-600 text-white hover:bg-green-500' : isActive ? 'bg-blue-600 text-white' : 'cursor-pointer bg-gray-600 text-white hover:bg-gray-500'
                                                     }`}
                                                 >
-                                                    {isCompleted ? (
-                                                        <svg
-                                                            className="h-3 w-3"
-                                                            fill="currentColor"
-                                                            viewBox="0 0 20 20"
-                                                        >
-                                                            <path
-                                                                fillRule="evenodd"
-                                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                                                clipRule="evenodd"
-                                                            />
-                                                        </svg>
-                                                    ) : (
-                                                        step.id
-                                                    )}
+                                                    {isCompleted ? '✓' : step.id}
                                                 </button>
-
                                                 {index < steps.length - 1 && (
-                                                    <div
-                                                        className={`mx-2 h-0.5 w-8 ${
-                                                            isCompleted
-                                                                ? 'bg-green-600'
-                                                                : 'bg-gray-600'
-                                                        }`}
-                                                    ></div>
+                                                    <div className={`mx-1 h-0.5 w-4 flex-1 min-w-0 ${isCompleted ? 'bg-green-600' : 'bg-gray-600'}`} />
                                                 )}
                                             </div>
                                         );
@@ -2044,39 +2000,30 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                         </div>
                                     )}
 
-                                    {/* Smart Zone Generation */}
-                                    <div className="rounded-lg border border-white p-4">
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            🎯 {t('Smart Zone Generation')}
+                                    {/* 1. Auto zones */}
+                                    <div className="rounded-lg border border-white/50 p-3">
+                                        <h3 className="mb-2 text-xs font-semibold text-white">
+                                            {t('Step3Block1')}
                                         </h3>
-                                        <div className="space-y-3">
-                                            {/* Zone Generation Method */}
-                                            <div>
-                                                <label className="mb-2 block text-xs text-gray-300">
-                                                    {t('Zone Generation Method')}:
-                                                </label>
-                                                <div className="flex gap-4 rounded-md bg-gray-700 p-1">
-                                                    <button
-                                                        onClick={() =>
-                                                            setZoneGenerationMethod('voronoi')
-                                                        }
-                                                        className={`flex-1 rounded py-1 text-xs ${zoneGenerationMethod === 'voronoi' ? 'bg-blue-600 text-white' : 'bg-transparent text-gray-300'}`}
-                                                    >
-                                                        {t('Voronoi')}
-                                                    </button>
-                                                    <button
-                                                        onClick={() =>
-                                                            setZoneGenerationMethod('convexHull')
-                                                        }
-                                                        className={`flex-1 rounded py-1 text-xs ${zoneGenerationMethod === 'convexHull' ? 'bg-blue-600 text-white' : 'bg-transparent text-gray-300'}`}
-                                                    >
-                                                        {t('Convex Hull')}
-                                                    </button>
-                                                </div>
+                                        <div className="space-y-2">
+                                            <div className="flex gap-1 rounded bg-gray-700 p-0.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setZoneGenerationMethod('voronoi')}
+                                                    className={`flex-1 rounded py-1 text-xs ${zoneGenerationMethod === 'voronoi' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
+                                                >
+                                                    {t('Voronoi')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setZoneGenerationMethod('convexHull')}
+                                                    className={`flex-1 rounded py-1 text-xs ${zoneGenerationMethod === 'convexHull' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
+                                                >
+                                                    {t('Convex Hull')}
+                                                </button>
                                             </div>
-
-                                            <div>
-                                                <label className="mb-1 block text-xs text-gray-300">
+                                            <div className="flex items-center gap-2">
+                                                <label className="shrink-0 text-xs text-gray-400">
                                                     {t('Number of Zones')}:
                                                 </label>
                                                 <input
@@ -2085,137 +2032,77 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                     max="20"
                                                     value={desiredZoneCount}
                                                     onChange={(e) =>
-                                                        setDesiredZoneCount(
-                                                            parseInt(e.target.value) || 1
-                                                        )
+                                                        setDesiredZoneCount(parseInt(e.target.value) || 1)
                                                     }
-                                                    className="w-full rounded border border-gray-500 bg-gray-700 px-2 py-1 text-xs text-white"
-                                                    placeholder={t('Enter number of zones')}
+                                                    className="w-16 rounded border border-gray-500 bg-gray-700 px-1 py-0.5 text-xs text-white"
                                                 />
                                             </div>
-
                                             {fieldData.totalWaterRequirement > 0 &&
-                                                (fieldData.irrigationPositions.sprinklers.length >
-                                                    0 ||
-                                                    fieldData.irrigationPositions.pivots.length >
-                                                        0) && (
-                                                    <div className="rounded bg-gray-700 p-2 text-xs">
-                                                        <div className="mb-1 text-gray-300">
-                                                            {t('Calculation Preview')}:
-                                                        </div>
-                                                        <div className="text-blue-300">
-                                                            {t('Water per zone')}:{' '}
-                                                            {(
-                                                                fieldData.totalWaterRequirement /
-                                                                desiredZoneCount
-                                                            ).toFixed(1)}{' '}
-                                                            {t('liters per irrigation')}
-                                                        </div>
-                                                        <div className="text-green-300">
-                                                            {t('Plants per zone')}: ~
-                                                            {Math.ceil(
-                                                                (fieldData.realPlantCount ||
-                                                                    fieldData.plantPoints.length) /
-                                                                    desiredZoneCount
-                                                            )}{' '}
-                                                            {t('points')}
-                                                        </div>
-                                                        {fieldData.irrigationPositions.sprinklers
-                                                            .length > 0 && (
-                                                            <div className="text-orange-300">
-                                                                {t('Sprinklers per zone')}: ~
-                                                                {Math.ceil(
-                                                                    fieldData.irrigationPositions
-                                                                        .sprinklers.length /
-                                                                        desiredZoneCount
-                                                                )}{' '}
-                                                                {t('units')}
-                                                            </div>
-                                                        )}
-                                                        {fieldData.irrigationPositions.pivots
-                                                            .length > 0 && (
-                                                            <div className="text-orange-300">
-                                                                {t('Pivots per zone')}: ~
-                                                                {Math.ceil(
-                                                                    fieldData.irrigationPositions
-                                                                        .pivots.length /
-                                                                        desiredZoneCount
-                                                                )}{' '}
-                                                                {t('units')}
-                                                            </div>
-                                                        )}
-                                                        <div className="mt-2 border-t border-gray-600 pt-2">
-                                                            <div className="text-xs text-yellow-300">
-                                                                💡 {t('Zone Generation Based On')}:
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-gray-400">
-                                                                🚿 {t('Sprinklers')} | 🔄{' '}
-                                                                {t('Pivots')}
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-blue-300">
-                                                                {t(
-                                                                    'Zones are generated based on irrigation equipment positions only'
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
+                                                (fieldData.irrigationPositions.sprinklers.length > 0 ||
+                                                    fieldData.irrigationPositions.pivots.length > 0) && (
+                                                <div className="text-xs text-gray-400">
+                                                    ~{(fieldData.totalWaterRequirement / desiredZoneCount).toFixed(0)} {t('liters per irrigation')}/{t('Zone')}
+                                                </div>
+                                            )}
                                             <button
+                                                type="button"
                                                 onClick={generateSmartAutoZones}
                                                 disabled={
                                                     isGeneratingZones ||
-                                                    (fieldData.irrigationPositions.sprinklers
-                                                        .length === 0 &&
-                                                        fieldData.irrigationPositions.pivots
-                                                            .length === 0)
+                                                    (fieldData.irrigationPositions.sprinklers.length === 0 &&
+                                                        fieldData.irrigationPositions.pivots.length === 0)
                                                 }
-                                                className="w-full rounded border border-white bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="w-full rounded border border-white bg-blue-600 px-2 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
                                             >
-                                                {isGeneratingZones
-                                                    ? t('Generating Smart Zones...')
-                                                    : t('Generate Smart Zones')}
+                                                {isGeneratingZones ? t('Generating Smart Zones...') : t('Generate Smart Zones')}
                                             </button>
-
                                             <button
+                                                type="button"
                                                 onClick={generateAutoZones}
-                                                className="w-full rounded border border-white bg-green-600 px-3 py-2 text-xs text-white transition-colors hover:bg-green-700"
+                                                className="w-full rounded border border-white/70 bg-green-600 px-2 py-1.5 text-xs text-white hover:bg-green-700"
                                             >
                                                 {t('Generate Simple Auto Zones')}
                                             </button>
+                                        </div>
+                                    </div>
 
+                                    {/* 2. Draw zone */}
+                                    <div className="rounded-lg border border-white/50 p-3">
+                                        <h3 className="mb-2 text-xs font-semibold text-white">
+                                            {t('Step3Block2')}
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2">
                                             <button
+                                                type="button"
                                                 onClick={startDrawingZone}
-                                                className="w-full rounded border border-white bg-purple-600 px-3 py-2 text-xs text-white transition-colors hover:bg-purple-700"
+                                                className="rounded border border-white bg-purple-600 px-3 py-1.5 text-xs text-white hover:bg-purple-700 disabled:opacity-50"
                                                 disabled={zoneEditingState.isDrawing}
                                             >
-                                                {zoneEditingState.isDrawing
-                                                    ? t('Click on map to draw zone...')
-                                                    : t('Draw Manual Zone')}
+                                                {zoneEditingState.isDrawing ? t('Click on map to draw zone...') : t('Draw Manual Zone')}
                                             </button>
-
                                             {zoneEditingState.isDrawing && (
                                                 <button
+                                                    type="button"
                                                     onClick={cancelDrawingZone}
-                                                    className="w-full rounded border border-white bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
+                                                    className="rounded border border-red-400 bg-red-600 px-2 py-1.5 text-xs text-white hover:bg-red-700"
                                                 >
                                                     {t('Cancel Drawing')}
                                                 </button>
                                             )}
-
                                             <button
+                                                type="button"
                                                 onClick={clearZones}
-                                                className="w-full rounded border border-white bg-red-600 px-3 py-2 text-xs text-white transition-colors hover:bg-red-700"
+                                                className="rounded border border-white/70 bg-gray-600 px-2 py-1.5 text-xs text-white hover:bg-gray-500"
                                             >
                                                 {t('Clear All Zones')}
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* Zone Statistics */}
+                                    {/* Zone Statistics (compact) */}
                                     {zoneStats && fieldData.zones.length > 0 && (
-                                        <div className="rounded-lg border border-white p-4">
-                                            <h3 className="mb-3 text-sm font-semibold text-white">
+                                        <div className="rounded-lg border border-white/50 p-3">
+                                            <h3 className="mb-2 text-xs font-semibold text-white">
                                                 📊 {t('Zone Statistics')}
                                             </h3>
                                             <div className="space-y-2 text-xs">
@@ -2255,10 +2142,10 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                         </div>
                                     )}
 
-                                    {/* Zone List */}
-                                    <div className="rounded-lg border border-white p-4">
-                                        <h3 className="mb-3 text-sm font-semibold text-white">
-                                            {t('Zones')} ({fieldData.zones.length})
+                                    {/* 3. Zone list */}
+                                    <div className="rounded-lg border border-white/50 p-3">
+                                        <h3 className="mb-2 text-xs font-semibold text-white">
+                                            {t('Step3Block3')} ({fieldData.zones.length})
                                         </h3>
                                         <div className="max-h-60 space-y-3 overflow-y-auto">
                                             {fieldData.zones.length === 0 ? (

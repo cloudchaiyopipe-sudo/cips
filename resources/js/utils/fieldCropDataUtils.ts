@@ -22,23 +22,12 @@ export const parseJsonSafely = <T>(jsonString: string | undefined, fallback: T):
 
 // Standardized data parsing from props
 export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<FieldData> => {
-    console.log('parseFieldDataFromProps - Input props:', props);
-
     // Always try to load from localStorage first, then merge with props
     let localStorageData: Partial<FieldData> = {};
     try {
         const stored = localStorage.getItem('fieldCropData');
-        console.log('parseFieldDataFromProps - localStorage raw data:', stored ? 'exists' : 'null');
         if (stored) {
             localStorageData = JSON.parse(stored);
-            console.log('parseFieldDataFromProps - localStorage parsed data:', {
-                selectedCrops: localStorageData.selectedCrops?.length || 0,
-                mainArea: localStorageData.mainArea?.length || 0,
-                obstacles: localStorageData.obstacles?.length || 0,
-                plantPoints: localStorageData.plantPoints?.length || 0,
-                zones: localStorageData.zones?.length || 0,
-                pipes: localStorageData.pipes?.length || 0,
-            });
         }
     } catch (error) {
         console.warn('Failed to parse localStorage data:', error);
@@ -111,15 +100,6 @@ export const parseFieldDataFromProps = (props: FieldCropPageProps): Partial<Fiel
         ...localStorageData,
         ...propsData,
     };
-
-    console.log('parseFieldDataFromProps - Final merged data:', {
-        selectedCrops: mergedData.selectedCrops?.length || 0,
-        mainArea: mergedData.mainArea?.length || 0,
-        obstacles: mergedData.obstacles?.length || 0,
-        plantPoints: mergedData.plantPoints?.length || 0,
-        zones: mergedData.zones?.length || 0,
-        pipes: mergedData.pipes?.length || 0,
-    });
 
     return mergedData;
 };

@@ -3,11 +3,9 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import Navbar from '../components/Navbar';
-import GoogleMapSummary from '../components/homegarden/GoogleMapSummary';
 import { useLanguage } from '../contexts/LanguageContext';
 
 import {
-    Coordinate,
     CanvasCoordinate,
     GardenPlannerData,
     ZONE_TYPES,
@@ -16,7 +14,6 @@ import {
     formatArea,
     validateGardenData,
     clipCircleToPolygon,
-    canvasToGPS,
     getManualSprinklerColor,
     Sprinkler,
 } from '../utils/homeGardenData';
@@ -935,7 +932,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const mapContainerRef = useRef<HTMLDivElement>(null);
     const [isCreatingImage, setIsCreatingImage] = useState(false);
 
     useEffect(() => {
@@ -1040,130 +1036,10 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         return Array.from(groups.values()).sort((a, b) => b.count - a.count);
     }, [gardenData, t]);
 
-    const mapCenter = useMemo(() => {
-        if (!gardenData) return [13.5799071, 100.8325833] as [number, number];
-
-        try {
-            const allPoints: Coordinate[] = [];
-
-            if (gardenData.gardenZones) {
-                gardenData.gardenZones.forEach((zone) => {
-                    if (zone.coordinates && zone.coordinates.length > 0) {
-                        allPoints.push(...zone.coordinates);
-                    } else if (
-                        zone.canvasCoordinates &&
-                        zone.canvasCoordinates.length > 0 &&
-                        gardenData.canvasData
-                    ) {
-                        const gpsCoords = zone.canvasCoordinates.map((c) =>
-                            canvasToGPS(c, gardenData.canvasData)
-                        );
-                        allPoints.push(...gpsCoords);
-                    }
-                });
-            }
-
-            if (gardenData.sprinklers) {
-                gardenData.sprinklers.forEach((s) => {
-                    if (s.position) allPoints.push(s.position);
-                });
-            }
-
-            if (gardenData.waterSources && gardenData.waterSources.length > 0) {
-                gardenData.waterSources.forEach((ws) => {
-                    if (ws?.position) allPoints.push(ws.position);
-                });
-            }
-
-            if (gardenData.pipes) {
-                gardenData.pipes.forEach((pipe) => {
-                    allPoints.push(pipe.start, pipe.end);
-                });
-            }
-
-            if (allPoints.length === 0) return [13.5799071, 100.8325833] as [number, number];
-
-            const validPoints = allPoints.filter(
-                (p) =>
-                    typeof p.lat === 'number' &&
-                    typeof p.lng === 'number' &&
-                    !isNaN(p.lat) &&
-                    !isNaN(p.lng)
-            );
-
-            if (validPoints.length === 0) return [13.5799071, 100.8325833] as [number, number];
-
-            const lats = validPoints.map((p) => p.lat);
-            const lngs = validPoints.map((p) => p.lng);
-
-            return [
-                (Math.min(...lats) + Math.max(...lats)) / 2,
-                (Math.min(...lngs) + Math.max(...lngs)) / 2,
-            ] as [number, number];
-        } catch (error) {
-            console.error('Error calculating map center:', error);
-            return [13.5799071, 100.8325833] as [number, number];
-        }
-    }, [gardenData]);
-
-    const calculateZoomLevel = useMemo(() => {
-        if (!gardenData || !gardenData.gardenZones || gardenData.gardenZones.length === 0)
-            return 22;
-
-        try {
-            const allPoints: Coordinate[] = [];
-            gardenData.gardenZones.forEach((zone) => {
-                if (zone.coordinates && zone.coordinates.length > 0) {
-                    allPoints.push(...zone.coordinates);
-                } else if (
-                    zone.canvasCoordinates &&
-                    zone.canvasCoordinates.length > 0 &&
-                    gardenData.canvasData
-                ) {
-                    const gpsCoords = zone.canvasCoordinates.map((c) =>
-                        canvasToGPS(c, gardenData.canvasData)
-                    );
-                    allPoints.push(...gpsCoords);
-                }
-            });
-
-            if (allPoints.length === 0) return 20;
-
-            const validPoints = allPoints.filter(
-                (p) =>
-                    typeof p.lat === 'number' &&
-                    typeof p.lng === 'number' &&
-                    !isNaN(p.lat) &&
-                    !isNaN(p.lng)
-            );
-
-            if (validPoints.length === 0) return 20;
-
-            const lats = validPoints.map((p) => p.lat);
-            const lngs = validPoints.map((p) => p.lng);
-
-            const latDiff = Math.max(...lats) - Math.min(...lats);
-            const lngDiff = Math.max(...lngs) - Math.min(...lngs);
-            const maxDiff = Math.max(latDiff, lngDiff);
-
-            if (maxDiff < 0.0005) return 80;
-            if (maxDiff < 0.001) return 60;
-            if (maxDiff < 0.002) return 50;
-            if (maxDiff < 0.005) return 40;
-            if (maxDiff < 0.01) return 30;
-            return 20;
-        } catch (error) {
-            console.error('Error calculating zoom level:', error);
-            return 20;
-        }
-    }, [gardenData]);
-
     const createMapImage = async () => {
         let targetElement: HTMLElement | null = null;
 
-        if (gardenData?.designMode === 'map' && mapContainerRef.current) {
-            targetElement = mapContainerRef.current;
-        } else if (
+        if (
             (gardenData?.designMode === 'canvas' || gardenData?.designMode === 'image') &&
             canvasRef.current
         ) {
@@ -1415,11 +1291,11 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                             📊 {t('สรุปผลการออกแบบระบบน้ำ')}
                             <span className="ml-2 text-sm font-normal text-gray-400">
                                 (
-                                {gardenData.designMode === 'map'
-                                    ? t('Google Map')
-                                    : gardenData.designMode === 'canvas'
-                                      ? t('วาดเอง')
-                                      : t('รูปแบบแปลน')}
+                                {gardenData.designMode === 'canvas'
+                                    ? t('วาดเอง')
+                                    : gardenData.designMode === 'image'
+                                      ? t('รูปแบบแปลน')
+                                      : t('วาดเอง')}
                                 )
                             </span>
                         </h1>
@@ -1478,22 +1354,22 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                 🗺️ {t('แผนผังโครงการ')}
                             </h3>
                             <div className="h-[600px] overflow-hidden rounded-lg border border-gray-600 bg-gray-900">
-                                {gardenData.designMode === 'map' && (
-                                    <div
-                                        ref={mapContainerRef}
-                                        id="map-container"
-                                        className="h-full"
-                                    >
-                                        <GoogleMapSummary
-                                            gardenData={gardenData}
-                                            mapCenter={mapCenter}
-                                            calculateZoomLevel={calculateZoomLevel}
-                                        />
+                                {gardenData.designMode === 'map' ? (
+                                    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                                        <p className="text-amber-300">
+                                            {t('โหมด Google Map ไม่รองรับแล้ว')}
+                                        </p>
+                                        <p className="text-sm text-gray-400">
+                                            {t('โครงการนี้สร้างด้วยโหมดแผนที่ กรุณากลับไปหน้าออกแบบแล้วเลือกโหมด วาดเอง หรือ รูปแบบแปลน')}
+                                        </p>
+                                        <button
+                                            onClick={() => router.visit('/home-garden-planner')}
+                                            className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                                        >
+                                            {t('ไปหน้าออกแบบ')}
+                                        </button>
                                     </div>
-                                )}
-
-                                {(gardenData.designMode === 'canvas' ||
-                                    gardenData.designMode === 'image') && (
+                                ) : (
                                     <CanvasRenderer gardenData={gardenData} canvasRef={canvasRef} />
                                 )}
                             </div>

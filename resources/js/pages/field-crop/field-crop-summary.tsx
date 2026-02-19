@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Head, Link, usePage, router } from '@inertiajs/react';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -14,7 +15,7 @@ import pointToLineDistance from '@turf/point-to-line-distance';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
+import { createGoogleMapsApiUrl } from '../../utils/googleMapsConfig';
 import { getEnhancedFieldCropData, calculateEnhancedFieldStats } from '../../utils/fieldCropData';
 
 // Reduce verbose logs in production/dev by toggling these flags
@@ -5046,23 +5047,104 @@ export default function FieldCropSummary() {
 
     const areaInRai = fieldAreaSize / 1600;
 
-    // Handle export to product page
+    // Handle export to product page: บันทึก fieldCropData แล้วไปหน้า product (ภาพแผนที่ capture ได้หรือไม่ก็ไป)
     const handleExportToProduct = async () => {
-        if (!mapContainerRef.current) {
-            alert(t('Map not found'));
-            return;
-        }
         setIsCapturingImage(true);
         try {
-            // Capture map image first
-            setCaptureStatus(t('Map image capture in progress...'));
+            let fieldData = getEnhancedFieldCropData();
+            if (!fieldData) {
+                fieldData = calculateEnhancedFieldStats(summaryData);
+            }
+            if (!fieldData || zoneIrrigationCounts.length === 0) {
+                alert(t('No Project Data Found'));
+                return;
+            }
 
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const totalSprinklerCount = zoneIrrigationCounts.reduce((total, count) => total + count.sprinkler, 0);
+            const fieldCropData = {
+                area: {
+                    size: fieldData.area.size,
+                    sizeInRai: fieldData.area.sizeInRai ?? (fieldData.area as any).rai ?? fieldData.area.size / 1600,
+                },
+                crops: {
+                    selectedCrops: fieldData.crops.selectedCrops ?? (fieldData.crops as any).selected,
+                    zoneAssignments: fieldData.crops.zoneAssignments,
+                },
+                zones: {
+                    info: fieldData.zones.info.map((zone: any, index: number) => {
+                        const zoneIrrigationCount = zoneIrrigationCounts[index] || { sprinkler: 0, pivot: 0, total: 0 };
+                        const actualSprinklerCount = zoneIrrigationCount.sprinkler;
+                        const zonePipeStats = zonePipeStatsMap.get(String(zone.id)) || {
+                            main: { count: 0, totalLength: 0, longestLength: 0 },
+                            submain: { count: 0, totalLength: 0, longestLength: 0 },
+                            lateral: { count: 0, totalLength: 0, longestLength: 0 },
+                            total: 0,
+                            totalLength: 0,
+                            totalLongestLength: 0,
+                        };
+                        let lateralOutlets = 0;
+                        let submainOutlets = 0;
+                        let lateralFlowLMin = 0;
+                        let submainFlowLMin = 0;
+                        let mainFlowLMin = 0;
+                        try {
+                            const longestFlows = buildZoneConnectivityLongestFlows(
+                                zone,
+                                actualPipes,
+                                actualIrrigationPoints,
+                                irrigationSettingsData || {}
+                            );
+                            lateralOutlets = longestFlows.lateral?.sprinklers ?? 0;
+                            submainOutlets = longestFlows.submain?.connectedLaterals ?? 0;
+                            lateralFlowLMin = longestFlows.lateral?.flowLMin ?? 0;
+                            submainFlowLMin = longestFlows.submain?.flowLMin ?? 0;
+                            mainFlowLMin = longestFlows.main?.flowLMin ?? 0;
+                        } catch {
+                            lateralOutlets = 0;
+                            submainOutlets = 0;
+                            lateralFlowLMin = 0;
+                            submainFlowLMin = 0;
+                            mainFlowLMin = 0;
+                        }
+                        const cropValue = zone.cropType ?? fieldData.crops.zoneAssignments?.[String(zone.id)] ?? fieldData.crops.zoneAssignments?.[zone.id];
+                        return {
+                            id: String(zone.id),
+                            name: zone.name,
+                            area: zone.area,
+                            cropType: cropValue ?? (fieldData.crops.selectedCrops?.[0]),
+                            sprinklerCount: actualSprinklerCount,
+                            totalPlantingPoints: actualSprinklerCount,
+                            totalWaterRequirementPerDay: (zone as any).totalWaterRequirementPerDay ?? 0,
+                            pipeStats: zonePipeStats,
+                            lateralOutlets: lateralOutlets > 0 ? lateralOutlets : undefined,
+                            submainOutlets: submainOutlets > 0 ? submainOutlets : undefined,
+                            lateralFlowLMin: lateralFlowLMin > 0 ? lateralFlowLMin : undefined,
+                            submainFlowLMin: submainFlowLMin > 0 ? submainFlowLMin : undefined,
+                            mainFlowLMin: mainFlowLMin > 0 ? mainFlowLMin : undefined,
+                        };
+                    }),
+                },
+                irrigation: {
+                    totalCount: totalSprinklerCount,
+                    sprinklerCount: totalSprinklerCount,
+                },
+                summary: {
+                    totalPlantingPoints: totalSprinklerCount,
+                    totalSprinklerCount: totalSprinklerCount,
+                },
+                irrigationSettings: irrigationSettingsData,
+            };
 
-            const html2canvas = await import('html2canvas');
-            const html2canvasLib = html2canvas.default || html2canvas;
+            localStorage.setItem('fieldCropData', JSON.stringify(fieldCropData));
+            localStorage.setItem('projectType', 'field-crop');
 
-            const canvas = await html2canvasLib(mapContainerRef.current, {
+            if (mapContainerRef.current) {
+                setCaptureStatus(t('Map image capture in progress...'));
+                await new Promise((resolve) => setTimeout(resolve, 500));
+                try {
+                const html2canvas = await import('html2canvas');
+                const html2canvasLib = html2canvas.default || html2canvas;
+                const canvas = await html2canvasLib(mapContainerRef.current, {
                 useCORS: true,
                 allowTaint: true,
                 scale: 2,
@@ -5136,103 +5218,21 @@ export default function FieldCropSummary() {
                 },
             });
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-            if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
-                localStorage.setItem('projectMapImage', dataUrl);
-                localStorage.setItem('projectType', 'field-crop');
-
-                setMapImageCaptured(true);
-                setCaptureStatus('บันทึกภาพแผนที่สำเร็จ');
-
-                // Get enhanced field crop data
-                let fieldData = getEnhancedFieldCropData();
-                if (!fieldData) {
-                    // Try to create from summary data
-                    fieldData = calculateEnhancedFieldStats(summaryData);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
+                    localStorage.setItem('projectMapImage', dataUrl);
+                    setMapImageCaptured(true);
+                    setCaptureStatus(t('บันทึกภาพแผนที่สำเร็จ') || 'บันทึกภาพแผนที่สำเร็จ');
                 }
-
-                if (fieldData && zoneIrrigationCounts.length > 0) {
-                    // คำนวณจำนวนสปริงเกลอร์รวมทั้งหมด
-                    const totalSprinklerCount = zoneIrrigationCounts.reduce(
-                        (total, count) => total + count.sprinkler,
-                        0
-                    );
-
-                    // ใช้ค่าอัตราการไหลจาก irrigationSettingsData
-
-                    // Create field crop data in the format expected by product page
-                    const fieldCropData = {
-                        area: {
-                            size: fieldData.area.size,
-                            rai: fieldData.area.sizeInRai,
-                        },
-                        crops: {
-                            selected: fieldData.crops.selectedCrops,
-                            zoneAssignments: fieldData.crops.zoneAssignments,
-                        },
-                        zones: {
-                            info: fieldData.zones.info.map((zone, index) => {
-                                // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts state
-                                const zoneIrrigationCount = zoneIrrigationCounts[index] || {
-                                    sprinkler: 0,
-                                    pivot: 0,
-                                    total: 0,
-                                };
-                                // ใช้แค่จำนวนสปริงเกลอร์ ไม่รวม drip tape, pivot, water jet tape
-                                const actualSprinklerCount = zoneIrrigationCount.sprinkler;
-
-                                // ใช้ข้อมูลท่อจาก zonePipeStatsMap ที่คำนวณแล้ว
-                                const zonePipeStats = zonePipeStatsMap.get(zone.id.toString()) || {
-                                    main: { count: 0, totalLength: 0, longestLength: 0 },
-                                    submain: { count: 0, totalLength: 0, longestLength: 0 },
-                                    lateral: { count: 0, totalLength: 0, longestLength: 0 },
-                                    total: 0,
-                                    totalLength: 0,
-                                    totalLongestLength: 0,
-                                };
-
-                                return {
-                                    id: zone.id,
-                                    name: zone.name,
-                                    area: zone.area,
-                                    sprinklerCount: actualSprinklerCount, // ใช้จำนวนสปริงเกลอร์จริง
-                                    totalPlantingPoints: actualSprinklerCount, // ใช้จำนวนสปริงเกลอร์แทน totalPlantingPoints
-                                    pipeStats: zonePipeStats, // ใช้ข้อมูลท่อที่คำนวณแล้ว
-                                };
-                            }),
-                        },
-                        irrigation: {
-                            totalCount: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
-                            sprinklerCount: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
-                        },
-                        summary: {
-                            totalPlantingPoints: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
-                            totalSprinklerCount: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
-                        },
-                        irrigationSettings: irrigationSettingsData, // ส่ง irrigationSettings ไปยัง product.tsx
-                    };
-
-                    // Save field crop data to localStorage in the format expected by product page
-                    localStorage.setItem('fieldCropData', JSON.stringify(fieldCropData));
-
-                    // Created fieldCropData successfully
-                    localStorage.setItem('projectType', 'field-crop');
-
-                    // Navigate to product page using router (similar to greenhouse)
-                    router.visit('/product?mode=field-crop');
-                } else {
-                    // No field crop data available
-                    alert(t('No Project Data Found'));
+                } catch (err: any) {
+                    console.error('Image capture error:', err);
+                    setCaptureStatus(t('Map image capture failed. Proceeding to product page.') || 'ไม่สามารถบันทึกภาพแผนที่ ได้ไปหน้าคำนวณอุปกรณ์');
                 }
-            } else {
-                throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');
             }
-        } catch {
-            // Error creating map image
-            alert(
-                '❌ เกิดข้อผิดพลาดในการสร้างภาพแผนผัง\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อ Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือใช้ Extension "Full Page Screen Capture"'
-            );
+            router.visit('/product?mode=field-crop');
+        } catch (err: any) {
+            console.error('Export to product error:', err);
+            alert(t('No Project Data Found'));
         } finally {
             setIsCapturingImage(false);
         }
@@ -5277,10 +5277,12 @@ export default function FieldCropSummary() {
                 <Navbar />
             </div>
 
-            {/* Fixed Header Section */}
-            <div className="top-16 z-40 border-b border-gray-700 bg-gray-800 print:hidden">
-                <div className="px-4 py-4">
-                    <div className="mx-auto">
+            {/* Content เริ่มใต้ Navbar */}
+            <div className="pt-16 print:pt-0">
+            {/* Header Section */}
+            <div className="z-40 border-b border-gray-700 bg-gray-800 print:hidden">
+                <div className="px-4 py-3 md:px-6 lg:px-8">
+                    <div className="w-full max-w-[1920px] mx-auto">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <div className="mb-2 flex flex-wrap gap-2">
@@ -5309,10 +5311,10 @@ export default function FieldCropSummary() {
                                         🔧 {t('Step 4: Pipes')}
                                     </Link>
                                 </div>
-                                <h1 className="mb-1 text-3xl font-bold">
+                                <h1 className="mb-0.5 text-xl font-bold text-white md:text-2xl">
                                     📊 {t('Field Crop Summary')}
                                 </h1>
-                                <p className="mb-2 text-gray-400">
+                                <p className="text-sm text-gray-400">
                                     {t('Complete overview of your irrigation planning project')}
                                 </p>
                             </div>
@@ -5436,25 +5438,24 @@ export default function FieldCropSummary() {
             </div>
 
             {/* Print header - only visible when printing */}
-            <div className="hidden print:mb-4 print:block">
-                <h1 className="text-2xl font-bold text-black">📊 {t('Field Crop Summary')}</h1>
-                <p className="text-gray-600">
+            <div className="hidden print:mb-3 print:block">
+                <h1 className="text-lg font-bold text-black">📊 {t('Field Crop Summary')}</h1>
+                <p className="text-sm text-gray-600">
                     {t('Generated on {date}').replace('{date}', new Date().toLocaleDateString())}
                 </p>
-                <hr className="my-2 border-gray-300" />
+                <hr className="my-1 border-gray-300" />
             </div>
 
-            {/* Scrollable Main Content */}
+            {/* Scrollable Main Content - ใช้ความกว้างเต็ม */}
             <div className="print:print-layout">
-                <div className="containe px-4 py-4">
-                    <div className="mx-auto">
+                <div className="w-full max-w-[1920px] mx-auto px-4 py-4 md:px-6 lg:px-8">
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
                             <div className="print:print-summary-section space-y-4">
                                 {/* Enhanced Map Visualization with better capture capabilities */}
                                 <div className="print:print-map-container overflow-hidden rounded-lg bg-gray-800 print:border">
                                     <div className="flex h-full flex-col">
-                                        <div className="print:print-map-header border-b border-gray-600 bg-gray-700 p-2">
-                                            <h3 className="text-sm font-semibold text-white print:text-black">
+                                        <div className="print:print-map-header border-b border-gray-600 bg-gray-700 px-3 py-1.5">
+                                            <h3 className="text-xs font-semibold text-white print:text-black">
                                                 🗺️ {t('Project Map Overview')}
                                                 {mapImageCaptured && (
                                                     <span className="ml-2 text-xs text-green-400 print:text-green-600">
@@ -5466,7 +5467,7 @@ export default function FieldCropSummary() {
                                         <div
                                             ref={mapContainerRef}
                                             className="print:print-map-container google-maps-container relative"
-                                            style={{ minHeight: 350, height: '550px' }}
+                                            style={{ minHeight: 280, height: '420px' }}
                                         >
                                             <GoogleMapsDisplay
                                                 center={optimalCenter as [number, number]}
@@ -5486,113 +5487,40 @@ export default function FieldCropSummary() {
                                     </div>
                                 </div>
 
-                                {/* Rest of the component with translation */}
-                                <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                    <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
-                                        🏡 {t('Project Overview')}
+                                {/* 1. ภาพรวม - แถวเดียว อ่านง่าย */}
+                                <div className="rounded-lg border border-gray-600/50 bg-gray-800 p-3 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 print:text-black">
+                                        {t('Project Overview')}
                                     </h2>
-                                    <div className="grid grid-cols-5 gap-2 print:gap-1">
-                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                            <div className="text-lg font-bold text-blue-400 print:text-sm print:text-black">
-                                                {areaInRai.toFixed(2)}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                {t('Rai')}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                            <div className="text-lg font-bold text-green-400 print:text-sm print:text-black">
-                                                {totalZones}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                {t('zones')}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                            <div className="text-lg font-bold text-purple-400 print:text-sm print:text-black">
-                                                {totalPlantingPoints.toLocaleString()}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                {t('Planting Points')}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                            <div className="text-lg font-bold text-cyan-400 print:text-sm print:text-black">
-                                                {sprinklerPoints + pivotPoints + 0 + 0 + dripLines}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                {t('Irrigation Points')}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-lg bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-1">
-                                            <div className="text-lg font-bold text-yellow-400 print:text-sm print:text-black">
-                                                {totalEstimatedYield.toLocaleString()}
-                                            </div>
-                                            <div className="text-xs text-gray-400 print:text-gray-600">
-                                                {t('kg')}
-                                            </div>
-                                        </div>
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                                        <span><span className="font-bold text-blue-400 print:text-black">{areaInRai.toFixed(2)}</span> {t('Rai')}</span>
+                                        <span><span className="font-bold text-green-400 print:text-black">{totalZones}</span> {t('zones')}</span>
+                                        <span><span className="font-bold text-purple-400 print:text-black">{totalPlantingPoints.toLocaleString()}</span> {t('Planting Points')}</span>
+                                        <span><span className="font-bold text-cyan-400 print:text-black">{sprinklerPoints + pivotPoints + 0 + 0 + dripLines}</span> {t('Irrigation Points')}</span>
+                                        <span><span className="font-bold text-yellow-400 print:text-black">{totalEstimatedYield.toLocaleString()}</span> {t('kg')}</span>
                                     </div>
                                 </div>
 
-                                {/* Infrastructure Summary - keeping existing code with translation */}
-                                <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                    <h2 className="mb-3 text-lg font-bold text-purple-400 print:text-base print:text-black">
-                                        🔧 {t('Infrastructure Summary')}
+                                {/* 2. โครงสร้างพื้นฐาน - สรุปสั้นด้านบน แล้วรายละเอียดด้านล่าง */}
+                                <div className="rounded-lg border border-gray-600/50 bg-gray-800 p-3 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 print:text-black">
+                                        {t('Infrastructure Summary')}
                                     </h2>
+                                    {/* สรุปหนึ่งบรรทัด: ท่อ · จุดเชื่อม · อุปกรณ์ */}
+                                    <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 rounded bg-gray-700/60 px-3 py-2 text-xs print:bg-gray-100">
+                                        <span className="text-gray-300 print:text-gray-700">
+                                            {t('Main')} {mainPipeStats.count} · {t('Submain')} {submainPipeStats.count} · {t('Lateral')} {lateralPipeStats.count} {t('pipes')} · {(mainPipeStats.totalLength + submainPipeStats.totalLength + lateralPipeStats.totalLength).toLocaleString()} {t('m.')}
+                                        </span>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="text-gray-300 print:text-gray-700">
+                                            {t('Pumps')}: {pumpCount} · {t('Sprinklers')}: {sprinklerPoints} · {t('Pivots')}: {pivotPoints}
+                                        </span>
+                                    </div>
                                     <div className="mb-3">
-                                        <h3 className="mb-2 text-sm font-semibold text-blue-400 print:text-xs print:text-black">
+                                        <h3 className="mb-1.5 text-xs font-semibold text-blue-400 print:text-black">
                                             📏 {t('Pipe System (finished drawing only)')}
                                         </h3>
-                                        <div className="space-y-2">
-                                            {/* Sprinkler specs summary */}
-                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="mb-1 flex items-center justify-between">
-                                                    <span className="text-xs font-medium text-cyan-300 print:text-black">
-                                                        {t('Sprinkler Specs')}
-                                                    </span>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-1 text-xs">
-                                                    <div>
-                                                        <span className="text-gray-400 print:text-gray-600">
-                                                            {t('Flow:')}{' '}
-                                                        </span>
-                                                        <span className="font-medium text-cyan-300 print:text-black">
-                                                            {(
-                                                                irrigationSettingsData
-                                                                    ?.sprinkler_system?.flow ?? 0
-                                                            ).toLocaleString()}{' '}
-                                                            {t('L/min')}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-gray-400 print:text-gray-600">
-                                                            {t('Radius:')}{' '}
-                                                        </span>
-                                                        <span className="font-medium text-cyan-300 print:text-black">
-                                                            {(
-                                                                irrigationSettingsData
-                                                                    ?.sprinkler_system
-                                                                    ?.coverageRadius ?? 0
-                                                            ).toLocaleString()}{' '}
-                                                            {t('m.')}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="text-gray-400 print:text-gray-600">
-                                                            {t('Pressure:')}{' '}
-                                                        </span>
-                                                        <span className="font-medium text-cyan-300 print:text-black">
-                                                            {(
-                                                                irrigationSettingsData
-                                                                    ?.sprinkler_system?.pressure ??
-                                                                0
-                                                            ).toFixed(1)}{' '}
-                                                            {t('bar')}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <div className="space-y-1.5">
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-blue-300 print:text-black">
@@ -5719,9 +5647,8 @@ export default function FieldCropSummary() {
                                         </div>
                                     </div>
 
-                                    {/* Connection Points Summary */}
-                                    <div className="mb-3">
-                                        <h3 className="mb-2 text-sm font-semibold text-yellow-400 print:text-xs print:text-black">
+                                    <div className="mb-2">
+                                        <h3 className="mb-1 text-xs font-semibold text-yellow-400 print:text-black">
                                             🔗 {t('Connection Points')}
                                         </h3>
                                         <div className="space-y-2">
@@ -5892,23 +5819,16 @@ export default function FieldCropSummary() {
                                         </div>
                                     </div>
 
-                                    <div className="mb-3">
-                                        <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-xs print:text-black">
+                                    <div className="mb-2">
+                                        <h3 className="mb-1 text-xs font-semibold text-orange-400 print:text-black">
                                             ⚙️ {t('Equipment')}
                                         </h3>
-                                        <div className="grid grid-cols-1 gap-1">
-                                            <div className="rounded bg-gray-700 p-1 text-center print:border">
-                                                <div className="text-sm font-bold text-orange-400">
-                                                    {pumpCount}
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {t('Pumps')}
-                                                </div>
-                                            </div>
+                                        <div className="text-xs text-gray-300">
+                                            {t('Pumps')}: <span className="font-medium text-orange-400">{pumpCount}</span>
                                         </div>
                                     </div>
-                                    <div className="mt-3">
-                                        <div className="mb-2 text-xs font-semibold text-gray-300">
+                                    <div className="mt-2">
+                                        <div className="mb-1 text-xs font-semibold text-gray-400">
                                             {t('Fittings')} (2/3/4 {t('way')})
                                         </div>
                                         <div className="overflow-x-auto">
@@ -6053,16 +5973,16 @@ export default function FieldCropSummary() {
                                         {/* เพิ่มส่วนแสดงจำนวนสปริงเกอร์รวม */}
                                         <div className="mt-2 rounded bg-cyan-900/30 p-2 text-center print:bg-cyan-50">
                                             <div className="text-xs text-cyan-200 print:text-cyan-700">
-                                                Total Irrigation Points:
+                                                {t('Total Irrigation Points:')}
                                             </div>
                                             <div className="text-sm font-bold text-cyan-100 print:text-cyan-800">
                                                 {sprinklerPoints + pivotPoints + 0 + 0 + dripLines}{' '}
-                                                จุด
+                                                {t('points')}
                                             </div>
                                         </div>
                                         {/* Global Pipe Network Summary under Irrigation System */}
-                                        <div className="mt-3 space-y-2 rounded bg-gray-700/40 p-2 print:border">
-                                            <div className="mb-2 text-xs font-semibold text-gray-200">
+                                        <div className="mt-2 space-y-1 rounded bg-gray-700/40 p-2 print:border">
+                                            <div className="mb-1 text-xs font-semibold text-gray-400">
                                                 {t('Pipe Network Summary')}
                                             </div>
                                             <div className="overflow-x-auto">
@@ -6109,18 +6029,15 @@ export default function FieldCropSummary() {
                                     </div>
                                 </div>
 
-                                {/* Financial & Water Summary - keeping existing code with translation */}
-                                <div className="rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                    <h2 className="mb-3 text-lg font-bold text-green-400 print:text-base print:text-black">
+                                {/* 3. สรุปน้ำ */}
+                                <div className="rounded-lg border border-gray-600/50 bg-gray-800 p-3 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 print:text-black">
                                         💧 {t('Water Summary')}
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
                                         <div className="rounded-lg bg-cyan-900/30 p-3 print:border-2 print:border-cyan-200 print:bg-cyan-50">
-                                            <h3 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
-                                                💧{' '}
-                                                {t(
-                                                    'Total Water Requirements (liters per irrigation - from cropData)'
-                                                )}
+                                            <h3 className="mb-1.5 text-xs font-semibold text-cyan-300 print:text-cyan-800">
+                                                {t('Total Water Requirements (liters per irrigation - from cropData)')}
                                             </h3>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="space-y-1">
@@ -6204,12 +6121,12 @@ export default function FieldCropSummary() {
                                     </div>
                                 </div>
 
-                                {/* Action Buttons - simplified (print removed) */}
-                                <div className="rounded-lg bg-gray-800 p-4 print:hidden">
-                                    <h2 className="mb-3 text-lg font-bold text-purple-400">
+                                {/* ปุ่มดำเนินการ */}
+                                <div className="rounded-lg border border-gray-600/50 bg-gray-800 p-3 print:hidden">
+                                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                                         📋 {t('Actions')}
                                     </h2>
-                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                         <Link
                                             href="/step4-pipe-system?currentStep=4&completedSteps=4"
                                             className="rounded-lg bg-blue-600 px-4 py-2 text-center font-semibold text-white hover:bg-blue-700"
@@ -6220,16 +6137,13 @@ export default function FieldCropSummary() {
                                 </div>
                             </div>
 
-                            {/* Right Column: Zone Details - keeping existing code structure with translation */}
+                            {/* คอลัมน์ขวา: รายละเอียดโซน */}
                             <div className="space-y-4 print:contents">
-                                <div className="print:print-other-content rounded-lg bg-gray-800 p-4 print:border print:border-gray-300 print:bg-white print:p-3">
-                                    <h2 className="mb-3 text-lg font-bold text-blue-400 print:text-base print:text-black">
-                                        🎯{' '}
-                                        {t(
-                                            'Zone Details & Irrigation Systems (liters per irrigation)'
-                                        )}
+                                <div className="print:print-other-content rounded-lg border border-gray-600/50 bg-gray-800 p-3 print:border print:border-gray-300 print:bg-white print:p-3">
+                                    <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 print:text-black">
+                                        🎯 {t('Zone Details & Irrigation Systems (liters per irrigation)')}
                                     </h2>
-                                    <div className="space-y-3 print:space-y-2">
+                                    <div className="space-y-2 print:space-y-2">
                                         {null}
                                         {actualZones.map((zone) => {
                                             const summary = calculatedZoneSummaries[zone.id];
@@ -6278,26 +6192,20 @@ export default function FieldCropSummary() {
                                             return (
                                                 <div
                                                     key={zone.id}
-                                                    className="rounded-lg bg-gray-700 p-3 print:border print:bg-gray-50"
+                                                    className="rounded-lg border border-gray-600/40 bg-gray-700 p-2.5 print:border print:bg-gray-50"
                                                 >
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <div className="flex items-center space-x-2">
+                                                    <div className="mb-1.5 flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
                                                             <div
-                                                                className="h-3 w-3 rounded-full"
-                                                                style={{
-                                                                    backgroundColor: zone.color,
-                                                                }}
-                                                            ></div>
-                                                            <h3 className="text-sm font-semibold text-white print:text-black">
+                                                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                                style={{ backgroundColor: zone.color }}
+                                                            />
+                                                            <h3 className="text-xs font-semibold text-white print:text-black">
                                                                 {zone.name}
                                                             </h3>
-                                                            {/* แสดงชื่อพืชที่เลือกจาก choose-crop ถ้ามี และตรงกับโซนนี้ */}
                                                             {assignedCrop && (
-                                                                <span className="ml-2 text-xs text-gray-300 print:text-black">
-                                                                    {getTranslatedCropByValue(
-                                                                        assignedCrop.value,
-                                                                        'th'
-                                                                    )?.name || assignedCrop.name}
+                                                                <span className="text-xs text-gray-400 print:text-black">
+                                                                    {getTranslatedCropByValue(assignedCrop.value, 'th')?.name || assignedCrop.name}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -6340,69 +6248,18 @@ export default function FieldCropSummary() {
                                                         (summary ? (
                                                             <div className="space-y-3">
                                                                 {/* แสดงข้อมูลจำนวนสปริงเกอร์ในส่วนสรุปข้อมูลโซน */}
-                                                                <div className="grid grid-cols-4 gap-2 text-xs">
-                                                                    <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                        <div className="text-gray-400 print:text-gray-600">
-                                                                            {t('Area')}
-                                                                        </div>
-                                                                        <div className="font-semibold text-blue-400 print:text-black">
-                                                                            {summary.zoneAreaRai}{' '}
-                                                                            {t('Rai')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                            {summary.zoneArea} ตร.ม.
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                        <div className="text-gray-400 print:text-gray-600">
-                                                                            {t('Plants')}
-                                                                        </div>
-                                                                        <div className="font-semibold text-green-400 print:text-black">
-                                                                            {summary.totalPlantingPoints.toLocaleString()}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                            {t('trees')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                        <div className="text-gray-400 print:text-gray-600">
-                                                                            Sprinklers
-                                                                        </div>
-                                                                        <div className="font-semibold text-cyan-400 print:text-black">
-                                                                            {
-                                                                                zoneIrrigationCounts.total
-                                                                            }
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                            จุด
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center print:bg-gray-100">
-                                                                        <div className="text-gray-400 print:text-gray-600">
-                                                                            Crop
-                                                                        </div>
-                                                                        <div className="text-xs font-semibold text-white print:text-black">
-                                                                            {getTranslatedCropByValue(
-                                                                                summary.cropValue ||
-                                                                                    '',
-                                                                                'th'
-                                                                            )?.name ||
-                                                                                summary.cropName}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400 print:text-gray-600">
-                                                                            {summary.cropCategory}
-                                                                        </div>
-                                                                    </div>
+                                                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                                                                    <span><span className="font-medium text-blue-400 print:text-black">{summary.zoneAreaRai}</span> {t('Rai')}</span>
+                                                                    <span><span className="font-medium text-green-400 print:text-black">{summary.totalPlantingPoints.toLocaleString()}</span> {t('trees')}</span>
+                                                                    <span><span className="font-medium text-cyan-400 print:text-black">{zoneIrrigationCounts.total}</span> {t('Sprinklers')} ({t('points')})</span>
+                                                                    <span className="text-gray-400">{getTranslatedCropByValue(summary.cropValue || '', 'th')?.name || summary.cropName}</span>
                                                                 </div>
 
-                                                                <div className="rounded-lg bg-cyan-900/30 p-3 print:border print:bg-cyan-50">
-                                                                    <h4 className="mb-2 text-sm font-semibold text-cyan-300 print:text-cyan-800">
-                                                                        💧{' '}
-                                                                        {t(
-                                                                            'Water Requirements (liters per irrigation)'
-                                                                        )}
+                                                                <div className="rounded bg-cyan-900/30 p-2 print:border print:bg-cyan-50">
+                                                                    <h4 className="mb-1 text-xs font-semibold text-cyan-300 print:text-cyan-800">
+                                                                        💧 {t('Water Requirements (liters per irrigation)')}
                                                                     </h4>
-                                                                    <div className="mt-1 rounded bg-cyan-800/30 p-2 text-xs text-cyan-200 print:bg-cyan-100 print:text-cyan-700">
+                                                                    <div className="mt-1 rounded bg-cyan-800/30 p-1.5 text-xs text-cyan-200 print:bg-cyan-100 print:text-cyan-700">
                                                                         {(() => {
                                                                             const flowPerUnit: Record<
                                                                                 string,

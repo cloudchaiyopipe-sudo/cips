@@ -19,27 +19,8 @@ import {
 export const useFieldData = (props: FieldCropPageProps) => {
     // Initialize field data from props and localStorage
     const initialFieldData = useMemo((): FieldData => {
-        console.log('useFieldData - Props received:', props);
-
         const propsData = parseFieldDataFromProps(props);
-        console.log('useFieldData - Parsed props data:', {
-            selectedCrops: propsData.selectedCrops?.length || 0,
-            mainArea: propsData.mainArea?.length || 0,
-            obstacles: propsData.obstacles?.length || 0,
-            plantPoints: propsData.plantPoints?.length || 0,
-            zones: propsData.zones?.length || 0,
-            pipes: propsData.pipes?.length || 0,
-        });
-
         const mergedData = mergeWithLocalStorage(propsData);
-        console.log('useFieldData - Merged data:', {
-            selectedCrops: mergedData.selectedCrops?.length || 0,
-            mainArea: mergedData.mainArea?.length || 0,
-            obstacles: mergedData.obstacles?.length || 0,
-            plantPoints: mergedData.plantPoints?.length || 0,
-            zones: mergedData.zones?.length || 0,
-            pipes: mergedData.pipes?.length || 0,
-        });
 
         // Validate and sanitize data
         const validatedData = {
@@ -49,15 +30,6 @@ export const useFieldData = (props: FieldCropPageProps) => {
             plantPoints: validatePlantPoints(mergedData.plantPoints),
             zones: validateZones(mergedData.zones),
         };
-
-        console.log('useFieldData - Final validated data:', {
-            selectedCrops: validatedData.selectedCrops?.length || 0,
-            mainArea: validatedData.mainArea?.length || 0,
-            obstacles: validatedData.obstacles?.length || 0,
-            plantPoints: validatedData.plantPoints?.length || 0,
-            zones: validatedData.zones?.length || 0,
-            pipes: validatedData.pipes?.length || 0,
-        });
 
         return validatedData;
     }, [props]);

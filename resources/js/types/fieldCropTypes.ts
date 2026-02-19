@@ -171,6 +171,6 @@ export const DEFAULT_IRRIGATION_POSITIONS: IrrigationPositions = {
 };
 
 export const MAP_CONFIG = {
-    DEFAULT_CENTER: { lat: 13.7563, lng: 100.5018 },
+    DEFAULT_CENTER: { lat: 17.5633821, lng: 103.8484052 },
     DEFAULT_ZOOM: 16,
 };
