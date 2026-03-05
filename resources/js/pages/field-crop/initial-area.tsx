@@ -214,7 +214,6 @@ export default function InitialArea(props: FieldCropPageProps) {
     const [isDrawing, setIsDrawing] = useState<boolean>(false);
     const [drawingManagerRef, setDrawingManagerRef] =
         useState<google.maps.drawing.DrawingManager | null>(null);
-    const [selectedShape, setSelectedShape] = useState<string>('polygon');
     const [drawnPolygon, setDrawnPolygon] = useState<google.maps.Polygon | null>(null);
 
     // Plant and Obstacle States
@@ -548,14 +547,16 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Helper function to calculate point size based on point count
     const calculatePointSize = useCallback((pointCount: number): number => {
-        if (pointCount >= 5000) {
-            return 8 * 0.4; // 60% reduction (40% of original size)
+        if (pointCount >= 8000) {
+            return 6;
+        } else if (pointCount >= 5000) {
+            return 7;
         } else if (pointCount >= 2000) {
-            return 8 * 0.6; // 40% reduction (60% of original size)
+            return 8;
         } else if (pointCount >= 800) {
-            return 8 * 0.8; // 20% reduction (80% of original size)
+            return 9;
         } else {
-            return 8; // Original size
+            return 10;
         }
     }, []);
 
@@ -904,7 +905,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                 'data:image/svg+xml;charset=UTF-8,' +
                 encodeURIComponent(`
                 <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.75}" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
+                    <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.85}" fill="#22c55e" fill-opacity="0.75" stroke="#15803d" stroke-opacity="1" stroke-width="1.2"/>
                 </svg>
             `),
             scaledSize: new google.maps.Size(pointSize, pointSize),
@@ -927,6 +928,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                 title: `Plant: ${point.cropType}`,
                 optimized: true,
                 clickable: false,
+                zIndex: 2000,
             });
             newMarkers.push(marker);
         });
@@ -940,18 +942,24 @@ export default function InitialArea(props: FieldCropPageProps) {
         }
     }, [map, plantPoints, clearAllPlantMarkers, calculatePointSize, mapZoom]);
 
-    // Calculate plant count and row/column info without creating actual points
+    // Max display points on map to avoid lag (full count still used for stats)
+    const MAX_DISPLAY_PLANT_POINTS = 5000;
+
+    // Calculate plant count and row/column info, and collect points for map display
     const calculatePlantCountOnly = useCallback(
-        async (generationId: number): Promise<{ count: number; rows: number; columns: number }> => {
+        async (
+            generationId: number
+        ): Promise<{ count: number; rows: number; columns: number; points: PlantPoint[] }> => {
             if (mainArea.length < 3 || selectedCrops.length === 0) {
-                return { count: 0, rows: 0, columns: 0 };
+                return { count: 0, rows: 0, columns: 0, points: [] };
             }
 
             const primaryCrop = selectedCrops[0];
             const cropInfo = getCropSpacingInfo(primaryCrop);
             const rowSpacingM = cropInfo.rowSpacing / 100;
             const plantSpacingM = cropInfo.plantSpacing / 100;
-            const bufferDistance = plantSpacingM * 0.3;
+            // ไม่ใช้ buffer เพื่อให้ต้นเต็มพื้นที่ถึงขอบ (ลดแถบว่างที่ขอบล่าง/ขอบอื่น)
+            const bufferDistance = 0;
 
             const origin = computeCentroid(mainArea);
 
@@ -970,59 +978,42 @@ export default function InitialArea(props: FieldCropPageProps) {
             let plantCount = 0;
             let actualRows = 0;
             let maxColumnsInAnyRow = 0;
+            const pointsByRow: PlantPoint[][] = [];
 
-            // Calculate center Y coordinate for starting from the middle
-            const centerY = (minY + maxY) / 2;
-
-            // Calculate how many rows we can fit above and below center
+            // สร้างแถวจากขอบล่างถึงขอบบน (แถวแรกที่ minY) — แถวเรียงตามระยะแถว (rowSpacing)
             const totalHeight = maxY - minY;
-            const maxRows = Math.floor(totalHeight / rowSpacingM);
-            const rowsAboveCenter = Math.floor(maxRows / 2);
-            const rowsBelowCenter = maxRows - rowsAboveCenter;
-
-            // Generate rows starting from center and expanding outward
+            const totalWidth = maxX - minX;
+            const numRows = Math.max(1, Math.ceil(totalHeight / rowSpacingM) + 1);
+            const numCols = Math.max(1, Math.ceil(totalWidth / plantSpacingM) + 1);
             const allRowYs: number[] = [];
-
-            // Add center row first
-            allRowYs.push(centerY);
-
-            // Add rows above center (going up)
-            for (let i = 1; i <= rowsAboveCenter; i++) {
-                const yAbove = centerY + i * rowSpacingM;
-                if (yAbove <= maxY) {
-                    allRowYs.push(yAbove);
-                }
+            for (let r = 0; r < numRows; r++) {
+                const y = minY + r * rowSpacingM;
+                if (y <= maxY) allRowYs.push(y);
+            }
+            // เติมแถวที่ขอบบนเมื่อมีช่องว่าง (เต็มพื้นที่)
+            if (allRowYs.length > 0 && maxY - allRowYs[allRowYs.length - 1] > rowSpacingM * 0.5) {
+                allRowYs.push(maxY);
             }
 
-            // Add rows below center (going down)
-            for (let i = 1; i <= rowsBelowCenter; i++) {
-                const yBelow = centerY - i * rowSpacingM;
-                if (yBelow >= minY) {
-                    allRowYs.push(yBelow);
-                }
-            }
-
-            // Sort rows from bottom to top for consistent ordering
-            allRowYs.sort((a, b) => a - b);
-
-            // Count plants for each row
+            // เก็บจุดแยกเป็นแถว (แต่ละแถวเรียงตามระยะต้น plantSpacing) เพื่อให้แสดงแล้วเห็นเป็นแถวชัด
             for (let rowIndex = 0; rowIndex < allRowYs.length; rowIndex++) {
                 const y = allRowYs[rowIndex];
 
-                // Check generation ID frequently during long operations
                 if (rowIndex % 10 === 0) {
                     if (currentGenerationIdRef.current !== generationId) {
-                        return { count: 0, rows: 0, columns: 0 };
+                        return { count: 0, rows: 0, columns: 0, points: [] };
                     }
                     await yieldToFrame();
                 }
 
-                let plantsInThisRow = 0;
+                const rowPoints: PlantPoint[] = [];
                 let plantIndex = 0;
-                for (let x = minX; x <= maxX; x += plantSpacingM) {
-                    // Additional check for very long rows
+                let lastX = minX - plantSpacingM;
+                for (let col = 0; col < numCols; col++) {
+                    const x = minX + col * plantSpacingM;
+                    if (x > maxX) break;
                     if (plantIndex % 50 === 0 && currentGenerationIdRef.current !== generationId) {
-                        return { count: 0, rows: 0, columns: 0 };
+                        return { count: 0, rows: 0, columns: 0, points: [] };
                     }
 
                     const pt = { x, y };
@@ -1035,19 +1026,79 @@ export default function InitialArea(props: FieldCropPageProps) {
                         );
                         if (distanceFromEdge >= bufferDistance) {
                             plantCount++;
-                            plantsInThisRow++;
+                            lastX = x;
+                            const latLng = toLatLngFromXY(pt, origin);
+                            rowPoints.push({
+                                id: `plant-r${rowIndex}-c${rowPoints.length}`,
+                                lat: latLng.lat,
+                                lng: latLng.lng,
+                                cropType: primaryCrop,
+                                isValid: true,
+                            });
                         }
                     }
                     plantIndex++;
                 }
+                // เติมจุดที่ขอบขวาเมื่อมีช่องว่าง (เต็มพื้นที่)
+                if (rowPoints.length > 0 && maxX - lastX > plantSpacingM * 0.5) {
+                    const pt = { x: maxX, y };
+                    const insideMain = isPointInPolygonXY(pt, mainXY);
+                    const insideAnyHole = obstaclesXY.some((poly) => isPointInPolygonXY(pt, poly));
+                    if (insideMain && !insideAnyHole) {
+                        const distanceFromEdge = Math.min(
+                            distanceToPolygonEdgeXY(pt, mainXY),
+                            ...obstaclesXY.map((poly) => distanceToPolygonEdgeXY(pt, poly))
+                        );
+                        if (distanceFromEdge >= bufferDistance) {
+                            plantCount++;
+                            const latLng = toLatLngFromXY(pt, origin);
+                            rowPoints.push({
+                                id: `plant-r${rowIndex}-c${rowPoints.length}`,
+                                lat: latLng.lat,
+                                lng: latLng.lng,
+                                cropType: primaryCrop,
+                                isValid: true,
+                            });
+                        }
+                    }
+                }
 
-                if (plantsInThisRow > 0) {
+                if (rowPoints.length > 0) {
+                    pointsByRow.push(rowPoints);
                     actualRows++;
-                    maxColumnsInAnyRow = Math.max(maxColumnsInAnyRow, plantsInThisRow);
+                    maxColumnsInAnyRow = Math.max(maxColumnsInAnyRow, rowPoints.length);
                 }
             }
 
-            return { count: plantCount, rows: actualRows, columns: maxColumnsInAnyRow };
+            // รวมจุดทุกแถว (เรียงแถวต่อแถว) แล้วถ้าเกิน MAX ให้ sample แบบกริดสม่ำเสมอ: ใช้ rowStep และ colStep เดียวกันทุกแถว เพื่อให้ระยะห่างที่แสดงตรงกับค่าที่ตั้ง
+            const allPoints = pointsByRow.flat();
+            let displayPoints: PlantPoint[];
+            if (allPoints.length <= MAX_DISPLAY_PLANT_POINTS) {
+                displayPoints = allPoints;
+            } else {
+                const numRows_ = pointsByRow.length;
+                const numCols_ = maxColumnsInAnyRow;
+                // ใช้ step เดียวกันทั้งแผนที่ เพื่อให้จุดที่แสดงเรียงเป็นกริดระยะเท่ากัน (rowStep*rowSpacing, colStep*plantSpacing)
+                const targetSide = Math.ceil(Math.sqrt(MAX_DISPLAY_PLANT_POINTS));
+                const rowStep = Math.max(1, Math.floor(numRows_ / targetSide));
+                const colStep = Math.max(1, Math.floor(numCols_ / targetSide));
+                displayPoints = [];
+                for (let r = 0; r < pointsByRow.length; r += rowStep) {
+                    const row = pointsByRow[r];
+                    for (let c = 0; c < row.length; c += colStep) {
+                        if (displayPoints.length >= MAX_DISPLAY_PLANT_POINTS) break;
+                        displayPoints.push({ ...row[c], id: `plant-display-${displayPoints.length}` });
+                    }
+                    if (displayPoints.length >= MAX_DISPLAY_PLANT_POINTS) break;
+                }
+            }
+
+            return {
+                count: plantCount,
+                rows: actualRows,
+                columns: maxColumnsInAnyRow,
+                points: displayPoints,
+            };
         },
         [
             mainArea,
@@ -1056,6 +1107,7 @@ export default function InitialArea(props: FieldCropPageProps) {
             getCropSpacingInfo,
             computeCentroid,
             toLocalXY,
+            toLatLngFromXY,
             isPointInPolygonXY,
             distanceToPolygonEdgeXY,
         ]
@@ -1063,13 +1115,18 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Save field data to localStorage immediately after plant count calculation
     const saveFieldDataToLocalStorage = useCallback(
-        (plantCount: number, rows: number, columns: number) => {
+        (
+            plantCount: number,
+            rows: number,
+            columns: number,
+            displayPoints: PlantPoint[] = []
+        ) => {
             try {
                 const fieldDataToSave = {
                     mainArea: mainArea.length >= 3 ? mainArea : [],
                     obstacles: obstacles.filter((obs) => obs.coordinates.length >= 3),
                     plantPoints: (() => {
-                        // Create a minimal plant points array to preserve realPlantCount
+                        // Create a minimal plant points array to preserve realPlantCount; store display points for next page
                         const minimalPoints: PlantPoint[] = [];
 
                         // If we have real plant count, create a single dummy point to preserve the count
@@ -1083,9 +1140,10 @@ export default function InitialArea(props: FieldCropPageProps) {
                             });
                         }
 
-                        // Preserve real count and real points in the plant points data
+                        // Preserve real count and display points for map (irrigation-generate ใช้แสดงต้นไม้)
                         (minimalPoints as PlantPointArrayWithRealCount).__realCount = plantCount;
-                        (minimalPoints as PlantPointArrayWithRealCount).__realPoints = [];
+                        (minimalPoints as PlantPointArrayWithRealCount).__realPoints =
+                            displayPoints.length > 0 ? displayPoints : [];
                         return minimalPoints;
                     })(),
                     // Add realPlantCount as a separate property to ensure it's saved
@@ -1143,11 +1201,15 @@ export default function InitialArea(props: FieldCropPageProps) {
             // Clear previous markers immediately for better UX
             clearAllPlantMarkers();
 
-            // Calculate plant count and row/column info (no actual point generation)
+            // Calculate plant count and row/column info and points for map display
             const result = await Promise.race([
                 calculatePlantCountOnly(generationId),
-                new Promise<{ count: number; rows: number; columns: number }>((_, reject) =>
-                    setTimeout(() => reject(new Error(t('Plant count calculation timeout'))), 10000)
+                new Promise<{ count: number; rows: number; columns: number; points: PlantPoint[] }>(
+                    (_, reject) =>
+                        setTimeout(
+                            () => reject(new Error(t('Plant count calculation timeout'))),
+                            10000
+                        )
                 ),
             ]);
 
@@ -1170,11 +1232,16 @@ export default function InitialArea(props: FieldCropPageProps) {
             setRealPlantCount(result.count);
             setCalculatedRows(result.rows);
             setCalculatedColumns(result.columns);
-            setRealPlantPoints([]); // No actual points stored
-            setPlantPoints([]); // No display points
+            setRealPlantPoints(result.points ?? []);
+            setPlantPoints(result.points ?? []); // Show points on map (faded)
 
-            // Save to localStorage immediately after calculation
-            saveFieldDataToLocalStorage(result.count, result.rows, result.columns);
+            // Save to localStorage immediately after calculation (รวมจุดปลูกสำหรับแสดงในหน้าถัดไป)
+            saveFieldDataToLocalStorage(
+                result.count,
+                result.rows,
+                result.columns,
+                result.points ?? []
+            );
         } catch (error) {
             if (error instanceof Error && error.message === t('Plant count calculation timeout')) {
                 alert(
@@ -1258,27 +1325,45 @@ export default function InitialArea(props: FieldCropPageProps) {
         distanceOverlaysByObstacle,
     ]);
 
-    // Delete specific obstacle function
+    // Delete specific obstacle function (ลบ polygon + เส้นระยะทางและ label ของแหล่งน้ำด้วย)
     const deleteObstacle = useCallback(
-        (obstacleId: string) => {
-            const obstacleIndex = obstacles.findIndex((obs) => obs.id === obstacleId);
-            if (obstacleIndex !== -1) {
-                if (obstacleOverlays[obstacleIndex]) {
-                    obstacleOverlays[obstacleIndex].setMap(null);
-                }
+        (obstacleId: string | number) => {
+            const obstacleIndex = obstacles.findIndex((obs) => obs.id === obstacleId || String(obs.id) === String(obstacleId));
+            if (obstacleIndex === -1) return;
 
-                setObstacles((prev) => prev.filter((obs) => obs.id !== obstacleId));
-                setObstacleOverlays((prev) => prev.filter((_, index) => index !== obstacleIndex));
-                const remaining = obstacles
-                    .filter((obs) => obs.id !== obstacleId)
-                    .map((o) => o.coordinates);
-                if (drawnPolygon && mainArea.length >= 3) {
-                    drawnPolygon.setPaths([mainArea, ...remaining]);
-                    computeAreaAndPerimeter(mainArea, remaining);
+            const overlays = obstacleOverlaysRef.current;
+            if (overlays[obstacleIndex]) {
+                overlays[obstacleIndex].setMap(null);
+            }
+
+            const distMap = distanceOverlaysByObstacleRef.current;
+            const idStr = String(obstacleId);
+            Object.keys(distMap).forEach((k) => {
+                if (String(k) !== idStr) return;
+                const entry = distMap[k];
+                if (entry) {
+                    entry.lines.forEach((line) => line.setMap(null));
+                    entry.labels.forEach((label) => label.setMap(null));
                 }
+            });
+
+            setObstacles((prev) => prev.filter((obs) => String(obs.id) !== idStr));
+            setObstacleOverlays((prev) => prev.filter((_, index) => index !== obstacleIndex));
+            setDistanceOverlaysByObstacle((prev) => {
+                const next = { ...prev };
+                Object.keys(next).forEach((k) => { if (String(k) === idStr) delete next[k]; });
+                return next;
+            });
+
+            const remaining = obstacles
+                .filter((obs) => obs.id !== obstacleId && String(obs.id) !== idStr)
+                .map((o) => o.coordinates);
+            if (drawnPolygon && mainArea.length >= 3) {
+                drawnPolygon.setPaths([mainArea, ...remaining]);
+                computeAreaAndPerimeter(mainArea, remaining);
             }
         },
-        [obstacles, obstacleOverlays, drawnPolygon, mainArea, computeAreaAndPerimeter]
+        [obstacles, drawnPolygon, mainArea, computeAreaAndPerimeter]
     );
 
     // Obstacle drawing functions
@@ -2110,6 +2195,7 @@ export default function InitialArea(props: FieldCropPageProps) {
                             clickable: true,
                         });
                         setObstacles((prev) => [...prev, newObstacle]);
+                        polygon.setMap(null);
                         setObstacleOverlays((prev) => [...prev, polygon]);
                         if (newObstacle.type === 'water_source')
                             createDistanceOverlaysForWaterObstacle(newObstacle);
@@ -2195,6 +2281,7 @@ export default function InitialArea(props: FieldCropPageProps) {
 
                         setObstacles((prev) => [...prev, newObstacle]);
 
+                        rectangle.setMap(null);
                         const styledPolygon = createEditablePolygon(coordinates, [], true);
                         setObstacleOverlays((prev) => [...prev, styledPolygon]);
 
@@ -2275,6 +2362,7 @@ export default function InitialArea(props: FieldCropPageProps) {
 
                         setObstacles((prev) => [...prev, newObstacle]);
 
+                        circle.setMap(null);
                         const styledPolygon = createEditablePolygon(coordinates, [], true);
                         setObstacleOverlays((prev) => [...prev, styledPolygon]);
 
@@ -2349,12 +2437,11 @@ export default function InitialArea(props: FieldCropPageProps) {
         [map]
     );
 
-    // Drawing control functions
+    // Drawing control functions (main area: polygon only)
     const startDrawing = (shapeType: string) => {
         if (!drawingManagerRef || isMainAreaSet) return;
 
         setIsDrawing(true);
-        setSelectedShape(shapeType);
 
         const drawingMode =
             shapeType === 'rectangle'
@@ -2897,14 +2984,40 @@ export default function InitialArea(props: FieldCropPageProps) {
                             {/* Scrollable Content — order: 1 Draw → 2 Water → 3 Plants → Crops/Spacing */}
                             <div className="flex-1 overflow-y-auto">
                                 <div className="space-y-4 p-3">
-                                    {/* 1. Draw area */}
+                                    {/* 1. วาดพื้นที่ทั้งหมด */}
                                     <div className="rounded-lg border border-white/50 bg-white/5 p-3">
                                         <div className="mb-2 flex items-center gap-2">
                                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
-                                            <span className="text-sm font-semibold text-white">{t('Draw area')}</span>
+                                            <span className="text-sm font-semibold text-white">{t('Draw area')}{isMainAreaSet ? ' ✓' : ''}</span>
                                         </div>
                                         {!isMainAreaSet ? (
-                                            <p className="mb-2 text-xs text-gray-400">{t('Draw main field on map')}</p>
+                                            <>
+                                                <p className="mb-2 text-xs text-gray-400">{t('Draw main field on map')}</p>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => startDrawing('polygon')}
+                                                        disabled={isDrawing}
+                                                        title={t('Polygon')}
+                                                        className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-2 text-xs font-medium transition-colors ${isDrawing ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white hover:bg-gray-500'} disabled:opacity-50`}
+                                                    >
+                                                        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 4-4 16-12-20z" />
+                                                        </svg>
+                                                        {t('Polygon')}
+                                                    </button>
+                                                    {isDrawing && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={stopDrawing}
+                                                            title={t('Cancel')}
+                                                            className="rounded bg-red-600 px-3 py-2 text-xs text-white hover:bg-red-700"
+                                                        >
+                                                            {t('Cancel')}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </>
                                         ) : (
                                             <>
                                                 <div className="mb-2 flex items-center justify-between text-xs">
@@ -2928,11 +3041,11 @@ export default function InitialArea(props: FieldCropPageProps) {
                                         )}
                                     </div>
 
-                                    {/* 2. Add water */}
+                                    {/* 2. เพิ่มแหล่งน้ำ */}
                                     <div className="rounded-lg border border-white/50 bg-white/5 p-3">
                                         <div className="mb-2 flex items-center gap-2">
                                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
-                                            <span className="text-sm font-semibold text-white">{t('Add water')}</span>
+                                            <span className="text-sm font-semibold text-white">{t('Add water')}{obstacles.some((o) => o.type === 'water_source') ? ' ✓' : ''}</span>
                                         </div>
                                         <p className="mb-2 text-xs text-gray-400">{t('Add at least one water source')}</p>
                                         {!isMainAreaSet ? (
@@ -2941,15 +3054,15 @@ export default function InitialArea(props: FieldCropPageProps) {
                                             <>
                                                 <div className="mb-2 flex flex-wrap gap-1">
                                                     {(['polygon', 'rectangle', 'circle'] as const).map((shape) => (
-                                                        <button key={shape} type="button" onClick={() => startDrawingObstacle('water_source', shape)} disabled={isDrawingObstacle}
-                                                            className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50" title={t('Water Source')}>
-                                                            💧 <span className="capitalize">{shape === 'polygon' ? '▣' : shape === 'rectangle' ? '▭' : '○'}</span>
+                                                        <button key={`water-${shape}`} type="button" onClick={() => startDrawingObstacle('water_source', shape)} disabled={isDrawingObstacle}
+                                                            className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50" title={`${t('Water Source')} (${shape === 'polygon' ? t('Polygon') : shape === 'rectangle' ? t('Rectangle') : t('Circle')})`}>
+                                                            💧 {shape === 'polygon' ? t('Polygon') : shape === 'rectangle' ? t('Rectangle') : t('Circle')}
                                                         </button>
                                                     ))}
                                                     {(['polygon', 'rectangle', 'circle'] as const).map((shape) => (
-                                                        <button key={shape} type="button" onClick={() => startDrawingObstacle('other', shape)} disabled={isDrawingObstacle}
-                                                            className="flex items-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs text-white hover:bg-gray-700 disabled:opacity-50" title={t('Obstacle')}>
-                                                            🚧 <span className="capitalize">{shape === 'polygon' ? '▣' : shape === 'rectangle' ? '▭' : '○'}</span>
+                                                        <button key={`obstacle-${shape}`} type="button" onClick={() => startDrawingObstacle('other', shape)} disabled={isDrawingObstacle}
+                                                            className="flex items-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs text-white hover:bg-gray-700 disabled:opacity-50" title={`${t('Obstacle')} (${shape === 'polygon' ? t('Polygon') : shape === 'rectangle' ? t('Rectangle') : t('Circle')})`}>
+                                                            🚧 {shape === 'polygon' ? t('Polygon') : shape === 'rectangle' ? t('Rectangle') : t('Circle')}
                                                         </button>
                                                     ))}
                                                 </div>
@@ -2975,11 +3088,11 @@ export default function InitialArea(props: FieldCropPageProps) {
                                         )}
                                     </div>
 
-                                    {/* 3. Get plant count */}
+                                    {/* 3. คำนวณจำนวนต้น */}
                                     <div className="rounded-lg border border-white/50 bg-white/5 p-3">
                                         <div className="mb-2 flex items-center gap-2">
                                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
-                                            <span className="text-sm font-semibold text-white">{t('Get plant count')}</span>
+                                            <span className="text-sm font-semibold text-white">{t('Get plant count')}{realPlantCount > 0 ? ' ✓' : ''}</span>
                                         </div>
                                         {!isMainAreaSet ? (
                                             <p className="text-xs text-amber-400">← {t('Draw area')} {t('first')}</p>
@@ -3292,104 +3405,12 @@ export default function InitialArea(props: FieldCropPageProps) {
                                     />
                                 </HorticultureMapComponent>
 
-                                {/* Drawing Tools - outside map so map receives clicks */}
-                                {!isMainAreaSet && (
-                                    <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-lg border border-white bg-black bg-opacity-80 p-1.5 shadow-lg">
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => startDrawing('polygon')}
-                                                disabled={isDrawing}
-                                                title={t('Polygon')}
-                                                className={`rounded p-2 transition-colors ${isDrawing && selectedShape === 'polygon' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
-                                            >
-                                                <svg
-                                                    className="h-5 w-5"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M4 4l16 4-4 16-12-20z"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => startDrawing('rectangle')}
-                                                disabled={isDrawing}
-                                                title={t('Rectangle')}
-                                                className={`rounded p-2 transition-colors ${isDrawing && selectedShape === 'rectangle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
-                                            >
-                                                <svg
-                                                    className="h-5 w-5"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <rect
-                                                        x="3"
-                                                        y="3"
-                                                        width="18"
-                                                        height="18"
-                                                        rx="2"
-                                                        ry="2"
-                                                    />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => startDrawing('circle')}
-                                                disabled={isDrawing}
-                                                title={t('Circle')}
-                                                className={`rounded p-2 transition-colors ${isDrawing && selectedShape === 'circle' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}
-                                            >
-                                                <svg
-                                                    className="h-5 w-5"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <circle cx="12" cy="12" r="10" />
-                                                </svg>
-                                            </button>
-                                            {isDrawing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={stopDrawing}
-                                                    title={t('Cancel')}
-                                                    className="rounded bg-red-600 p-2 text-white transition-colors hover:bg-red-700"
-                                                >
-                                                    <svg
-                                                        className="h-5 w-5"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M6 18L18 6M6 6l12 12"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
                                 {/* Overlays */}
                                 {isDrawing && !isMainAreaSet && (
                                     <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-lg border border-blue-500 bg-blue-900 bg-opacity-90 p-3 shadow-lg">
                                         <div className="text-center text-sm text-white">
                                             <div className="mb-1 font-semibold">🎯 {t('Drawing')}</div>
-                                            <div className="text-xs text-blue-200">
-                                                {selectedShape === 'polygon' ? '▣' : selectedShape === 'rectangle' ? '▭' : '○'}
-                                            </div>
+                                            <div className="text-xs text-blue-200">▣ {t('Polygon')}</div>
                                         </div>
                                     </div>
                                 )}

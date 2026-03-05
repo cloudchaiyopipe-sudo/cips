@@ -126,7 +126,7 @@ export interface FieldCropPageProps {
 export const FIELD_STYLING = {
     MAIN_AREA: {
         fillColor: '#86EFAC',
-        fillOpacity: 0.3,
+        fillOpacity: 0.12,
         strokeColor: '#22C55E',
         strokeWeight: 2,
         strokeOpacity: 1,

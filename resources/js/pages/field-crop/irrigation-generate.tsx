@@ -210,15 +210,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         fieldData.plantSpacing
     );
 
-    // Adjust rotation angle by delta (supports 0.5° increments)
-    const adjustRotationAngle = useCallback((delta: number) => {
-        setParsedRotationAngle((prev) => {
-            const next = prev + delta;
-            const clamped = Math.max(-180, Math.min(180, next));
-            // round to nearest 0.5
-            return Math.round(clamped * 2) / 2;
-        });
-    }, []);
     const [parsedSelectedCrops, setParsedSelectedCrops] = useState<string[]>(
         fieldData.selectedCrops
     );
@@ -348,7 +339,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                         selectedIrrigationType: '',
                         irrigationCounts: {
                             sprinkler_system: 0,
-                            pivot: 0,
                         },
                         irrigationSettings: {
                             sprinkler_system: {
@@ -357,7 +347,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                 flow: 10,
                                 pressure: 2.5,
                             },
-                            pivot: { coverageRadius: 165, overlap: 0, flow: 50, pressure: 3.0 },
                         },
                         irrigationPositions: {
                             sprinklers: [],
@@ -529,10 +518,39 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         if (Array.isArray(obstaclesData)) return obstaclesData;
         return [];
     }, [parsedObstacles, obstaclesData]);
-    const finalPlantPoints = useMemo(
-        () => (parsedPlantPoints.length > 0 ? parsedPlantPoints : []),
-        [parsedPlantPoints]
-    );
+    const finalPlantPoints = useMemo(() => {
+        const raw = parsedPlantPoints;
+        const withReal = raw as PlantPoint[] & { __realPoints?: PlantPoint[] };
+        if (
+            withReal.__realPoints &&
+            Array.isArray(withReal.__realPoints) &&
+            withReal.__realPoints.length > 0
+        ) {
+            return withReal.__realPoints;
+        }
+        if (parsedPlantPoints.length > 0) return parsedPlantPoints;
+        if (plantPointsData) {
+            try {
+                const parsed =
+                    typeof plantPointsData === 'string'
+                        ? (JSON.parse(plantPointsData) as PlantPoint[])
+                        : plantPointsData;
+                const arr = Array.isArray(parsed) ? parsed : [];
+                const withRealFromProps = arr as PlantPoint[] & { __realPoints?: PlantPoint[] };
+                if (
+                    withRealFromProps.__realPoints &&
+                    Array.isArray(withRealFromProps.__realPoints) &&
+                    withRealFromProps.__realPoints.length > 0
+                ) {
+                    return withRealFromProps.__realPoints;
+                }
+                return arr;
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    }, [parsedPlantPoints, plantPointsData]);
 
     const finalAreaRai = parsedAreaRai !== null ? parsedAreaRai : null;
     const finalPerimeterMeters = parsedPerimeterMeters !== null ? parsedPerimeterMeters : null;
@@ -581,8 +599,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     const [isAngleRegenerating, setIsAngleRegenerating] = useState(false);
     const [irrigationCounts, setIrrigationCounts] = useState({
         sprinkler_system: 0,
-        pivot: 0,
-    });
+    } as Record<string, number>);
 
     // เพิ่ม state สำหรับเก็บตำแหน่งอุปกรณ์ irrigation
     const [irrigationPositions, setIrrigationPositions] = useState<IrrigationPositions>(
@@ -593,14 +610,12 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     const [sprinklerMode, setSprinklerMode] = useState<'none' | 'add' | 'move' | 'delete'>('none');
     const [selectedSprinklers, setSelectedSprinklers] = useState<number[]>([]);
 
-    // Require at least one generated irrigation type before proceeding
-    const hasGeneratedIrrigation =
-        irrigationPositions.sprinklers.length > 0 || irrigationPositions.pivots.length > 0;
+    // Require at least one generated irrigation (sprinklers) before proceeding
+    const hasGeneratedIrrigation = irrigationPositions.sprinklers.length > 0;
 
     // Irrigation settings for different types
     const defaultSettings: IrrigationSettings = {
         sprinkler_system: { coverageRadius: 8, overlap: 0, flow: 10, pressure: 2.5 },
-        pivot: { coverageRadius: 165, overlap: 0, flow: 50, pressure: 3.0 },
     };
 
     const [irrigationSettings, setIrrigationSettings] = useState<IrrigationSettings>({
@@ -608,15 +623,33 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         ...(fieldData.irrigationSettings || {}),
     });
 
-    // Type guard functions for irrigation settings
+    // Type guard for sprinkler settings
     const getSprinklerSettings = useCallback(
         () => irrigationSettings.sprinkler_system || defaultSettings.sprinkler_system!,
         [irrigationSettings.sprinkler_system, defaultSettings.sprinkler_system]
     );
-    const getPivotSettings = useCallback(
-        () => irrigationSettings.pivot || defaultSettings.pivot!,
-        [irrigationSettings.pivot, defaultSettings.pivot]
-    );
+
+    // เปิด/ปิด dropdown รัศมี และ Overlap (กดเปิดได้ทุกครั้ง)
+    const [sprinklerDropdownOpen, setSprinklerDropdownOpen] = useState<
+        'radius' | 'overlap' | null
+    >(null);
+    const radiusDropdownRef = useRef<HTMLDivElement>(null);
+    const overlapDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (sprinklerDropdownOpen === null) return;
+        const close = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (
+                radiusDropdownRef.current?.contains(target) ||
+                overlapDropdownRef.current?.contains(target)
+            )
+                return;
+            setSprinklerDropdownOpen(null);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [sprinklerDropdownOpen]);
 
     // Calculate total water requirement
     const totalWaterRequirement = useMemo(() => {
@@ -828,7 +861,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                       selectedIrrigationType: '',
                       irrigationCounts: {
                           sprinkler_system: 0,
-                          pivot: 0,
                       },
                       totalWaterRequirement: 0,
                       irrigationSettings,
@@ -921,20 +953,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                     anchor: new google.maps.Point(newSize / 2, newSize / 2),
                 };
                 marker.setIcon(newIcon);
-            } else if (marker.getTitle()?.includes('Pivot')) {
-                const newIcon = {
-                    url:
-                        'data:image/svg+xml;charset=UTF-8,' +
-                        encodeURIComponent(`
-                        <svg width="${newSize}" height="${newSize}" viewBox="0 0 ${newSize} ${newSize}" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="${newSize / 2}" cy="${newSize / 2}" r="${newSize / 2 - 1}" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-                            <circle cx="${newSize / 2}" cy="${newSize / 2}" r="${newSize / 4}" fill="#ffffff"/>
-                        </svg>
-                    `),
-                    scaledSize: new google.maps.Size(newSize, newSize),
-                    anchor: new google.maps.Point(newSize / 2, newSize / 2),
-                };
-                marker.setIcon(newIcon);
             }
         });
     }, []);
@@ -964,37 +982,27 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         [updateMarkerSizes]
     );
 
-    // Real-time regenerate irrigation overlays when angle changes
+    // เมื่อเปลี่ยน มุม / รัศมี / การทับซ้อน ถ้ามีจุดสปริงเกลอร์อยู่แล้ว ให้สร้างใหม่ให้เห็นผลทันที
     useEffect(() => {
         if (!isMapLoaded) return;
 
-        // ใช้ debounce timer แทน requestAnimationFrame เพื่อลดการ regenerate บ่อยเกินไป
         const debounceTimer = setTimeout(() => {
-            setIsAngleRegenerating(true);
-
-            // Only regenerate the currently selected type, if any data exists
-            const hasSprinklers = irrigationPositions.sprinklers.length > 0;
-            const hasPivots = irrigationPositions.pivots.length > 0;
-
-            if (hasSprinklers && hasPivots) {
-                // If both exist, regenerate both but with a small delay between them
+            if (irrigationPositions.sprinklers.length > 0) {
+                setIsAngleRegenerating(true);
                 generateSprinklerSystem();
-                setTimeout(() => generatePivotSystem(), 50);
-            } else if (hasSprinklers) {
-                generateSprinklerSystem();
-            } else if (hasPivots) {
-                generatePivotSystem();
+                setTimeout(() => setIsAngleRegenerating(false), 200);
             }
+        }, 300);
 
-            // Reset flag after a short delay to allow state updates to complete
-            setTimeout(() => setIsAngleRegenerating(false), 150);
-        }, 500); // เพิ่ม debounce time เป็น 500ms เพื่อลดการ regenerate บ่อยเกินไป
-
-        return () => {
-            clearTimeout(debounceTimer);
-        };
+        return () => clearTimeout(debounceTimer);
+        // สร้างใหม่เมื่อมุม/รัศมี/การทับซ้อนเปลี่ยน (ไม่ใส่ irrigationPositions เพื่อไม่ให้รันซ้ำหลังสร้างเสร็จ)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [parsedRotationAngle]);
+    }, [
+        parsedRotationAngle,
+        irrigationSettings.sprinkler_system?.coverageRadius,
+        irrigationSettings.sprinkler_system?.overlap,
+        isMapLoaded,
+    ]);
 
     // Fit map to main area when main area changes
     useEffect(() => {
@@ -1008,24 +1016,12 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     }, [finalMainArea]);
 
     const handleIrrigationTypeSelect = (type: string) => {
-        // Clear all existing irrigation overlays when switching types
         irrigationMarkersRef.current.forEach((marker) => marker.setMap(null));
         irrigationMarkersRef.current = [];
         irrigationCirclesRef.current.forEach((circle) => circle.setMap(null));
         irrigationCirclesRef.current = [];
-
-        // Reset irrigation counts when switching types
-        setIrrigationCounts({
-            sprinkler_system: 0,
-            pivot: 0,
-        });
-
-        // Clear irrigation positions when switching types
-        setIrrigationPositions({
-            sprinklers: [],
-            pivots: [],
-        });
-
+        setIrrigationCounts({ sprinkler_system: 0 });
+        setIrrigationPositions({ sprinklers: [], pivots: [] });
         setSelectedIrrigationType(type);
     };
 
@@ -1246,7 +1242,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         setIsGeneratingIrrigation(true);
 
         try {
-            // Clear existing sprinkler overlays เท่านั้น (ไม่กระทบ pivot)
+            // Clear existing sprinkler overlays
             // เก็บ index ของ sprinkler markers ก่อนลบ
             const sprinklerIndices: number[] = [];
             irrigationMarkersRef.current.forEach((marker, index) => {
@@ -1494,650 +1490,279 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         }
     }, [finalMainArea, finalObstacles, getSprinklerSettings, parsedRotationAngle]);
 
-    // Updated generatePivotSystem function to use center-first row placement like plant points
-    const generatePivotSystem = useCallback(async () => {
-        if (!mapRef.current || finalMainArea.length < 3) return;
-
-        setIsGeneratingIrrigation(true);
-
-        try {
-            // Clear existing pivot overlays เท่านั้น (ไม่กระทบ sprinkler)
-            // เก็บ index ของ pivot markers ก่อนลบ
-            const pivotIndices: number[] = [];
-            irrigationMarkersRef.current.forEach((marker, index) => {
-                if (marker.getTitle()?.includes('Pivot')) {
-                    pivotIndices.push(index);
-                }
-            });
-
-            // ลบ markers และ circles ที่เกี่ยวข้องกัน
-            pivotIndices
-                .sort((a, b) => b - a)
-                .forEach((index) => {
-                    // ลบ marker
-                    if (irrigationMarkersRef.current[index]) {
-                        irrigationMarkersRef.current[index].setMap(null);
-                        irrigationMarkersRef.current.splice(index, 1);
-                    }
-                    // ลบ circle ที่ตรงกับ index เดียวกัน
-                    if (irrigationCirclesRef.current[index]) {
-                        irrigationCirclesRef.current[index].setMap(null);
-                        irrigationCirclesRef.current.splice(index, 1);
-                    }
-                });
-
-            const pivotSettings = getPivotSettings();
-            const radius = pivotSettings.coverageRadius || 165;
-            const overlap = (pivotSettings.overlap || 0) / 100;
-            const effectiveSpacing = radius * 2 * (1 - overlap); // Distance between pivot centers
-            const rotationAngleRad = (parsedRotationAngle * Math.PI) / 180;
-            const bufferDistance = effectiveSpacing * 0.3; // Buffer from edges like plant points
-
-            // Geometry helper functions (same as plant point generation)
-            const computeCentroid = (points: { lat: number; lng: number }[]) => {
-                if (points.length === 0) return { lat: 0, lng: 0 };
-                let sumLat = 0;
-                let sumLng = 0;
-                for (const p of points) {
-                    sumLat += p.lat;
-                    sumLng += p.lng;
-                }
-                return { lat: sumLat / points.length, lng: sumLng / points.length };
-            };
-
-            const toLocalXY = (
-                p: { lat: number; lng: number },
-                origin: { lat: number; lng: number }
-            ) => {
-                const latFactor = 111000;
-                const lngFactor = 111000 * Math.cos((origin.lat * Math.PI) / 180);
-                return {
-                    x: (p.lng - origin.lng) * lngFactor,
-                    y: (p.lat - origin.lat) * latFactor,
-                };
-            };
-
-            const toLatLngFromXY = (
-                xy: { x: number; y: number },
-                origin: { lat: number; lng: number }
-            ) => {
-                const latFactor = 111000;
-                const lngFactor = 111000 * Math.cos((origin.lat * Math.PI) / 180);
-                return {
-                    lat: xy.y / latFactor + origin.lat,
-                    lng: xy.x / lngFactor + origin.lng,
-                };
-            };
-
-            const rotateXY = (xy: { x: number; y: number }, angleRad: number) => {
-                const cosA = Math.cos(angleRad);
-                const sinA = Math.sin(angleRad);
-                return {
-                    x: xy.x * cosA - xy.y * sinA,
-                    y: xy.x * sinA + xy.y * cosA,
-                };
-            };
-
-            const isPointInPolygonXY = (
-                point: { x: number; y: number },
-                polygon: Array<{ x: number; y: number }>
-            ): boolean => {
-                let inside = false;
-                const x = point.x;
-                const y = point.y;
-                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                    const xi = polygon[i].x;
-                    const yi = polygon[i].y;
-                    const xj = polygon[j].x;
-                    const yj = polygon[j].y;
-                    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-                        inside = !inside;
-                    }
-                }
-                return inside;
-            };
-
-            const distanceToPolygonEdgeXY = (
-                point: { x: number; y: number },
-                polygon: Array<{ x: number; y: number }>
-            ): number => {
-                let minDistance = Infinity;
-                for (let i = 0; i < polygon.length; i++) {
-                    const j = (i + 1) % polygon.length;
-                    const e1 = polygon[i];
-                    const e2 = polygon[j];
-                    const A = point.x - e1.x;
-                    const B = point.y - e1.y;
-                    const C = e2.x - e1.x;
-                    const D = e2.y - e1.y;
-                    const dot = A * C + B * D;
-                    const lenSq = C * C + D * D;
-                    let param = -1;
-                    if (lenSq !== 0) param = dot / lenSq;
-                    let xx, yy;
-                    if (param < 0) {
-                        xx = e1.x;
-                        yy = e1.y;
-                    } else if (param > 1) {
-                        xx = e2.x;
-                        yy = e2.y;
-                    } else {
-                        xx = e1.x + param * C;
-                        yy = e1.y + param * D;
-                    }
-                    const dx = point.x - xx;
-                    const dy = point.y - yy;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    minDistance = Math.min(minDistance, distance);
-                }
-                return minDistance;
-            };
-
-            // Convert main area and obstacles to local coordinates
-            const origin = computeCentroid(finalMainArea);
-            const mainAreaXY = finalMainArea.map((p) => toLocalXY(p, origin));
-            const obstaclesXY = finalObstacles.map((o) =>
-                o.coordinates.map((p) => toLocalXY(p, origin))
-            );
-
-            // Rotate main area and obstacles to align with rotation angle
-            const rotatedMain = mainAreaXY.map((p) => rotateXY(p, -rotationAngleRad));
-            const rotatedObstacles = obstaclesXY.map((poly) =>
-                poly.map((p) => rotateXY(p, -rotationAngleRad))
-            );
-
-            // Calculate bounds of rotated main area
-            const xs = rotatedMain.map((p) => p.x);
-            const ys = rotatedMain.map((p) => p.y);
-            const minX = Math.min(...xs);
-            const maxX = Math.max(...xs);
-            const minY = Math.min(...ys);
-            const maxY = Math.max(...ys);
-
-            // Calculate center Y coordinate for starting from the middle (like plant points)
-            const centerY = (minY + maxY) / 2;
-
-            // Calculate how many rows we can fit above and below center
-            const totalHeight = maxY - minY;
-            const maxRows = Math.floor(totalHeight / effectiveSpacing);
-            const rowsAboveCenter = Math.floor(maxRows / 2);
-            const rowsBelowCenter = maxRows - rowsAboveCenter;
-
-            // Generate rows starting from center and expanding outward
-            const allRowYs: number[] = [];
-
-            // Add center row first
-            allRowYs.push(centerY);
-
-            // Add rows above center (going up)
-            for (let i = 1; i <= rowsAboveCenter; i++) {
-                const yAbove = centerY + i * effectiveSpacing;
-                if (yAbove <= maxY) {
-                    allRowYs.push(yAbove);
-                }
-            }
-
-            // Add rows below center (going down)
-            for (let i = 1; i <= rowsBelowCenter; i++) {
-                const yBelow = centerY - i * effectiveSpacing;
-                if (yBelow >= minY) {
-                    allRowYs.push(yBelow);
-                }
-            }
-
-            // Sort rows from bottom to top for consistent ordering
-            allRowYs.sort((a, b) => a - b);
-
-            // Generate pivots for each row with improved symmetrical placement
-            const pivots: { lat: number; lng: number }[] = [];
-
-            // Calculate center X coordinate for symmetrical column placement
-            const centerX = (minX + maxX) / 2;
-
-            // Calculate how many columns we can fit left and right of center
-            const totalWidth = maxX - minX;
-            const maxCols = Math.floor(totalWidth / effectiveSpacing);
-            const colsLeftOfCenter = Math.floor(maxCols / 2);
-            const colsRightOfCenter = maxCols - colsLeftOfCenter;
-
-            // Generate columns starting from center and expanding outward
-            const allColXs: number[] = [];
-
-            // Add center column first
-            allColXs.push(centerX);
-
-            // Add columns right of center (going right)
-            for (let i = 1; i <= colsRightOfCenter; i++) {
-                const xRight = centerX + i * effectiveSpacing;
-                if (xRight <= maxX) {
-                    allColXs.push(xRight);
-                }
-            }
-
-            // Add columns left of center (going left)
-            for (let i = 1; i <= colsLeftOfCenter; i++) {
-                const xLeft = centerX - i * effectiveSpacing;
-                if (xLeft >= minX) {
-                    allColXs.push(xLeft);
-                }
-            }
-
-            // Sort columns from left to right for consistent ordering
-            allColXs.sort((a, b) => a - b);
-
-            for (let rowIndex = 0; rowIndex < allRowYs.length; rowIndex++) {
-                const y = allRowYs[rowIndex];
-
-                for (let colIndex = 0; colIndex < allColXs.length; colIndex++) {
-                    const x = allColXs[colIndex];
-                    const pt = { x, y };
-                    const insideMain = isPointInPolygonXY(pt, rotatedMain);
-                    const insideAnyHole = rotatedObstacles.some((poly) =>
-                        isPointInPolygonXY(pt, poly)
-                    );
-
-                    if (insideMain && !insideAnyHole) {
-                        // Check distance from edges (like plant points)
-                        const distanceFromEdge = Math.min(
-                            distanceToPolygonEdgeXY(pt, rotatedMain),
-                            ...rotatedObstacles.map((poly) => distanceToPolygonEdgeXY(pt, poly))
-                        );
-
-                        if (distanceFromEdge >= bufferDistance) {
-                            // Rotate back to original space
-                            const unrotated = rotateXY(pt, rotationAngleRad);
-                            const latLng = toLatLngFromXY(unrotated, origin);
-
-                            pivots.push(latLng);
-                        }
-                    }
-                }
-            }
-
-            // Update irrigation count
-            setIrrigationCounts((prev) => ({ ...prev, pivot: pivots.length }));
-
-            // Save pivot positions
-            setIrrigationPositions((prev) => ({ ...prev, pivots }));
-
-            // Create all markers and circles at once for full area generation
-            pivots.forEach((pos, index) => {
-                // Create marker
-                const marker = new google.maps.Marker({
-                    position: pos,
-                    map: mapRef.current,
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-									<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-								</svg>
-							`),
-                        scaledSize: new google.maps.Size(12, 12),
-                        anchor: new google.maps.Point(6, 6),
-                    },
-                    title: `Pivot ${index + 1}`,
-                    optimized: true,
-                    clickable: false,
-                    zIndex: 2000,
-                });
-                irrigationMarkersRef.current.push(marker);
-
-                // Create coverage circle
-                const circle = new google.maps.Circle({
-                    center: pos,
-                    radius: radius,
-                    fillColor: '#f97316',
-                    fillOpacity: 0.2,
-                    strokeColor: '#ea580c',
-                    strokeOpacity: 1.0,
-                    strokeWeight: 1,
-                    map: mapRef.current,
-                    clickable: false,
-                    zIndex: 2000,
-                });
-                irrigationCirclesRef.current.push(circle);
-            });
-        } catch {
-            // Error generating pivot system
-        } finally {
-            setIsGeneratingIrrigation(false);
-        }
-    }, [finalMainArea, finalObstacles, getPivotSettings, parsedRotationAngle]);
-
     // Function to render irrigation settings based on selected type
     const renderIrrigationSettings = () => {
         if (!selectedIrrigationType) return null;
 
         switch (selectedIrrigationType) {
-            case 'sprinkler_system':
+            case 'sprinkler_system': {
+                const settings = getSprinklerSettings();
+                const radius = settings.coverageRadius ?? 8;
+                const overlap = settings.overlap ?? 0;
                 return (
                     <div
-                        className="rounded border border-white p-3"
-                        style={{ backgroundColor: '#000005' }}
+                        className="rounded-lg border border-white/60 p-4"
+                        style={{ backgroundColor: '#0a0a0f' }}
                     >
-                        <h4 className="mb-3 text-sm font-medium text-white">
-                            {t('Sprinkler System Settings')}
-                        </h4>
+                        <p className="mb-4 text-xs text-gray-400">
+                            {t('Sprinkler settings description')}
+                        </p>
+
                         <div className="space-y-4">
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Coverage Radius')}: {getSprinklerSettings().coverageRadius}m
+                            <div className="relative" ref={radiusDropdownRef}>
+                                <label className="mb-1 block text-xs font-medium text-white">
+                                    {t('Coverage Radius')} (m)
                                 </label>
-                                <input
-                                    type="range"
-                                    min={1}
-                                    max={15}
-                                    step={1}
-                                    value={getSprinklerSettings().coverageRadius}
-                                    onChange={(e) =>
-                                        handleSettingsChange(
-                                            'sprinkler_system',
-                                            'coverageRadius',
-                                            parseInt(e.target.value)
-                                        )
-                                    }
-                                    className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                    style={{
-                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(((getSprinklerSettings()?.coverageRadius || 8) - 1) / 14) * 100}%, #6b7280 ${(((getSprinklerSettings()?.coverageRadius || 8) - 1) / 14) * 100}%, #6b7280 100%)`,
-                                    }}
-                                />
-                                <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                    <span>1m</span>
-                                    <span>15m</span>
+                                <div className="flex rounded-lg border border-gray-600 bg-gray-700/80 focus-within:ring-1 focus-within:ring-blue-500">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={15}
+                                        step={0.1}
+                                        value={radius}
+                                        onChange={(e) => {
+                                            const v = parseFloat(e.target.value);
+                                            if (!isNaN(v))
+                                                handleSettingsChange(
+                                                    'sprinkler_system',
+                                                    'coverageRadius',
+                                                    Math.max(1, Math.min(15, v))
+                                                );
+                                        }}
+                                        onFocus={() => setSprinklerDropdownOpen('radius')}
+                                        className="w-full rounded-l-lg bg-transparent px-3 py-2 text-sm text-white focus:outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setSprinklerDropdownOpen((prev) =>
+                                                prev === 'radius' ? null : 'radius'
+                                            )
+                                        }
+                                        className="rounded-r-lg border-l border-gray-600 px-2 text-gray-400 hover:bg-gray-600 hover:text-white"
+                                        aria-label={t('Open list')}
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
                                 </div>
+                                {sprinklerDropdownOpen === 'radius' && (
+                                    <ul
+                                        className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-lg border border-gray-600 bg-gray-800 py-1 shadow-lg"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        {Array.from({ length: 29 }, (_, i) => 1 + i * 0.5).map(
+                                            (n) => (
+                                                <li key={n}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            handleSettingsChange(
+                                                                'sprinkler_system',
+                                                                'coverageRadius',
+                                                                n
+                                                            );
+                                                            setSprinklerDropdownOpen(null);
+                                                        }}
+                                                        className={`w-full px-3 py-1.5 text-left text-sm hover:bg-blue-600 ${
+                                                            radius === n ? 'bg-blue-600/80 text-white' : 'text-gray-200'
+                                                        }`}
+                                                    >
+                                                        {n} m
+                                                    </button>
+                                                </li>
+                                            )
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
+
+                            <div className="relative" ref={overlapDropdownRef}>
+                                <label className="mb-1 block text-xs font-medium text-white">
+                                    {t('Overlap')} (%)
+                                </label>
+                                <div className="flex rounded-lg border border-gray-600 bg-gray-700/80 focus-within:ring-1 focus-within:ring-blue-500">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={50}
+                                        value={overlap}
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value, 10);
+                                            if (!isNaN(v))
+                                                handleSettingsChange(
+                                                    'sprinkler_system',
+                                                    'overlap',
+                                                    Math.max(0, Math.min(50, v))
+                                                );
+                                        }}
+                                        onFocus={() => setSprinklerDropdownOpen('overlap')}
+                                        className="w-full rounded-l-lg bg-transparent px-3 py-2 text-sm text-white focus:outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setSprinklerDropdownOpen((prev) =>
+                                                prev === 'overlap' ? null : 'overlap'
+                                            )
+                                        }
+                                        className="rounded-r-lg border-l border-gray-600 px-2 text-gray-400 hover:bg-gray-600 hover:text-white"
+                                        aria-label={t('Open list')}
+                                    >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                {sprinklerDropdownOpen === 'overlap' && (
+                                    <ul
+                                        className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-lg border border-gray-600 bg-gray-800 py-1 shadow-lg"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        {Array.from({ length: 51 }, (_, i) => i).map((n) => (
+                                            <li key={n}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        handleSettingsChange(
+                                                            'sprinkler_system',
+                                                            'overlap',
+                                                            n
+                                                        );
+                                                        setSprinklerDropdownOpen(null);
+                                                    }}
+                                                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-blue-600 ${
+                                                        overlap === n ? 'bg-blue-600/80 text-white' : 'text-gray-200'
+                                                    }`}
+                                                >
+                                                    {n}%
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
 
                             <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Overlap')}: {getSprinklerSettings().overlap}%
-                                </label>
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={50}
-                                    step={5}
-                                    value={getSprinklerSettings().overlap}
-                                    onChange={(e) =>
-                                        handleSettingsChange(
-                                            'sprinkler_system',
-                                            'overlap',
-                                            parseInt(e.target.value)
-                                        )
-                                    }
-                                    className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                    style={{
-                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(((getSprinklerSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 ${(((getSprinklerSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 100%)`,
-                                    }}
-                                />
-                                <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                    <span>0%</span>
-                                    <span>50%</span>
+                                <div className="mb-1 flex items-center justify-between">
+                                    <label className="text-xs font-medium text-white">
+                                        {t('Angle')} (°)
+                                    </label>
+                                    <span className="rounded bg-blue-600/80 px-2 py-0.5 text-xs font-medium text-white">
+                                        {parsedRotationAngle}°
+                                    </span>
                                 </div>
-                            </div>
-
-                            {/* Irrigation rotation angle for sprinklers */}
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Angle')}: {parsedRotationAngle.toFixed(1)}°
-                                </label>
                                 <input
                                     type="range"
                                     min={-180}
                                     max={180}
-                                    step={0.5}
+                                    step={1}
                                     value={parsedRotationAngle}
                                     onChange={(e) =>
                                         setParsedRotationAngle(parseFloat(e.target.value))
                                     }
-                                    className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
+                                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-gray-600 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500"
                                     style={{
-                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 100%)`,
+                                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((parsedRotationAngle + 180) / 360) * 100}%, #4b5563 ${((parsedRotationAngle + 180) / 360) * 100}%, #4b5563 100%)`,
                                     }}
                                 />
-                                <div className="mt-1 flex justify-between text-xs text-gray-400">
+                                <div className="mt-0.5 flex justify-between text-[10px] text-gray-500">
                                     <span>-180°</span>
                                     <span>0°</span>
                                     <span>180°</span>
-                                </div>
-                                <div className="mt-2 flex items-center justify-between">
-                                    <button
-                                        onClick={() => adjustRotationAngle(-0.5)}
-                                        className="rounded border border-white bg-gray-700 px-2 py-1 text-xs text-white"
-                                    >
-                                        -0.5°
-                                    </button>
-                                    <button
-                                        onClick={() => adjustRotationAngle(0.5)}
-                                        className="rounded border border-white bg-gray-700 px-2 py-1 text-xs text-white"
-                                    >
-                                        +0.5°
-                                    </button>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
+                                    <label className="mb-1 block text-xs text-gray-400">
                                         {t('Flow')} (L/min)
                                     </label>
                                     <input
                                         type="number"
                                         min={5}
                                         max={30}
-                                        step={1}
-                                        value={getSprinklerSettings().flow}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'sprinkler_system',
-                                                'flow',
-                                                parseInt(e.target.value) || 10
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-                                        placeholder="10"
+                                        list="sprinkler-flow-list"
+                                        value={settings.flow}
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value, 10);
+                                            if (!isNaN(v))
+                                                handleSettingsChange(
+                                                    'sprinkler_system',
+                                                    'flow',
+                                                    Math.max(5, Math.min(30, v))
+                                                );
+                                        }}
+                                        className="w-full rounded-lg border border-gray-600 bg-gray-700/80 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
+                                    <datalist id="sprinkler-flow-list">
+                                        {Array.from({ length: 26 }, (_, i) => i + 5).map((n) => (
+                                            <option key={n} value={n} />
+                                        ))}
+                                    </datalist>
                                 </div>
-
                                 <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
+                                    <label className="mb-1 block text-xs text-gray-400">
                                         {t('Pressure')} (bar)
                                     </label>
                                     <input
                                         type="number"
                                         min={1.5}
-                                        max={4.0}
+                                        max={4}
                                         step={0.1}
-                                        value={getSprinklerSettings().pressure}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'sprinkler_system',
-                                                'pressure',
-                                                parseFloat(e.target.value) || 2.5
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
-                                        placeholder="2.5"
+                                        list="sprinkler-pressure-list"
+                                        value={settings.pressure}
+                                        onChange={(e) => {
+                                            const v = parseFloat(e.target.value);
+                                            if (!isNaN(v))
+                                                handleSettingsChange(
+                                                    'sprinkler_system',
+                                                    'pressure',
+                                                    Math.max(1.5, Math.min(4, v))
+                                                );
+                                        }}
+                                        className="w-full rounded-lg border border-gray-600 bg-gray-700/80 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     />
+                                    <datalist id="sprinkler-pressure-list">
+                                        {Array.from({ length: 26 }, (_, i) => 1.5 + i * 0.1).map(
+                                            (n) => (
+                                                <option key={n} value={n.toFixed(1)} />
+                                            )
+                                        )}
+                                    </datalist>
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => generateSprinklerSystem()}
-                                disabled={isGeneratingIrrigation}
-                                className="w-full rounded bg-blue-600 px-3 py-2 text-xs text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-500"
-                            >
-                                {isGeneratingIrrigation
-                                    ? t('Generating...')
-                                    : t('Generate Sprinkler System')}
-                            </button>
-                            {irrigationCounts.sprinkler_system > 0 && (
-                                <div className="mt-2 text-center text-xs text-blue-400">
-                                    {t('Generated')}: {irrigationCounts.sprinkler_system}{' '}
-                                    {t('sprinklers')}
-                                </div>
-                            )}
+                            {/* ปุ่มสร้างระบบสปริงเกลอร์ - ไว้ด้านล่าง */}
+                            <div className="border-t border-white/20 pt-4">
+                                <button
+                                    onClick={() => generateSprinklerSystem()}
+                                    disabled={isGeneratingIrrigation}
+                                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 text-sm font-medium text-white shadow-lg transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isGeneratingIrrigation ? (
+                                        <>
+                                            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                            กำลังสร้าง...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-lg">🚿</span>
+                                            สร้างระบบสปริงเกลอร์
+                                        </>
+                                    )}
+                                </button>
+                                {irrigationCounts.sprinkler_system > 0 && (
+                                    <div className="mt-2 text-center text-sm font-medium text-green-400">
+                                        ✓ สร้างแล้ว {irrigationCounts.sprinkler_system} จุด
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 );
-
-            case 'pivot':
-                return (
-                    <div
-                        className="rounded border border-white p-3"
-                        style={{ backgroundColor: '#000005' }}
-                    >
-                        <h4 className="mb-3 text-sm font-medium text-white">
-                            {t('System Pivot Settings')}
-                        </h4>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Coverage Radius')}: {getPivotSettings().coverageRadius}m
-                                </label>
-                                <input
-                                    type="range"
-                                    min={80}
-                                    max={250}
-                                    step={5}
-                                    value={getPivotSettings().coverageRadius}
-                                    onChange={(e) =>
-                                        handleSettingsChange(
-                                            'pivot',
-                                            'coverageRadius',
-                                            parseInt(e.target.value)
-                                        )
-                                    }
-                                    className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                    style={{
-                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${(((getPivotSettings()?.coverageRadius || 165) - 80) / 170) * 100}%, #6b7280 ${(((getPivotSettings()?.coverageRadius || 165) - 80) / 170) * 100}%, #6b7280 100%)`,
-                                    }}
-                                />
-                                <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                    <span>80m</span>
-                                    <span>250m</span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Overlap')}: {getPivotSettings().overlap}%
-                                </label>
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={50}
-                                    step={5}
-                                    value={getPivotSettings().overlap}
-                                    onChange={(e) =>
-                                        handleSettingsChange(
-                                            'pivot',
-                                            'overlap',
-                                            parseInt(e.target.value)
-                                        )
-                                    }
-                                    className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                    style={{
-                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${(((getPivotSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 ${(((getPivotSettings()?.overlap || 0) - 0) / 50) * 100}%, #6b7280 100%)`,
-                                    }}
-                                />
-                                <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                    <span>0%</span>
-                                    <span>50%</span>
-                                </div>
-                            </div>
-
-                            {/* Irrigation rotation angle for pivots */}
-                            <div>
-                                <label className="mb-2 block text-xs text-gray-400">
-                                    {t('Angle')}: {parsedRotationAngle.toFixed(1)}°
-                                </label>
-                                <input
-                                    type="range"
-                                    min={-180}
-                                    max={180}
-                                    step={0.5}
-                                    value={parsedRotationAngle}
-                                    onChange={(e) =>
-                                        setParsedRotationAngle(parseFloat(e.target.value))
-                                    }
-                                    className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-600"
-                                    style={{
-                                        background: `linear-gradient(to right, #f97316 0%, #f97316 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 100%)`,
-                                    }}
-                                />
-                                <div className="mt-1 flex justify-between text-xs text-gray-400">
-                                    <span>-180°</span>
-                                    <span>0°</span>
-                                    <span>180°</span>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
-                                        {t('Flow')} (L/min)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={20}
-                                        max={100}
-                                        step={5}
-                                        value={getPivotSettings().flow}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'pivot',
-                                                'flow',
-                                                parseInt(e.target.value) || 50
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none"
-                                        placeholder="50"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="mb-2 block text-xs text-gray-400">
-                                        {t('Pressure')} (bar)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={2.0}
-                                        max={5.0}
-                                        step={0.1}
-                                        value={getPivotSettings().pressure}
-                                        onChange={(e) =>
-                                            handleSettingsChange(
-                                                'pivot',
-                                                'pressure',
-                                                parseFloat(e.target.value) || 3.0
-                                            )
-                                        }
-                                        className="w-full rounded border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none"
-                                        placeholder="3.0"
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => generatePivotSystem()}
-                                disabled={isGeneratingIrrigation}
-                                className="w-full rounded bg-orange-600 px-3 py-2 text-xs text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-gray-500"
-                            >
-                                {isGeneratingIrrigation
-                                    ? t('Generating...')
-                                    : t('Generate Pivot System')}
-                            </button>
-                            {irrigationCounts.pivot > 0 && (
-                                <div className="mt-2 text-center text-xs text-orange-400">
-                                    {t('Generated')}: {irrigationCounts.pivot} {t('pivots')}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
+            }
 
             default:
                 return null;
@@ -2431,55 +2056,9 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
             });
         }
 
-        // Recreate pivot overlays at once
-        if (irrigationPositions.pivots.length > 0) {
-            const radius = getPivotSettings().coverageRadius;
-
-            irrigationPositions.pivots.forEach((pos, index) => {
-                // Create marker
-                const marker = new google.maps.Marker({
-                    position: pos,
-                    map: mapRef.current,
-                    icon: {
-                        url:
-                            'data:image/svg+xml;charset=UTF-8,' +
-                            encodeURIComponent(`
-								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-									<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-								</svg>
-							`),
-                        scaledSize: new google.maps.Size(12, 12),
-                        anchor: new google.maps.Point(6, 6),
-                    },
-                    title: `Pivot ${index + 1}`,
-                    optimized: true,
-                    clickable: false,
-                    zIndex: 2000,
-                });
-                irrigationMarkersRef.current.push(marker);
-
-                // Create coverage circle
-                const circle = new google.maps.Circle({
-                    center: pos,
-                    radius: radius,
-                    fillColor: '#f97316',
-                    fillOpacity: 0.2,
-                    strokeColor: '#ea580c',
-                    strokeOpacity: 0.6,
-                    strokeWeight: 1,
-                    map: mapRef.current,
-                    clickable: false,
-                    zIndex: 2000,
-                });
-                irrigationCirclesRef.current.push(circle);
-            });
-        }
     }, [
         isMapLoaded,
         getSprinklerSettings,
-        getPivotSettings,
-        irrigationPositions.pivots,
         irrigationPositions.sprinklers,
         sprinklerMode,
         deleteSprinkler,
@@ -2491,8 +2070,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
     useEffect(() => {
         if (isMapLoaded && mapRef.current && !isAngleRegenerating) {
             // Check if we have irrigation data that should be displayed
-            const hasIrrigationData =
-                irrigationPositions.sprinklers.length > 0 || irrigationPositions.pivots.length > 0;
+            const hasIrrigationData = irrigationPositions.sprinklers.length > 0;
 
             if (hasIrrigationData) {
                 renderIrrigationOverlays();
@@ -2500,7 +2078,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
         }
     }, [
         isMapLoaded,
-        irrigationPositions.pivots.length,
         irrigationPositions.sprinklers.length,
         renderIrrigationOverlays,
         isAngleRegenerating,
@@ -2588,6 +2165,23 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                     <h1 className="text-lg font-bold text-white">
                                         {steps.find((s) => s.id === currentStep)?.title}
                                     </h1>
+                                    {finalSelectedCrops.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            <span className="text-xs text-gray-400">{t('Crops')}:</span>
+                                            {finalSelectedCrops.map((crop, idx) => {
+                                                const cropData = getCropByValue(crop);
+                                                return (
+                                                    <span
+                                                        key={idx}
+                                                        className="flex items-center gap-0.5 rounded border border-white/50 bg-blue-600/80 px-2 py-0.5 text-xs text-white"
+                                                    >
+                                                        {cropData?.icon || '🌱'}{' '}
+                                                        {cropData?.name || crop}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Step Navigation - Horizontal */}
@@ -2602,10 +2196,7 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                 case 1: // Initial Area
                                                     return finalMainArea.length >= 3;
                                                 case 2: // Irrigation Generate
-                                                    return (
-                                                        irrigationPositions.sprinklers.length > 0 ||
-                                                        irrigationPositions.pivots.length > 0
-                                                    );
+                                                    return irrigationPositions.sprinklers.length > 0;
                                                 default:
                                                     return false;
                                             }
@@ -2700,6 +2291,25 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                 {t('Field Information')}
                                             </h3>
                                             <div className="space-y-2 text-xs">
+                                                {finalSelectedCrops.length > 0 && (
+                                                    <div className="flex flex-wrap items-center gap-1">
+                                                        <span className="text-gray-400">
+                                                            {t('Plants')}:
+                                                        </span>
+                                                        {finalSelectedCrops.map((crop, idx) => {
+                                                            const cropData = getCropByValue(crop);
+                                                            return (
+                                                                <span
+                                                                    key={idx}
+                                                                    className="flex items-center gap-1 rounded border border-white/50 bg-blue-600/80 px-2 py-0.5 text-white"
+                                                                >
+                                                                    {cropData?.icon || '🌱'}{' '}
+                                                                    {cropData?.name || crop}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                                 <div className="flex justify-between text-gray-400">
                                                     <span>{t('Area')}:</span>
                                                     <span className="text-green-400">
@@ -2768,7 +2378,23 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                         <h3 className="mb-3 text-sm font-semibold text-white">
                                             {t('Irrigation Types')}
                                         </h3>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        {finalSelectedCrops.length > 0 && (
+                                            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                                                <span className="text-xs text-gray-400">{t('Crops')}:</span>
+                                                {finalSelectedCrops.map((crop, idx) => {
+                                                    const cropData = getCropByValue(crop);
+                                                    return (
+                                                        <span
+                                                            key={idx}
+                                                            className="flex items-center gap-1 rounded border border-white/50 bg-blue-600/80 px-2 py-0.5 text-xs text-white"
+                                                        >
+                                                            {cropData?.icon || '🌱'} {cropData?.name || crop}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-1 gap-2">
                                             <div
                                                 onClick={() =>
                                                     handleIrrigationTypeSelect('sprinkler_system')
@@ -2797,34 +2423,6 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                     <div className="mt-1 text-xs text-blue-300">
                                                         {irrigationCounts.sprinkler_system}{' '}
                                                         {t('generated')}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div
-                                                onClick={() => handleIrrigationTypeSelect('pivot')}
-                                                className={`cursor-pointer rounded border border-white p-2 text-center transition-colors ${
-                                                    selectedIrrigationType === 'pivot'
-                                                        ? 'border-blue-400 bg-blue-600'
-                                                        : 'hover:bg-gray-800'
-                                                }`}
-                                                style={{
-                                                    backgroundColor:
-                                                        selectedIrrigationType === 'pivot'
-                                                            ? '#3b82f6'
-                                                            : '#000005',
-                                                }}
-                                            >
-                                                <div className="mb-1 text-lg">🔄</div>
-                                                <h4 className="text-xs font-medium text-white">
-                                                    {t('System Pivot')}
-                                                </h4>
-                                                <p className="text-xs text-gray-400">
-                                                    {t('Rotating irrigation')}
-                                                </p>
-                                                {irrigationCounts.pivot > 0 && (
-                                                    <div className="mt-1 text-xs text-orange-300">
-                                                        {irrigationCounts.pivot} {t('generated')}
                                                     </div>
                                                 )}
                                             </div>
@@ -2867,18 +2465,11 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                                     flow: 10,
                                                     pressure: 2.5,
                                                 },
-                                                pivot: {
-                                                    coverageRadius: 165,
-                                                    overlap: 0,
-                                                    flow: 50,
-                                                    pressure: 3.0,
-                                                },
                                             });
 
                                             // Clear irrigation counts
                                             setIrrigationCounts({
                                                 sprinkler_system: 0,
-                                                pivot: 0,
                                             });
 
                                             // Clear irrigation positions
@@ -2942,11 +2533,14 @@ export default function IrrigationGenerate(props: FieldCropPageProps) {
                                 </div>
 
                                 {/* Sprinkler Management Controls */}
-                                <div className="absolute left-4 top-2.5 z-10 rounded-lg border border-white bg-black bg-opacity-80 p-3">
-                                    <div className="mb-2 text-xs font-semibold text-white">
+                                <div className="absolute left-4 top-2.5 z-10 w-44 rounded-lg border border-white/60 bg-black/90 p-3 shadow-lg">
+                                    <div className="mb-1.5 text-xs font-semibold text-white">
                                         🚿 {t('Sprinkler Management')}
                                     </div>
-                                    <div className="flex flex-col gap-2">
+                                    <p className="mb-2 text-[10px] text-gray-400">
+                                        {t('Add / Move / Delete on map')}
+                                    </p>
+                                    <div className="flex flex-col gap-1.5">
                                         <button
                                             onClick={() =>
                                                 handleSprinklerModeChange(

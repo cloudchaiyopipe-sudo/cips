@@ -40,7 +40,6 @@ class UserController extends Controller
                   ->orWhere('email', 'LIKE', "%{$query}%")
                   ->orWhere('phone', 'LIKE', "%{$query}%");
             })
-            ->where('id', '!=', $currentUser->id) // Exclude current user
             ->limit(20)
             ->get(['id', 'name', 'email', 'phone']);
             

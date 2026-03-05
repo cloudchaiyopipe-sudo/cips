@@ -54,6 +54,8 @@ interface Pipe {
     length?: number;
     fromZone?: string;
     toZone?: string;
+    /** โซนที่ท่อเป็นของ (กำหนดจากจุดสิ้นสุดของการวาด) — ห้ามเชื่อมท่อคนละโซน */
+    zoneId?: string;
     // สำหรับท่อตรงที่โค้งมุม: เก็บสถานะต่อมุม (รองรับข้อมูลเรขาคณิตเพื่อปรับซ้ำ)
     roundedCorners?: {
         cornerIndex: number;
@@ -198,6 +200,16 @@ interface DrawingState {
 
 // ===== UTILITY FUNCTIONS =====
 // ... (ส่วนนี้เหมือนเดิมทั้งหมด) ...
+
+/** ใช้เปรียบเทียบ zoneId ให้ตรงกันเสมอ (รองรับ id เป็น string หรือ number) */
+const normalizeZoneId = (z: string | number | null | undefined): string | null =>
+    z == null || z === '' ? null : String(z);
+
+/** โซนเดียวกันหรือทั้งคู่นอกโซน */
+const isSameZoneId = (
+    a: string | number | null | undefined,
+    b: string | number | null | undefined
+): boolean => normalizeZoneId(a) === normalizeZoneId(b);
 
 // Helper function to check if a point is inside or on a polygon
 const isPointInOrOnPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
@@ -507,6 +519,11 @@ const usePipeManager = () => {
     const [pipeHistoryIndex, setPipeHistoryIndex] = useState(0);
     const isApplyingHistoryRef = useRef(false);
     const lastPipeActionTime = useRef<number>(0); // Track when last pipe action occurred
+
+    // ─── Refs สำหรับ synchronous access (หลีกเลี่ยง stale closure / nested setState) ──
+    const pipesRef = useRef<Pipe[]>([]);
+    const pipeHistoryRef = useRef<Pipe[][]>([[]]);
+    const pipeHistoryIndexRef = useRef(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedType, setSelectedType] = useState<PipeType>('main');
     const [selectedCurveType, setSelectedCurveType] = useState<CurveType>('straight');
@@ -526,89 +543,80 @@ const usePipeManager = () => {
         return JSON.parse(JSON.stringify(src)) as Pipe[];
     }, []);
 
+    // ─── recordHistory: ใช้ refs เพื่อหลีกเลี่ยง nested setState และ stale closure ──────
     const recordHistory = useCallback(
         (nextPipes: Pipe[], resetHistory?: boolean) => {
-            if (isApplyingHistoryRef.current) {
-                // Skipping history record (applying history)
-                return;
-            }
-            const snapshot = deepCopyPipes(nextPipes);
+            if (isApplyingHistoryRef.current) return;
 
-            // Update timestamp for pipe action
+            const snapshot = deepCopyPipes(nextPipes);
             lastPipeActionTime.current = Date.now();
 
             if (resetHistory) {
+                pipeHistoryRef.current = [snapshot];
+                pipeHistoryIndexRef.current = 0;
                 setPipeHistory([snapshot]);
                 setPipeHistoryIndex(0);
                 return;
             }
 
-            setPipeHistoryIndex((prevIndex) => {
-                setPipeHistory((prev) => {
-                    const upto = prev.slice(0, prevIndex + 1);
-                    const newHistory = [...upto, snapshot];
-                    return newHistory;
-                });
-
-                return prevIndex + 1;
-            });
+            // อ่าน index จาก ref เสมอ (synchronous, ไม่มี stale closure)
+            const currentIdx = pipeHistoryIndexRef.current;
+            const newHistory = [...pipeHistoryRef.current.slice(0, currentIdx + 1), snapshot];
+            pipeHistoryRef.current = newHistory;
+            pipeHistoryIndexRef.current = currentIdx + 1;
+            // อัปเดต state เพื่อ trigger re-render (ไม่ nested)
+            setPipeHistory(newHistory);
+            setPipeHistoryIndex(currentIdx + 1);
         },
         [deepCopyPipes]
     );
 
+    // ─── setPipesWithHistory: ไม่เรียก recordHistory ภายใน state updater ─────────────
     const setPipesWithHistory = useCallback(
         (
             updater: Pipe[] | ((prev: Pipe[]) => Pipe[]),
             options?: { silent?: boolean; resetHistory?: boolean }
         ) => {
-            if (typeof updater === 'function') {
-                setPipes((prev) => {
-                    const next = (updater as (p: Pipe[]) => Pipe[])(prev);
-                    if (!options?.silent) recordHistory(next, options?.resetHistory);
-                    return next;
-                });
-            } else {
-                const next = updater as Pipe[];
-                setPipes(next);
-                if (!options?.silent) recordHistory(next, options?.resetHistory);
-            }
+            // คำนวณ next โดยใช้ pipesRef.current (synchronous) แทนการ pass functional updater
+            const next = typeof updater === 'function'
+                ? (updater as (p: Pipe[]) => Pipe[])(pipesRef.current)
+                : updater;
+            pipesRef.current = next;
+            setPipes(next);
+            if (!options?.silent) recordHistory(next, options?.resetHistory);
         },
         [recordHistory]
     );
 
+    // ─── addPipe / updatePipe / removePipe: ไม่เรียก recordHistory ใน setState updater ─
     const addPipe = useCallback(
         (pipe: Pipe) => {
-            setPipes((prev) => {
-                const newPipes = [...prev, pipe];
-
-                // record history outside of state functional updater for clarity
-                recordHistory(newPipes);
-                return newPipes;
-            });
+            const newPipes = [...pipesRef.current, pipe];
+            pipesRef.current = newPipes;
+            setPipes(newPipes);
+            recordHistory(newPipes);
         },
         [recordHistory]
     );
 
     const updatePipe = useCallback(
         (pipeId: string, updates: Partial<Pipe>) => {
-            setPipes((prev) => {
-                const next = prev.map((pipe) =>
-                    pipe.id === pipeId ? { ...pipe, ...updates } : pipe
-                );
-                recordHistory(next);
-                return next;
-            });
+            const next = pipesRef.current.map((p) =>
+                p.id === pipeId ? { ...p, ...updates } : p
+            );
+            pipesRef.current = next;
+            setPipes(next);
+            recordHistory(next);
         },
         [recordHistory]
     );
 
     const removePipe = useCallback(
         (pipeId: string) => {
-            setPipes((prev) => {
-                const next = prev.filter((pipe) => pipe.id !== pipeId);
-                recordHistory(next);
-                return next;
-            });
+            const next = pipesRef.current.filter((p) => p.id !== pipeId);
+            pipesRef.current = next;
+            setPipes(next);
+            recordHistory(next);
         },
         [recordHistory]
     );
@@ -910,31 +918,40 @@ const usePipeManager = () => {
         lastPipeActionTime, // Export timestamp ref
         // history API
         undo: () => {
-            if (pipeHistoryIndex > 0) {
-                const newIndex = pipeHistoryIndex - 1;
+            // ใช้ ref เพื่อ index ล่าสุดเสมอ (ไม่มี stale closure)
+            const currentIdx = pipeHistoryIndexRef.current;
+            if (currentIdx > 0) {
+                const newIndex = currentIdx - 1;
+                pipeHistoryIndexRef.current = newIndex;
                 isApplyingHistoryRef.current = true;
-                setPipes(deepCopyPipes(pipeHistory[newIndex]));
+                const snapshot = deepCopyPipes(pipeHistoryRef.current[newIndex]);
+                pipesRef.current = snapshot;
+                setPipes(snapshot);
                 setPipeHistoryIndex(newIndex);
-                isApplyingHistoryRef.current = false;
-            } else {
-                // Cannot undo: already at beginning of history
+                // reset flag หลัง React process state updates (ไม่ reset ทันที)
+                setTimeout(() => { isApplyingHistoryRef.current = false; }, 0);
             }
         },
         redo: () => {
-            if (pipeHistoryIndex < pipeHistory.length - 1) {
-                const newIndex = pipeHistoryIndex + 1;
+            const currentIdx = pipeHistoryIndexRef.current;
+            if (currentIdx < pipeHistoryRef.current.length - 1) {
+                const newIndex = currentIdx + 1;
+                pipeHistoryIndexRef.current = newIndex;
                 isApplyingHistoryRef.current = true;
-                setPipes(deepCopyPipes(pipeHistory[newIndex]));
+                const snapshot = deepCopyPipes(pipeHistoryRef.current[newIndex]);
+                pipesRef.current = snapshot;
+                setPipes(snapshot);
                 setPipeHistoryIndex(newIndex);
-                isApplyingHistoryRef.current = false;
-            } else {
-                // Cannot redo: already at end of history
+                setTimeout(() => { isApplyingHistoryRef.current = false; }, 0);
             }
         },
         pipeHistoryIndex,
         pipeHistoryLength: pipeHistory.length,
         resetHistory: (initial?: Pipe[]) => {
             const base = deepCopyPipes(initial || []);
+            pipeHistoryRef.current = [base];
+            pipeHistoryIndexRef.current = 0;
+            pipesRef.current = base;
             setPipeHistory([base]);
             setPipeHistoryIndex(0);
         },
@@ -961,9 +978,20 @@ const useSnapSystem = () => {
             pipes: Pipe[],
             irrigationPositions: IrrigationPositions,
             pumpsParam: Pump[] = [],
-            options?: { lateralMode?: LateralMode }
+            options?: {
+                lateralMode?: LateralMode;
+                allowedZoneId?: string | null;
+                /** เมื่อมีค่า จะสแนปปั๊ม/จุดให้น้ำเฉพาะที่อยู่ในโซนที่อนุญาตเท่านั้น (ห้ามเชื่อมข้ามโซน) */
+                isPointInAllowedZone?: (coord: Coordinate) => boolean;
+            }
         ): Coordinate | null => {
             if (!isEnabled) return null;
+
+            const allowedZoneId = options?.allowedZoneId;
+            const isPointInAllowedZone = options?.isPointInAllowedZone;
+            // ห้ามเชื่อมข้ามโซน: สแนปได้เฉพาะท่อที่โซนตรงกัน (หรือทั้งคู่นอกโซน)
+            const sameZone = (p: Pipe) =>
+                isSameZoneId(allowedZoneId, (p as Pipe & { zoneId?: string }).zoneId);
 
             let closestPoint: Coordinate | null = null;
             // For main and submain pipes, clamp snap distance to 1-5 meters
@@ -975,9 +1003,14 @@ const useSnapSystem = () => {
 
             // For main pipes, snap to submain pipes and pumps
             if (pipeType === 'main') {
-                // 1) Snap to pumps
+                // 1) Snap to pumps (เฉพาะปั๊มในโซนเดียวกัน — ถ้ามีโซนต้องส่ง isPointInAllowedZone)
                 pumpsParam.forEach((pump) => {
                     const pumpCoord = { lat: pump.lat, lng: pump.lng } as Coordinate;
+                    if (isPointInAllowedZone) {
+                        if (!isPointInAllowedZone(pumpCoord)) return;
+                    } else if (allowedZoneId != null) {
+                        return;
+                    }
                     const dist = calculateDistanceBetweenPoints(point, pumpCoord);
                     if (dist < minDistance) {
                         minDistance = dist;
@@ -985,18 +1018,22 @@ const useSnapSystem = () => {
                     }
                 });
 
-                // 2) Snap to submain and main pipes
-                const targetPipes = pipes.filter((p) => p.type === 'submain' || p.type === 'main');
+                // 2) Snap to submain and main pipes (same zone only when allowedZoneId set)
+                const targetPipes = pipes.filter(
+                    (p) => (p.type === 'submain' || p.type === 'main') && sameZone(p)
+                );
                 for (const pipe of targetPipes) {
                     if (!pipe.coordinates || pipe.coordinates.length < 2) continue;
-                    [pipe.coordinates[0], pipe.coordinates[pipe.coordinates.length - 1]].forEach(
-                        (coord) => {
-                            const dist = calculateDistanceBetweenPoints(point, coord);
-                            if (dist < minDistance) {
-                                minDistance = dist;
-                                closestPoint = coord;
-                            }
+                    const accept = (candidate: Coordinate) => {
+                        if (isPointInAllowedZone && !isPointInAllowedZone(candidate)) return;
+                        const dist = calculateDistanceBetweenPoints(point, candidate);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            closestPoint = candidate;
                         }
+                    };
+                    [pipe.coordinates[0], pipe.coordinates[pipe.coordinates.length - 1]].forEach(
+                        (coord) => accept(coord)
                     );
                     for (let i = 0; i < pipe.coordinates.length - 1; i++) {
                         const a = pipe.coordinates[i];
@@ -1006,10 +1043,7 @@ const useSnapSystem = () => {
                             a,
                             b
                         );
-                        if (segDist < minDistance) {
-                            minDistance = segDist;
-                            closestPoint = segSnap;
-                        }
+                        if (segDist < minDistance) accept(segSnap);
                     }
                 }
                 return closestPoint;
@@ -1024,6 +1058,9 @@ const useSnapSystem = () => {
                     : [];
 
             for (const irrigationPoint of allIrrigationPoints) {
+                if (isPointInAllowedZone) {
+                    if (!isPointInAllowedZone(irrigationPoint)) continue;
+                } else if (allowedZoneId != null) continue;
                 const dist = calculateDistanceBetweenPoints(point, irrigationPoint);
                 if (dist < minDistance) {
                     minDistance = dist;
@@ -1031,28 +1068,30 @@ const useSnapSystem = () => {
                 }
             }
 
-            // Allow submain and lateral to snap to both main and submain
+            // Allow submain and lateral to snap to both main and submain (same zone only when allowedZoneId set)
             const targetPipeTypes =
                 pipeType === 'submain'
                     ? ['main']
                     : pipeType === 'lateral'
                       ? ['main', 'submain']
                       : [];
-            const targetPipes = pipes.filter((p) => targetPipeTypes.includes(p.type));
+            const targetPipes = pipes.filter(
+                (p) => targetPipeTypes.includes(p.type) && sameZone(p)
+            );
 
             for (const pipe of targetPipes) {
                 if (!pipe.coordinates || pipe.coordinates.length < 2) continue;
-
-                [pipe.coordinates[0], pipe.coordinates[pipe.coordinates.length - 1]].forEach(
-                    (coord) => {
-                        const dist = calculateDistanceBetweenPoints(point, coord);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            closestPoint = coord;
-                        }
+                const accept = (candidate: Coordinate) => {
+                    if (isPointInAllowedZone && !isPointInAllowedZone(candidate)) return;
+                    const dist = calculateDistanceBetweenPoints(point, candidate);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestPoint = candidate;
                     }
+                };
+                [pipe.coordinates[0], pipe.coordinates[pipe.coordinates.length - 1]].forEach(
+                    (coord) => accept(coord)
                 );
-
                 for (let i = 0; i < pipe.coordinates.length - 1; i++) {
                     const a = pipe.coordinates[i];
                     const b = pipe.coordinates[i + 1];
@@ -1061,10 +1100,7 @@ const useSnapSystem = () => {
                         a,
                         b
                     );
-                    if (segDist < minDistance) {
-                        minDistance = segDist;
-                        closestPoint = segSnap;
-                    }
+                    if (segDist < minDistance) accept(segSnap);
                 }
             }
 
@@ -1897,7 +1933,12 @@ const useMapManager = () => {
 
     // ปรับปรุง drawPipes ให้มีประสิทธิภาพ
     const drawPipes = useCallback(
-        (pipes: Pipe[], editingPipeId: string | null, onPipeClick: (pipeId: string) => void) => {
+        (
+            pipes: Pipe[],
+            editingPipeId: string | null,
+            onPipeClick: (pipeId: string) => void,
+            isDeleteMode = false
+        ) => {
             if (!mapRef.current) return;
 
             const currentPipeMap = overlaysRef.current.pipes;
@@ -1929,26 +1970,36 @@ const useMapManager = () => {
             pipes.forEach((pipe) => {
                 const isEditing = pipe.id === editingPipeId;
                 const config = getPipeConfig(pipe.type);
+
+                // delete mode: ขยาย strokeWeight เพื่อให้คลิกง่าย + opacity เต็ม
+                const effectiveWeight = isDeleteMode
+                    ? config.weight + 8
+                    : isEditing
+                      ? config.weight + 2
+                      : config.weight;
+                const effectiveOpacity = isDeleteMode ? 1 : isEditing ? 1 : config.opacity;
+                const effectiveZIndex = isDeleteMode ? 3000 : isEditing ? 3500 : 2000;
+
                 const existingPolyline = currentPipeMap.get(pipe.id);
 
                 if (existingPolyline) {
                     // อัปเดต pipe ที่มีอยู่
                     existingPolyline.setPath(pipe.coordinates);
                     existingPolyline.setOptions({
-                        strokeWeight: isEditing ? config.weight + 2 : config.weight,
-                        strokeOpacity: isEditing ? 1 : config.opacity,
-                        zIndex: isEditing ? 3500 : 2000, // Above zones (1500)
+                        strokeWeight: effectiveWeight,
+                        strokeOpacity: effectiveOpacity,
+                        zIndex: effectiveZIndex,
                     });
                 } else {
                     // สร้าง pipe ใหม่
                     const polyline = new google.maps.Polyline({
                         path: pipe.coordinates,
                         strokeColor: config.color,
-                        strokeWeight: isEditing ? config.weight + 2 : config.weight,
-                        strokeOpacity: isEditing ? 1 : config.opacity,
+                        strokeWeight: effectiveWeight,
+                        strokeOpacity: effectiveOpacity,
                         map: mapRef.current,
                         clickable: true,
-                        zIndex: isEditing ? 3500 : 2000, // Above zones (1500)
+                        zIndex: effectiveZIndex,
                     }) as ExtendedPolyline;
 
                     polyline.pipeId = pipe.id;
@@ -1999,7 +2050,7 @@ const useMapManager = () => {
             }
 
             // สร้าง markers ใหม่แบบ batch เพื่อลดการกระพริบ
-            const newMarkers: google.maps.Marker[] = [];
+            const newMarkers: Array<{ marker: google.maps.Marker; id: string }> = [];
 
             connectionPoints.forEach((connectionPoint) => {
                 try {
@@ -2059,17 +2110,18 @@ const useMapManager = () => {
                         draggable: false,
                     });
 
-                    newMarkers.push(marker);
+                    // ใช้ connectionPoint.id เป็น key เพื่อให้ทุก marker มี key ที่ไม่ซ้ำกัน
+                    newMarkers.push({ marker, id: connectionPoint.id });
                 } catch {
                     // Error creating marker for connection point
                 }
             });
 
             // แสดง markers ทั้งหมดพร้อมกันเพื่อลดการกระพริบ
-            newMarkers.forEach((marker) => {
+            newMarkers.forEach(({ marker, id }) => {
                 marker.setMap(currentMap);
                 if (overlays.connectionPoints) {
-                    overlays.connectionPoints.set(marker.getTitle() || 'unknown', marker);
+                    overlays.connectionPoints.set(id, marker);
                 }
             });
         },
@@ -2092,7 +2144,8 @@ const useMapManager = () => {
                     startPoint: Coordinate | null;
                     startMarkerId: string | null;
                 }>
-            >
+            >,
+            getZoneIdAtCoordinateFn: (coord: Coordinate) => string | null
         ) => {
             // ทำงานเฉพาะเมื่อโหมดเชื่อมท่อเปิดอยู่
             if (!lateralConnectionMode.isActive) {
@@ -2109,11 +2162,13 @@ const useMapManager = () => {
             } else {
                 // สร้างท่อย่อยเชื่อมระหว่างจุดเริ่มต้นและจุดปลาย
                 if (lateralConnectionMode.startMarkerId !== markerId) {
+                    const endZoneId = getZoneIdAtCoordinateFn(position);
                     const newLateralPipe: Pipe = {
                         id: `lateral-${Date.now()}`,
                         type: 'lateral',
                         coordinates: [lateralConnectionMode.startPoint, position],
                         curveType: 'straight',
+                        zoneId: endZoneId ?? undefined,
                     };
 
                     // คำนวณความยาวท่อย่อย
@@ -2157,7 +2212,8 @@ const useMapManager = () => {
                     startPoint: Coordinate | null;
                     startMarkerId: string | null;
                 }>
-            >
+            >,
+            getZoneIdAtCoordinateFn: (coord: Coordinate) => string | null
         ) => {
             if (!mapRef.current) return;
 
@@ -2183,7 +2239,8 @@ const useMapManager = () => {
                                 },
                                 pipeManager,
                                 lateralConnectionMode,
-                                setLateralConnectionMode
+                                setLateralConnectionMode,
+                                getZoneIdAtCoordinateFn
                             );
                         }
                     });
@@ -2764,7 +2821,8 @@ const useMapManager = () => {
                     startPoint: Coordinate | null;
                     startMarkerId: string | null;
                 }>
-            >
+            >,
+            getZoneIdAtCoordinateFn: (coord: Coordinate) => string | null
         ) => {
             if (!mapRef.current) return;
 
@@ -2786,7 +2844,8 @@ const useMapManager = () => {
                 addIrrigationClickListeners(
                     pipeManager,
                     lateralConnectionMode,
-                    setLateralConnectionMode
+                    setLateralConnectionMode,
+                    getZoneIdAtCoordinateFn
                 );
             }
         },
@@ -2830,6 +2889,23 @@ const useMapManager = () => {
         }>;
     }, []);
 
+    // ล้าง connection points และ connection lines ออกจากแผนที่ทันที
+    const clearConnectionOverlays = useCallback(() => {
+        const overlays = overlaysRef.current;
+        if (overlays.connectionPoints) {
+            overlays.connectionPoints.forEach((marker) => {
+                if (marker && marker.setMap) marker.setMap(null);
+            });
+            overlays.connectionPoints.clear();
+        }
+        if (overlays.connectionLines) {
+            overlays.connectionLines.forEach((line) => {
+                if (line && line.setMap) line.setMap(null);
+            });
+            overlays.connectionLines.clear();
+        }
+    }, []);
+
     return useMemo(
         () => ({
             mapRef,
@@ -2845,6 +2921,7 @@ const useMapManager = () => {
             drawConnectionPoints,
             drawConnectionLines,
             removeConnectionLinesForPipe,
+            clearConnectionOverlays,
             fitBounds,
             updateMapVisuals,
         }),
@@ -2862,6 +2939,7 @@ const useMapManager = () => {
             drawConnectionPoints,
             drawConnectionLines,
             removeConnectionLinesForPipe,
+            clearConnectionOverlays,
             fitBounds,
             updateMapVisuals,
         ]
@@ -2981,13 +3059,28 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     // Deprecated legacy maps for prior logic removed
 
     const [pumps, setPumps] = useState<Pump[]>([]);
+    const pumpsRef = useRef<Pump[]>([]); // sync ref for pumps (ไม่มี stale closure)
     // History stacks for undo/redo of pump operations
     const [pumpHistory, setPumpHistory] = useState<Pump[][]>([[]]);
     const [pumpHistoryIndex, setPumpHistoryIndex] = useState(0);
     const isApplyingPumpHistoryRef = useRef(false);
+    // ref สำหรับ pump history (synchronous, ไม่มี stale closure)
+    const pumpHistoryRef = useRef<Pump[][]>([[]]);
+    const pumpHistoryIndexRef = useRef(0);
     const [isPlacingPump, setIsPlacingPump] = useState(false);
     const isPlacingPumpRef = useRef(false);
     const [mapZoom, setMapZoom] = useState<number>(18); // Track map zoom level
+
+    // state สำหรับ modal สร้างท่อย่อยอัตโนมัติ (ค่าเริ่มต้น: ทุกโซน)
+    const ALL_ZONES_ID = '__all__';
+    const [showAutoLateralModal, setShowAutoLateralModal] = useState(false);
+    const [autoLateralZoneId, setAutoLateralZoneId] = useState<string | null>(ALL_ZONES_ID);
+    const [autoLateralPattern, setAutoLateralPattern] = useState<'extending' | 'crossing'>('extending');
+
+    // ─── Delete Mode: เลือกท่อเพื่อลบ ──────────────────────────────────────────
+    const [isDeleteMode, setIsDeleteMode] = useState(false);
+    // ref ใช้อ่านใน closure ของ event listener โดยไม่ต้อง re-create listener
+    const isDeleteModeRef = useRef(false);
 
     // Track last pump action timestamp to determine which history to undo/redo
     const lastPumpActionTime = useRef<number>(0);
@@ -3063,8 +3156,12 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                     }) as Pump
                             );
                         if (restored.length > 0) {
+                            const initHistory = [[], restored.map((pump) => ({ ...pump }))] as Pump[][];
+                            pumpsRef.current = restored;
+                            pumpHistoryRef.current = initHistory;
+                            pumpHistoryIndexRef.current = 1;
                             setPumps(restored);
-                            setPumpHistory([[], restored.map((pump) => ({ ...pump }))]);
+                            setPumpHistory(initHistory);
                             setPumpHistoryIndex(1);
                         }
                     }
@@ -3108,6 +3205,28 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         }
     }, [pipeManager.pipes, updateFieldData]);
 
+    /** โซนที่จุดอยู่ (ใช้กำหนด ownership ท่อและห้ามเชื่อมข้ามโซน) */
+    const getZoneIdAtCoordinate = useCallback(
+        (coord: Coordinate): string | null => {
+            const zone = fieldData.zones?.find((z) =>
+                z.coordinates && z.coordinates.length >= 3 && isPointInOrOnPolygon(coord, z.coordinates)
+            );
+            return zone != null ? String(zone.id) : null;
+        },
+        [fieldData.zones]
+    );
+
+    /** ท่อทุกเส้นมี zoneId (ท่อเก่าที่ไม่มีจะใช้จุดปลายคำนวณ) — ใช้ตอนเช็คโซนเท่านั้น */
+    const pipesWithResolvedZoneId = useMemo(() => {
+        return pipeManager.pipes.map((p) => {
+            if (p.zoneId != null && p.zoneId !== '') return p;
+            const last =
+                p.coordinates?.length ? p.coordinates[p.coordinates.length - 1] : undefined;
+            const z = last ? getZoneIdAtCoordinate(last) : null;
+            return { ...p, zoneId: z ?? undefined };
+        });
+    }, [pipeManager.pipes, getZoneIdAtCoordinate]);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         // สร้าง hash ของ fieldData ปัจจุบัน
@@ -3127,7 +3246,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     fieldData,
                     pipeManager,
                     lateralConnectionMode,
-                    setLateralConnectionMode
+                    setLateralConnectionMode,
+                    getZoneIdAtCoordinate
                 );
             }, 100); // 100ms debounce สำหรับ map visuals
         }
@@ -3145,6 +3265,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         pipeManager,
         lateralConnectionMode,
         setLateralConnectionMode,
+        getZoneIdAtCoordinate,
     ]); // Added lateralConnectionMode to dependencies
 
     // useEffect แยกสำหรับการโหลดข้อมูลทันทีเมื่อเข้าสู่หน้า
@@ -3156,7 +3277,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 fieldData,
                 pipeManager,
                 lateralConnectionMode,
-                setLateralConnectionMode
+                setLateralConnectionMode,
+                getZoneIdAtCoordinate
             );
         }
     }, [
@@ -3166,15 +3288,29 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         pipeManager,
         lateralConnectionMode,
         setLateralConnectionMode,
+        getZoneIdAtCoordinate,
     ]); // Added lateralConnectionMode to dependencies
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (!mapManager.mapRef.current) return;
-        mapManager.drawPipes(pipeManager.pipes, pipeManager.editingPipeId, (pipeId) =>
-            pipeManager.setEditingPipeId(pipeId)
+        mapManager.drawPipes(
+            pipeManager.pipes,
+            pipeManager.editingPipeId,
+            (pipeId) => {
+                // อ่าน isDeleteModeRef.current ณ เวลา click (ไม่ใช่ตอน capture)
+                if (isDeleteModeRef.current) {
+                    mapManager.clearConnectionOverlays();
+                    mapManager.removeConnectionLinesForPipe(pipeId);
+                    pipeManager.removePipe(pipeId);
+                    pipeManager.setEditingPipeId(null);
+                } else {
+                    pipeManager.setEditingPipeId(pipeId);
+                }
+            },
+            isDeleteMode
         );
-    }, [pipeManager.pipes, pipeManager.editingPipeId, mapManager, pipeManager]); // Removed mapManager and pipeManager.setEditingPipeId from dependencies
+    }, [pipeManager.pipes, pipeManager.editingPipeId, isDeleteMode, mapManager, pipeManager]);
 
     // Control point drag handler - moved outside useEffect
     const handleControlPointDrag = useCallback(
@@ -3432,6 +3568,40 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         // No DOM dblclick handler; click timeout logic only
     }, [pipeManager, mapManager, snapSystem]);
 
+    // ─── ลบท่อที่ระบุ (ใช้ได้ทั้งจากปุ่มและ delete mode) ─────────────────────
+    const deleteSpecificPipe = useCallback(
+        (pipeId: string) => {
+            mapManager.clearConnectionOverlays();
+            mapManager.removeConnectionLinesForPipe(pipeId);
+            pipeManager.removePipe(pipeId);
+            pipeManager.setEditingPipeId(null);
+        },
+        [mapManager, pipeManager]
+    );
+
+    // Toggle delete mode: เปิด/ปิดโหมดลบท่อ
+    const toggleDeleteMode = useCallback(() => {
+        setIsDeleteMode((prev) => {
+            const next = !prev;
+            isDeleteModeRef.current = next;
+            if (next) {
+                // เปิด delete mode: ยกเลิกการวาดและ deselect pipe
+                if (pipeManager.isDrawing) stopDrawing();
+                pipeManager.setEditingPipeId(null);
+                // เปลี่ยน cursor เป็น crosshair
+                if (mapManager.mapRef.current) {
+                    mapManager.mapRef.current.setOptions({ draggableCursor: 'crosshair' });
+                }
+            } else {
+                // ปิด delete mode: คืน cursor เดิม
+                if (mapManager.mapRef.current) {
+                    mapManager.mapRef.current.setOptions({ draggableCursor: null });
+                }
+            }
+            return next;
+        });
+    }, [pipeManager, stopDrawing, mapManager]);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -3441,12 +3611,17 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     stopDrawing();
                     return;
                 }
-                // If a pipe is selected, ESC deletes that pipe
+                // If delete mode is active, ESC turns it off
+                if (isDeleteModeRef.current) {
+                    setIsDeleteMode(false);
+                    isDeleteModeRef.current = false;
+                    if (mapManager.mapRef.current) {
+                        mapManager.mapRef.current.setOptions({ draggableCursor: null });
+                    }
+                    return;
+                }
+                // If a pipe is selected, ESC deselects it (no longer auto-deletes)
                 if (pipeManager.editingPipeId) {
-                    const toDelete = pipeManager.editingPipeId;
-                    // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
-                    mapManager.removeConnectionLinesForPipe(toDelete);
-                    pipeManager.removePipe(toDelete);
                     pipeManager.setEditingPipeId(null);
                 }
             }
@@ -3501,25 +3676,37 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             const snappedCoordinates = [...coordinates];
 
             if (coordinates.length > 0) {
+                const firstZoneId = getZoneIdAtCoordinate(coordinates[0]) ?? null;
                 const firstSnap = snapSystem.findSnapPoint(
                     coordinates[0],
                     pipeType,
-                    pipeManager.pipes,
+                    pipesWithResolvedZoneId,
                     fieldData.irrigationPositions,
                     pumps,
-                    { lateralMode: pipeManager.lateralMode }
+                    {
+                        lateralMode: pipeManager.lateralMode,
+                        allowedZoneId: firstZoneId,
+                        isPointInAllowedZone: (c) =>
+                            isSameZoneId(getZoneIdAtCoordinate(c), firstZoneId),
+                    }
                 );
                 if (firstSnap) snappedCoordinates[0] = firstSnap;
             }
 
             if (coordinates.length > 1) {
+                const lastZoneId = getZoneIdAtCoordinate(coordinates[coordinates.length - 1]) ?? null;
                 const lastSnap = snapSystem.findSnapPoint(
                     coordinates[coordinates.length - 1],
                     pipeType,
-                    pipeManager.pipes,
+                    pipesWithResolvedZoneId,
                     fieldData.irrigationPositions,
                     pumps,
-                    { lateralMode: pipeManager.lateralMode }
+                    {
+                        lateralMode: pipeManager.lateralMode,
+                        allowedZoneId: lastZoneId,
+                        isPointInAllowedZone: (c) =>
+                            isSameZoneId(getZoneIdAtCoordinate(c), lastZoneId),
+                    }
                 );
                 if (lastSnap) snappedCoordinates[coordinates.length - 1] = lastSnap;
             }
@@ -3528,10 +3715,11 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         },
         [
             snapSystem,
-            pipeManager.pipes,
+            pipesWithResolvedZoneId,
             pipeManager.lateralMode,
             fieldData.irrigationPositions,
             pumps,
+            getZoneIdAtCoordinate,
         ]
     );
 
@@ -3564,7 +3752,11 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // generateGuidedLateralsFromTemplate will be defined later (hoisted via function declaration)
     const generateGuidedLateralsFromTemplateRef = useRef<
-        ((template: Pipe, selectedPattern?: 'extending' | 'crossing') => Pipe[]) | null
+        ((
+            template: Pipe,
+            selectedPattern?: 'extending' | 'crossing',
+            zoneOverride?: (typeof fieldData.zones)[number]
+        ) => Pipe[]) | null
     >(null);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3583,6 +3775,12 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
             if (pipeManager.isDrawing) {
                 stopDrawing();
+            }
+
+            // ปิด delete mode เมื่อเริ่มวาดท่อ
+            if (isDeleteModeRef.current) {
+                setIsDeleteMode(false);
+                isDeleteModeRef.current = false;
             }
 
             pipeManager.setEditingPipeId(null);
@@ -3616,7 +3814,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     let controlPoints: Coordinate[] = [];
                     const tension = 0.5;
                     if (type === 'lateral') {
-                        outputCoordinates = [...coords];
+                        outputCoordinates = applySnapToCoordinates(coords, 'lateral');
                         // Auto-center between rows after finalize for better accuracy and convenience
                         if (
                             pipeManager.lateralMode === 'betweenRows' &&
@@ -3771,18 +3969,20 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                         ];
                         const targetTypes: PipeType[] = ['submain', 'main'];
                         endpoints.forEach(({ idx, pt }) => {
+                            const endpointZoneId = getZoneIdAtCoordinate(pt);
                             let best: {
                                 pipe: Pipe | null;
                                 segIndex: number;
                                 point: Coordinate | null;
                                 dist: number;
                             } = { pipe: null, segIndex: -1, point: null, dist: Infinity };
-                            pipeManager.pipes
+                            pipesWithResolvedZoneId
                                 .filter(
                                     (p) =>
                                         targetTypes.includes(p.type) &&
                                         p.coordinates &&
-                                        p.coordinates.length >= 2
+                                        p.coordinates.length >= 2 &&
+                                        isSameZoneId(endpointZoneId, p.zoneId)
                                 )
                                 .forEach((p) => {
                                     const coords = p.coordinates as Coordinate[];
@@ -3796,7 +3996,18 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                             best = { pipe: p, segIndex: i, point, dist: distance };
                                     }
                                 });
-                            if (best.pipe && best.point && best.dist <= joinThreshold) {
+                            const snapPointZone = best.point
+                                ? getZoneIdAtCoordinate(best.point) ?? null
+                                : null;
+                            const snapPointInOtherZone =
+                                snapPointZone != null &&
+                                !isSameZoneId(snapPointZone, endpointZoneId);
+                            if (
+                                best.pipe &&
+                                best.point &&
+                                best.dist <= joinThreshold &&
+                                !snapPointInOtherZone
+                            ) {
                                 outputCoordinates = outputCoordinates.map((c, k) =>
                                     k === idx ? (best.point as Coordinate) : c
                                 );
@@ -3817,6 +4028,43 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                             }
                         });
                     }
+                    // ป้องกันเชื่อมข้ามโซน: ถ้าปลายท่อไปทับท่อคนละโซน ให้ย้อนกลับเป็นจุดเดิม
+                    const joinThresholdSafe = Math.max(
+                        Math.min(Math.max(snapSystem.distance ?? 3, 1), 5),
+                        1
+                    );
+                    const distanceFromPointToPipe = (pt: Coordinate, pipe: Pipe): number => {
+                        if (!pipe.coordinates || pipe.coordinates.length < 2) return Infinity;
+                        let d = Infinity;
+                        for (let i = 0; i < pipe.coordinates.length - 1; i++) {
+                            const { distance } = getClosestPointOnSegment(
+                                pt,
+                                pipe.coordinates[i],
+                                pipe.coordinates[i + 1]
+                            );
+                            if (distance < d) d = distance;
+                        }
+                        return d;
+                    };
+                    const finalOutput = [...outputCoordinates];
+                    const newPipeZoneId = getZoneIdAtCoordinate(
+                        finalOutput[finalOutput.length - 1]
+                    ) ?? null;
+                    for (const idx of [0, finalOutput.length - 1]) {
+                        const pt = finalOutput[idx];
+                        for (const pipe of pipesWithResolvedZoneId) {
+                            if (!pipe.coordinates || pipe.coordinates.length < 2) continue;
+                            if (isSameZoneId(pipe.zoneId, newPipeZoneId)) continue;
+                            if (distanceFromPointToPipe(pt, pipe) < joinThresholdSafe) {
+                                finalOutput[idx] = coords[idx];
+                                break;
+                            }
+                        }
+                    }
+                    outputCoordinates = finalOutput;
+                    const endZoneId = getZoneIdAtCoordinate(
+                        outputCoordinates[outputCoordinates.length - 1]
+                    );
                     const newPipe: Pipe = {
                         id: `${type}-${Date.now()}`,
                         type,
@@ -3825,6 +4073,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                         controlPoints: controlPoints.length > 0 ? controlPoints : undefined,
                         tension: curveType === 'spline' ? 0.5 : undefined,
                         length: calculateDistance(outputCoordinates),
+                        zoneId: endZoneId ?? undefined,
                     };
                     pipeManager.addPipe(newPipe);
                     if (type === 'submain') {
@@ -3852,6 +4101,14 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                     pipe.coordinates.length < 2
                                 )
                                     continue;
+                                const mainZone =
+                                    pipe.zoneId ??
+                                    (pipe.coordinates?.length
+                                        ? getZoneIdAtCoordinate(
+                                              pipe.coordinates[pipe.coordinates.length - 1]
+                                          )
+                                        : null);
+                                if (!isSameZoneId(sub.zoneId, mainZone)) continue;
                                 const endpoints: Array<{ idx: number; pt: Coordinate }> = [
                                     { idx: 0, pt: pipe.coordinates[0] },
                                     {
@@ -3861,6 +4118,10 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                 ];
                                 let changedMain = false;
                                 for (const { idx, pt } of endpoints) {
+                                    // ห้ามเชื่อมข้ามโซน: ย้าย endpoint ไปชน submain ได้เฉพาะเมื่อจุดนั้นอยู่แน่ชัดในโซนเดียวกับ submain (ถ้าโซนของจุดเป็น null เช่น อยู่ที่ปั๊มนอก polygon ไม่ให้เชื่อม)
+                                    const ptZone = getZoneIdAtCoordinate(pt) ?? null;
+                                    if (ptZone == null || !isSameZoneId(ptZone, sub.zoneId))
+                                        continue;
                                     let best = {
                                         segIndex: -1,
                                         point: null as Coordinate | null,
@@ -4054,11 +4315,15 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                             ) < 0.5
                                     );
                                     if (!overlapsExisting) {
+                                        const mirrorEndZoneId = getZoneIdAtCoordinate(
+                                            mirrorCoords[mirrorCoords.length - 1]
+                                        );
                                         const oppositePipe: Pipe = {
                                             id: `lateral-mirror-${Date.now()}`,
                                             type: 'lateral',
                                             coordinates: mirrorCoords,
                                             length: calculateDistance(mirrorCoords),
+                                            zoneId: mirrorEndZoneId ?? undefined,
                                         };
                                         pipeManager.addPipe(oppositePipe);
                                         // แสดงป้ายอัตราการไหลให้เส้นฝั่งตรงข้ามด้วย
@@ -4200,13 +4465,19 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                 lat: e.latLng.lat(),
                                 lng: e.latLng.lng(),
                             } as Coordinate;
+                            const startZoneId = getZoneIdAtCoordinate(start) ?? null;
                             const snapped = snapSystem.findSnapPoint(
                                 start,
                                 type,
-                                pipeManager.pipes,
+                                pipesWithResolvedZoneId,
                                 fieldData.irrigationPositions,
                                 pumps,
-                                { lateralMode: pipeManager.lateralMode }
+                                {
+                                    lateralMode: pipeManager.lateralMode,
+                                    allowedZoneId: startZoneId,
+                                    isPointInAllowedZone: (c) =>
+                                        isSameZoneId(getZoneIdAtCoordinate(c), startZoneId),
+                                }
                             );
                             if (snapped)
                                 startLatLng = new google.maps.LatLng(snapped.lat, snapped.lng);
@@ -4216,13 +4487,19 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 } else {
                     if (type === 'lateral') {
                         const point: Coordinate = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+                        const pointZoneId = getZoneIdAtCoordinate(point) ?? null;
                         const snapped = snapSystem.findSnapPoint(
                             point,
                             type,
-                            pipeManager.pipes,
+                            pipesWithResolvedZoneId,
                             fieldData.irrigationPositions,
                             pumps,
-                            { lateralMode: pipeManager.lateralMode }
+                            {
+                                lateralMode: pipeManager.lateralMode,
+                                allowedZoneId: pointZoneId,
+                                isPointInAllowedZone: (c) =>
+                                    isSameZoneId(getZoneIdAtCoordinate(c), pointZoneId),
+                            }
                         );
                         const nextLatLng = snapped
                             ? new google.maps.LatLng(snapped.lat, snapped.lng)
@@ -4232,13 +4509,19 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                         let nextLatLng = e.latLng;
                         if (type === 'main') {
                             const point: Coordinate = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+                            const pointZoneId = getZoneIdAtCoordinate(point) ?? null;
                             const snapped = snapSystem.findSnapPoint(
                                 point,
                                 type,
-                                pipeManager.pipes,
+                                pipesWithResolvedZoneId,
                                 fieldData.irrigationPositions,
                                 pumps,
-                                { lateralMode: pipeManager.lateralMode }
+                                {
+                                    lateralMode: pipeManager.lateralMode,
+                                    allowedZoneId: pointZoneId,
+                                    isPointInAllowedZone: (c) =>
+                                        isSameZoneId(getZoneIdAtCoordinate(c), pointZoneId),
+                                }
                             );
                             if (snapped)
                                 nextLatLng = new google.maps.LatLng(snapped.lat, snapped.lng);
@@ -4332,13 +4615,19 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     let hover = e.latLng;
                     const hoverCoord: Coordinate = { lat: hover.lat(), lng: hover.lng() };
                     if (type === 'lateral' || type === 'main') {
+                        const hoverZoneId = getZoneIdAtCoordinate(hoverCoord) ?? null;
                         const snapped = snapSystem.findSnapPoint(
                             hoverCoord,
                             type,
-                            pipeManager.pipes,
+                            pipesWithResolvedZoneId,
                             fieldData.irrigationPositions,
                             pumps,
-                            { lateralMode: pipeManager.lateralMode }
+                            {
+                                lateralMode: pipeManager.lateralMode,
+                                allowedZoneId: hoverZoneId,
+                                isPointInAllowedZone: (c) =>
+                                    isSameZoneId(getZoneIdAtCoordinate(c), hoverZoneId),
+                            }
                         );
                         if (snapped) hover = new google.maps.LatLng(snapped.lat, snapped.lng);
                     }
@@ -4407,6 +4696,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             t,
             fieldData,
             getNearestPointOnPipes,
+            getZoneIdAtCoordinate,
+            pipesWithResolvedZoneId,
             pumps,
         ]
     );
@@ -4460,6 +4751,310 @@ export default function PipeGenerate(props: FieldCropPageProps) {
     useEffect(() => {
         void generateLateralPipes;
     }, [generateLateralPipes]);
+
+    // สร้างท่อย่อยอัตโนมัติตามโซนและรูปแบบที่เลือก (algorithm ใหม่ไม่พึ่ง generateGuidedLateralsFromTemplate)
+    const MIN_LATERAL_LENGTH_M = 0.3; // ความยาวขั้นต่ำของท่อย่อย (ม.) เพื่อไม่ตัดท่อสั้นในโซนเล็ก
+    const generateLateralsForZone = useCallback(
+        (zoneId: string, pattern: 'extending' | 'crossing') => {
+            // ─── 1. หา submain ที่ยาวที่สุดในโซน ───────────────────────────────────────
+            const submainInZone = pipesWithResolvedZoneId.filter(
+                (p) =>
+                    p.type === 'submain' &&
+                    p.coordinates &&
+                    p.coordinates.length >= 2 &&
+                    isSameZoneId(p.zoneId, zoneId)
+            );
+            if (submainInZone.length === 0) {
+                alert(t('Draw submain pipes first'));
+                return;
+            }
+            const calcLen = (p: (typeof submainInZone)[number]) =>
+                (p.coordinates ?? []).reduce(
+                    (s, c, i, a) => (i === 0 ? 0 : s + calculateDistanceBetweenPoints(a[i - 1], c)),
+                    0
+                );
+            const submain = submainInZone.reduce((b, p) => (calcLen(p) > calcLen(b) ? p : b));
+            const smCoords = submain.coordinates!;
+
+            // ─── 2. ตั้งระบบพิกัดท้องถิ่น (เมตร) บน midpoint ของ submain ──────────────
+            const smMid = {
+                lat: smCoords.reduce((s, c) => s + c.lat, 0) / smCoords.length,
+                lng: smCoords.reduce((s, c) => s + c.lng, 0) / smCoords.length,
+            };
+            const originLatRad = (smMid.lat * Math.PI) / 180;
+            const MPD_LAT = 110574;
+            const MPD_LNG = 111320 * Math.cos(originLatRad);
+            const toXY = (c: Coordinate) => ({
+                x: (c.lng - smMid.lng) * MPD_LNG,
+                y: (c.lat - smMid.lat) * MPD_LAT,
+            });
+            const fromXY = (p: { x: number; y: number }): Coordinate => ({
+                lat: smMid.lat + p.y / MPD_LAT,
+                lng: smMid.lng + p.x / MPD_LNG,
+            });
+
+            // ─── 3. หาทิศทาง submain (unit vector ตามแนว submain) ───────────────────────
+            const smFirst = toXY(smCoords[0]);
+            const smLast = toXY(smCoords[smCoords.length - 1]);
+            const smDx = smLast.x - smFirst.x;
+            const smDy = smLast.y - smFirst.y;
+            const smLen = Math.sqrt(smDx * smDx + smDy * smDy) || 1;
+            const uAlong = { x: smDx / smLen, y: smDy / smLen }; // unit vec ตามแนว submain
+            const uPerp = { x: -uAlong.y, y: uAlong.x }; // unit vec ตั้งฉาก submain
+
+            // ─── 4. Project submain เป็นเส้นตรงขยายออกไป (สำหรับหา foot of perpendicular) ─
+            // ใช้ closest point on INFINITE LINE ผ่าน smFirst → smLast
+            const projectOntoSubmainLine = (p: { x: number; y: number }) => {
+                const dx = p.x - smFirst.x;
+                const dy = p.y - smFirst.y;
+                const t = dx * uAlong.x + dy * uAlong.y; // เส้นไม่จำกัดปลาย
+                return {
+                    t, // ระยะตามแนว submain จาก smFirst (เมตร)
+                    perp: dx * uPerp.x + dy * uPerp.y, // ระยะตั้งฉาก submain (+ = ด้านหนึ่ง)
+                    foot: { x: smFirst.x + t * uAlong.x, y: smFirst.y + t * uAlong.y },
+                };
+            };
+
+            // ─── 5. ดึง irrigation points ─────────────────────────────────────────────
+            const targetZone = fieldData.zones.find((z) => String(z.id) === zoneId);
+            const allPts = [
+                ...fieldData.irrigationPositions.sprinklers,
+                ...fieldData.irrigationPositions.pivots,
+            ];
+            // filter ด้วย zone polygon ก่อน, fallback ใช้ทั้งหมดถ้าไม่พบ
+            let irrigPts = targetZone
+                ? allPts.filter((p) =>
+                      isPointInPolygonEnhanced([p.lat, p.lng], targetZone.coordinates)
+                  )
+                : [];
+            if (irrigPts.length < 2) irrigPts = allPts;
+            if (irrigPts.length < 2) {
+                alert(t('No irrigation points found for this zone'));
+                return;
+            }
+
+            // ─── 6. คำนวณ (t, perp) ของแต่ละ irrigation point ──────────────────────────
+            const projected = irrigPts.map((pt) => {
+                const xy = toXY(pt);
+                const { t, perp, foot } = projectOntoSubmainLine(xy);
+                return { pt, xy, t, perp, foot };
+            });
+
+            // ─── 7. จับกลุ่มเป็น "column" ตามระยะ t (ตามแนว submain) ─────────────────
+            // เรียงตาม t ก่อนเสมอ
+            const sortedByT = [...projected].sort((a, b) => a.t - b.t);
+
+            // คำนวณ gap ระหว่าง t ที่เรียงแล้ว
+            const allGaps = sortedByT.slice(1).map((p, i) => p.t - sortedByT[i].t);
+            const sortedGaps = [...allGaps].sort((a, b) => a - b);
+
+            // ─── หา splitThreshold ด้วย "Maximum Gap Jump" heuristic ─────────────────
+            // Gap ภายใน row: เล็ก (เพราะ sprinkler ใกล้กัน)
+            // Gap ระหว่าง row: ใหญ่ (เป็น row spacing จริง)
+            // หา "กระโดด" ที่ใหญ่ที่สุดในชุด sorted gaps → นั่นคือจุดแบ่ง within-row vs between-row
+            let splitThreshold = sortedGaps[sortedGaps.length - 1] ?? 1.0;
+            let maxJump = 0;
+            for (let i = 1; i < sortedGaps.length; i++) {
+                const jump = sortedGaps[i] - sortedGaps[i - 1];
+                if (jump > maxJump) {
+                    maxJump = jump;
+                    // threshold = midpoint ระหว่าง within-row และ between-row
+                    splitThreshold = (sortedGaps[i - 1] + sortedGaps[i]) / 2;
+                }
+            }
+            // safety: ต้องไม่เล็กกว่า 0.3m และไม่ใหญ่กว่า largest gap
+            splitThreshold = Math.max(0.3, splitThreshold);
+
+            type Col = { tCenter: number; pts: typeof projected };
+            const columns: Col[] = [];
+            for (const proj of sortedByT) {
+                const lastCol = columns[columns.length - 1];
+                const lastT = lastCol ? lastCol.pts[lastCol.pts.length - 1].t : -Infinity;
+                // เปรียบ gap กับ t ของ point สุดท้ายใน column (ป้องกัน chaining)
+                if (!lastCol || proj.t - lastT > splitThreshold) {
+                    columns.push({ tCenter: proj.t, pts: [proj] });
+                } else {
+                    lastCol.pts.push(proj);
+                    lastCol.tCenter = lastCol.pts.reduce((s, p) => s + p.t, 0) / lastCol.pts.length;
+                }
+            }
+
+            // ─── 8. สร้างท่อย่อยสำหรับแต่ละ column ──────────────────────────────────
+            const generated: Pipe[] = [];
+            const now = Date.now();
+
+            // helper: สร้าง lateral pipe จาก anchor point + ชุด projected points
+            // useActualPositions=true  → ใช้ .xy จริงของ sprinkler (inRow mode)
+            // useActualPositions=false → ใช้ geometric projection ผ่าน uPerp (betweenRows mode)
+            const pushLateral = (
+                anchorFoot: { x: number; y: number },
+                anchorCoord: Coordinate,
+                sortedPts: typeof projected,
+                useActualPositions = false
+            ) => {
+                if (sortedPts.length < 1) return;
+                const minPerp = sortedPts[0];
+                const maxPerp = sortedPts[sortedPts.length - 1];
+
+                if (pattern === 'crossing') {
+                    // inRow: ใช้พิกัดจริงของ sprinkler → pipe ตรงแถวเสมอ
+                    // betweenRows: ใช้ geometric midpoint → pipe กลางระหว่าง 2 แถว
+                    const startCoord = useActualPositions
+                        ? fromXY(minPerp.xy)
+                        : fromXY({
+                              x: anchorFoot.x + minPerp.perp * uPerp.x,
+                              y: anchorFoot.y + minPerp.perp * uPerp.y,
+                          });
+                    const endCoord = useActualPositions
+                        ? fromXY(maxPerp.xy)
+                        : fromXY({
+                              x: anchorFoot.x + maxPerp.perp * uPerp.x,
+                              y: anchorFoot.y + maxPerp.perp * uPerp.y,
+                          });
+                    const lengthM = calculateDistance([startCoord, endCoord]);
+                    if (lengthM >= MIN_LATERAL_LENGTH_M) {
+                        generated.push({
+                            id: `auto-lat-cross-${now}-${generated.length}`,
+                            type: 'lateral',
+                            coordinates: [startCoord, endCoord],
+                            length: lengthM,
+                            zoneId: zoneId,
+                        });
+                    }
+                } else {
+                    // extending: anchor อยู่บน submain, ปลายท่อชี้ออกไปตาม row จริง
+                    const negPts = sortedPts.filter((p) => p.perp < -0.5);
+                    const posPts = sortedPts.filter((p) => p.perp > 0.5);
+
+                    // หาก useActualPositions ให้คำนวณจุด anchor จาก intersection จริงของ row กับ submain
+                    let effectiveAnchorCoord = anchorCoord;
+                    if (useActualPositions && sortedPts.length >= 2) {
+                        // row direction: จาก minPerp.xy → maxPerp.xy
+                        const rowDx = maxPerp.xy.x - minPerp.xy.x;
+                        const rowDy = maxPerp.xy.y - minPerp.xy.y;
+                        const rowLen = Math.sqrt(rowDx * rowDx + rowDy * rowDy) || 1;
+                        const uRow = { x: rowDx / rowLen, y: rowDy / rowLen };
+                        // 2D line intersection: row line vs submain line
+                        // row: minPerp.xy + s * uRow
+                        // submain: smFirst + u * uAlong
+                        const cross = uRow.x * uAlong.y - uRow.y * uAlong.x;
+                        if (Math.abs(cross) > 1e-8) {
+                            const dx = smFirst.x - minPerp.xy.x;
+                            const dy = smFirst.y - minPerp.xy.y;
+                            const s = (dx * uAlong.y - dy * uAlong.x) / cross;
+                            const intersectXY = {
+                                x: minPerp.xy.x + s * uRow.x,
+                                y: minPerp.xy.y + s * uRow.y,
+                            };
+                            effectiveAnchorCoord = fromXY(intersectXY);
+                        }
+                    }
+
+                    if (negPts.length > 0) {
+                        const far = negPts[0];
+                        const endCoord = useActualPositions
+                            ? fromXY(far.xy)
+                            : fromXY({
+                                  x: anchorFoot.x + far.perp * uPerp.x,
+                                  y: anchorFoot.y + far.perp * uPerp.y,
+                              });
+                        const lengthM = calculateDistance([effectiveAnchorCoord, endCoord]);
+                        if (lengthM >= MIN_LATERAL_LENGTH_M) {
+                            generated.push({
+                                id: `auto-lat-ext-neg-${now}-${generated.length}`,
+                                type: 'lateral',
+                                coordinates: [effectiveAnchorCoord, endCoord],
+                                length: lengthM,
+                                zoneId: zoneId,
+                            });
+                        }
+                    }
+                    if (posPts.length > 0) {
+                        const far = posPts[posPts.length - 1];
+                        const endCoord = useActualPositions
+                            ? fromXY(far.xy)
+                            : fromXY({
+                                  x: anchorFoot.x + far.perp * uPerp.x,
+                                  y: anchorFoot.y + far.perp * uPerp.y,
+                              });
+                        const lengthM = calculateDistance([effectiveAnchorCoord, endCoord]);
+                        if (lengthM >= MIN_LATERAL_LENGTH_M) {
+                            generated.push({
+                                id: `auto-lat-ext-pos-${now}-${generated.length}`,
+                                type: 'lateral',
+                                coordinates: [effectiveAnchorCoord, endCoord],
+                                length: lengthM,
+                                zoneId: zoneId,
+                            });
+                        }
+                    }
+                }
+            };
+
+            if (pipeManager.lateralMode === 'betweenRows') {
+                // โหมดระหว่างแถว: ท่อ 1 เส้นรับใช้ 2 แถว (ซ้าย+ขวา)
+                // จับคู่แถว (0,1), (2,3), (4,5), ... → ท่อ N/2 เส้น
+                const sortedCols = [...columns].sort((a, b) => a.tCenter - b.tCenter);
+                for (let i = 0; i + 1 < sortedCols.length; i += 2) {
+                    const colA = sortedCols[i];
+                    const colB = sortedCols[i + 1];
+                    const midT = (colA.tCenter + colB.tCenter) / 2;
+                    const anchorFoot = {
+                        x: smFirst.x + midT * uAlong.x,
+                        y: smFirst.y + midT * uAlong.y,
+                    };
+                    const anchorCoord = fromXY(anchorFoot);
+                    // รวม irrigation points ของสองแถวเพื่อกำหนดขอบเขต perp
+                    const combinedPts = [...colA.pts, ...colB.pts].sort(
+                        (a, b) => a.perp - b.perp
+                    );
+                    // betweenRows: ใช้ geometric midpoint (useActualPositions = false)
+                    pushLateral(anchorFoot, anchorCoord, combinedPts, false);
+                }
+            } else {
+                // โหมดในแถว (inRow): ใช้พิกัดจริงของ sprinkler → pipe ตรงแถวเสมอ
+                for (const col of columns) {
+                    if (col.pts.length < 1) continue;
+                    const anchorFoot = {
+                        x: smFirst.x + col.tCenter * uAlong.x,
+                        y: smFirst.y + col.tCenter * uAlong.y,
+                    };
+                    const anchorCoord = fromXY(anchorFoot);
+                    const sorted = [...col.pts].sort((a, b) => a.perp - b.perp);
+                    // inRow: ใช้ .xy จริงของ sprinkler ปลายสุด (useActualPositions = true)
+                    pushLateral(anchorFoot, anchorCoord, sorted, true);
+                }
+            }
+
+            if (generated.length > 0) {
+                // ลบท่อย่อยเก่าของโซนนี้ออกก่อน แล้วค่อยใส่ท่อใหม่
+                mapManager.clearConnectionOverlays();
+                pipeManager.setPipes((prev) => {
+                    const withoutOldLaterals = prev.filter(
+                        (p) => !(p.type === 'lateral' && isSameZoneId(p.zoneId, zoneId))
+                    );
+                    return [...withoutOldLaterals, ...generated];
+                });
+                mapManager.drawConnectionLines(
+                    generated,
+                    fieldData.irrigationPositions,
+                    pipeManager.lateralMode,
+                    pipeManager.findNearbyConnectedIrrigationPoints
+                );
+            } else {
+                // มีจุดน้ำแต่ไม่มีท่อย่อยที่ยาวพอ (length < MIN) หรือรูปแบบไม่สร้างท่อ
+                alert(t('Could not generate laterals'));
+            }
+        },
+        [
+            pipesWithResolvedZoneId,
+            fieldData.zones,
+            fieldData.irrigationPositions,
+            pipeManager,
+            mapManager,
+            t,
+        ]
+    );
 
     // หาจุดตัดของเส้นสองเส้น
     const getLineIntersection = useCallback(
@@ -4544,8 +5139,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
             }> = [];
 
-            // หาท่อเมนย่อยทั้งหมด
-            const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
+            // หาท่อเมนย่อยทั้งหมด (ใช้ pipesWithResolvedZoneId เพื่อให้ท่อ legacy มี zoneId ครบ)
+            const submainPipes = pipesWithResolvedZoneId.filter((p) => p.type === 'submain');
 
             lateralPipes.forEach((lateral) => {
                 if (!lateral.coordinates || lateral.coordinates.length < 2) return;
@@ -4553,11 +5148,14 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 const lateralStart = lateral.coordinates[0];
                 const lateralEnd = lateral.coordinates[lateral.coordinates.length - 1];
 
-                // ตรวจสอบการข้ามท่อเมนย่อย
+                // ตรวจสอบการข้ามท่อเมนย่อย (เฉพาะโซนเดียวกัน)
+                const sameZoneSubmains = submainPipes.filter((s) =>
+                    isSameZoneId(lateral.zoneId, s.zoneId)
+                );
                 const crossingInfo = checkLateralCrossingSubmain(
                     lateralStart,
                     lateralEnd,
-                    submainPipes
+                    sameZoneSubmains
                 );
 
                 if (crossingInfo.crosses && crossingInfo.intersectionPoints.length > 0) {
@@ -4589,7 +5187,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                     let nearestPoint: Coordinate | null = null;
                     let minDistance = Infinity;
 
-                    submainPipes.forEach((submain) => {
+                    sameZoneSubmains.forEach((submain) => {
                         if (!submain.coordinates || submain.coordinates.length < 2) return;
 
                         // ตรวจสอบจุดเริ่มต้นของท่อย่อย
@@ -4650,7 +5248,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
             return connectionPoints;
         },
-        [pipeManager.pipes, checkLateralCrossingSubmain]
+        [pipesWithResolvedZoneId, checkLateralCrossingSubmain]
     );
 
     // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
@@ -4663,9 +5261,9 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
         }> = [];
 
-        // หาท่อเมนและท่อเมนย่อยทั้งหมด
-        const mainPipes = pipeManager.pipes.filter((p) => p.type === 'main');
-        const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
+        // หาท่อเมนและท่อเมนย่อยทั้งหมด (ใช้ pipesWithResolvedZoneId เพื่อให้ท่อ legacy มี zoneId ครบ)
+        const mainPipes = pipesWithResolvedZoneId.filter((p) => p.type === 'main');
+        const submainPipes = pipesWithResolvedZoneId.filter((p) => p.type === 'submain');
 
         if (mainPipes.length === 0 || submainPipes.length === 0) {
             // No main or submain pipes, returning empty connection points
@@ -4680,6 +5278,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
             mainPipes.forEach((main) => {
                 if (!main.coordinates || main.coordinates.length < 2) return;
+                // ห้ามสร้างจุดเชื่อมระหว่างท่อคนละโซน
+                if (!isSameZoneId(submain.zoneId, main.zoneId)) return;
 
                 // ตรวจสอบการเชื่อมต่อที่ปลายท่อเมน (L-shape และ T-shape)
                 const mainStart = main.coordinates[0];
@@ -5093,13 +5693,13 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         });
 
         return connectionPoints;
-    }, [pipeManager.pipes, getLineIntersection]);
+    }, [pipesWithResolvedZoneId, getLineIntersection]);
 
     // สร้างจุดเชื่อมต่อแบบเสถียร - ใช้ useMemo และ useEffect แยกกัน
     const connectionPointsData = useMemo(() => {
-        const lateralPipes = pipeManager.pipes.filter((p) => p.type === 'lateral');
-        const mainPipes = pipeManager.pipes.filter((p) => p.type === 'main');
-        const submainPipes = pipeManager.pipes.filter((p) => p.type === 'submain');
+        const lateralPipes = pipesWithResolvedZoneId.filter((p) => p.type === 'lateral');
+        const mainPipes = pipesWithResolvedZoneId.filter((p) => p.type === 'main');
+        const submainPipes = pipesWithResolvedZoneId.filter((p) => p.type === 'submain');
 
         // ตรวจสอบว่ามีท่อครบถ้วนหรือไม่
         const hasCompletePipeSystem = mainPipes.length > 0 && submainPipes.length > 0;
@@ -5130,7 +5730,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             hasData: allConnectionPoints.length > 0,
             hasCompleteSystem: hasCompletePipeSystem,
         };
-    }, [pipeManager.pipes, createLateralConnectionPoints, createSubmainToMainConnectionPoints]);
+    }, [pipesWithResolvedZoneId, createLateralConnectionPoints, createSubmainToMainConnectionPoints]);
 
     // ฟังก์ชันสำหรับการวาดจุดเชื่อมต่อ
     const renderConnectionPoints = useCallback(() => {
@@ -5275,23 +5875,38 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
     // สร้างท่อย่อยตาม "แถวของจุดให้น้ำ" โดยใช้มุมการหมุนของแปลง
     const generateGuidedLateralsFromTemplate = useCallback(
-        (template: Pipe, selectedPattern?: 'extending' | 'crossing'): Pipe[] => {
+        (
+            template: Pipe,
+            selectedPattern?: 'extending' | 'crossing',
+            zoneOverride?: (typeof fieldData.zones)[number]
+        ): Pipe[] => {
             if (!template.coordinates || template.coordinates.length < 2) return [];
 
             // เลือกโซนเดียวกับต้นแบบเพื่อจำกัดขอบเขตการสร้าง
+            // ถ้ามี zoneOverride (เรียกจากปุ่มอัตโนมัติ) ใช้โซนนั้นเลย ไม่ต้องตรวจ polygon
             const guideStart = template.coordinates[0];
             const findZoneForPoint = (p: Coordinate) =>
                 fieldData.zones.find((z) =>
                     isPointInPolygonEnhanced([p.lat, p.lng], z.coordinates)
                 );
-            const zone = findZoneForPoint(guideStart);
+            const zone = zoneOverride ?? findZoneForPoint(guideStart);
             if (!zone) return [];
 
             // ดึงจุดให้น้ำทั้งหมดในโซนนั้น
-            const allIrrigationPoints = [
+            const allPoints = [
                 ...fieldData.irrigationPositions.sprinklers,
                 ...fieldData.irrigationPositions.pivots,
-            ].filter((point) => isPointInPolygonEnhanced([point.lat, point.lng], zone.coordinates));
+            ];
+            // ใช้ isPointInPolygonEnhanced เสมอ (รองรับทั้ง {lat,lng} และ [lat,lng] format)
+            let allIrrigationPoints = allPoints.filter((point) =>
+                isPointInPolygonEnhanced([point.lat, point.lng], zone.coordinates)
+            );
+
+            // ถ้า filter ไม่เจอจุดเลย (เช่น zone.coordinates ในรูปแบบที่ไม่รองรับ)
+            // ให้ fallback: ใช้ทุกจุดในแปลงแทน เพื่อไม่ให้ generation หยุดทำงาน
+            if (allIrrigationPoints.length < 2) {
+                allIrrigationPoints = allPoints;
+            }
 
             if (allIrrigationPoints.length < 2) return [];
 
@@ -5358,9 +5973,21 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             const templatePattern =
                 selectedPattern || analyzeTemplatePattern(template, nearestSubmain);
 
-            const subRot = (nearestSubmain.coordinates as Coordinate[]).map((c) =>
+            const subRotRaw = (nearestSubmain.coordinates as Coordinate[]).map((c) =>
                 rotateXY(toXYm(c))
             );
+            // ขยาย submain ในแนว y ออกทั้งสองข้างให้ครอบคลุม y-range ของทุก row
+            // เพื่อให้ horizontalIntersectionsX หาจุดตัดได้ทุกแถว (ไม่มี xs=[] เพราะ submain สั้นเกินไป)
+            const subYmin = Math.min(...subRotRaw.map((p) => p.y));
+            const subYmax = Math.max(...subRotRaw.map((p) => p.y));
+            const subXFirst = subRotRaw[0].x;
+            const subXLast = subRotRaw[subRotRaw.length - 1].x;
+            const extendDist = 2000; // 2000 m ในระบบ rotated — ครอบคลุมทุกแปลง
+            const subRot = [
+                { x: subXFirst, y: subYmin - extendDist },
+                ...subRotRaw,
+                { x: subXLast, y: subYmax + extendDist },
+            ];
             // หา x ที่จุดตัดระหว่างเส้นแนวนอน y=y0 กับเส้น submain ในพิกัดที่หมุนแล้ว
             const horizontalIntersectionsX = (y0: number): number[] => {
                 const xs: number[] = [];
@@ -6085,6 +6712,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
 
             return generated;
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [
             fieldData.zones,
             fieldData.irrigationPositions,
@@ -6104,10 +6732,8 @@ export default function PipeGenerate(props: FieldCropPageProps) {
             } else {
                 pipeManager.setPipes([], { resetHistory: true });
             }
-            // ไม่ต้องเรียก mapManager.clearPipeOverlays โดยตรง เพราะ useEffect จะจัดการเอง
-            if (!type || type === 'lateral') {
-                // ลบจุดเชื่อมต่อเมื่อลบท่อย่อยจะถูกจัดการใน useEffect
-            }
+            // ล้าง connection points/lines ทันทีเมื่อลบท่อ ไม่รอ useEffect cascade
+            mapManager.clearConnectionOverlays();
             if (mapManager.drawingManagerRef.current) {
                 mapManager.drawingManagerRef.current.setDrawingMode(null);
             }
@@ -6122,41 +6748,41 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         return pumps.map((pump) => ({ ...pump }));
     }, []);
 
-    // Save current pump state to history
+    // Save current pump state to history (ใช้ ref เพื่อหลีกเลี่ยง stale closure)
     const savePumpToHistory = useCallback(
         (newPumps: Pump[]) => {
             if (isApplyingPumpHistoryRef.current) return;
 
-            // Update timestamp for pump action
             lastPumpActionTime.current = Date.now();
 
-            setPumpHistory((prev) => {
-                const newHistory = prev.slice(0, pumpHistoryIndex + 1);
-                newHistory.push(deepCopyPumps(newPumps));
-                return newHistory.slice(-50); // Keep only last 50 states
-            });
-            setPumpHistoryIndex((prev) => Math.min(prev + 1, 49));
+            const currentIdx = pumpHistoryIndexRef.current;
+            const sliced = pumpHistoryRef.current.slice(0, currentIdx + 1);
+            sliced.push(deepCopyPumps(newPumps));
+            const newHistory = sliced.slice(-50); // Keep only last 50 states
+            pumpHistoryRef.current = newHistory;
+            pumpHistoryIndexRef.current = newHistory.length - 1;
+            setPumpHistory(newHistory);
+            setPumpHistoryIndex(newHistory.length - 1);
         },
-        [pumpHistoryIndex, deepCopyPumps]
+        [deepCopyPumps]
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const handleMapClick = useCallback(
         (e: google.maps.MapMouseEvent) => {
             if (isPlacingPumpRef.current && e.latLng) {
-                setPumps((prev) => {
-                    const newPump: Pump = {
-                        id: `pump-${Date.now()}`,
-                        lat: e.latLng!.lat(),
-                        lng: e.latLng!.lng(),
-                        type: 'water_pump',
-                        name: `Water Pump ${prev.length + 1}`,
-                        capacity: 5000,
-                    };
-                    const newPumps = [...prev, newPump];
-                    savePumpToHistory(newPumps);
-                    return newPumps;
-                });
+                const newPump: Pump = {
+                    id: `pump-${Date.now()}`,
+                    lat: e.latLng!.lat(),
+                    lng: e.latLng!.lng(),
+                    type: 'water_pump',
+                    name: `Water Pump ${pumpsRef.current.length + 1}`,
+                    capacity: 5000,
+                };
+                const newPumps = [...pumpsRef.current, newPump];
+                pumpsRef.current = newPumps;
+                setPumps(newPumps);
+                savePumpToHistory(newPumps);
                 setIsPlacingPump(false);
             } else if (!pipeManager.isDrawing) {
                 pipeManager.setEditingPipeId(null);
@@ -6210,14 +6836,22 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 fieldData,
                 pipeManager,
                 lateralConnectionMode,
-                setLateralConnectionMode
+                setLateralConnectionMode,
+                getZoneIdAtCoordinate
             );
 
             // Ensure pipes are drawn on first map load with currently loaded state
             try {
-                mapManager.drawPipes(pipeManager.pipes, pipeManager.editingPipeId, (pipeId) =>
-                    pipeManager.setEditingPipeId(pipeId)
-                );
+                mapManager.drawPipes(pipeManager.pipes, pipeManager.editingPipeId, (pipeId) => {
+                    if (isDeleteModeRef.current) {
+                        mapManager.clearConnectionOverlays();
+                        mapManager.removeConnectionLinesForPipe(pipeId);
+                        pipeManager.removePipe(pipeId);
+                        pipeManager.setEditingPipeId(null);
+                    } else {
+                        pipeManager.setEditingPipeId(pipeId);
+                    }
+                });
             } catch (err) {
                 console.warn('drawPipes on initial map load failed:', err);
             }
@@ -6227,7 +6861,16 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 mapManager.drawPumps(pumps, t);
             }
         },
-        [fieldData, mapManager, handleMapClick, pipeManager, pumps, t, lateralConnectionMode]
+        [
+            fieldData,
+            mapManager,
+            handleMapClick,
+            pipeManager,
+            pumps,
+            t,
+            lateralConnectionMode,
+            getZoneIdAtCoordinate,
+        ]
     );
     // ======================== MODIFIED SECTION END ========================
 
@@ -6413,90 +7056,99 @@ export default function PipeGenerate(props: FieldCropPageProps) {
         setIsPlacingPump(true);
     }, [pipeManager.isDrawing, stopDrawing, mapManager]);
 
-    // Undo pump operation
+    // Undo pump operation (ใช้ ref เสมอ ไม่มี stale closure)
     const undoPump = useCallback(() => {
-        if (pumpHistoryIndex > 0) {
-            const newIndex = pumpHistoryIndex - 1;
+        const currentIdx = pumpHistoryIndexRef.current;
+        if (currentIdx > 0) {
+            const newIndex = currentIdx - 1;
+            pumpHistoryIndexRef.current = newIndex;
             isApplyingPumpHistoryRef.current = true;
-            setPumps(deepCopyPumps(pumpHistory[newIndex]));
+            const snapshot = deepCopyPumps(pumpHistoryRef.current[newIndex]);
+            pumpsRef.current = snapshot;
+            setPumps(snapshot);
             setPumpHistoryIndex(newIndex);
-            isApplyingPumpHistoryRef.current = false;
+            setTimeout(() => { isApplyingPumpHistoryRef.current = false; }, 0);
         }
-    }, [pumpHistoryIndex, pumpHistory, deepCopyPumps]);
+    }, [deepCopyPumps]);
 
     // Redo pump operation
     const redoPump = useCallback(() => {
-        if (pumpHistoryIndex < pumpHistory.length - 1) {
-            const newIndex = pumpHistoryIndex + 1;
+        const currentIdx = pumpHistoryIndexRef.current;
+        if (currentIdx < pumpHistoryRef.current.length - 1) {
+            const newIndex = currentIdx + 1;
+            pumpHistoryIndexRef.current = newIndex;
             isApplyingPumpHistoryRef.current = true;
-            setPumps(deepCopyPumps(pumpHistory[newIndex]));
+            const snapshot = deepCopyPumps(pumpHistoryRef.current[newIndex]);
+            pumpsRef.current = snapshot;
+            setPumps(snapshot);
             setPumpHistoryIndex(newIndex);
-            isApplyingPumpHistoryRef.current = false;
+            setTimeout(() => { isApplyingPumpHistoryRef.current = false; }, 0);
         }
-    }, [pumpHistoryIndex, pumpHistory, deepCopyPumps]);
+    }, [deepCopyPumps]);
 
     const removePump = useCallback(
         (pumpId: string) => {
-            setPumps((prev) => {
-                const newPumps = prev.filter((pump) => pump.id !== pumpId);
-                savePumpToHistory(newPumps);
-                return newPumps;
-            });
+            const newPumps = pumpsRef.current.filter((pump) => pump.id !== pumpId);
+            pumpsRef.current = newPumps;
+            setPumps(newPumps);
+            savePumpToHistory(newPumps);
         },
         [savePumpToHistory]
     );
 
     const removeAllPumps = useCallback(() => {
+        pumpsRef.current = [];
         setPumps([]);
         savePumpToHistory([]);
     }, [savePumpToHistory]);
 
-    // Combined undo/redo functions that work with both pipes and pumps
+    // Combined undo/redo functions — ใช้ state (pipeHistoryIndex, pumpHistoryIndex) สำหรับ availability check
     const combinedUndo = useCallback(() => {
         const canUndoPipe = pipeManager.pipeHistoryIndex > 0;
-        const canUndoPump = pumpHistoryIndex > 0;
+        const canUndoPump = pumpHistoryIndexRef.current > 0;
 
-        if (!canUndoPipe && !canUndoPump) {
-            return;
-        }
+        if (!canUndoPipe && !canUndoPump) return;
 
-        // Determine which action was more recent based on timestamp
         const shouldUndoPipe =
             canUndoPipe &&
             (!canUndoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
 
         if (shouldUndoPipe) {
+            mapManager.clearConnectionOverlays();
             pipeManager.undo();
         } else {
             undoPump();
         }
-    }, [pipeManager, pumpHistoryIndex, undoPump, lastPumpActionTime]);
+    }, [pipeManager, undoPump, lastPumpActionTime, mapManager]);
 
     const combinedRedo = useCallback(() => {
         const canRedoPipe = pipeManager.pipeHistoryIndex < pipeManager.pipeHistoryLength - 1;
-        const canRedoPump = pumpHistoryIndex < pumpHistory.length - 1;
+        const canRedoPump = pumpHistoryIndexRef.current < pumpHistoryRef.current.length - 1;
 
-        if (!canRedoPipe && !canRedoPump) {
-            return;
-        }
+        if (!canRedoPipe && !canRedoPump) return;
 
-        // Determine which action to redo based on timestamp
         const shouldRedoPipe =
             canRedoPipe &&
             (!canRedoPump || pipeManager.lastPipeActionTime.current >= lastPumpActionTime.current);
 
         if (shouldRedoPipe) {
+            mapManager.clearConnectionOverlays();
             pipeManager.redo();
         } else {
             redoPump();
         }
-    }, [pipeManager, pumpHistoryIndex, pumpHistory.length, redoPump, lastPumpActionTime]);
+    }, [pipeManager, redoPump, lastPumpActionTime, mapManager]);
 
-    // Check if undo/redo is available
+    // Check if undo/redo is available (ใช้ state สำหรับ UI re-render)
     const canUndo = pipeManager.pipeHistoryIndex > 0 || pumpHistoryIndex > 0;
     const canRedo =
         pipeManager.pipeHistoryIndex < pipeManager.pipeHistoryLength - 1 ||
         pumpHistoryIndex < pumpHistory.length - 1;
+
+    // ─── ลำดับขั้นตอนการทำงาน: ปั๊ม → ท่อเมน → ท่อเมนรอง → ท่อย่อย ────────────────
+    const hasPump = pumps.length > 0;
+    const hasMainPipe = pipeManager.pipes.some((p) => p.type === 'main');
+    const hasSubmainPipe = pipeManager.pipes.some((p) => p.type === 'submain');
 
     // Debug logging for undo/redo availability
     useEffect(() => {
@@ -6822,6 +7474,64 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         </div>
                                     )}
 
+                                    {/* ---------- ขั้นตอนที่ 1: วางปั๊มน้ำ ---------- */}
+                                    <div className={`rounded-lg border p-3 ${hasPump ? 'border-green-500/60 bg-green-950/20' : 'border-orange-500/50 bg-orange-950/30'}`}>
+                                        <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
+                                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${hasPump ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>
+                                                {hasPump ? '✓' : '1'}
+                                            </span>
+                                            <span className={hasPump ? 'text-green-300' : 'text-orange-300'}>
+                                                {t('Pump Placement Mode')}
+                                                {hasPump && <span className="ml-1 text-green-400">({pumps.length})</span>}
+                                            </span>
+                                        </h3>
+                                        <div className="space-y-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => startPumpPlacement()}
+                                                className={`w-full rounded border px-3 py-2 text-xs transition-colors ${
+                                                    isPlacingPump
+                                                        ? 'border-orange-500 bg-orange-700 text-white'
+                                                        : 'border-orange-500 bg-orange-600 text-white hover:bg-orange-700'
+                                                }`}
+                                                disabled={isPlacingPump}
+                                                title={t('Place Water Pump')}
+                                            >
+                                                💧 {t('Place Water Pump')}
+                                            </button>
+                                            {isPlacingPump && (
+                                                <div className="rounded border border-orange-500/50 bg-orange-600/20 p-2 text-xs">
+                                                    <div className="text-yellow-200">{t('Click on map to place pump')}</div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsPlacingPump(false)}
+                                                        className="mt-1.5 w-full rounded bg-gray-600 px-2 py-1 text-white hover:bg-gray-500"
+                                                    >
+                                                        {t('Cancel')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="border-t border-orange-600/40 pt-2">
+                                                <div className="mb-1 text-xs text-gray-400">{t('Pump Management')} ({pumps.length})</div>
+                                                {pumps.length > 0 && (
+                                                    <div className="max-h-24 space-y-1 overflow-y-auto">
+                                                        {pumps.map((pump) => (
+                                                            <div key={pump.id} className="flex items-center justify-between rounded border border-orange-600/30 bg-orange-600/10 px-2 py-1 text-xs">
+                                                                <span className="text-gray-300">{pump.name} {pump.capacity} L/h</span>
+                                                                <button type="button" onClick={() => removePump(pump.id)} className="text-red-400 hover:text-red-300" title={t('Remove Pump')}>🗑️</button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {pumps.length > 0 && (
+                                                    <button type="button" onClick={removeAllPumps} className="mt-1 w-full rounded border border-red-500/60 bg-red-600/80 py-1 text-xs text-white hover:bg-red-600">
+                                                        {t('Remove All Pumps')}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* ---------- วาดท่อตามลำดับ (เรียง 1 → 2 → 3 ไม่ข้ามไปมา) ---------- */}
                                     <div
                                         className="rounded-lg border border-blue-500/50 bg-blue-950/30 p-3"
@@ -6856,140 +7566,308 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                             </div>
                                         )}
 
-                                        {/* 1. ท่อหลัก */}
-                                        <div className="mb-3 rounded border border-red-500/40 bg-red-950/20 p-2">
-                                            <div className="mb-1.5 text-xs font-semibold text-red-300">
-                                                {t('Step4Pipe1Title')}
-                                            </div>
-                                            <div className="mb-1.5 flex gap-1">
-                                                {(['straight', 'bezier', 'spline'] as const).map((curve) => (
+                                        {/* ── Delete Mode Banner (sidebar) ── */}
+                                        {isDeleteMode && (
+                                            <div className="mb-3 rounded-lg border border-red-500 bg-red-900/40 p-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-semibold text-red-300">
+                                                        🗑 โหมดลบท่อ — คลิกที่ท่อที่ต้องการลบ
+                                                    </span>
                                                     <button
-                                                        key={curve}
                                                         type="button"
-                                                        onClick={() => pipeManager.setSelectedCurveType(curve)}
-                                                        className={`rounded border px-1.5 py-0.5 text-xs ${
-                                                            pipeManager.selectedCurveType === curve
-                                                                ? 'border-red-400 bg-red-600 text-white'
-                                                                : 'border-gray-600 bg-gray-700 text-gray-400'
-                                                        }`}
+                                                        onClick={toggleDeleteMode}
+                                                        className="shrink-0 rounded border border-red-400 bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-600"
                                                     >
-                                                        {curve === 'straight' ? '📏' : curve === 'bezier' ? '🎯' : '🌊'}
+                                                        ✕ ยกเลิก (ESC)
                                                     </button>
-                                                ))}
+                                                </div>
                                             </div>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startDrawing('main', pipeManager.selectedCurveType)}
-                                                    className={`flex-1 rounded border border-red-400 px-2 py-1.5 text-xs text-white ${
-                                                        pipeManager.isDrawing && pipeManager.selectedType === 'main'
-                                                            ? 'bg-red-700'
-                                                            : 'bg-red-600 hover:bg-red-700'
-                                                    }`}
-                                                    disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'main'}
-                                                >
-                                                    {pipeManager.isDrawing && pipeManager.selectedType === 'main'
-                                                        ? t('Drawing') + '...'
-                                                        : t('Draw')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => clearPipes('main')}
-                                                    className="rounded border border-red-500/60 bg-red-600/80 px-2 py-1.5 text-xs text-white hover:bg-red-600"
-                                                    title={t('Clear Main Pipes')}
-                                                >
-                                                    🗑️
-                                                </button>
+                                        )}
+
+                                        {/* 2. ท่อหลัก */}
+                                        <div className={`mb-3 rounded border p-2 ${!hasPump ? 'border-gray-600/40 bg-gray-900/40 opacity-50' : hasMainPipe ? 'border-green-500/40 bg-green-950/20' : 'border-red-500/40 bg-red-950/20'}`}>
+                                            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold">
+                                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${!hasPump ? 'bg-gray-600 text-gray-400' : hasMainPipe ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                    {!hasPump ? '🔒' : hasMainPipe ? '✓' : '2'}
+                                                </span>
+                                                <span className={!hasPump ? 'text-gray-500' : hasMainPipe ? 'text-green-300' : 'text-red-300'}>
+                                                    {t('Step4Pipe1Title')}
+                                                </span>
                                             </div>
+                                            {!hasPump ? (
+                                                <div className="text-xs text-gray-500 italic">{t('Place pump first (step 1)')}</div>
+                                            ) : (
+                                                <>
+                                                    <div className="mb-1.5 flex gap-1">
+                                                        {(['straight', 'bezier', 'spline'] as const).map((curve) => (
+                                                            <button
+                                                                key={curve}
+                                                                type="button"
+                                                                onClick={() => pipeManager.setSelectedCurveType(curve)}
+                                                                className={`rounded border px-1.5 py-0.5 text-xs ${
+                                                                    pipeManager.selectedCurveType === curve
+                                                                        ? 'border-red-400 bg-red-600 text-white'
+                                                                        : 'border-gray-600 bg-gray-700 text-gray-400'
+                                                                }`}
+                                                            >
+                                                                {curve === 'straight' ? '📏' : curve === 'bezier' ? '🎯' : '🌊'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startDrawing('main', pipeManager.selectedCurveType)}
+                                                            className={`flex-1 rounded border border-red-400 px-2 py-1.5 text-xs text-white ${
+                                                                pipeManager.isDrawing && pipeManager.selectedType === 'main'
+                                                                    ? 'bg-red-700'
+                                                                    : 'bg-red-600 hover:bg-red-700'
+                                                            }`}
+                                                            disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'main'}
+                                                        >
+                                                            {pipeManager.isDrawing && pipeManager.selectedType === 'main'
+                                                                ? t('Drawing') + '...'
+                                                                : t('Draw')}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => clearPipes('main')}
+                                                            className="rounded border border-red-500/60 bg-red-600/80 px-2 py-1.5 text-xs text-white hover:bg-red-600"
+                                                            title={t('Clear Main Pipes')}
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
 
-                                        {/* 2. ท่อรอง */}
-                                        <div className="mb-3 rounded border border-purple-500/40 bg-purple-950/20 p-2">
-                                            <div className="mb-1.5 text-xs font-semibold text-purple-300">
-                                                {t('Step4Pipe2Title')}
+                                        {/* 3. ท่อรอง */}
+                                        <div className={`mb-3 rounded border p-2 ${!hasMainPipe ? 'border-gray-600/40 bg-gray-900/40 opacity-50' : hasSubmainPipe ? 'border-green-500/40 bg-green-950/20' : 'border-purple-500/40 bg-purple-950/20'}`}>
+                                            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold">
+                                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${!hasMainPipe ? 'bg-gray-600 text-gray-400' : hasSubmainPipe ? 'bg-green-500 text-white' : 'bg-purple-500 text-white'}`}>
+                                                    {!hasMainPipe ? '🔒' : hasSubmainPipe ? '✓' : '3'}
+                                                </span>
+                                                <span className={!hasMainPipe ? 'text-gray-500' : hasSubmainPipe ? 'text-green-300' : 'text-purple-300'}>
+                                                    {t('Step4Pipe2Title')}
+                                                </span>
                                             </div>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startDrawing('submain')}
-                                                    className={`flex-1 rounded border border-purple-400 px-2 py-1.5 text-xs text-white ${
-                                                        pipeManager.isDrawing && pipeManager.selectedType === 'submain'
-                                                            ? 'bg-purple-700'
-                                                            : 'bg-purple-600 hover:bg-purple-700'
-                                                    }`}
-                                                    disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'submain'}
-                                                >
-                                                    {pipeManager.isDrawing && pipeManager.selectedType === 'submain'
-                                                        ? t('Drawing') + '...'
-                                                        : t('Draw')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => clearPipes('submain')}
-                                                    className="rounded border border-purple-500/60 bg-purple-600/80 px-2 py-1.5 text-xs text-white hover:bg-purple-600"
-                                                    title={t('Clear Submain Pipes')}
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
+                                            {!hasMainPipe ? (
+                                                <div className="text-xs text-gray-500 italic">{t('Draw main pipe first (step 2)')}</div>
+                                            ) : (
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => startDrawing('submain')}
+                                                        className={`flex-1 rounded border border-purple-400 px-2 py-1.5 text-xs text-white ${
+                                                            pipeManager.isDrawing && pipeManager.selectedType === 'submain'
+                                                                ? 'bg-purple-700'
+                                                                : 'bg-purple-600 hover:bg-purple-700'
+                                                        }`}
+                                                        disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'submain'}
+                                                    >
+                                                        {pipeManager.isDrawing && pipeManager.selectedType === 'submain'
+                                                            ? t('Drawing') + '...'
+                                                            : t('Draw')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => clearPipes('submain')}
+                                                        className="rounded border border-purple-500/60 bg-purple-600/80 px-2 py-1.5 text-xs text-white hover:bg-purple-600"
+                                                        title={t('Clear Submain Pipes')}
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* 3. ท่อย่อย */}
-                                        <div className="mb-3 rounded border border-green-500/40 bg-green-950/20 p-2">
-                                            <div className="mb-1.5 text-xs font-semibold text-green-300">
-                                                {t('Step4Pipe3Title')}
+                                        {/* 4. ท่อย่อย */}
+                                        <div className={`mb-3 rounded border p-2 ${!hasSubmainPipe ? 'border-gray-600/40 bg-gray-900/40 opacity-50' : 'border-green-500/40 bg-green-950/20'}`}>
+                                            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold">
+                                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${!hasSubmainPipe ? 'bg-gray-600 text-gray-400' : 'bg-green-500 text-white'}`}>
+                                                    {!hasSubmainPipe ? '🔒' : '4'}
+                                                </span>
+                                                <span className={!hasSubmainPipe ? 'text-gray-500' : 'text-green-300'}>
+                                                    {t('Step4Pipe3Title')}
+                                                </span>
                                             </div>
-                                            <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                                                <span className="text-gray-400">{t('Lateral Mode')}:</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => pipeManager.setLateralMode('inRow')}
-                                                    className={`rounded border px-1.5 py-0.5 ${pipeManager.lateralMode === 'inRow' ? 'border-green-400 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
-                                                >
-                                                    {t('Within rows')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => pipeManager.setLateralMode('betweenRows')}
-                                                    className={`rounded border px-1.5 py-0.5 ${pipeManager.lateralMode === 'betweenRows' ? 'border-green-400 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
-                                                >
-                                                    {t('Between rows')}
-                                                </button>
-                                            </div>
-                                            <div className="mb-1.5 flex items-center gap-1.5 text-xs">
-                                                <span className="text-gray-400">{t('Connect Mode')}:</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={toggleLateralConnectionMode}
-                                                    className={`rounded border px-1.5 py-0.5 ${lateralConnectionMode.isActive ? 'border-blue-400 bg-blue-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
-                                                >
-                                                    {lateralConnectionMode.isActive ? t('ON') : t('OFF')}
-                                                </button>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startDrawing('lateral')}
-                                                    className={`flex-1 rounded border border-green-400 px-2 py-1.5 text-xs text-white ${
-                                                        pipeManager.isDrawing && pipeManager.selectedType === 'lateral'
-                                                            ? 'bg-green-700'
-                                                            : 'bg-green-600 hover:bg-green-700'
-                                                    }`}
-                                                    disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'lateral'}
-                                                >
-                                                    {pipeManager.isDrawing && pipeManager.selectedType === 'lateral'
-                                                        ? t('Drawing') + '...'
-                                                        : t('Draw')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => clearPipes('lateral')}
-                                                    className="rounded border border-green-500/60 bg-green-600/80 px-2 py-1.5 text-xs text-white hover:bg-green-600"
-                                                    title={t('Clear Lateral Pipes')}
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
+                                            {!hasSubmainPipe ? (
+                                                <div className="text-xs text-gray-500 italic">{t('Draw submain pipe first (step 3)')}</div>
+                                            ) : (
+                                                <>
+                                                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                                                        <span className="text-gray-400">{t('Lateral Mode')}:</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => pipeManager.setLateralMode('inRow')}
+                                                            className={`rounded border px-1.5 py-0.5 ${pipeManager.lateralMode === 'inRow' ? 'border-green-400 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
+                                                        >
+                                                            {t('Within rows')}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => pipeManager.setLateralMode('betweenRows')}
+                                                            className={`rounded border px-1.5 py-0.5 ${pipeManager.lateralMode === 'betweenRows' ? 'border-green-400 bg-green-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
+                                                        >
+                                                            {t('Between rows')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="mb-1.5 flex items-center gap-1.5 text-xs">
+                                                        <span className="text-gray-400">{t('Connect Mode')}:</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={toggleLateralConnectionMode}
+                                                            className={`rounded border px-1.5 py-0.5 ${lateralConnectionMode.isActive ? 'border-blue-400 bg-blue-600 text-white' : 'border-gray-600 bg-gray-700 text-gray-400'}`}
+                                                        >
+                                                            {lateralConnectionMode.isActive ? t('ON') : t('OFF')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startDrawing('lateral')}
+                                                            className={`flex-1 rounded border border-green-400 px-2 py-1.5 text-xs text-white ${
+                                                                pipeManager.isDrawing && pipeManager.selectedType === 'lateral'
+                                                                    ? 'bg-green-700'
+                                                                    : 'bg-green-600 hover:bg-green-700'
+                                                            }`}
+                                                            disabled={pipeManager.isDrawing && pipeManager.selectedType !== 'lateral'}
+                                                        >
+                                                            {pipeManager.isDrawing && pipeManager.selectedType === 'lateral'
+                                                                ? t('Drawing') + '...'
+                                                                : t('Draw')}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => clearPipes('lateral')}
+                                                            className="rounded border border-green-500/60 bg-green-600/80 px-2 py-1.5 text-xs text-white hover:bg-green-600"
+                                                            title={t('Clear Lateral Pipes')}
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                    {/* ปุ่มสร้างท่อย่อยอัตโนมัติ */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setShowAutoLateralModal((v) => !v);
+                                                        }}
+                                                        className="mt-1 w-full rounded border border-teal-500 bg-teal-700 px-2 py-1.5 text-xs text-white hover:bg-teal-600"
+                                                        disabled={pipeManager.isDrawing}
+                                                    >
+                                                        ⚡ สร้างท่อย่อยอัตโนมัติ
+                                                    </button>
+                                                    {/* Panel สร้างท่อย่อยอัตโนมัติ */}
+                                                    {showAutoLateralModal && (
+                                                        <div className="mt-2 space-y-2 rounded border border-teal-600/60 bg-teal-950/40 p-2 text-xs">
+                                                            {/* เลือกโซน */}
+                                                            <div>
+                                                                <div className="mb-1 text-gray-300">{t('Select zone')}:</div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setAutoLateralZoneId(ALL_ZONES_ID)}
+                                                                        className={`rounded border px-2 py-0.5 text-xs ${
+                                                                            autoLateralZoneId === ALL_ZONES_ID
+                                                                                ? 'border-teal-400 bg-teal-600 text-white'
+                                                                                : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                        }`}
+                                                                    >
+                                                                        {t('All zones')}
+                                                                    </button>
+                                                                    {fieldData.zones.map((zone) => {
+                                                                        const submainCount = pipesWithResolvedZoneId.filter(
+                                                                            (p) =>
+                                                                                p.type === 'submain' &&
+                                                                                isSameZoneId(p.zoneId, String(zone.id))
+                                                                        ).length;
+                                                                        return (
+                                                                            <button
+                                                                                key={zone.id}
+                                                                                type="button"
+                                                                                onClick={() => setAutoLateralZoneId(String(zone.id))}
+                                                                                className={`rounded border px-2 py-0.5 text-xs ${
+                                                                                    autoLateralZoneId === String(zone.id)
+                                                                                        ? 'border-teal-400 bg-teal-600 text-white'
+                                                                                        : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                                }`}
+                                                                            >
+                                                                                {zone.name || `${t('Zone')} ${zone.id}`}
+                                                                                {submainCount > 0 ? (
+                                                                                    <span className="ml-1 text-teal-300">({submainCount})</span>
+                                                                                ) : (
+                                                                                    <span className="ml-1 text-red-400">(!)</span>
+                                                                                )}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                            {/* เลือกรูปแบบ */}
+                                                            <div>
+                                                                <div className="mb-1 text-gray-300">{t('Lateral pattern')}:</div>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setAutoLateralPattern('extending')}
+                                                                        className={`flex-1 rounded border px-2 py-1 text-xs ${
+                                                                            autoLateralPattern === 'extending'
+                                                                                ? 'border-teal-400 bg-teal-600 text-white'
+                                                                                : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                        }`}
+                                                                        title={t('Laterals split both ways from submain')}
+                                                                    >
+                                                                        ⬌ แยกซ้าย-ขวา
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setAutoLateralPattern('crossing')}
+                                                                        className={`flex-1 rounded border px-2 py-1 text-xs ${
+                                                                            autoLateralPattern === 'crossing'
+                                                                                ? 'border-teal-400 bg-teal-600 text-white'
+                                                                                : 'border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                                        }`}
+                                                                        title={t('Single lateral through two rows')}
+                                                                    >
+                                                                        → ลากผ่านเส้นเดียว
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            {/* ปุ่มสร้าง + ยกเลิก */}
+                                                            <div className="flex gap-1 pt-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        if (!autoLateralZoneId) {
+                                                                            alert(t('Please select zone first'));
+                                                                            return;
+                                                                        }
+                                                                        if (autoLateralZoneId === ALL_ZONES_ID) {
+                                                                            fieldData.zones.forEach((z) => {
+                                                                                generateLateralsForZone(String(z.id), autoLateralPattern);
+                                                                            });
+                                                                        } else {
+                                                                            generateLateralsForZone(autoLateralZoneId, autoLateralPattern);
+                                                                        }
+                                                                        setShowAutoLateralModal(false);
+                                                                    }}
+                                                                    className="flex-1 rounded border border-teal-400 bg-teal-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
+                                                                >
+                                                                    ✅ สร้าง
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowAutoLateralModal(false)}
+                                                                    className="rounded border border-gray-500 bg-gray-700 px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-600"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
 
                                         <button
@@ -7000,6 +7878,21 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         >
                                             🗑️ {t('Clear All Pipes')}
                                         </button>
+
+                                        {/* ── Delete Mode Toggle ── */}
+                                        {!pipeManager.isDrawing && pipeManager.pipes.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={toggleDeleteMode}
+                                                className={`mt-1.5 w-full rounded border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                                                    isDeleteMode
+                                                        ? 'border-red-400 bg-red-700 text-white'
+                                                        : 'border-gray-500 bg-gray-700/60 text-gray-300 hover:border-red-400 hover:bg-red-900/40 hover:text-red-300'
+                                                }`}
+                                            >
+                                                🗑 {isDeleteMode ? t('Delete mode...') : t('Select pipes to delete')}
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* ---------- ตั้งค่าเสริม (Snap + ปั๊ม) ---------- */}
@@ -7031,24 +7924,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                                     onChange={(e) => snapSystem.setDistance(Math.min(Math.max(parseInt(e.target.value), 1), 5))}
                                                     className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-gray-700"
                                                 />
-                                            </div>
-                                            <div className="border-t border-gray-600 pt-2">
-                                                <div className="mb-1 text-xs text-gray-400">{t('Pump Management')} ({pumps.length})</div>
-                                                {pumps.length > 0 && (
-                                                    <div className="max-h-24 space-y-1 overflow-y-auto">
-                                                        {pumps.map((pump) => (
-                                                            <div key={pump.id} className="flex items-center justify-between rounded border border-orange-600/30 bg-orange-600/10 px-2 py-1 text-xs">
-                                                                <span className="text-gray-300">{pump.name} {pump.capacity} L/h</span>
-                                                                <button type="button" onClick={() => removePump(pump.id)} className="text-red-400 hover:text-red-300" title={t('Remove Pump')}>🗑️</button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                {pumps.length > 0 && (
-                                                    <button type="button" onClick={removeAllPumps} className="mt-1 w-full rounded border border-red-500/60 bg-red-600/80 py-1 text-xs text-white hover:bg-red-600">
-                                                        {t('Remove All Pumps')}
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -7282,6 +8157,26 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                     </div>
                                 </div>
 
+
+                                {/* ── Delete Mode Overlay ── */}
+                                {isDeleteMode && (
+                                    <div className="absolute left-1 top-11 z-20 min-w-[200px] rounded-lg border border-red-500 bg-black/90 p-2.5 text-xs shadow-lg">
+                                        <div className="mb-1.5 font-semibold text-red-300">
+                                            🗑 โหมดลบท่อ
+                                        </div>
+                                        <div className="mb-2 text-gray-400">
+                                            คลิกที่ท่อที่ต้องการลบ
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={toggleDeleteMode}
+                                            className="w-full rounded border border-red-400 bg-red-800 px-2 py-1 text-xs text-white hover:bg-red-700"
+                                        >
+                                            ✕ ยกเลิก (ESC)
+                                        </button>
+                                    </div>
+                                )}
+
                                 {pipeManager.isDrawing && (
                                     <div className="absolute left-1 top-11 z-10 rounded-lg border border-blue-400 bg-blue-600 bg-opacity-90 p-3 text-xs">
                                         <div className="font-bold text-white">
@@ -7332,6 +8227,13 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                             className="mt-2 w-full rounded bg-gray-600 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-700"
                                         >
                                             {t('Done Editing')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => deleteSpecificPipe(pipeManager.editingPipeId!)}
+                                            className="mt-1 w-full rounded border border-red-500 bg-red-700 px-2 py-1 text-xs text-white hover:bg-red-600 active:bg-red-800"
+                                        >
+                                            🗑 ลบท่อนี้
                                         </button>
                                     </div>
                                 )}
@@ -7393,43 +8295,6 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                                         </button>
                                     </div>
                                 )}
-
-                                {/* Pump Placement Button */}
-                                <div className="absolute bottom-1 left-20 z-10">
-                                    <div className="rounded-lg border border-white bg-black bg-opacity-80 p-2">
-                                        <div className="mb-2 text-center text-xs font-bold text-white">
-                                            {t('Pump Tools')}
-                                        </div>
-                                        <div className="flex flex-col space-y-2">
-                                            <button
-                                                onClick={() => startPumpPlacement()}
-                                                className={`flex items-center justify-center rounded border px-3 py-2 text-xs transition-colors ${
-                                                    isPlacingPump
-                                                        ? 'cursor-not-allowed border-blue-500 bg-blue-700 text-white'
-                                                        : 'cursor-pointer border-blue-500 bg-blue-600 text-white hover:bg-blue-700'
-                                                }`}
-                                                disabled={isPlacingPump}
-                                                title={t('Place Water Pump')}
-                                            >
-                                                <span className="mr-1">💧</span>
-                                                {t('Water Pump')}
-                                            </button>
-                                        </div>
-                                        {isPlacingPump && (
-                                            <div className="mt-2 text-center">
-                                                <div className="text-xs text-yellow-300">
-                                                    {t('Click on map to place pump')}
-                                                </div>
-                                                <button
-                                                    onClick={() => setIsPlacingPump(false)}
-                                                    className="mt-1 rounded bg-gray-600 px-2 py-1 text-xs text-white transition-colors hover:bg-gray-700"
-                                                >
-                                                    {t('Cancel')}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -7448,7 +8313,7 @@ export default function PipeGenerate(props: FieldCropPageProps) {
                 type={notificationModal.type}
                 showConfirmButton={!!notificationModal.onConfirm}
                 confirmText={t('Confirm')}
-                cancelText={t('ยกเลิก')}
+                cancelText={t('Cancel')}
                 showColorOptions={notificationModal.showColorOptions}
             />
 

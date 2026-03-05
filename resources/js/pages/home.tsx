@@ -173,7 +173,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('crop_optimization'),
             t('environmental_monitoring'),
         ],
-        isAvailable: false, // กำลังพัฒนา
+        isAvailable: true, // พร้อมใช้งาน
     },
     {
         id: 'field-crop',
@@ -189,7 +189,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('weather_integration'),
             t('yield_optimization'),
         ],
-        isAvailable: false, // กำลังพัฒนา
+        isAvailable: true, // พร้อมใช้งาน
     },
     // {
     //     id: 'khok-nong-na',

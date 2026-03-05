@@ -4743,6 +4743,7 @@ export default function FieldCropSummary() {
                             irrigationType: iAssign[zoneId] || t('Not defined'),
                             sprinklerCount: zoneIrrigationCounts.sprinkler,
                             // miniSprinklerCount and microSprayCount removed
+                            pivotCount: zoneIrrigationCounts.pivot,
                             totalIrrigationPoints: zoneIrrigationCounts.total,
                         };
                     }
@@ -5405,7 +5406,7 @@ export default function FieldCropSummary() {
                                             d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                                         />
                                     </svg>
-                                    {t('คำนวณอุปกรณ์')}
+                                    {t('Calculate Equipment')}
                                 </button>
                             </div>
                         </div>
@@ -5496,7 +5497,7 @@ export default function FieldCropSummary() {
                                         <span><span className="font-bold text-blue-400 print:text-black">{areaInRai.toFixed(2)}</span> {t('Rai')}</span>
                                         <span><span className="font-bold text-green-400 print:text-black">{totalZones}</span> {t('zones')}</span>
                                         <span><span className="font-bold text-purple-400 print:text-black">{totalPlantingPoints.toLocaleString()}</span> {t('Planting Points')}</span>
-                                        <span><span className="font-bold text-cyan-400 print:text-black">{sprinklerPoints + pivotPoints + 0 + 0 + dripLines}</span> {t('Irrigation Points')}</span>
+                                        <span><span className="font-bold text-cyan-400 print:text-black">{sprinklerPoints + pivotPoints}</span> {t('Irrigation Points')}</span>
                                         <span><span className="font-bold text-yellow-400 print:text-black">{totalEstimatedYield.toLocaleString()}</span> {t('kg')}</span>
                                     </div>
                                 </div>
@@ -6146,13 +6147,23 @@ export default function FieldCropSummary() {
                                     <div className="space-y-2 print:space-y-2">
                                         {null}
                                         {actualZones.map((zone) => {
-                                            const summary = calculatedZoneSummaries[zone.id];
-                                            const assignedCrop = zoneAssignments[zone.id]
-                                                ? getCropByValue(zoneAssignments[zone.id])
+                                            const summary = calculatedZoneSummaries[zone.id.toString()];
+                                            // Prefer zone.cropType (set by zone-obstacle page), then zoneAssignments,
+                                            // then summary.cropValue as fallback
+                                            const cropValue =
+                                                zone.cropType ||
+                                                zoneAssignments[zone.id] ||
+                                                zoneAssignments[zone.id.toString()] ||
+                                                summary?.cropValue ||
+                                                null;
+                                            const assignedCrop = cropValue
+                                                ? getCropByValue(cropValue)
                                                 : null;
                                             const irrigationType =
                                                 globalIrrigationType ||
-                                                irrigationAssignments[zone.id];
+                                                irrigationAssignments[zone.id] ||
+                                                irrigationAssignments[zone.id.toString()] ||
+                                                summary?.irrigationType;
                                             // Read from precomputed map to avoid recomputation per render
                                             const zonePipeStats: ZonePipeStats =
                                                 zonePipeStatsMap.get(zone.id.toString()) ?? {
@@ -6662,9 +6673,7 @@ export default function FieldCropSummary() {
                                                                                                 )
                                                                                                     return false;
                                                                                                 const byId =
-                                                                                                    (p.zoneId?.toString?.() ||
-                                                                                                        '') ===
-                                                                                                    zone.id.toString();
+                                                                                                    (p.zoneId?.toString?.() || '') === zone.id.toString();
                                                                                                 const byGeom =
                                                                                                     isPipeInZone(
                                                                                                         p,
@@ -6806,12 +6815,9 @@ export default function FieldCropSummary() {
                                                                                                 <button
                                                                                                     onClick={() =>
                                                                                                         setZoneLateralDetailsOpen(
-                                                                                                            (
-                                                                                                                prev
-                                                                                                            ) => ({
+                                                                                                            (prev) => ({
                                                                                                                 ...prev,
-                                                                                                                [zone.id.toString()]:
-                                                                                                                    !open,
+                                                                                                                [zone.id.toString()]: !open,
                                                                                                             })
                                                                                                         )
                                                                                                     }
@@ -7279,25 +7285,22 @@ export default function FieldCropSummary() {
                                                                         ❓
                                                                     </div>
                                                                     <div className="text-sm">
-                                                                        No crop assigned to this
-                                                                        zone
+                                                                        {t('No crop assigned to this zone')}
                                                                     </div>
                                                                     <div className="text-xs">
-                                                                        Cannot calculate water
-                                                                        requirements
+                                                                        {t('Cannot calculate water requirements')}
                                                                     </div>
                                                                 </div>
 
                                                                 {/* แสดงข้อมูลจำนวนสปริงเกอร์แม้ไม่มีพืชปลูก */}
                                                                 <div className="rounded-lg bg-blue-900/30 p-3 print:border print:bg-blue-50">
                                                                     <h4 className="mb-2 text-sm font-semibold text-blue-300 print:text-blue-800">
-                                                                        💧 Irrigation Points in
-                                                                        Zone:
+                                                                        💧 {t('Irrigation Points in Zone:')}
                                                                     </h4>
                                                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                                                         <div className="rounded bg-blue-700/20 p-2 text-center print:bg-blue-50">
                                                                             <div className="text-blue-200 print:text-blue-800">
-                                                                                🟢 Sprinklers
+                                                                                🟢 {t('Sprinklers')}
                                                                             </div>
                                                                             <div className="font-semibold text-blue-100 print:text-blue-900">
                                                                                 {
@@ -7309,13 +7312,13 @@ export default function FieldCropSummary() {
                                                                     </div>
                                                                     <div className="mt-2 rounded bg-blue-800/30 p-2 text-center print:bg-blue-100">
                                                                         <div className="text-xs text-blue-200 print:text-blue-700">
-                                                                            Total Irrigation Points:
+                                                                            {t('Total Irrigation Points:')}
                                                                         </div>
                                                                         <div className="text-sm font-bold text-blue-100 print:text-blue-900">
                                                                             {
                                                                                 zoneIrrigationCounts.total
                                                                             }{' '}
-                                                                            จุด
+                                                                            {t('points')}
                                                                         </div>
                                                                     </div>
                                                                 </div>

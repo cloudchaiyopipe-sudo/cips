@@ -208,47 +208,6 @@ const isPointInOrOnPolygon = (point: Coordinate, polygon: Coordinate[]): boolean
     return false;
 };
 
-const computeConvexHull = (points: Coordinate[]): Coordinate[] => {
-    if (points.length < 3) return points;
-
-    let bottomMost = points[0];
-    for (const point of points) {
-        if (
-            point.lat < bottomMost.lat ||
-            (point.lat === bottomMost.lat && point.lng < bottomMost.lng)
-        ) {
-            bottomMost = point;
-        }
-    }
-
-    const sortedPoints = points
-        .filter((p) => p !== bottomMost)
-        .sort((a, b) => {
-            const angleA = Math.atan2(a.lat - bottomMost.lat, a.lng - bottomMost.lng);
-            const angleB = Math.atan2(b.lat - bottomMost.lat, b.lng - bottomMost.lng);
-            return angleA - angleB;
-        });
-
-    const hull = [bottomMost];
-
-    for (const point of sortedPoints) {
-        while (hull.length > 1) {
-            const last = hull[hull.length - 1];
-            const secondLast = hull[hull.length - 2];
-
-            const cross =
-                (last.lng - secondLast.lng) * (point.lat - secondLast.lat) -
-                (last.lat - secondLast.lat) * (point.lng - secondLast.lng);
-
-            if (cross > 0) break;
-            hull.pop();
-        }
-        hull.push(point);
-    }
-
-    return hull;
-};
-
 const getObstacleColors = (type: string) => {
     const obstacleType = type as keyof typeof FIELD_STYLING.OBSTACLES;
     if (
@@ -273,9 +232,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
     // ==================== STATE ====================
     const [desiredZoneCount, setDesiredZoneCount] = useState<number>(4);
     const [isGeneratingZones, setIsGeneratingZones] = useState<boolean>(false);
-    const [zoneGenerationMethod, setZoneGenerationMethod] = useState<'convexHull' | 'voronoi'>(
-        'voronoi'
-    );
     const [zoneStats, setZoneStats] = useState<ZoneStats | null>(null);
     const [pointReductionMessage, setPointReductionMessage] = useState<string | null>(null);
 
@@ -311,6 +267,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
     const irrigationCirclesRef = useRef<google.maps.Circle[]>([]);
     const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
     const suppressUpdatesRef = useRef<boolean>(false);
+    const latestZonesRef = useRef<Zone[]>(fieldData.zones);
     // Note: useMapRefs hook is not needed as we use individual refs directly
 
     // On browser reload, keep zones to persist user-created zones
@@ -759,44 +716,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         [fieldData.mainArea]
     );
 
-    // Voronoi-based zone generation is now available as an alternative to convex hull
-
-    const createConvexHullZones = useCallback(
-        (clusters: CombinedPoint[][]): Zone[] => {
-            return clusters.map((cluster, index) => {
-                const coords = cluster.map((p) => ({ lat: p.lat, lng: p.lng }));
-                let hull = computeConvexHull(coords);
-
-                // Expand the hull slightly to ensure better coverage of irrigation points
-                if (hull.length >= 3) {
-                    const center = {
-                        lat: hull.reduce((sum, p) => sum + p.lat, 0) / hull.length,
-                        lng: hull.reduce((sum, p) => sum + p.lng, 0) / hull.length,
-                    };
-
-                    // Expand each point outward by a small factor
-                    const expansionFactor = 1.1; // 10% expansion
-                    hull = hull.map((point) => ({
-                        lat: center.lat + (point.lat - center.lat) * expansionFactor,
-                        lng: center.lng + (point.lng - center.lng) * expansionFactor,
-                    }));
-                }
-
-                const waterInfo = calculateZoneWaterInfo(hull);
-
-                return {
-                    id: `convex-zone-${Date.now()}-${index}`,
-                    name: `${t('Zone')} ${index + 1} (${waterInfo.waterRequirement.toFixed(1)} ${t('liters per irrigation')})`,
-                    coordinates: hull,
-                    color: ZONE_COLORS[index % ZONE_COLORS.length],
-                    cropType: fieldData.selectedCrops[0],
-                    ...waterInfo,
-                };
-            });
-        },
-        [fieldData.selectedCrops, calculateZoneWaterInfo, t]
-    );
-
     const createVoronoiZones = useCallback(
         (clusters: CombinedPoint[][]): Zone[] => {
             if (clusters.length === 0) return [];
@@ -946,10 +865,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 throw new Error('K-means clustering failed to produce valid clusters');
             }
 
-            const newZones: Zone[] =
-                zoneGenerationMethod === 'voronoi'
-                    ? createVoronoiZones(clusters)
-                    : createConvexHullZones(clusters);
+            const newZones: Zone[] = createVoronoiZones(clusters);
 
             if (!newZones || newZones.length === 0) {
                 throw new Error(t('No zones were generated successfully'));
@@ -973,85 +889,12 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         fieldData.totalWaterRequirement,
         desiredZoneCount,
         performKMeansClustering,
-        createConvexHullZones,
         createVoronoiZones,
         calculateZoneStats,
         memoizedCombinedPoints,
-        zoneGenerationMethod,
         updateFieldData,
         t,
-    ]); // Use memoizedCombinedPoints instead of createCombinedPoints
-
-    const generateAutoZones = useCallback(() => {
-        if (fieldData.mainArea.length < 3) return;
-
-        const bounds = {
-            minLat: Math.min(...fieldData.mainArea.map((p) => p.lat)),
-            maxLat: Math.max(...fieldData.mainArea.map((p) => p.lat)),
-            minLng: Math.min(...fieldData.mainArea.map((p) => p.lng)),
-            maxLng: Math.max(...fieldData.mainArea.map((p) => p.lng)),
-        };
-
-        const centerLat = (bounds.minLat + bounds.maxLat) / 2;
-        const centerLng = (bounds.minLng + bounds.maxLng) / 2;
-
-        const simpleZoneCoordinates = [
-            [
-                { lat: bounds.minLat, lng: bounds.minLng },
-                { lat: centerLat, lng: bounds.minLng },
-                { lat: centerLat, lng: centerLng },
-                { lat: bounds.minLat, lng: centerLng },
-            ],
-            [
-                { lat: centerLat, lng: bounds.minLng },
-                { lat: bounds.maxLat, lng: bounds.minLng },
-                { lat: bounds.maxLat, lng: centerLng },
-                { lat: centerLat, lng: centerLng },
-            ],
-            [
-                { lat: bounds.minLat, lng: centerLng },
-                { lat: centerLat, lng: centerLng },
-                { lat: centerLat, lng: bounds.maxLng },
-                { lat: bounds.minLat, lng: bounds.maxLng },
-            ],
-            [
-                { lat: centerLat, lng: centerLng },
-                { lat: bounds.maxLat, lng: centerLng },
-                { lat: bounds.maxLat, lng: bounds.maxLng },
-                { lat: centerLat, lng: bounds.maxLng },
-            ],
-        ];
-
-        const autoZones = simpleZoneCoordinates.map((coordinates, index) => {
-            const waterInfo = calculateZoneWaterInfo(coordinates);
-
-            return {
-                id: `auto-${index + 1}`,
-                name: `Zone ${index + 1}`,
-                coordinates,
-                color: ZONE_COLORS[index],
-                cropType: fieldData.selectedCrops[0],
-                ...waterInfo,
-            };
-        });
-
-        updateFieldData({ zones: autoZones });
-
-        const targetWaterPerZone = fieldData.totalWaterRequirement / 4;
-        const stats = calculateZoneStats(autoZones, targetWaterPerZone);
-        setZoneStats(stats);
-
-        // Auto zone generation completed
-
-        // Note: saveState is no longer needed as updateFieldData automatically saves to localStorage
-    }, [
-        fieldData.mainArea,
-        fieldData.selectedCrops,
-        fieldData.totalWaterRequirement,
-        calculateZoneWaterInfo,
-        calculateZoneStats,
-        updateFieldData,
-    ]); // Keep all dependencies as they are needed for auto zone generation
+    ]);
 
     // ==================== MAP FUNCTIONS ====================
     const clearMapObjects = useCallback(() => {
@@ -1197,10 +1040,10 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 }
             });
             if (removedCount > 0) {
-                setPointReductionMessage(`${removedCount} โซนถูกลบเนื่องจากถูกทับซ้อนทั้งหมด`);
+                setPointReductionMessage(t('Zones removed overlap').replace('{count}', String(removedCount)));
                 setTimeout(() => setPointReductionMessage(null), 4000);
             } else if (modifiedCount > 0) {
-                setPointReductionMessage(`${modifiedCount} โซนถูกปรับรูปทรงเพื่อลบส่วนที่ทับซ้อน`);
+                setPointReductionMessage(t('Zones adjusted overlap').replace('{count}', String(modifiedCount)));
                 setTimeout(() => setPointReductionMessage(null), 4000);
             }
 
@@ -1523,22 +1366,24 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                     currentDrawingMode === google.maps.drawing.OverlayType.POLYGON;
 
                 if (zoneEditingState.isDrawing || isCurrentlyDrawing) {
-                    const mainAreaBounds = new google.maps.LatLngBounds();
-                    fieldData.mainArea.forEach((p) => mainAreaBounds.extend(p));
-
-                    const isValid = coordinates.every((coord) => mainAreaBounds.contains(coord));
+                    // Validate against the real main polygon (not only bounding box)
+                    const isValid = coordinates.every((coord) =>
+                        isPointInOrOnPolygon(coord, fieldData.mainArea)
+                    );
 
                     if (!isValid) {
                         alert(t('Zone must be drawn within the main field area'));
                         polygon.setMap(null);
-                        setZoneEditingState((prev) => ({ ...prev, isDrawing: false }));
-                        drawingManager.setDrawingMode(null);
+                        // Keep drawing mode active so user can retry immediately
+                        setZoneEditingState((prev) => ({ ...prev, isDrawing: true }));
+                        drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
                         return;
                     }
 
                     const waterInfo = calculateZoneWaterInfo(coordinates);
                     const irrigationInfo = calculateZoneIrrigationInfo(coordinates);
-                    const zoneIndex = fieldData.zones.length;
+                    const existingZones = latestZonesRef.current;
+                    const zoneIndex = existingZones.length;
                     const previewColor =
                         (polygon.get('fillColor') as string) ||
                         (polygon.get('strokeColor') as string) ||
@@ -1547,7 +1392,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                 | google.maps.PolygonOptions
                                 | undefined
                         )?.fillColor as string) ||
-                        getNextZoneColor(fieldData.zones);
+                        getNextZoneColor(existingZones);
 
                     const newZone: Zone = {
                         id: `manual-zone-${Date.now()}`,
@@ -1560,7 +1405,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
                     polygon.setMap(null);
 
-                    const updatedZones = [...fieldData.zones, newZone];
+                    const updatedZones = [...existingZones, newZone];
                     updateFieldData({ zones: updatedZones });
                     setTimeout(() => {
                         const stats = calculateZoneStats(updatedZones, defaultWaterPerZone);
@@ -1586,7 +1431,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
         [
             fieldData.mainArea,
             fieldData.selectedCrops,
-            fieldData.zones,
             fieldData.mapCenter,
             fieldData.mapZoom,
             zoneEditingState.isDrawing,
@@ -1608,6 +1452,10 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
             updateMapVisuals(mapRef.current, false);
         }
     }, [fieldData.zones, fieldData.selectedCrops, zoneEditingState.currentEdit, updateMapVisuals]); // Remove calculateZoneIrrigationInfo
+
+    useEffect(() => {
+        latestZonesRef.current = fieldData.zones;
+    }, [fieldData.zones]);
 
     useEffect(() => {
         zonePolygonsRef.current.forEach((poly, zoneId) => {
@@ -2000,28 +1848,12 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                         </div>
                                     )}
 
-                                    {/* 1. Auto zones */}
+                                    {/* 1. สร้างโซนอัตโนมัติ (ใช้ Voronoi ไม่แสดงชื่อ) */}
                                     <div className="rounded-lg border border-white/50 p-3">
                                         <h3 className="mb-2 text-xs font-semibold text-white">
                                             {t('Step3Block1')}
                                         </h3>
                                         <div className="space-y-2">
-                                            <div className="flex gap-1 rounded bg-gray-700 p-0.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setZoneGenerationMethod('voronoi')}
-                                                    className={`flex-1 rounded py-1 text-xs ${zoneGenerationMethod === 'voronoi' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
-                                                >
-                                                    {t('Voronoi')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setZoneGenerationMethod('convexHull')}
-                                                    className={`flex-1 rounded py-1 text-xs ${zoneGenerationMethod === 'convexHull' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
-                                                >
-                                                    {t('Convex Hull')}
-                                                </button>
-                                            </div>
                                             <div className="flex items-center gap-2">
                                                 <label className="shrink-0 text-xs text-gray-400">
                                                     {t('Number of Zones')}:
@@ -2055,13 +1887,6 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                                                 className="w-full rounded border border-white bg-blue-600 px-2 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
                                             >
                                                 {isGeneratingZones ? t('Generating Smart Zones...') : t('Generate Smart Zones')}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={generateAutoZones}
-                                                className="w-full rounded border border-white/70 bg-green-600 px-2 py-1.5 text-xs text-white hover:bg-green-700"
-                                            >
-                                                {t('Generate Simple Auto Zones')}
                                             </button>
                                         </div>
                                     </div>

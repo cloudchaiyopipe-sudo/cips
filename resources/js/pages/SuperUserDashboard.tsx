@@ -9,6 +9,8 @@ import Navbar from '../components/Navbar';
 import PaymentReviewModal from '../components/PaymentReviewModal';
 import PaymentEditModal from '../components/PaymentEditModal';
 import HorticultureMapPreview from '../components/horticulture/HorticultureMapPreview';
+import { clearGardenDataCache } from '../utils/homeGardenData';
+import QuotationDocument from './components/QuotationDocument';
 import {
     FaUsers,
     FaFolder,
@@ -73,6 +75,8 @@ type Field = {
     field_crop_data?: any;
     createdAt?: string;
     area?: Array<{ lat: number; lng: number }>;
+    layers?: Array<{ type: string; coordinates: Array<{ lat: number; lng: number }> }>;
+    customerName?: string;
 };
 
 type Folder = {
@@ -165,6 +169,10 @@ export default function SuperUserDashboard() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [fieldToDelete, setFieldToDelete] = useState<Field | null>(null);
     const [deleting, setDeleting] = useState(false);
+    // Open project (finished → modal with planner/product/quotation)
+    const [showFinishedProjectModal, setShowFinishedProjectModal] = useState(false);
+    const [selectedFinishedProject, setSelectedFinishedProject] = useState<Field | null>(null);
+    const [showQuotationModal, setShowQuotationModal] = useState(false);
 
     useEffect(() => {
         loadDashboardData();
@@ -319,6 +327,70 @@ export default function SuperUserDashboard() {
     const cancelDelete = () => {
         setShowDeleteConfirm(false);
         setFieldToDelete(null);
+    };
+
+    /** Open project: if finished show modal (planner/product/quotation); else go to planner by category (same as home) */
+    const handleOpenProject = (field: Field) => {
+        try {
+            localStorage.setItem('currentFieldId', field.id);
+            localStorage.setItem('currentFieldName', field.name);
+
+            if (field.status === 'finished' || field.isCompleted) {
+                setSelectedFinishedProject(field);
+                setShowFinishedProjectModal(true);
+                return;
+            }
+
+            switch (field.category) {
+                case 'home-garden': {
+                    clearGardenDataCache();
+                    if (field.garden_data) {
+                        const gardenData = typeof field.garden_data === 'string' ? (() => { try { return JSON.parse(field.garden_data); } catch { return null; } })() : field.garden_data;
+                        if (gardenData) localStorage.setItem('gardenPlannerData', JSON.stringify(gardenData));
+                    }
+                    router.visit('/home-garden/planner');
+                    break;
+                }
+                case 'field-crop':
+                    router.visit('/field-crop');
+                    break;
+                case 'greenhouse': {
+                    const greenhouseData = field.greenhouse_data;
+                    const crops = greenhouseData?.selectedCrops || [];
+                    const method = greenhouseData?.planningMethod || 'draw';
+                    const lastSavedPage = greenhouseData?.lastSavedPage || 'planner';
+                    const queryParams = new URLSearchParams();
+                    if (crops.length > 0) queryParams.set('crops', crops.join(','));
+                    if (method) queryParams.set('method', method);
+                    if (greenhouseData?.lastSavedPage === 'irrigation-selection' && greenhouseData?.shapes) {
+                        queryParams.set('shapes', encodeURIComponent(JSON.stringify(greenhouseData.shapes)));
+                        router.visit(`/choose-irrigation?${queryParams.toString()}`);
+                    } else if (greenhouseData?.lastSavedPage === 'irrigation-design') {
+                        if (greenhouseData?.shapes) queryParams.set('shapes', encodeURIComponent(JSON.stringify(greenhouseData.shapes)));
+                        if (greenhouseData?.irrigationMethod) queryParams.set('irrigation', greenhouseData.irrigationMethod);
+                        router.visit(`/greenhouse-map?${queryParams.toString()}`);
+                    } else {
+                        router.visit(`/greenhouse-planner?${queryParams.toString()}`);
+                    }
+                    break;
+                }
+                case 'horticulture':
+                default: {
+                    const params = new URLSearchParams({
+                        area: JSON.stringify(field.area || []),
+                        areaType: '',
+                        plantType: JSON.stringify(field.plantType || {}),
+                        layers: JSON.stringify(field.layers || []),
+                        editFieldId: field.id,
+                    });
+                    router.visit(`/horticulture/planner?${params.toString()}`);
+                    break;
+                }
+            }
+        } catch (error: any) {
+            console.error('Error opening project:', error);
+            alert(t('error_opening_field') || 'ไม่สามารถเปิดโครงการได้');
+        }
     };
 
     const handleCreateUser = async (
@@ -1873,6 +1945,7 @@ export default function SuperUserDashboard() {
                     folders={userFolders}
                     fields={userFields}
                     loading={loadingUserProjects}
+                    onOpenProject={handleOpenProject}
                     onRename={handleRenameProject}
                     onMove={handleMoveProject}
                     onCopy={handleCopyProject}
@@ -2094,6 +2167,224 @@ export default function SuperUserDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Finished Project Modal (open in planner / product / quotation) */}
+            {showFinishedProjectModal && selectedFinishedProject && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-75">
+                    <div className="relative mx-4 w-full max-w-lg rounded-lg bg-gray-800 p-6 shadow-xl">
+                        <button
+                            onClick={() => {
+                                setShowFinishedProjectModal(false);
+                                setSelectedFinishedProject(null);
+                            }}
+                            className="absolute right-3 top-3 text-gray-400 hover:text-white"
+                        >
+                            <FaTimes className="h-5 w-5" />
+                        </button>
+                        <h3 className="mb-4 text-lg font-semibold text-white">
+                            {selectedFinishedProject.name}
+                        </h3>
+                        <p className="mb-4 text-sm text-gray-400">
+                            {t('select_action') || 'เลือกการดำเนินการ'}
+                        </p>
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => {
+                                    setShowFinishedProjectModal(false);
+                                    localStorage.setItem('currentFieldId', selectedFinishedProject.id);
+                                    localStorage.setItem('currentFieldName', selectedFinishedProject.name);
+                                    localStorage.setItem('isEditingExistingProject', 'true');
+                                    const projectData = (selectedFinishedProject as any).projectData || selectedFinishedProject.project_data;
+                                    if (projectData) {
+                                        const data = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+                                        localStorage.setItem('horticultureIrrigationData', JSON.stringify(data));
+                                        localStorage.setItem('horticultureProjectData', JSON.stringify(data));
+                                        if (data.mainArea) localStorage.setItem('horticultureMainArea', JSON.stringify(data.mainArea));
+                                        if (data.plants) localStorage.setItem('horticulturePlants', JSON.stringify(data.plants));
+                                        if (data.irrigationZones) localStorage.setItem('horticultureIrrigationZones', JSON.stringify(data.irrigationZones));
+                                        if (data.zones) localStorage.setItem('horticultureZones', JSON.stringify(data.zones));
+                                        if (data.exclusionAreas) localStorage.setItem('horticultureExclusionAreas', JSON.stringify(data.exclusionAreas));
+                                        if (data.mainPipes) localStorage.setItem('horticultureMainPipes', JSON.stringify(data.mainPipes));
+                                        if (data.subMainPipes) localStorage.setItem('horticultureSubMainPipes', JSON.stringify(data.subMainPipes));
+                                        if (data.lateralPipes) localStorage.setItem('horticultureLateralPipes', JSON.stringify(data.lateralPipes));
+                                        if (data.pump) localStorage.setItem('horticulturePump', JSON.stringify(data.pump));
+                                        if (data.selectedPlantType) localStorage.setItem('selectedPlantType', JSON.stringify(data.selectedPlantType));
+                                    }
+                                    const projectStats = (selectedFinishedProject as any).projectStats || selectedFinishedProject.project_stats;
+                                    if (projectStats) {
+                                        const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+                                        if (stats.zoneInputs) localStorage.setItem('horticultureZoneInputs', JSON.stringify(stats.zoneInputs));
+                                        if (stats.zoneSprinklers) localStorage.setItem('horticultureZoneSprinklers', JSON.stringify(stats.zoneSprinklers));
+                                    }
+                                    if (selectedFinishedProject.category === 'home-garden') {
+                                        clearGardenDataCache();
+                                        if (selectedFinishedProject.garden_data) {
+                                            const gd = typeof selectedFinishedProject.garden_data === 'string' ? JSON.parse(selectedFinishedProject.garden_data) : selectedFinishedProject.garden_data;
+                                            localStorage.setItem('gardenPlannerData', JSON.stringify(gd));
+                                        }
+                                        if (selectedFinishedProject.garden_stats) {
+                                            const gs = typeof selectedFinishedProject.garden_stats === 'string' ? JSON.parse(selectedFinishedProject.garden_stats) : selectedFinishedProject.garden_stats;
+                                            localStorage.setItem('gardenStatistics', JSON.stringify(gs));
+                                        }
+                                    }
+                                    if (selectedFinishedProject.category === 'field-crop' && selectedFinishedProject.field_crop_data) {
+                                        const fcd = typeof selectedFinishedProject.field_crop_data === 'string' ? JSON.parse(selectedFinishedProject.field_crop_data) : selectedFinishedProject.field_crop_data;
+                                        localStorage.setItem('fieldCropData', JSON.stringify(fcd));
+                                    }
+                                    if (selectedFinishedProject.category) localStorage.setItem('projectType', selectedFinishedProject.category);
+                                    if (selectedFinishedProject.category === 'greenhouse' && selectedFinishedProject.greenhouse_data) {
+                                        const gh = typeof selectedFinishedProject.greenhouse_data === 'string' ? JSON.parse(selectedFinishedProject.greenhouse_data) : selectedFinishedProject.greenhouse_data;
+                                        localStorage.setItem('greenhouseData', JSON.stringify(gh));
+                                    }
+                                    const plannerModeMap: { [key: string]: string } = {
+                                        horticulture: '/horticulture/planner',
+                                        'home-garden': '/home-garden/planner',
+                                        'field-crop': '/field-crop/planner',
+                                        greenhouse: '/greenhouse/planner',
+                                    };
+                                    const route = plannerModeMap[selectedFinishedProject.category || 'horticulture'] || '/horticulture/planner';
+                                    router.visit(route);
+                                }}
+                                className="w-full rounded-lg bg-green-600 px-6 py-4 text-left text-white transition-colors hover:bg-green-700"
+                            >
+                                <div className="flex items-center">
+                                    <span className="mr-3 text-2xl">🗺️</span>
+                                    <div>
+                                        <p className="font-semibold">{t('open_in_planner')}</p>
+                                        <p className="text-sm text-green-200">{t('edit_map_and_layout')}</p>
+                                    </div>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowFinishedProjectModal(false);
+                                    localStorage.setItem('currentFieldId', selectedFinishedProject.id);
+                                    localStorage.setItem('currentFieldName', selectedFinishedProject.name);
+                                    const projectData = (selectedFinishedProject as any).projectData || selectedFinishedProject.project_data;
+                                    if (projectData) {
+                                        const data = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+                                        localStorage.setItem('horticultureProjectData', JSON.stringify(data));
+                                    }
+                                    const projectStats = (selectedFinishedProject as any).projectStats || selectedFinishedProject.project_stats;
+                                    if (projectStats) {
+                                        const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+                                        if (stats.zoneInputs) localStorage.setItem('zoneInputs', JSON.stringify(stats.zoneInputs));
+                                        if (stats.zoneSprinklers) localStorage.setItem('zoneSprinklers', JSON.stringify(stats.zoneSprinklers));
+                                        if (stats.selectedPipes) localStorage.setItem('selectedPipes', JSON.stringify(stats.selectedPipes));
+                                        if (stats.selectedPump) localStorage.setItem('selectedPump', JSON.stringify(stats.selectedPump));
+                                        if (stats.sprinklerEquipmentSets) localStorage.setItem('sprinklerEquipmentSets', JSON.stringify(stats.sprinklerEquipmentSets));
+                                        if (stats.connectionEquipments) localStorage.setItem('connectionEquipments', JSON.stringify(stats.connectionEquipments));
+                                        if (stats.results) localStorage.setItem('calculationResults', JSON.stringify(stats.results));
+                                    }
+                                    if (selectedFinishedProject.category === 'field-crop' && selectedFinishedProject.field_crop_data) {
+                                        const fcd = typeof selectedFinishedProject.field_crop_data === 'string' ? JSON.parse(selectedFinishedProject.field_crop_data) : selectedFinishedProject.field_crop_data;
+                                        localStorage.setItem('fieldCropData', JSON.stringify(fcd));
+                                    }
+                                    if (selectedFinishedProject.category) localStorage.setItem('projectType', selectedFinishedProject.category);
+                                    const productModeMap: { [key: string]: string } = {
+                                        horticulture: '',
+                                        'home-garden': '?mode=garden',
+                                        'field-crop': '?mode=field-crop',
+                                        greenhouse: '?mode=greenhouse',
+                                    };
+                                    const modeParam = productModeMap[selectedFinishedProject.category || 'horticulture'] || '';
+                                    router.visit(`/product${modeParam}`);
+                                }}
+                                className="w-full rounded-lg bg-blue-600 px-6 py-4 text-left text-white transition-colors hover:bg-blue-700"
+                            >
+                                <div className="flex items-center">
+                                    <span className="mr-3 text-2xl">🛠️</span>
+                                    <div>
+                                        <p className="font-semibold">{t('open_in_product')}</p>
+                                        <p className="text-sm text-blue-200">{t('edit_equipment_and_costs')}</p>
+                                    </div>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowFinishedProjectModal(false);
+                                    setSelectedFinishedProject(selectedFinishedProject);
+                                    setShowQuotationModal(true);
+                                }}
+                                className="w-full rounded-lg bg-purple-600 px-6 py-4 text-left text-white transition-colors hover:bg-purple-700"
+                            >
+                                <div className="flex items-center">
+                                    <span className="mr-3 text-2xl">📋</span>
+                                    <div>
+                                        <p className="font-semibold">{t('view_quotation')}</p>
+                                        <p className="text-sm text-purple-200">{t('view_and_print_quotation')}</p>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => { setShowFinishedProjectModal(false); setSelectedFinishedProject(null); }}
+                            className="mt-6 w-full rounded-lg bg-gray-600 px-6 py-2 text-white transition-colors hover:bg-gray-700"
+                        >
+                            {t('cancel')}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Quotation Modal */}
+            {showQuotationModal && selectedFinishedProject && (() => {
+                const projectStats = (selectedFinishedProject as any).projectStats || selectedFinishedProject.project_stats;
+                const stats = typeof projectStats === 'string' ? JSON.parse(projectStats) : projectStats;
+                const projectData = (selectedFinishedProject as any).projectData || selectedFinishedProject.project_data;
+                const parsedProjectData = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+                return (
+                    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black bg-opacity-90">
+                        <div className="relative mx-4 h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white p-6">
+                            <button
+                                onClick={() => { setShowQuotationModal(false); setSelectedFinishedProject(null); }}
+                                className="absolute right-4 top-4 z-10 rounded-full bg-red-600 p-2 text-white hover:bg-red-700"
+                            >
+                                ×
+                            </button>
+                            {stats && stats.results ? (
+                                <QuotationDocument
+                                    show={true}
+                                    results={stats.results}
+                                    zoneSprinklers={stats.zoneSprinklers || {}}
+                                    selectedPipes={stats.selectedPipes || {}}
+                                    selectedSprinkler={Object.values(stats.zoneSprinklers || {})[0] || null}
+                                    selectedPump={stats.selectedPump}
+                                    selectedBranchPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.branch || null}
+                                    selectedSecondaryPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.secondary || null}
+                                    selectedMainPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.main || null}
+                                    selectedEmitterPipe={(stats.selectedPipes && Object.values(stats.selectedPipes)[0] as any)?.emitter || null}
+                                    projectData={parsedProjectData}
+                                    gardenData={selectedFinishedProject.garden_data}
+                                    gardenStats={selectedFinishedProject.garden_stats}
+                                    fieldCropData={selectedFinishedProject.field_crop_data}
+                                    greenhouseData={selectedFinishedProject.greenhouse_data}
+                                    zoneInputs={stats.zoneInputs || {}}
+                                    quotationData={{ yourReference: '', quotationDate: new Date().toLocaleString('th-TH'), salesperson: '', paymentTerms: '0' }}
+                                    quotationDataCustomer={{
+                                        name: (selectedFinishedProject as any).customerName || '',
+                                        projectName: selectedFinishedProject.name,
+                                        address: '',
+                                        phone: '',
+                                    }}
+                                    projectMode={selectedFinishedProject.category as any}
+                                    sprinklerEquipmentSets={stats.sprinklerEquipmentSets || {}}
+                                    connectionEquipments={stats.connectionEquipments || {}}
+                                    projectImage={parsedProjectData?.projectImage || null}
+                                    showPump={true}
+                                    onClose={() => { setShowQuotationModal(false); setSelectedFinishedProject(null); }}
+                                />
+                            ) : (
+                                <div className="text-center text-gray-800">
+                                    <h2 className="mb-4 text-2xl font-bold">📋 {t('quotation_title')}</h2>
+                                    <p className="mb-4">{t('project_label')}: {selectedFinishedProject.name}</p>
+                                    <p className="text-red-600">{t('no_quotation_data')}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
@@ -2612,6 +2903,7 @@ const ViewUserProjectsModal = ({
     folders,
     fields,
     loading,
+    onOpenProject,
     onRename,
     onMove,
     onCopy,
@@ -2626,6 +2918,7 @@ const ViewUserProjectsModal = ({
     folders: Folder[];
     fields: Field[];
     loading: boolean;
+    onOpenProject?: (field: Field) => void;
     onRename?: (field: Field) => void;
     onMove?: (field: Field) => void;
     onCopy?: (field: Field) => void;
@@ -2715,6 +3008,7 @@ const ViewUserProjectsModal = ({
                                                         <UserFieldCard
                                                             key={field.id}
                                                             field={field}
+                                                            onOpenProject={onOpenProject}
                                                             onMenuToggle={(fieldId) => {
                                                                 setSelectedFieldMenu(selectedFieldMenu === fieldId ? null : fieldId);
                                                             }}
@@ -2751,6 +3045,7 @@ const ViewUserProjectsModal = ({
                                                     <UserFieldCard
                                                         key={field.id}
                                                         field={field}
+                                                        onOpenProject={onOpenProject}
                                                         onMenuToggle={(fieldId) => {
                                                             setSelectedFieldMenu(selectedFieldMenu === fieldId ? null : fieldId);
                                                         }}
@@ -2780,6 +3075,7 @@ const ViewUserProjectsModal = ({
 // User Field Card Component (simplified version for modal)
 const UserFieldCard = ({
     field,
+    onOpenProject,
     onMenuToggle,
     showMenu,
     onRename,
@@ -2791,6 +3087,7 @@ const UserFieldCard = ({
     t,
 }: {
     field: Field;
+    onOpenProject?: (field: Field) => void;
     onMenuToggle: (fieldId: string) => void;
     showMenu: boolean;
     onRename?: (field: Field) => void;
@@ -2804,7 +3101,11 @@ const UserFieldCard = ({
     const isFinished = field.status === 'finished' || field.isCompleted;
 
     return (
-        <div className="group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-4 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10">
+        <div
+            className={`group relative overflow-hidden rounded-lg border border-gray-700 bg-gray-800 p-4 transition-all duration-200 hover:border-blue-500 hover:bg-blue-900/10 ${onOpenProject ? 'cursor-pointer' : ''}`}
+            onClick={() => onOpenProject?.(field)}
+            role={onOpenProject ? 'button' : undefined}
+        >
             {/* Field Header */}
             <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
