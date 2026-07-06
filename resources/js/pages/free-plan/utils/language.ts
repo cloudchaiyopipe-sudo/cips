@@ -409,10 +409,7 @@ export interface LanguageTranslations {
     scanQRCodeToContact: string;
     orAddFriendAtLineId: string;
     close: string;
-    // Contact modal (same as Navbar)
-    contactModalChooseChannel: string;
-    contactModalProgram: string;
-    contactModalProgramDesc: string;
+    // Contact modal
     contactModalScanQR: string;
     contactModalLineId: string;
     contactModalOpenLine: string;
@@ -679,9 +676,6 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         currentLineId: 'Current LINE ID:',
         pleaseEnterLineId: 'Please enter LINE ID',
 
-        contactModalChooseChannel: 'Choose contact channel by consultation type',
-        contactModalProgram: 'Program support',
-        contactModalProgramDesc: 'Mainly consultation on program usage',
         contactModalScanQR: 'Scan QR Code to add Line',
         contactModalLineId: 'Line ID',
         contactModalOpenLine: 'Open Line',
@@ -1253,9 +1247,6 @@ export const translations: Record<'EN' | 'TH', LanguageTranslations> = {
         currentLineId: 'LINE ID ปัจจุบัน:',
         pleaseEnterLineId: 'กรุณากรอก LINE ID',
 
-        contactModalChooseChannel: 'เลือกช่องทางติดต่อตามประเภทคำปรึกษา',
-        contactModalProgram: 'ติดต่อเรื่องโปรแกรม',
-        contactModalProgramDesc: 'ให้คำปรึกษาการใช้งานโปรแกรมเป็นหลัก',
         contactModalScanQR: 'สแกน QR Code เพื่อเพิ่ม Line',
         contactModalLineId: 'Line ID',
         contactModalOpenLine: 'เปิด Line',

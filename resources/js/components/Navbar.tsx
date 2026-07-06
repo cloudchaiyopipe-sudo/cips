@@ -34,7 +34,6 @@ const Navbar: React.FC = () => {
 
     // State for contact modal
     const [showContactModal, setShowContactModal] = useState(false);
-    const [contactQrProgramError, setContactQrProgramError] = useState(false);
     const [contactQrInstallError, setContactQrInstallError] = useState(false);
 
     // State for suggestion/feedback modal (คำแนะนำ)
@@ -728,10 +727,10 @@ const Navbar: React.FC = () => {
                 </div>
             )}
 
-            {/* Contact Modal - 2 sections: Program support & Water system installation */}
+            {/* Contact Modal - Water system installation team */}
             {showContactModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4">
-                    <div className="relative z-[10000] max-h-[95vh] sm:max-h-[90vh] w-full max-w-[calc(100vw-1rem)] sm:max-w-4xl overflow-y-auto rounded-2xl bg-gray-900 p-4 sm:p-6 md:p-8 mx-2 sm:mx-0">
+                    <div className="relative z-[10000] max-h-[95vh] sm:max-h-[90vh] w-full max-w-[calc(100vw-1rem)] sm:max-w-lg overflow-y-auto rounded-2xl bg-gray-900 p-4 sm:p-6 md:p-8 mx-2 sm:mx-0">
                         {/* Header */}
                         <div className="mb-4 sm:mb-6 flex items-center justify-between gap-2">
                             <div className="min-w-0 flex-1">
@@ -739,13 +738,12 @@ const Navbar: React.FC = () => {
                                     {t('ติดต่อ')}
                                 </h2>
                                 <p className="text-xs sm:text-sm text-gray-400">
-                                    {t('เลือกช่องทางติดต่อตามประเภทคำปรึกษา')}
+                                    {t('ให้คำปรึกษาเกี่ยวกับการติดตั้งระบบน้ำ')}
                                 </p>
                             </div>
                             <button
                                 onClick={() => {
                                     setShowContactModal(false);
-                                    setContactQrProgramError(false);
                                     setContactQrInstallError(false);
                                 }}
                                 className="text-gray-400 transition-colors hover:text-white flex-shrink-0"
@@ -766,58 +764,7 @@ const Navbar: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                            {/* Section 1: ติดต่อเรื่องโปรแกรม - คำปรึกษาการใช้งานโปรแกรม */}
-                            <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6">
-                                <h3 className="mb-2 text-lg font-semibold text-white">
-                                    {t('ติดต่อเรื่องโปรแกรม')}
-                                </h3>
-                                <p className="mb-4 text-sm text-gray-400">
-                                    {t('ให้คำปรึกษาการใช้งานโปรแกรมเป็นหลัก')}
-                                </p>
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="flex flex-col items-center">
-                                        <span className="mb-2 text-xs text-gray-500">{t('สแกน QR Code เพื่อเพิ่ม Line')}</span>
-                                        <div className="h-32 w-32 rounded-lg border-2 border-gray-600 bg-white p-1 flex items-center justify-center overflow-hidden">
-                                            {!contactQrProgramError ? (
-                                                <img
-                                                    src="/images/hacks.jpg"
-                                                    alt="Line QR - โปรแกรม"
-                                                    className="h-full w-full object-contain"
-                                                    onError={() => setContactQrProgramError(true)}
-                                                />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center bg-gray-100 text-gray-500 text-xs text-center p-2">
-                                                    QR Code
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="w-full text-center">
-                                        <p className="mb-1 text-xs text-gray-500">{t('Line ID')}</p>
-                                        <p className="mb-2 font-mono text-sm font-medium text-green-400">hackskie</p>
-                                        <a
-                                            href="https://line.me/ti/p/~hackskie"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#05b04c]"
-                                        >
-                                            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-                                            </svg>
-                                            {t('เปิด Line')}
-                                        </a>
-                                    </div>
-                                    <div className="w-full border-t border-gray-700 pt-4 text-center">
-                                        <p className="mb-1 text-xs text-gray-500">{t('เบอร์โทร')}</p>
-                                        <a href="tel:0981586900" className="text-base font-medium text-white hover:text-teal-400">
-                                            098-158-6900
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 2: ทีมผู้เชี่ยวชาญติดตั้งระบบน้ำ */}
+                        <div>
                             <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5 md:p-6">
                                 <h3 className="mb-2 text-lg font-semibold text-white">
                                     {t('ทีมผู้เชี่ยวชาญติดตั้งระบบน้ำ')}

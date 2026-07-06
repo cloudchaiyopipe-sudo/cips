@@ -598,9 +598,8 @@ Route::prefix('company')->group(function () {
             'chaiyo_pipe_fitting' => [
                 'phones' => ['065-9404230', '065-9404231', '089-9892211', '086-3107020', '066-1549-5974', '02-451-1111'],
                 'fax' => '02-416-3011',
-                'emails' => ['chaiyopipeonline@gmail.com', 'chayut@kanokproduct.com'],
+                'emails' => ['chaiyopipeonline@gmail.com'],
                 'website' => 'www.chaiyopipe.co.th',
-                'line_id' => 'chayut.tee'
             ],
             'kanok_product' => [
                 'phone_main' => '02-451-1111',
