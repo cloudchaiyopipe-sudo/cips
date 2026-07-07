@@ -12,6 +12,6 @@ composer install --no-dev --optimize-autoloader
 npm install
 npm run build
 sudo mv public/build/.vite/manifest.json public/build/manifest.json
-# รันคำสั่ง Laravel กรณีที่มีการแก้ไขโครงสร้างฐานข้อมูล
+// รันคำสั่ง Laravel กรณีที่มีการแก้ไขโครงสร้างฐานข้อมูล
 php artisan migrate --force
 php artisan optimize:clear
