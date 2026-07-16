@@ -7,7 +7,7 @@ git push origin main
 # 2. บน Server ที่เมนู VM Instance กดปุ่ม SSH แล้วทำตามนี้
 cd /var/www/chaiyopipeandfitting.com
 git reset --hard HEAD
-git pull origin feature/depoly/project
+git pull origin main
 composer install --no-dev --optimize-autoloader
 npm install
 npm run build
