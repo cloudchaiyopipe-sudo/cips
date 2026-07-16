@@ -107,7 +107,8 @@ export default defineConfig(({ command, mode }) => {
                 '@turf/boolean-point-in-polygon',
                 '@turf/line-intersect',
                 '@turf/point-to-line-distance',
-                'geojson',
+                'terra-draw',
+                'terra-draw-google-maps-adapter',
             ],
             exclude: [
                 // Exclude Google Maps from pre-bundling to avoid issues
