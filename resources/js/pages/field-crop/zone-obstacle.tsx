@@ -19,6 +19,7 @@ import {
     MAP_CONFIG,
 } from '../../types/fieldCropTypes';
 import { useFieldData } from '../../hooks/useFieldData';
+import { TerraDrawingManager, OverlayType } from '../../utils/terraDrawingManager';
 
 // ==================== CONSTANTS ====================
 // 🎨 ใช้สีชุดเดียวกับ ZONE_COLORS ใน horticultureUtils.ts
@@ -265,7 +266,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
     const plantPointMarkersRef = useRef<google.maps.Marker[]>([]);
     const irrigationMarkersRef = useRef<google.maps.Marker[]>([]);
     const irrigationCirclesRef = useRef<google.maps.Circle[]>([]);
-    const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+    const drawingManagerRef = useRef<TerraDrawingManager | null>(null);
     const suppressUpdatesRef = useRef<boolean>(false);
     const latestZonesRef = useRef<Zone[]>(fieldData.zones);
     // Note: useMapRefs hook is not needed as we use individual refs directly
@@ -1336,7 +1337,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 loadedMap.setZoom(fieldData.mapZoom);
             }
 
-            const drawingManager = new google.maps.drawing.DrawingManager({
+            const drawingManager = new TerraDrawingManager({
                 drawingMode: null,
                 drawingControl: false,
                 polygonOptions: {
@@ -1362,8 +1363,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 }
 
                 const currentDrawingMode = drawingManager.getDrawingMode();
-                const isCurrentlyDrawing =
-                    currentDrawingMode === google.maps.drawing.OverlayType.POLYGON;
+                const isCurrentlyDrawing = currentDrawingMode === OverlayType.POLYGON;
 
                 if (zoneEditingState.isDrawing || isCurrentlyDrawing) {
                     // Validate against the real main polygon (not only bounding box)
@@ -1376,7 +1376,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                         polygon.setMap(null);
                         // Keep drawing mode active so user can retry immediately
                         setZoneEditingState((prev) => ({ ...prev, isDrawing: true }));
-                        drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+                        drawingManager.setDrawingMode(OverlayType.POLYGON);
                         return;
                     }
 
@@ -1517,7 +1517,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
 
     // ==================== EVENT HANDLERS ====================
     const startDrawingZone = () => {
-        if (typeof google === 'undefined' || !google.maps || !google.maps.drawing) {
+        if (typeof google === 'undefined' || !google.maps) {
             alert(t('Drawing library not loaded. Please refresh the page.'));
             return;
         }
@@ -1547,7 +1547,7 @@ export default function ZoneObstacle(props: FieldCropPageProps) {
                 clickable: false,
             },
         });
-        drawingManagerRef.current.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        drawingManagerRef.current.setDrawingMode(OverlayType.POLYGON);
     };
 
     const clearZones = () => {

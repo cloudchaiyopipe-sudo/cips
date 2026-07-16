@@ -551,12 +551,12 @@ function FreeMap() {
 
             // Get bounds based on shape type
             if (
-                shapeType === window.google.maps.drawing.OverlayType.RECTANGLE &&
+                shapeType === 'rectangle' &&
                 shapeData.bounds
             ) {
                 bounds = shapeData.bounds;
             } else if (
-                shapeType === window.google.maps.drawing.OverlayType.CIRCLE &&
+                shapeType === 'circle' &&
                 shapeData.center &&
                 shapeData.radius
             ) {
@@ -570,7 +570,7 @@ function FreeMap() {
                     west: center.lng - radius,
                 };
             } else if (
-                shapeType === window.google.maps.drawing.OverlayType.POLYGON &&
+                shapeType === 'polygon' &&
                 shapeData.path
             ) {
                 // Calculate bounds from polygon points
@@ -630,12 +630,12 @@ function FreeMap() {
                     // Check if point is within the shape (for polygon and circle)
                     let isWithinShape = true;
                     if (
-                        shapeType === window.google.maps.drawing.OverlayType.POLYGON &&
+                        shapeType === 'polygon' &&
                         shapeData.path
                     ) {
                         isWithinShape = isPointInPolygon(position, shapeData.path);
                     } else if (
-                        shapeType === window.google.maps.drawing.OverlayType.CIRCLE &&
+                        shapeType === 'circle' &&
                         shapeData.center &&
                         shapeData.radius
                     ) {
@@ -790,12 +790,7 @@ function FreeMap() {
         // Load Google Maps script
         const loadGoogleMaps = () => {
             // Check if Google Maps is already loaded with all required libraries
-            if (
-                window.google &&
-                window.google.maps &&
-                window.google.maps.drawing &&
-                window.google.maps.geometry
-            ) {
+            if (window.google && window.google.maps && window.google.maps.geometry) {
                 if (isMounted) {
                     setApiLoading(false);
                     setMapLoaded(true);
@@ -834,7 +829,7 @@ function FreeMap() {
 
             const script = document.createElement('script');
             // Include geometry library for distance/area calculations used in summary
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&libraries=places,drawing,geometry`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'}&libraries=places,geometry`;
             script.async = true;
             script.defer = true;
             script.onload = () => {
@@ -842,12 +837,7 @@ function FreeMap() {
                 script.setAttribute('data-loaded', 'true');
                 // Wait a bit more to ensure all libraries are fully loaded
                 setTimeout(() => {
-                    if (
-                        isMounted &&
-                        window.google &&
-                        window.google.maps &&
-                        window.google.maps.drawing
-                    ) {
+                    if (isMounted && window.google && window.google.maps) {
                         setApiLoading(false);
                         setMapLoaded(true);
                         initializeMap();
@@ -1450,7 +1440,7 @@ function FreeMap() {
                         let overlay: unknown = null;
 
                         if (
-                            shape.type === window.google.maps.drawing.OverlayType.POLYGON &&
+                            shape.type === 'polygon' &&
                             shape.data.path
                         ) {
                             overlay = new window.google.maps.Polygon({
@@ -1468,7 +1458,7 @@ function FreeMap() {
                             (overlay as { setMap: (map: unknown) => void }).setMap(map);
                             allDrawnShapeOverlaysRef.current.push(overlay as google.maps.Polygon);
                         } else if (
-                            shape.type === window.google.maps.drawing.OverlayType.RECTANGLE &&
+                            shape.type === 'rectangle' &&
                             shape.data.bounds
                         ) {
                             overlay = new window.google.maps.Rectangle({
@@ -1489,7 +1479,7 @@ function FreeMap() {
                             (overlay as { setMap: (map: unknown) => void }).setMap(map);
                             allDrawnShapeOverlaysRef.current.push(overlay as google.maps.Rectangle);
                         } else if (
-                            shape.type === window.google.maps.drawing.OverlayType.CIRCLE &&
+                            shape.type === 'circle' &&
                             shape.data.center &&
                             shape.data.radius
                         ) {
@@ -1629,7 +1619,7 @@ function FreeMap() {
 
                                 if (
                                     shape.type ===
-                                        window.google.maps.drawing.OverlayType.RECTANGLE &&
+                                        'rectangle' &&
                                     shape.data.bounds
                                 ) {
                                     const bounds = shape.data.bounds;
@@ -1639,7 +1629,7 @@ function FreeMap() {
                                         clickedLng >= bounds.west &&
                                         clickedLng <= bounds.east;
                                 } else if (
-                                    shape.type === window.google.maps.drawing.OverlayType.CIRCLE &&
+                                    shape.type === 'circle' &&
                                     shape.data.center &&
                                     shape.data.radius
                                 ) {
@@ -1652,7 +1642,7 @@ function FreeMap() {
                                         ) * 111000; // Convert to meters (rough approximation)
                                     isInside = distance <= radius;
                                 } else if (
-                                    shape.type === window.google.maps.drawing.OverlayType.POLYGON &&
+                                    shape.type === 'polygon' &&
                                     shape.data.path
                                 ) {
                                     // Simple point-in-polygon check
@@ -2087,7 +2077,7 @@ function FreeMap() {
                         | google.maps.Circle
                         | null = null;
                     if (
-                        shape.type === window.google.maps.drawing.OverlayType.POLYGON &&
+                        shape.type === 'polygon' &&
                         shape.data.path
                     ) {
                         overlay = new window.google.maps.Polygon({
@@ -2101,7 +2091,7 @@ function FreeMap() {
                             zIndex: 100,
                         });
                     } else if (
-                        shape.type === window.google.maps.drawing.OverlayType.RECTANGLE &&
+                        shape.type === 'rectangle' &&
                         shape.data.bounds
                     ) {
                         overlay = new window.google.maps.Rectangle({
@@ -2118,7 +2108,7 @@ function FreeMap() {
                             zIndex: 100,
                         });
                     } else if (
-                        shape.type === window.google.maps.drawing.OverlayType.CIRCLE &&
+                        shape.type === 'circle' &&
                         shape.data.center &&
                         shape.data.radius
                     ) {
@@ -2938,7 +2928,7 @@ function FreeMap() {
 
         const newShape = {
             overlay: polygon,
-            type: window.google.maps.drawing.OverlayType.POLYGON,
+            type: 'polygon',
             id: Date.now(),
             data: overlayData,
         };
@@ -3061,7 +3051,7 @@ function FreeMap() {
         );
 
         // Create plant points after drawing area
-        const newPlantPoints = createPlantPoints(map, overlayData, window.google.maps.drawing.OverlayType.POLYGON);
+        const newPlantPoints = createPlantPoints(map, overlayData, 'polygon');
         if (newPlantPoints) {
             newPlantPoints.forEach((p) => {
                 if (p.marker) allPlantPointMarkersRef.current.push(p.marker as google.maps.Marker);
@@ -3120,7 +3110,7 @@ function FreeMap() {
             const recreatedData = { path: pathForRedo };
             const recreatedShape = {
                 overlay: polygon,
-                type: window.google.maps.drawing.OverlayType.POLYGON,
+                type: 'polygon',
                 id: Date.now(),
                 data: recreatedData,
             };
@@ -3139,7 +3129,7 @@ function FreeMap() {
                     setPumpPlacementPoints(placementPoints);
                 }
             });
-            const pts = createPlantPoints(map, recreatedData, window.google.maps.drawing.OverlayType.POLYGON);
+            const pts = createPlantPoints(map, recreatedData, 'polygon');
             if (pts) {
                 pts.forEach((p) => {
                     if (p.marker) allPlantPointMarkersRef.current.push(p.marker as google.maps.Marker);
@@ -3341,7 +3331,7 @@ function FreeMap() {
         },
         shapeType: string
     ): boolean => {
-        if (shapeType === window.google.maps.drawing.OverlayType.RECTANGLE && shapeData.bounds) {
+        if (shapeType === 'rectangle' && shapeData.bounds) {
             const bounds = shapeData.bounds;
             return (
                 point.lat >= bounds.south &&
@@ -3350,13 +3340,13 @@ function FreeMap() {
                 point.lng <= bounds.east
             );
         } else if (
-            shapeType === window.google.maps.drawing.OverlayType.CIRCLE &&
+            shapeType === 'circle' &&
             shapeData.center &&
             shapeData.radius
         ) {
             const distance = getDistanceFromLatLonInMeters(point, shapeData.center);
             return distance <= shapeData.radius;
-        } else if (shapeType === window.google.maps.drawing.OverlayType.POLYGON && shapeData.path) {
+        } else if (shapeType === 'polygon' && shapeData.path) {
             return isPointInPolygon(point, shapeData.path);
         }
         return true;
@@ -3523,15 +3513,15 @@ function FreeMap() {
         if (shapeData && shapeType) {
             // For rectangles, clip to bounds
             if (
-                shapeType === window.google.maps.drawing.OverlayType.RECTANGLE &&
+                shapeType === 'rectangle' &&
                 shapeData.bounds
             ) {
                 hull = clipPolygonToBounds(hull, shapeData.bounds);
             }
             // For polygons and circles, filter points that are outside
             else if (
-                shapeType === window.google.maps.drawing.OverlayType.POLYGON ||
-                shapeType === window.google.maps.drawing.OverlayType.CIRCLE
+                shapeType === 'polygon' ||
+                shapeType === 'circle'
             ) {
                 // Filter hull points to only include those inside the drawn area
                 hull = hull.filter((point) => isPointInDrawnArea(point, shapeData, shapeType));
@@ -3541,7 +3531,7 @@ function FreeMap() {
                     // Get bounds from polygon path if available
                     let bounds = shapeData.bounds;
                     if (
-                        shapeType === window.google.maps.drawing.OverlayType.POLYGON &&
+                        shapeType === 'polygon' &&
                         shapeData.path
                     ) {
                         const lats = shapeData.path.map((p) => p.lat);
@@ -3553,7 +3543,7 @@ function FreeMap() {
                             west: Math.min(...lngs),
                         };
                     } else if (
-                        shapeType === window.google.maps.drawing.OverlayType.CIRCLE &&
+                        shapeType === 'circle' &&
                         shapeData.center &&
                         shapeData.radius
                     ) {
@@ -4131,9 +4121,9 @@ function FreeMap() {
         let originalBounds: { north: number; south: number; east: number; west: number };
 
         // Get bounds from different shape types
-        if (shape.type === window.google.maps.drawing.OverlayType.RECTANGLE && shape.data.bounds) {
+        if (shape.type === 'rectangle' && shape.data.bounds) {
             originalBounds = shape.data.bounds;
-        } else if (shape.type === window.google.maps.drawing.OverlayType.CIRCLE && shape.data.center && shape.data.radius) {
+        } else if (shape.type === 'circle' && shape.data.center && shape.data.radius) {
             // Convert circle to approximate rectangle bounds
             const center = shape.data.center;
             const radius = shape.data.radius / 111000; // Convert meters to degrees (rough approximation)
@@ -4143,7 +4133,7 @@ function FreeMap() {
                 east: center.lng + radius,
                 west: center.lng - radius
             };
-        } else if (shape.type === window.google.maps.drawing.OverlayType.POLYGON && shape.data.path) {
+        } else if (shape.type === 'polygon' && shape.data.path) {
             // Calculate bounds from polygon points
             const path = shape.data.path;
             const lats = path.map(p => p.lat);
