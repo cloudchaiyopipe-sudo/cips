@@ -15,7 +15,7 @@ const getGoogleMapsConfig = () => {
 
     return {
         apiKey,
-        libraries: ['drawing', 'geometry', 'places', 'marker', 'elevation'],
+        libraries: ['geometry', 'places', 'marker', 'elevation'],
         defaultMapOptions: {
             mapTypeId: 'hybrid', // เปลี่ยนจาก 'satellite' เป็น 'hybrid' เพื่อแสดงชื่อสถานที่
             disableDefaultUI: false,
@@ -316,25 +316,18 @@ const renderMap = (status: Status): React.ReactElement => {
         case Status.FAILURE:
             return <MapErrorComponent onRetry={() => window.location.reload()} />;
         case Status.SUCCESS:
-            // ✅ Wait for Places API and Drawing Library before dispatching event
+            // ✅ Wait for Places API before dispatching event
             setTimeout(() => {
                 const waitForAPIs = () => {
                     const hasPlacesAPI = !!(
                         window.google?.maps?.places?.PlacesService &&
                         window.google?.maps?.places?.AutocompleteService
                     );
-                    const hasDrawingLibrary = !!window.google?.maps?.drawing?.DrawingManager;
-                    
+
                     if (hasPlacesAPI) {
                         window.dispatchEvent(new Event('google-maps-loaded'));
                         window.dispatchEvent(new Event('map-ready'));
-                    }
-                    
-                    if (hasDrawingLibrary) {
-                        window.dispatchEvent(new Event('drawing-library-loaded'));
-                    }
-                    
-                    if (!hasPlacesAPI || !hasDrawingLibrary) {
+                    } else {
                         setTimeout(waitForAPIs, 100);
                     }
                 };

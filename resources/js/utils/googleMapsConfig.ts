@@ -40,7 +40,9 @@ export const GOOGLE_MAPS_CONFIG = {
         return apiKey;
     },
 
-    libraries: ['places', 'geometry', 'drawing'] as ('places' | 'geometry' | 'drawing')[],
+    // 'drawing' was removed from the Maps JavaScript API in v3.65 (mid-2026); drawing
+    // interactions are now handled by Terra Draw, see resources/js/utils/terraDrawingManager.ts
+    libraries: ['places', 'geometry'] as ('places' | 'geometry')[],
 
     version: 'weekly',
 

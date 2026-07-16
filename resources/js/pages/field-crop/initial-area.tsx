@@ -6,6 +6,7 @@ import HorticultureMapComponent from '../../components/horticulture/Horticulture
 import HorticultureDrawingManager from '../../components/horticulture/HorticultureDrawingManager';
 import EnhancedHorticultureSearchControl from '../../components/horticulture/HorticultureSearchControl';
 import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMeasurementOverlay';
+import { TerraDrawingManager, OverlayType } from '../../utils/terraDrawingManager';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 import {
@@ -212,8 +213,7 @@ export default function InitialArea(props: FieldCropPageProps) {
 
     // Drawing States
     const [isDrawing, setIsDrawing] = useState<boolean>(false);
-    const [drawingManagerRef, setDrawingManagerRef] =
-        useState<google.maps.drawing.DrawingManager | null>(null);
+    const [drawingManagerRef, setDrawingManagerRef] = useState<TerraDrawingManager | null>(null);
     const [drawnPolygon, setDrawnPolygon] = useState<google.maps.Polygon | null>(null);
 
     // Plant and Obstacle States
@@ -262,7 +262,7 @@ export default function InitialArea(props: FieldCropPageProps) {
     const distanceOverlaysByObstacleRef = useRef<
         Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>
     >({});
-    const drawingManagerObjRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+    const drawingManagerObjRef = useRef<TerraDrawingManager | null>(null);
 
     // Refs for race condition prevention and cleanup
     const currentGenerationIdRef = useRef<number>(0);
@@ -1382,10 +1382,10 @@ export default function InitialArea(props: FieldCropPageProps) {
 
             const drawingMode =
                 shapeType === 'rectangle'
-                    ? google.maps.drawing.OverlayType.RECTANGLE
+                    ? OverlayType.RECTANGLE
                     : shapeType === 'circle'
-                      ? google.maps.drawing.OverlayType.CIRCLE
-                      : google.maps.drawing.OverlayType.POLYGON;
+                      ? OverlayType.CIRCLE
+                      : OverlayType.POLYGON;
 
             drawingManagerRef.setOptions({
                 polygonOptions: {
@@ -2044,12 +2044,12 @@ export default function InitialArea(props: FieldCropPageProps) {
             })
         );
 
-        if (!window.google?.maps?.drawing) {
+        if (!window.google?.maps) {
             alert(t('Drawing tools could not be loaded. Please refresh the page.'));
             return;
         }
 
-        const drawingManager = new google.maps.drawing.DrawingManager({
+        const drawingManager = new TerraDrawingManager({
             drawingMode: null,
             drawingControl: false,
             polygonOptions: {
@@ -2445,10 +2445,10 @@ export default function InitialArea(props: FieldCropPageProps) {
 
         const drawingMode =
             shapeType === 'rectangle'
-                ? google.maps.drawing.OverlayType.RECTANGLE
+                ? OverlayType.RECTANGLE
                 : shapeType === 'circle'
-                  ? google.maps.drawing.OverlayType.CIRCLE
-                  : google.maps.drawing.OverlayType.POLYGON;
+                  ? OverlayType.CIRCLE
+                  : OverlayType.POLYGON;
 
         drawingManagerRef.setDrawingMode(drawingMode);
     };

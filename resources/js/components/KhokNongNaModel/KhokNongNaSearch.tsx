@@ -87,7 +87,7 @@ const KhokNongNaSearch: React.FC<KhokNongNaSearchProps> = ({
             // Create and load the script
             const script = document.createElement('script');
             script.id = '__googleMapsScriptId';
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&libraries=places,drawing,geometry,marker,elevation`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&libraries=places,geometry,marker,elevation`;
             script.async = true;
             script.defer = true;
             script.onload = () => {
